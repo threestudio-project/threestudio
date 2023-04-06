@@ -37,7 +37,7 @@ class BaseModule(nn.Module, Updateable):
     class Config:
         configure_at_runtime: bool = False
 
-    cfg: Config
+    cfg: Config # add this to every subclass of BaseModule to enable static type checking
 
     def __init__(self, cfg: Optional[Union[dict, DictConfig]] = None, *args, **kwargs) -> None:
         super().__init__()
