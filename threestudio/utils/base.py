@@ -20,12 +20,14 @@ class Configurable:
 class Updateable:
     def do_update_step(self, epoch: int, global_step: int):
         for attr in self.__dir__():
+            if attr.startswith('_'):
+                continue
             try:
-                attr = getattr(self, attr)
+                module = getattr(self, attr)
             except:
                 continue # ignore attributes like property, which can't be retrived using getattr?
-            if isinstance(attr, Updateable):
-                attr.do_update_step(epoch, global_step)
+            if isinstance(module, Updateable):
+                module.do_update_step(epoch, global_step)
         self.update_step(epoch, global_step)
 
     def update_step(self, epoch: int, global_step: int):

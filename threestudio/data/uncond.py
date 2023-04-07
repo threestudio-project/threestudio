@@ -101,6 +101,7 @@ class RandomCameraIterableDataset(IterableDataset):
         directions: Float[Tensor, "B H W 3"] = self.directions_unit_focal[None,:,:,:].repeat(self.cfg.batch_size, 1, 1, 1)
         directions[:,:,:,:2] = directions[:,:,:,:2] / focal_length[:,None,None,None]
 
+        # Importance note: the returned rays_d MUST be normalized!
         rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
         
         proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(fov, 0.1, 100.) # FIXME: hard-coded near and far

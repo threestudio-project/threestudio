@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
+
+import torch
+
 import threestudio
 from threestudio.systems.base import BaseSystem
 from threestudio.utils.typing import *
-from threestudio.utils.ops import dot
+from threestudio.utils.ops import dot, binary_cross_entropy
 
 @threestudio.register("dreamfusion-system")
 class DreamFusion(BaseSystem):
@@ -56,13 +59,24 @@ class DreamFusion(BaseSystem):
         self.log('train/loss_sds', loss_sds)
         loss += loss_sds * self.C(self.cfg.loss.lambda_sds)
 
-        loss_orient = (out['weights'].detach() * dot(out['normal'], out['t_dirs']).clamp_min(0.)**2).sum() / (out['opacity'] > 0).sum()
-        self.log('train/loss_orient', loss_orient)
-        loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
+        if self.C(self.cfg.loss.lambda_orient) > 0:
+            if 'normal' not in out:
+                raise ValueError("Normal is required for orientation loss, no normal is found in the output.")
+            loss_orient = (out['weights'].detach() * dot(out['normal'], out['t_dirs']).clamp_min(0.)**2).sum() / (out['opacity'] > 0).sum()
+            self.log('train/loss_orient', loss_orient)
+            loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
-        loss_opacity = (out['opacity']**2 + 0.01).sqrt().mean()
-        self.log('train/loss_opacity', loss_opacity)
-        loss += loss_opacity * self.C(self.cfg.loss.lambda_opacity)
+        loss_sparsity = (out['opacity']**2 + 0.01).sqrt().mean()
+        self.log('train/loss_sparsity', loss_sparsity)
+        loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
+
+        opacity_clamped = out['opacity'].clamp(1.e-3, 1.-1.e-3)
+        loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
+        self.log('train/loss_opaque', loss_opaque)
+        loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+
+        for name, value in self.cfg.loss.items():
+            self.log(f'train_params/{name}', self.C(value))
 
         return {
             'loss': loss
@@ -72,8 +86,9 @@ class DreamFusion(BaseSystem):
         out = self(batch)
         self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", [
             {'type': 'rgb', 'img': out['comp_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
-            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (-1, 1)}},
-            {'type': 'rgb', 'img': out['comp_pred_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (-1, 1)}},
+        ] + ([
+            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
+        ] if 'comp_normal' in out else []) + [
             {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
         ])
     
@@ -84,8 +99,9 @@ class DreamFusion(BaseSystem):
         out = self(batch)
         self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", [
             {'type': 'rgb', 'img': out['comp_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
-            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (-1, 1)}},
-            {'type': 'rgb', 'img': out['comp_pred_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (-1, 1)}},
+        ] + ([
+            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
+        ] if 'comp_normal' in out else []) + [
             {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
         ])
 

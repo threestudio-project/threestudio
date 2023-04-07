@@ -215,3 +215,10 @@ def get_mvp_matrix(c2w: Float[Tensor, "B 3 4"], proj_mtx: Float[Tensor, "B 4 4"]
     # calculate mvp matrix by proj_mtx @ w2c (mv_mtx)
     mvp_mtx = proj_mtx @ w2c
     return mvp_mtx   
+
+
+def binary_cross_entropy(input, target):
+    """
+    F.binary_cross_entropy is not numerically stable in mixed-precision training.
+    """
+    return -(target * torch.log(input) + (1 - target) * torch.log(1 - input)).mean()

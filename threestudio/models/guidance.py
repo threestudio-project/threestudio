@@ -127,6 +127,7 @@ class StableDiffusionGuidance(BaseModule):
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents, grad)
+
         return {
             'sds': loss
         }

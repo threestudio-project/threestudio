@@ -29,8 +29,8 @@ def main() -> None:
     from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
     from pytorch_lightning.loggers import TensorBoardLogger, CSVLogger
 
-    from typeguard import install_import_hook
-    install_import_hook(['threestudio'])
+    # from typeguard import install_import_hook
+    # install_import_hook(['threestudio'])
     import threestudio
 
     from threestudio.utils.config import ExperimentConfig, load_config
@@ -72,6 +72,7 @@ def main() -> None:
     trainer = Trainer(
         callbacks=callbacks,
         logger=loggers,
+        inference_mode=False,
         **cfg.trainer
     )
 

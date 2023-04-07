@@ -37,7 +37,7 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
         return self._grid_vertices
 
     def forward(self, level: Float[Tensor, "N3 1"], threshold: float):
-        level = level.float().view(self.resolution, self.resolution, self.resolution)
+        level = level.view(self.resolution, self.resolution, self.resolution)
         v_pos, t_pos_idx = self.mc_func(-level.numpy(), threshold)  # transform to numpy
         v_pos, t_pos_idx = (
             torch.from_numpy(v_pos).float(),

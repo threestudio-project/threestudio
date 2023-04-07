@@ -40,6 +40,18 @@ class ProgressiveBandFrequency(nn.Module, Updateable):
             rank_zero_debug(f'Update mask: {global_step}/{self.n_masking_step} {self.mask}')
 
 
+class TCNNEncoding(nn.Module):
+    def __init__(self, in_channels, config, dtype=torch.float32) -> None:
+        super().__init__()
+        self.n_input_dims = in_channels
+        with torch.cuda.device(get_rank()):
+            self.encoding = tcnn.Encoding(in_channels, config, dtype=dtype)
+        self.n_output_dims = self.encoding.n_output_dims
+    
+    def forward(self, x):
+        return self.encoding(x)
+
+
 class ProgressiveBandHashGrid(nn.Module, Updateable):
     def __init__(self, in_channels, config):
         super().__init__()
@@ -47,8 +59,7 @@ class ProgressiveBandHashGrid(nn.Module, Updateable):
         encoding_config = config.copy()
         encoding_config['otype'] = 'Grid'
         encoding_config['type'] = 'Hash'
-        with torch.cuda.device(get_rank()):
-            self.encoding = tcnn.Encoding(in_channels, encoding_config)
+        self.encoding = TCNNEncoding(in_channels, encoding_config)
         self.n_output_dims = self.encoding.n_output_dims
         self.n_level = config['n_levels']
         self.n_features_per_level = config['n_features_per_level']
@@ -88,8 +99,7 @@ def get_encoding(n_input_dims: int, config) -> nn.Module:
     elif config.otype == 'ProgressiveBandHashGrid':
         encoding = ProgressiveBandHashGrid(n_input_dims, config_to_primitive(config))
     else:
-        with torch.cuda.device(get_rank()):
-            encoding = tcnn.Encoding(n_input_dims, config_to_primitive(config))
+        encoding = TCNNEncoding(n_input_dims, config_to_primitive(config))
     encoding = CompositeEncoding(encoding, include_xyz=config.get('include_xyz', False), xyz_scale=2., xyz_offset=-1.) # FIXME: hard coded
     return encoding
 
@@ -108,12 +118,12 @@ class VanillaMLP(nn.Module):
         self.output_activation = get_activation(config.get('output_activation', None))
     
     def forward(self, x):
-        x = self.layers(x.float()) # FIXME: precision
+        x = self.layers(x)
         x = self.output_activation(x)
         return x
     
     def make_linear(self, dim_in, dim_out, is_first, is_last):
-        layer = nn.Linear(dim_in, dim_out, bias=True) # network without bias will degrade quality
+        layer = nn.Linear(dim_in, dim_out, bias=True)
         if self.sphere_init:
             if is_last:
                 torch.nn.init.constant_(layer.bias, -self.sphere_init_radius)
@@ -140,13 +150,23 @@ class VanillaMLP(nn.Module):
             return nn.ReLU(inplace=True)
 
 
+class TCNNNetwork(nn.Module):
+    def __init__(self, dim_in: int, dim_out: int, config: dict) -> None:
+        super().__init__()
+        with torch.cuda.device(get_rank()):
+            self.network = tcnn.Network(dim_in, dim_out, config)
+    
+    def forward(self, x):
+        return self.network(x).float() # transform to float32
+
+
 def get_mlp(n_input_dims, n_output_dims, config) -> nn.Module:
+    network: nn.Module
     if config.otype == 'VanillaMLP':
         network = VanillaMLP(n_input_dims, n_output_dims, config_to_primitive(config))
     else:
         assert config.get('sphere_init', False) is False, 'sphere_init=True only supported by VanillaMLP'
-        with torch.cuda.device(get_rank()):
-            network = tcnn.Network(n_input_dims, n_output_dims, config_to_primitive(config))
+        network = TCNNNetwork(n_input_dims, n_output_dims, config_to_primitive(config))
     return network
 
 
@@ -159,19 +179,34 @@ class NetworkWithInputEncoding(nn.Module, Updateable):
         return self.network(self.encoding(x))
 
 
+class TCNNNetworkWithInputEncoding(nn.Module):
+    def __init__(self, n_input_dims: int, n_output_dims: int, encoding_config: dict, network_config: dict) -> None:
+        super().__init__()
+        with torch.cuda.device(get_rank()):
+            self.network_with_input_encoding = tcnn.NetworkWithInputEncoding(
+                n_input_dims=n_input_dims,
+                n_output_dims=n_output_dims,
+                encoding_config=encoding_config,
+                network_config=network_config
+            )
+    
+    def forward(self, x):
+        return self.network_with_input_encoding(x).float() # transform to float32
+
+
 def create_network_with_input_encoding(n_input_dims: int, n_output_dims: int, encoding_config, network_config) -> nn.Module:
     # input suppose to be range [0, 1]
+    network_with_input_encoding: nn.Module
     if encoding_config.otype in ['VanillaFrequency', 'ProgressiveBandHashGrid'] \
         or network_config.otype in ['VanillaMLP']:
         encoding = get_encoding(n_input_dims, encoding_config)
         network = get_mlp(encoding.n_output_dims, n_output_dims, network_config)
         network_with_input_encoding = NetworkWithInputEncoding(encoding, network)
     else:
-        with torch.cuda.device(get_rank()):
-            network_with_input_encoding = tcnn.NetworkWithInputEncoding(
-                n_input_dims=n_input_dims,
-                n_output_dims=n_output_dims,
-                encoding_config=config_to_primitive(encoding_config),
-                network_config=config_to_primitive(network_config)
-            )
+        network_with_input_encoding = TCNNNetworkWithInputEncoding(
+            n_input_dims=n_input_dims,
+            n_output_dims=n_output_dims,
+            encoding_config=config_to_primitive(encoding_config),
+            network_config=config_to_primitive(network_config)
+        )
     return network_with_input_encoding

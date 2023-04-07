@@ -17,6 +17,7 @@ class BaseMaterial(BaseModule):
         pass
 
     cfg: Config
+    requires_normal: bool = False
 
     def configure(self):
         pass
@@ -54,8 +55,34 @@ class NeuralRadianceMaterial(BaseMaterial):
         viewdirs = (viewdirs + 1.) / 2. # (-1, 1) => (0, 1)
         viewdirs_embd = self.encoding(viewdirs.view(-1, 3))
         network_inp = torch.cat([features.view(-1, features.shape[-1]), viewdirs_embd], dim=-1)
-        color = self.network(network_inp).view(*features.shape[:-1], 3).float()
+        color = self.network(network_inp).view(*features.shape[:-1], 3)
         color = get_activation(self.cfg.color_activation)(color)
+        return color
+
+
+@threestudio.register('no-material')
+class NoMaterial(BaseMaterial):
+    @dataclass
+    class Config(BaseMaterial.Config):
+        color_activation: str = 'sigmoid'
+        input_feature_dims: Optional[int] = None
+        mlp_network_config: Optional[dict] = None
+
+    cfg: Config
+
+    def configure(self) -> None:
+        self.use_network = False
+        if self.cfg.input_feature_dims is not None and self.cfg.mlp_network_config is not None:
+            self.network = get_mlp(self.cfg.input_feature_dims, 3, self.cfg.mlp_network_config)
+            self.use_network = True
+
+    @typechecker
+    def forward(self, features: Float[Tensor, "B ... Nf"], **kwargs) -> Float[Tensor, "B ... 3"]:
+        if not self.use_network:
+            color = get_activation(self.cfg.color_activation)(features[..., :3])
+        else:
+            color = self.network(features.view(-1, features.shape[-1])).view(*features.shape[:-1], 3)
+            color = get_activation(self.cfg.color_activation)(color)
         return color
 
 
@@ -71,6 +98,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         albedo_activation: str = 'sigmoid'
 
     cfg: Config
+    requires_normal: bool = True
 
     def configure(self) -> None:
         self.ambient_light_color: Float[Tensor, "3"]
@@ -79,15 +107,17 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         self.register_buffer('diffuse_light_color', torch.as_tensor(self.cfg.diffuse_light_color, dtype=torch.float32))
         self.ambient_only = False
 
-    @typechecker
     def forward(self, features: Float[Tensor, "B ... Nf"], positions: Float[Tensor, "B ... 3"], shading_normal: Float[Tensor, "B ... 3"], light_positions: Float[Tensor, "B ... 3"], **kwargs) -> Float[Tensor, "B ... 3"]:
         albedo = get_activation(self.cfg.albedo_activation)(features[..., :3])
         if self.ambient_only:
             return albedo
         light_directions: Float[Tensor, "B ... 3"] = F.normalize(light_positions - positions, dim=-1)
-        diffuse_light: Float[Tensor, "B ... 3"] = dot(shading_normal, light_directions).clamp(min=0.) * self.ambient_light_color
+        diffuse_light: Float[Tensor, "B ... 3"] = dot(shading_normal, light_directions).clamp(min=0.) * self.diffuse_light_color
         textureless_color = diffuse_light + self.ambient_light_color
         color = albedo * textureless_color
+
+        if not self.training:
+            return color
 
         # adopt the same type of augmentation for the whole batch
         if torch.rand([]) > self.cfg.diffuse_prob:

@@ -1,4 +1,4 @@
-name: "dreamfusion"
+name: "dreamfusion-wonormal"
 tag: "debug"
 exp_root_dir: "outputs"
 seed: 0
@@ -9,11 +9,9 @@ system_type: "dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    normal_type: "finite_difference"
+    normal_type: null
 
-  material_type: "diffuse-with-point-light-material"
-  material:
-    ambient_only_steps: 1000
+  material_type: "no-material"
   
   background_type: "solid-color-background"
 

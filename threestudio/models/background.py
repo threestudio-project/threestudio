@@ -66,6 +66,6 @@ class NeuralEnvironmentMapBackground(BaseBackground):
         # viewdirs must be normalized before passing to this function
         dirs = (dirs + 1.) / 2.  # (-1, 1) => (0, 1)
         dirs_embd = self.encoding(dirs.view(-1, 3))
-        color = self.network(dirs_embd).view(*dirs.shape[:-1], 3).float()
+        color = self.network(dirs_embd).view(*dirs.shape[:-1], 3)
         color = get_activation(self.cfg.color_activation)(color)
         return color
