@@ -4,8 +4,9 @@
 - `pip install -r requirements-dev.txt` for linters and formatters, and set the default linter in vscode to mypy
 
 ## Known Problems
-- Saved images may be broken at the last training step and test steps after training. Testing using resumed checkpoints work fine.
 - Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
+- Gradients of Vanilla MLP parameters are empty if autocast is enabled in AMP (temporarily fixed by disabling autocast).
+- FullyFused MLP causes NaNs both in mixed-precision and 32 precision. Gradient clipping does not solve the issue.
 
 ## Structure
 - All methods should be implemented as a subclass of `BaseSystem` (in `systems/base.py`). For the DreamFusion system, there're 6 modules: geometry, material, background, renderer, guidance, prompt_processor. All modules are subclass of `BaseModule` (in `utils/base.py`).
