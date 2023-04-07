@@ -31,6 +31,7 @@ class DreamFusion(BaseSystem):
         self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
         self.background = threestudio.find(self.cfg.background_type)(self.cfg.background)
         self.renderer = threestudio.find(self.cfg.renderer_type)(self.cfg.renderer, geometry=self.geometry, material=self.material, background=self.background)
+        self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -49,15 +50,14 @@ class DreamFusion(BaseSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(self.cfg.prompt_processor)
 
     def training_step(self, batch, batch_idx):
+        opt = self.optimizers()
+        opt.zero_grad()
+
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
-        guidance_out = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=False) 
+        _ = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=False) 
 
         loss = 0.
-
-        loss_sds = guidance_out['sds']
-        self.log('train/loss_sds', loss_sds)
-        loss += loss_sds * self.C(self.cfg.loss.lambda_sds)
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
             if 'normal' not in out:
@@ -78,9 +78,10 @@ class DreamFusion(BaseSystem):
         for name, value in self.cfg.loss.items():
             self.log(f'train_params/{name}', self.C(value))
 
-        return {
-            'loss': loss
-        }
+        self.manual_backward(loss)
+        opt.step()
+        sch = self.lr_schedulers()
+        sch.step()
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
@@ -119,3 +120,12 @@ class DreamFusion(BaseSystem):
         # TODO: better way?
         checkpoint['state_dict'] = {k: v for k, v in checkpoint['state_dict'].items() if k.split('.')[0] not in ['prompt_processor', 'guidance']}
         return super().on_save_checkpoint(checkpoint)
+
+    def on_before_optimizer_step(self, optimizer):
+        # Compute the 2-norm for each layer
+        # If using mixed precision, the gradients are already unscaled here
+        # debug use
+        pass
+        # from lightning.pytorch.utilities import grad_norm
+        # norms = grad_norm(self.geometry, norm_type=2)
+        # print(norms)

@@ -33,7 +33,7 @@ class SpecifyGradient(torch.autograd.Function):
     @custom_bwd
     def backward(ctx, grad_scale):
         (gt_grad,) = ctx.saved_tensors
-        gt_grad = gt_grad * grad_scale
+        # gt_grad = gt_grad * grad_scale
         return gt_grad, None
 
 
@@ -123,14 +123,12 @@ class StableDiffusionGuidance(BaseModule):
         # clip grad for stable training?
         if self.cfg.grad_clip is not None:
             grad = grad.clamp(-self.cfg.grad_clip, self.cfg.grad_clip)
-        grad = torch.nan_to_num(grad)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)
+        # loss = SpecifyGradient.apply(latents, grad)
+        latents.backward(grad, retain_graph=True)
 
-        return {
-            'sds': loss
-        }
+        return {}
     
     def encode_images(self, imgs: Float[Tensor, "B 3 512 512"]) -> Float[Tensor, "B 4 64 64"]:
         imgs = 2 * imgs - 1

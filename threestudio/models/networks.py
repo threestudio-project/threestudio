@@ -118,8 +118,11 @@ class VanillaMLP(nn.Module):
         self.output_activation = get_activation(config.get('output_activation', None))
     
     def forward(self, x):
-        x = self.layers(x)
-        x = self.output_activation(x)
+        # disable autocast
+        # strange that the parameters will have empty gradients if autocast is enabled in AMP
+        with torch.cuda.amp.autocast(enabled=False):
+            x = self.layers(x)
+            x = self.output_activation(x)
         return x
     
     def make_linear(self, dim_in, dim_out, is_first, is_last):

@@ -128,7 +128,7 @@ class ImplicitVolume(BaseImplicitGeometry):
             "per_level_scale": 1.447269237440378
         })
         mlp_network_config: dict = field(default_factory=lambda: {
-            "otype": "FullyFusedMLP",
+            "otype": "VanillaMLP",
             "activation": "ReLU",
             "output_activation": "none",
             "n_neurons": 64,
