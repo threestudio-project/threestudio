@@ -28,22 +28,24 @@ class BaseBackground(BaseModule):
 class SolidColorBackground(BaseBackground):
     @dataclass
     class Config(BaseBackground.Config):
-        color: Tuple[float, float, float] = (1., 1., 1.)
+        n_output_dims: int = 3
+        color: Tuple = (1., 1., 1.)
 
     cfg: Config
 
     def configure(self) -> None:
-        self.env_color: Float[Tensor, "3"]
+        self.env_color: Float[Tensor, "Nc"]
         self.register_buffer('env_color', torch.as_tensor(self.cfg.color, dtype=torch.float32))
 
-    def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B 3"]:
-        return torch.ones_like(dirs) * self.env_color
+    def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B Nc"]:
+        return torch.ones(*dirs.shape[:-1], self.cfg.n_output_dims).to(dirs) * self.env_color
 
 
 @threestudio.register("neural-environment-map-background")
 class NeuralEnvironmentMapBackground(BaseBackground):
     @dataclass
     class Config(BaseBackground.Config):
+        n_output_dims: int = 3
         color_activation: str = 'sigmoid'
         dir_encoding_config: dict = field(default_factory=lambda: {
             "otype": "SphericalHarmonics",
@@ -60,12 +62,12 @@ class NeuralEnvironmentMapBackground(BaseBackground):
 
     def configure(self) -> None:
         self.encoding = get_encoding(3, self.cfg.dir_encoding_config)
-        self.network = get_mlp(self.encoding.n_output_dims, 3, self.cfg.mlp_network_config)
+        self.network = get_mlp(self.encoding.n_output_dims, self.cfg.n_output_dims, self.cfg.mlp_network_config)
 
     def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B 3"]:
         # viewdirs must be normalized before passing to this function
         dirs = (dirs + 1.) / 2.  # (-1, 1) => (0, 1)
         dirs_embd = self.encoding(dirs.view(-1, 3))
-        color = self.network(dirs_embd).view(*dirs.shape[:-1], 3)
+        color = self.network(dirs_embd).view(*dirs.shape[:-1], self.cfg.n_output_dims)
         color = get_activation(self.cfg.color_activation)(color)
         return color

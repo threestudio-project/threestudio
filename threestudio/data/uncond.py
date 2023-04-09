@@ -26,6 +26,7 @@ class RandomCameraDataModuleConfig:
     eval_height: int = 512
     eval_width: int = 512
     batch_size: int = 1
+    eval_batch_size: int = 1
     elevation_range: Tuple[float, float] = (-10, 90)
     azimuth_range: Tuple[float, float] = (-180, 180)
     camera_distance_range: Tuple[float, float] = (1, 1.5)
@@ -147,7 +148,7 @@ class RandomCameraDataset(Dataset):
         # default scene center at origin
         center: Float[Tensor, "B 3"] = torch.zeros_like(camera_positions)
         # default camera up direction as +z
-        up: Float[Tensor, "B 3"] = torch.as_tensor([0, 0, 1], dtype=torch.float32)[None,:].repeat(self.cfg.batch_size, 1)
+        up: Float[Tensor, "B 3"] = torch.as_tensor([0, 0, 1], dtype=torch.float32)[None,:].repeat(self.cfg.eval_batch_size, 1)
 
         # sample fovs from a uniform distribution bounded by fov_range
         fov_deg: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.fov_range[0] + self.cfg.fov_range[1]) / 2)

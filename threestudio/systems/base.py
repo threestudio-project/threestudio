@@ -21,9 +21,6 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     
     def configure(self, *args, **kwargs) -> None:
         pass
-
-    def forward(self, batch):
-        raise NotImplementedError
     
     def C(self, value):
         if isinstance(value, int) or isinstance(value, float):

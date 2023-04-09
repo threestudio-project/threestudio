@@ -56,9 +56,9 @@ class NeRFVolumeRenderer(VolumeRenderer):
 
     def forward(self, rays_o: Float[Tensor, "B H W 3"], rays_d: Float[Tensor, "B H W 3"], light_positions: Float[Tensor, "B 3"], **kwargs) -> Dict[str, Float[Tensor, "..."]]:
         batch_size, height, width = rays_o.shape[:3]
-        rays_o_flatten: Float[Tensor, "Nr 3"] = rays_o.view(-1, 3)
-        rays_d_flatten: Float[Tensor, "Nr 3"] = rays_d.view(-1, 3)
-        light_positions_flatten: Float[Tensor, "Nr 3"] = light_positions.view(-1, 1, 1, 3).expand(-1, height, width, -1).view(-1, 3)
+        rays_o_flatten: Float[Tensor, "Nr 3"] = rays_o.reshape(-1, 3)
+        rays_d_flatten: Float[Tensor, "Nr 3"] = rays_d.reshape(-1, 3)
+        light_positions_flatten: Float[Tensor, "Nr 3"] = light_positions.reshape(-1, 1, 1, 3).expand(-1, height, width, -1).reshape(-1, 3)
         n_rays = rays_o_flatten.shape[0]
 
         def sigma_fn(t_starts, t_ends, ray_indices):
@@ -98,13 +98,13 @@ class NeRFVolumeRenderer(VolumeRenderer):
         weights = weights_[...,None]
         opacity: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(weights[...,0], values=None, ray_indices=ray_indices, n_rays=n_rays)
         depth: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(weights[...,0], values=t_positions, ray_indices=ray_indices, n_rays=n_rays)
-        comp_rgb_fg: Float[Tensor, "Nr 3"] = nerfacc.accumulate_along_rays(weights[...,0], values=rgb_fg_all, ray_indices=ray_indices, n_rays=n_rays)
+        comp_rgb_fg: Float[Tensor, "Nr Nc"] = nerfacc.accumulate_along_rays(weights[...,0], values=rgb_fg_all, ray_indices=ray_indices, n_rays=n_rays)
         comp_rgb = comp_rgb_fg + comp_rgb_bg * (1.0 - opacity)    
 
         out = {
-            'comp_rgb': comp_rgb.view(batch_size, height, width, 3),
-            'comp_rgb_fg': comp_rgb_fg.view(batch_size, height, width, 3),
-            'comp_rgb_bg': comp_rgb_bg.view(batch_size, height, width, 3),
+            'comp_rgb': comp_rgb.view(batch_size, height, width, -1),
+            'comp_rgb_fg': comp_rgb_fg.view(batch_size, height, width, -1),
+            'comp_rgb_bg': comp_rgb_bg.view(batch_size, height, width, -1),
             'opacity': opacity.view(batch_size, height, width, 1),
             'depth': depth.view(batch_size, height, width, 1)
         }

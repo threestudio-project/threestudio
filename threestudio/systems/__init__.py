@@ -1,1 +1,1 @@
-from . import dreamfusion
+from . import dreamfusion, latentnerf
