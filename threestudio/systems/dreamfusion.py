@@ -31,7 +31,7 @@ class DreamFusion(BaseSystem):
         self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
         self.background = threestudio.find(self.cfg.background_type)(self.cfg.background)
         self.renderer = threestudio.find(self.cfg.renderer_type)(self.cfg.renderer, geometry=self.geometry, material=self.material, background=self.background)
-        self.automatic_optimization = False
+        # self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -50,14 +50,16 @@ class DreamFusion(BaseSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(self.cfg.prompt_processor)
 
     def training_step(self, batch, batch_idx):
-        opt = self.optimizers()
-        opt.zero_grad()
+        # opt = self.optimizers()
+        # opt.zero_grad()
 
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
-        _ = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=False) 
+        guidance_out = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=False) 
 
         loss = 0.
+
+        loss += guidance_out['sds'] * self.C(self.cfg.loss.lambda_sds)
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
             if 'normal' not in out:
@@ -78,10 +80,13 @@ class DreamFusion(BaseSystem):
         for name, value in self.cfg.loss.items():
             self.log(f'train_params/{name}', self.C(value))
 
-        self.manual_backward(loss)
-        opt.step()
-        sch = self.lr_schedulers()
-        sch.step()
+        return {
+            'loss': loss
+        }
+        # self.manual_backward(loss)
+        # opt.step()
+        # sch = self.lr_schedulers()
+        # sch.step()
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)

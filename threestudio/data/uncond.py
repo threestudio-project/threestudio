@@ -215,7 +215,7 @@ class RandomCameraDataModule(pl.LightningDataModule):
     def general_loader(self, dataset, batch_size, collate_fn=None) -> DataLoader:
         return DataLoader(
             dataset, 
-            num_workers=os.cpu_count(), # type: ignore
+            num_workers=1, # type: ignore
             batch_size=batch_size,
             collate_fn=collate_fn
         )

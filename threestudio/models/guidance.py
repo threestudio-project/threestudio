@@ -33,7 +33,7 @@ class SpecifyGradient(torch.autograd.Function):
     @custom_bwd
     def backward(ctx, grad_scale):
         (gt_grad,) = ctx.saved_tensors
-        # gt_grad = gt_grad * grad_scale
+        gt_grad = gt_grad * grad_scale
         return gt_grad, None
 
 
@@ -66,7 +66,7 @@ class StableDiffusionGuidance(BaseModule):
             self.unet.enable_xformers_memory_efficient_attention()
 
         self.scheduler = DDIMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path, subfolder="scheduler"
+            self.cfg.pretrained_model_name_or_path, subfolder="scheduler", torch_dtype=weights_dtype
         )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
@@ -120,15 +120,18 @@ class StableDiffusionGuidance(BaseModule):
         # w = self.alphas[t] ** 0.5 * (1 - self.alphas[t])
         grad = w * (noise_pred - noise)
 
+        grad = torch.nan_to_num(grad)
         # clip grad for stable training?
         if self.cfg.grad_clip is not None:
             grad = grad.clamp(-self.cfg.grad_clip, self.cfg.grad_clip)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        # loss = SpecifyGradient.apply(latents, grad)
-        latents.backward(grad, retain_graph=True)
+        loss = SpecifyGradient.apply(latents, grad)
+        # latents.backward(grad, retain_graph=True)
 
-        return {}
+        return {
+            'sds': loss
+        }
     
     def encode_images(self, imgs: Float[Tensor, "B 3 512 512"]) -> Float[Tensor, "B 4 64 64"]:
         imgs = 2 * imgs - 1

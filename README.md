@@ -1,12 +1,17 @@
 ## Setup
 - Python >= 3.8
+- PyTorch >= 1.12 (PyTorch 2.0 not tested)
 - `pip install -r requirements.txt` (change torch source url and version accroding to your CUDA version, requires torch>=1.12)
 - `pip install -r requirements-dev.txt` for linters and formatters, and set the default linter in vscode to mypy
 
 ## Known Problems
 - Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
 - Gradients of Vanilla MLP parameters are empty if autocast is enabled in AMP (temporarily fixed by disabling autocast).
-- FullyFused MLP causes NaNs both in mixed-precision and 32 precision. Gradient clipping does not solve the issue.
+- FullyFused MLP causes NaNs in 32 precision. Aggressive gradient clipping could solve the issue (e.g., `system.guidance.grad_clip=0.1`).
+
+## Precision
+- mixed precision training: `trainer.precision=16-mixed`; `system.guidance.half_precision_weights=true`; either `VanillaMLP` and `FullyFusedMLP` can be used.
+- float32 precision training: `trainer.precision=32`; `system.guidance.half_precision_weights=false`; only `VanillaMLP` can be used.
 
 ## Structure
 - All methods should be implemented as a subclass of `BaseSystem` (in `systems/base.py`). For the DreamFusion system, there're 6 modules: geometry, material, background, renderer, guidance, prompt_processor. All modules are subclass of `BaseModule` (in `utils/base.py`).

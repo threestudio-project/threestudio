@@ -10,6 +10,12 @@ system:
   geometry_type: "implicit-volume"
   geometry:
     normal_type: null
+    mlp_network_config:
+      otype: "VanillaMLP"
+      activation: "ReLU"
+      output_activation: "none"
+      n_neurons: 64
+      n_hidden_layers: 1
 
   material_type: "no-material"
   
@@ -30,7 +36,7 @@ system:
     grad_clip: null
   
   loss:
-    # lambda_sds: 1.
+    lambda_sds: 1.
     lambda_orient: 0.0
     lambda_sparsity: 0.0
     lambda_opaque: 0.0
