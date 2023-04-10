@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from threestudio.utils.config import parse_structured
-from threestudio.utils.misc import get_device
+from threestudio.utils.misc import get_device, load_module_weights
 
 
 class Configurable:
@@ -38,6 +38,7 @@ class BaseModule(nn.Module, Updateable):
     @dataclass
     class Config:
         configure_at_runtime: bool = False
+        weights: Optional[str] = None
 
     cfg: Config # add this to every subclass of BaseModule to enable static type checking
 
@@ -49,6 +50,10 @@ class BaseModule(nn.Module, Updateable):
         if not self.cfg.configure_at_runtime:
             self.configure(*args, **kwargs)
             self.ready = True
+        if self.cfg.weights is not None:
+            # format: path/to/weights:module_name
+            weights_path, module_name = self.cfg.weights.split(':')
+            self.load_state_dict(load_module_weights(weights_path, module_name=module_name, map_location='cpu'))
     
     def configure(self, *args, **kwargs) -> None:
         pass

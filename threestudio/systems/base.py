@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 import pytorch_lightning as pl
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
@@ -5,6 +6,7 @@ from threestudio.utils.config import parse_structured, config_to_primitive
 from threestudio.utils.base import Updateable
 from threestudio.utils.saving import SaverMixin
 from threestudio.utils.typing import *
+from threestudio.utils.misc import load_module_weights
 
 class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     @dataclass
@@ -12,12 +14,16 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         loss: dict = field(default_factory=dict)
         optimizer: dict = field(default_factory=dict)
         scheduler: Optional[dict] = None
+        weights: Optional[str] = None
+        weights_ignore_modules: Optional[List[str]] = None
 
     def __init__(self, cfg) -> None:
         super().__init__()
         self.cfg = parse_structured(self.Config, cfg)
         self._save_dir: Optional[str] = None
         self.configure()
+        if self.cfg.weights is not None:
+            self.load_state_dict(load_module_weights(self.cfg.weights, ignore_modules=self.cfg.weights_ignore_modules, map_location='cpu'), strict=False)
     
     def configure(self, *args, **kwargs) -> None:
         pass

@@ -12,25 +12,19 @@ class LatentNeRF(BaseSystem):
     @dataclass
     class Config(BaseSystem.Config):
         geometry_type: str = "implicit-volume"
-        geometry: dict = field(default_factory=lambda: {
-            'n_feature_dims': 4
-        })
+        geometry: dict = field(default_factory=dict)
         material_type: str = "nomaterial"
-        material: dict = field(default_factory=lambda: {
-            'n_output_dims': 4,
-            'color_activation': 'tanh'
-        })
+        material: dict = field(default_factory=dict)
         background_type: str = "solid-color-background"
-        background: dict = field(default_factory=lambda: {
-            'n_output_dims': 4,
-            'color': (0., 0., 0., 0.)
-        })
+        background: dict = field(default_factory=dict)
         renderer_type: str = "nerf-volume-renderer"
         renderer: dict = field(default_factory=dict)
         guidance_type: str = "stable-diffusion-guidance"
         guidance: dict = field(default_factory=dict)
         prompt_processor_type: str = "dreamfusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
+
+        refinement: bool = False
 
     cfg: Config
 
@@ -39,8 +33,11 @@ class LatentNeRF(BaseSystem):
         self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
         self.background = threestudio.find(self.cfg.background_type)(self.cfg.background)
         self.renderer = threestudio.find(self.cfg.renderer_type)(self.cfg.renderer, geometry=self.geometry, material=self.material, background=self.background)
-        # different from dreamfusion, guidance is also used in validation/testing
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        self.guidance = None
+    
+    def setup_guidance(self):
+        if self.guidance is None:
+            self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def forward(self, batch: Dict[str, Any], decode: bool = False) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -48,7 +45,10 @@ class LatentNeRF(BaseSystem):
             **render_out,
         }
         if decode:
-            out['decoded_rgb'] = self.guidance.decode_latents(out['comp_rgb'].permute(0,3,1,2)).permute(0,2,3,1)
+            if self.cfg.refinement:
+                out['decoded_rgb'] = out['comp_rgb']
+            else:
+                out['decoded_rgb'] = self.guidance.decode_latents(out['comp_rgb'].permute(0,3,1,2)).permute(0,2,3,1)
         return out
     
     def on_fit_start(self) -> None:
@@ -59,6 +59,15 @@ class LatentNeRF(BaseSystem):
         To avoid being saved to checkpoints, see on_save_checkpoint below.
         """
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(self.cfg.prompt_processor)
+        self.setup_guidance()
+    
+    def on_validation_start(self) -> None:
+        if not self.cfg.refinement:
+            self.setup_guidance()
+    
+    def on_test_start(self) -> None:
+        if not self.cfg.refinement:
+            self.setup_guidance()
 
     def training_step(self, batch, batch_idx):
         # opt = self.optimizers()
@@ -66,7 +75,7 @@ class LatentNeRF(BaseSystem):
 
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
-        guidance_out = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=True) 
+        guidance_out = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=not self.cfg.refinement) 
 
         loss = 0.
 
@@ -101,15 +110,12 @@ class LatentNeRF(BaseSystem):
 
     def validation_step(self, batch, batch_idx):
         out = self(batch, decode=True)
-        # self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", [
-        #     {'type': 'rgb', 'img': out['decoded_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
-        # ] + ([
-        #     {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
-        # ] if 'comp_normal' in out else []) + [
-        #     {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
-        # ])
         self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", [
             {'type': 'rgb', 'img': out['decoded_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
+        ] + ([
+            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
+        ] if 'comp_normal' in out else []) + [
+            {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
         ])
     
     def on_validation_epoch_end(self):
@@ -117,15 +123,12 @@ class LatentNeRF(BaseSystem):
 
     def test_step(self, batch, batch_idx):
         out = self(batch, decode=True)
-        # self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", [
-        #     {'type': 'rgb', 'img': out['decoded_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
-        # ] + ([
-        #     {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
-        # ] if 'comp_normal' in out else []) + [
-        #     {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
-        # ])
         self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", [
             {'type': 'rgb', 'img': out['decoded_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
+        ] + ([
+            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
+        ] if 'comp_normal' in out else []) + [
+            {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
         ])
 
     def on_test_epoch_end(self):

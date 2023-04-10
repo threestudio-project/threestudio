@@ -13,17 +13,35 @@ from threestudio.models.background import BaseBackground
 from threestudio.utils.typing import *
 from threestudio.utils.ops import chunk_batch
 
+
 class Renderer(BaseModule):
     def configure(self, geometry: BaseImplicitGeometry, material: BaseMaterial, background: BaseBackground) -> None:
-        self.geometry = geometry
-        self.material = material
-        self.background = background
+        # keep references to submodules using namedtuple, avoid being registered as modules
+        class SubModules(NamedTuple):
+            geometry: BaseImplicitGeometry
+            material: BaseMaterial
+            background: BaseBackground
+        self.sub_modules = SubModules(geometry, material, background)
     
     def forward(self, *args, **kwargs) -> Dict[str, Float[Tensor, "..."]]:
         raise NotImplementedError
 
+    @property
+    def geometry(self) -> BaseImplicitGeometry:
+        return self.sub_modules.geometry
+    
+    @property
+    def material(self) -> BaseMaterial:
+        return self.sub_modules.material
+    
+    @property
+    def background(self) -> BaseBackground:
+        return self.sub_modules.background
+
+
 class VolumeRenderer(Renderer):
     pass
+
 
 class Rasterizer(Renderer):
     pass

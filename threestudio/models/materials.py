@@ -133,3 +133,28 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
             self.ambient_only = True
         else:
             self.ambient_only = False
+
+
+@threestudio.register('sd-latent-adapter-material')
+class StableDiffusionLatentAdapterMaterial(BaseMaterial):
+    @dataclass
+    class Config(BaseMaterial.Config):
+        pass
+
+    cfg: Config
+
+    def configure(self) -> None:
+        adapter = nn.Parameter(torch.as_tensor([
+            #   R       G       B
+            [0.298, 0.207, 0.208],  # L1
+            [0.187, 0.286, 0.173],  # L2
+            [-0.158, 0.189, 0.264],  # L3
+            [-0.184, -0.271, -0.473],  # L4
+        ]))
+        self.register_parameter('adapter', adapter)
+
+    def forward(self, features: Float[Tensor, "B ... 4"], **kwargs) -> Float[Tensor, "B ... 3"]:
+        assert features.shape[-1] == 4
+        color = torch.tanh(features) @ self.adapter
+        color = color.clamp(0., 1.)
+        return color
