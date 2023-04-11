@@ -18,3 +18,27 @@
 - All systems, modules, and data modules have their configurations in their own dataclass named `Config`.
 - Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm is better than the one used in `instant-nsr-pl` as (1) it natually supports default values for properties; (2) it effectively prevents wrong assignments of these properties (say typos in the yaml file) and inappropriate usage at runtime.
 - This projects use both static and runtime type checking. For more details, see `utils/typing.py`.
+
+## Run
+### DreamFusion
+```bash
+# train with diffuse material and point lighting
+python launch.py --config configs/dreamfusion.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
+# train with simple surface color without material assumption
+python launch.py --config configs/dreamfusion-wonormal.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
+```
+### Latent-NeRF
+```bash
+# train in stable-diffusion latent space
+python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
+# refine in RGB space
+python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger" system.weights=path/to/latentnerf/weights
+```
+
+## Tips
+- To resume a model and continue training, please load the `parsed.yaml` in the trial directory and set `resume` to the checkpoint path. Example:
+```bash
+python launch.py --config path/to/your/trial/output/parsed.yaml --train --gpu 0 resume=path/to/your/checkpoint
+```
+- Press ctrl+c **once** will stop training and continue to testing. Press ctrl+c the second time to fully quit the program.
+- To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem` and `BaseModule` (including all geometry, materials, guidance, prompt processors, and renderers) are by default inherit to `Updateable`.
