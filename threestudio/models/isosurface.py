@@ -20,10 +20,13 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
 
         self.mc_func: Callable = mcubes.marching_cubes
         self._grid_vertices: Optional[Float[Tensor, "N3 3"]] = None
+        self._dummy: Float[Tensor, "..."]
+        self.register_buffer('_dummy', torch.zeros(0, dtype=torch.float32), persistent=False)
 
     @property
     def grid_vertices(self) -> Float[Tensor, "N3 3"]:
         if self._grid_vertices is None:
+            # keep the vertices on CPU so that we can support very large resolution
             x, y, z = (
                 torch.linspace(*self.points_range, self.resolution),
                 torch.linspace(*self.points_range, self.resolution),
@@ -36,13 +39,13 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
             self._grid_vertices = verts
         return self._grid_vertices
 
-    def forward(self, level: Float[Tensor, "N3 1"], threshold: float):
-        level = level.view(self.resolution, self.resolution, self.resolution)
-        v_pos, t_pos_idx = self.mc_func(-level.numpy(), threshold)  # transform to numpy
+    def forward(self, level: Float[Tensor, "N3 1"]) -> Mesh:
+        level = -level.view(self.resolution, self.resolution, self.resolution)
+        v_pos, t_pos_idx = self.mc_func(level.detach().cpu().numpy(), 0.0)  # transform to numpy
         v_pos, t_pos_idx = (
-            torch.from_numpy(v_pos).float(),
-            torch.from_numpy(v_pos).long(),
-        )  # transform back to pytorch
+            torch.from_numpy(v_pos).float().to(self._dummy.device),
+            torch.from_numpy(t_pos_idx.astype(np.int64)).long().to(self._dummy.device),
+        )  # transform back to torch tensor on CUDA
         v_pos = v_pos / (self.resolution - 1.0)
         return Mesh(v_pos=v_pos, t_pos_idx=t_pos_idx)
 
@@ -195,6 +198,6 @@ class MarchingTetrahedraHelper(IsosurfaceHelper):
 
         return verts, faces
 
-    def forward(self, level: Float[Tensor, "N3 1"], threshold: float):
-        v_pos, t_pos_idx = self._forward(self.grid_vertices, level - threshold, self.indices)
+    def forward(self, level: Float[Tensor, "N3 1"]):
+        v_pos, t_pos_idx = self._forward(self.grid_vertices, level, self.indices)
         return Mesh(v_pos=v_pos, t_pos_idx=t_pos_idx)

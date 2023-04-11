@@ -33,7 +33,7 @@ class BaseImplicitGeometry(BaseModule):
         radius: float = 1.0
         isosurface: bool = True
         isosurface_method: str = "mt"
-        isosurface_resolution: int = 32
+        isosurface_resolution: int = 64
         isosurface_threshold: float = 0.0
         isosurface_chunk: int = 2097152
         isosurface_optimize_grid: bool = False
@@ -76,16 +76,19 @@ class BaseImplicitGeometry(BaseModule):
 
     def _isosurface(self, bbox: Float[Tensor, "2 3"]) -> Mesh:
         def batch_func(x):
-            x = scale_tensor(x, (0, 1), bbox)
-            rv = self.forward_level(x)
+            # scale to bbox as the input vertices are in [0, 1]
+            rv = self.forward_level(scale_tensor(x.to(bbox.device), (0, 1), bbox)).to(x.device) # move to the same device as the input (could be CPU)
             return rv
 
         assert self.isosurface_helper is not None
-        level = chunk_batch(
-            batch_func, self.cfg.isosurface_chunk, self.isosurface_helper.grid_vertices
-        )
-        mesh = self.isosurface_helper(level, threshold=self.cfg.isosurface_threshold)
-        mesh.v_pos = scale_tensor(mesh.v_pos, (0, 1), bbox)
+        if self.cfg.isosurface_chunk > 0:
+            level = chunk_batch(
+                batch_func, self.cfg.isosurface_chunk, self.isosurface_helper.grid_vertices
+            )
+        else:
+            level = batch_func(self.isosurface_helper.grid_vertices)
+        mesh = self.isosurface_helper(level)
+        mesh.v_pos = scale_tensor(mesh.v_pos, (0, 1), bbox) # scale to bbox as the grid vertices are in [0, 1]
         return mesh
 
     def isosurface(self) -> Mesh:
@@ -244,4 +247,4 @@ class ImplicitVolume(BaseImplicitGeometry):
 
     def forward_level(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
         density = self.forward_density(points)
-        return -density
+        return -(density - self.cfg.isosurface_threshold)
