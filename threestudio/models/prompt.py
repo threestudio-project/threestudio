@@ -1,8 +1,10 @@
 import os
+import json
 from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
+
 
 from transformers import AutoTokenizer, CLIPTextModel
 
@@ -61,15 +63,42 @@ class DreamFusionPromptProcessor(PromptProcessor):
             DirectionConfig('overhead', ', overhead view', '', lambda ele, azi, dis: ele > self.cfg.overhead_threshold)
         ]
         self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
+
+        # load prompt library
+        with open(os.path.join('load/prompt_library.json'), 'r') as f:
+            self.prompt_library = json.load(f)
+
+        # use provided prompt or find prompt in library
+        self.prompt = self.preprocess_prompt(self.cfg.prompt)
+        # use provided negative prompt
+        self.negative_prompt = self.cfg.negative_prompt
+        threestudio.info(f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]")
+
         self.text_embeddings, self.uncond_text_embeddings = self.get_text_embeddings(
-            [self.cfg.prompt], [self.cfg.negative_prompt]
+            [self.prompt], [self.negative_prompt]
         )
         # view-dependent text embeddings
         self.text_embeddings_vd, self.uncond_text_embeddings_vd = self.get_text_embeddings(
-            [f"{self.cfg.prompt} {d.prompt}" for d in self.directions],
-            [f"{self.cfg.negative_prompt} {d.negative_prompt}" for d in self.directions],
+            [f"{self.prompt} {d.prompt}" for d in self.directions],
+            [f"{self.negative_prompt} {d.negative_prompt}" for d in self.directions],
         )
-
+    
+    def preprocess_prompt(self, prompt: str) -> str:
+        if prompt.startswith('lib:'):
+            # find matches in the library
+            candidate = None
+            keywords = prompt[4:].lower().split('_')
+            for prompt in self.prompt_library['dreamfusion']:
+                if all([k in prompt.lower() for k in keywords]):
+                    if candidate is not None:
+                        raise ValueError(f"Multiple prompts matched with keywords {keywords} in library")
+                    candidate = prompt
+            if candidate is None:
+                raise ValueError(f"Cannot find prompt with keywords {keywords} in library")
+            return candidate
+        else:
+            return prompt
+    
     def get_text_embeddings(self, prompt: Union[str, List[str]], negative_prompt: Union[str, List[str]]) -> Tuple[Float[Tensor, "B 77 768"], Float[Tensor, "B 77 768"]]:
         if isinstance(prompt, str):
             prompt = [prompt]
