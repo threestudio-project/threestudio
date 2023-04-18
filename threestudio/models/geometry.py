@@ -118,9 +118,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         n_feature_dims: int = 3
         density_activation: Optional[str] = "softplus"
         density_bias: Union[float, str] = 'blob'
-        # density_blob_scale: float = 10.
-        # density_blob_std: float = 0.5
-        density_blob_scale: float = 5.
+        density_blob_scale: float = 10.
         density_blob_std: float = 0.5
         pos_encoding_config: dict = field(default_factory=lambda: {
             "otype": "HashGrid",
@@ -249,6 +247,123 @@ class ImplicitVolume(BaseImplicitGeometry):
         density = self.forward_density(points)
         return -(density - self.cfg.isosurface_threshold)
 
+
+@threestudio.register("implicit-sdf")
+class ImplicitSDF(BaseImplicitGeometry):
+    @dataclass
+    class Config(BaseImplicitGeometry.Config):
+        n_input_dims: int = 3
+        n_feature_dims: int = 3
+        pos_encoding_config: dict = field(default_factory=lambda: {
+            "otype": "HashGrid",
+            "n_levels": 16,
+            "n_features_per_level": 2,
+            "log2_hashmap_size": 19,
+            "base_resolution": 16,
+            "per_level_scale": 1.447269237440378,
+        })
+        mlp_network_config: dict = field(default_factory=lambda: {
+            "otype": "VanillaMLP",
+            "activation": "ReLU",
+            "output_activation": "none",
+            "n_neurons": 32,
+            "n_hidden_layers": 2,
+        })
+        normal_type: Optional[str] = "finite_difference" # in ['pred', 'finite_difference']
+        shape_init: Optional[str] = None
+        shape_init_params: Optional[Any] = None
+        force_shape_init: bool = False   
+
+    cfg: Config
+
+    def configure(self) -> None:
+        super().configure()
+        self.n_output_dims = 1 + self.cfg.n_feature_dims
+        self.encoding = get_encoding(self.cfg.n_input_dims, self.cfg.pos_encoding_config)
+        self.network = get_mlp(self.encoding.n_output_dims, self.n_output_dims, self.cfg.mlp_network_config)
+        if self.cfg.normal_type == "pred":
+            self.normal_network = get_mlp(self.encoding.n_output_dims, 3, self.cfg.mlp_network_config)
+
+    def initialize_shape(self) -> None:
+        if self.cfg.shape_init is None and not self.cfg.force_shape_init:
+            return
+        
+        # do not initialize shape if weights are provided
+        if self.cfg.weights is not None and not self.cfg.force_shape_init:
+            return
+        
+        # Initialize SDF to a given shape when no weights are provided or force_shape_init is True
+        optim = torch.optim.Adam(self.parameters(), lr=1e-3)
+        from tqdm import tqdm
+        for _ in tqdm(range(1000), desc=f"Initializing SDF to a(n) {self.cfg.shape_init}:"):
+            points_rand = torch.rand((10000, 3), dtype=torch.float32).to(self.device) * 2. - 1.
+            if self.cfg.shape_init == "ellipsoid":
+                assert isinstance(self.cfg.shape_init_params, Sized) and len(self.cfg.shape_init_params) == 3
+                size = torch.as_tensor(self.cfg.shape_init_params).to(points_rand)
+                sdf_gt = ((points_rand / size)**2).sum(dim=-1, keepdim=True).sqrt() - 1.0 # pseudo signed distance of an ellipsoid
+            elif self.cfg.shape_init == "sphere":
+                assert isinstance(self.cfg.shape_init_params, float)
+                radius = self.cfg.shape_init_params
+                sdf_gt = ((points_rand ** 2).sum(dim=-1, keepdim=True).sqrt() - radius)
+            elif self.cfg.shape_init == "mesh":
+                raise NotImplementedError
+            else:
+                raise ValueError(f"Unknown shape initialization type: {self.cfg.shape_init}")
+            sdf_pred = self.forward_sdf(points_rand)
+            loss = F.mse_loss(sdf_pred, sdf_gt)
+            optim.zero_grad()
+            loss.backward()
+            optim.step()            
+
+    def forward(
+        self, points: Float[Tensor, "*N Di"], output_normal: bool = False
+    ) -> Dict[str, Float[Tensor, "..."]]:
+        points_unscaled = points # points in the original scale
+        points = contract_to_unisphere(points, self.bbox, self.unbounded) # points normalized to (0, 1)
+        
+        enc = self.encoding(points.view(-1, self.cfg.n_input_dims))
+        out = self.network(enc).view(*points.shape[:-1], self.n_output_dims)
+        sdf, features = out[..., 0:1], out[..., 1:]
+
+        output = {
+            'sdf': sdf,
+            'features': features,
+        }
+
+        if output_normal:
+            if self.cfg.normal_type == "finite_difference":
+                eps = 1.e-3
+                offsets: Float[Tensor, "6 3"] = torch.as_tensor([[eps, 0., 0.], [-eps, 0., 0.], [0., eps, 0.], [0., -eps, 0.], [0., 0., eps], [0., 0., -eps]]).to(points_unscaled)
+                points_offset: Float[Tensor, "... 6 3"] = (points_unscaled[...,None,:] + offsets).clamp(-self.cfg.radius, self.cfg.radius)
+                sdf_offset: Float[Tensor, "... 6 1"] = self.forward_sdf(points_offset)
+                normal = 0.5 * (sdf_offset[...,0::2,0] - sdf_offset[...,1::2,0]) / eps
+                normal = F.normalize(normal, dim=-1)
+            elif self.cfg.normal_type == "pred":
+                normal = self.normal_network(enc).view(*points.shape[:-1], 3)
+                normal = F.normalize(normal, dim=-1)
+            else:
+                raise AttributeError(f"Unknown normal type {self.cfg.normal_type}")
+            output.update({
+                'normal': normal,
+                'shading_normal': normal
+            })
+        return output
+    
+    def forward_sdf(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
+        points_unscaled = points
+        points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
+    
+        sdf = self.network(self.encoding(
+            points.reshape(-1, self.cfg.n_input_dims)
+        )).reshape(*points.shape[:-1], self.n_output_dims)[..., 0:1]
+
+        return sdf
+
+    def forward_level(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
+        sdf = self.forward_sdf(points)
+        return sdf - self.cfg.isosurface_threshold
+
+
 @threestudio.register("volume-grid")
 class VolumeGrid(BaseImplicitGeometry):
     @dataclass
@@ -354,9 +469,3 @@ class VolumeGrid(BaseImplicitGeometry):
     def forward_level(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
         density = self.forward_density(points)
         return -(density - self.cfg.isosurface_threshold)
-
-
-
-
-
-

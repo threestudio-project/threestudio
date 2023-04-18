@@ -13,9 +13,9 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 1000
+    ambient_only_steps: 1001
   
-  background_type: "solid-color-background"
+  background_type: "neural-environment-map-background"
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -29,7 +29,6 @@ system:
   guidance:
     half_precision_weights: true
     guidance_scale: 100.
-    grad_clip: null
   
   loss:
     lambda_sds: 1.

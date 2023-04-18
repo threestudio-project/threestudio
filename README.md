@@ -34,6 +34,14 @@ python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_
 # refine in RGB space
 python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger" system.weights=path/to/latentnerf/weights
 ```
+### Fantasia3D (WIP)
+I by far have implemented the early training stage of Fantasia3D, which regards the downsampled normal and silhouette as the latent feature map and optimizes using SDS.
+```bash
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry"
+# Fantasia3D highly relies on the initialized SDF shape
+# change the shape initialization to match your input prompt
+python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
+```
 
 ### Score Jacobian Chaining
 ```bash
@@ -50,3 +58,4 @@ python launch.py --config path/to/your/trial/output/parsed.yaml --train --gpu 0 
 ```
 - Press ctrl+c **once** will stop training and continue to testing. Press ctrl+c the second time to fully quit the program.
 - To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem` and `BaseModule` (including all geometry, materials, guidance, prompt processors, and renderers) are by default inherit to `Updateable`.
+- For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's exactly one match. The used prompt will be printed to console.

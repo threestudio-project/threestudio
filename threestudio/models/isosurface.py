@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from threestudio.utils.typing import *
 from threestudio.models.mesh import Mesh
@@ -10,6 +11,7 @@ class IsosurfaceHelper(nn.Module):
     @property
     def grid_vertices(self) -> Float[Tensor, "N 3"]:
         raise NotImplementedError
+
 
 class MarchingCubeCPUHelper(IsosurfaceHelper):
     def __init__(self, resolution: int) -> None:
@@ -21,7 +23,9 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
         self.mc_func: Callable = mcubes.marching_cubes
         self._grid_vertices: Optional[Float[Tensor, "N3 3"]] = None
         self._dummy: Float[Tensor, "..."]
-        self.register_buffer('_dummy', torch.zeros(0, dtype=torch.float32), persistent=False)
+        self.register_buffer(
+            "_dummy", torch.zeros(0, dtype=torch.float32), persistent=False
+        )
 
     @property
     def grid_vertices(self) -> Float[Tensor, "N3 3"]:
@@ -41,7 +45,9 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
 
     def forward(self, level: Float[Tensor, "N3 1"]) -> Mesh:
         level = -level.view(self.resolution, self.resolution, self.resolution)
-        v_pos, t_pos_idx = self.mc_func(level.detach().cpu().numpy(), 0.0)  # transform to numpy
+        v_pos, t_pos_idx = self.mc_func(
+            level.detach().cpu().numpy(), 0.0
+        )  # transform to numpy
         v_pos, t_pos_idx = (
             torch.from_numpy(v_pos).float().to(self._dummy.device),
             torch.from_numpy(t_pos_idx.astype(np.int64)).long().to(self._dummy.device),
@@ -59,58 +65,77 @@ class MarchingTetrahedraHelper(IsosurfaceHelper):
         self.points_range = (0, 1)
 
         self.triangle_table: Float[Tensor, "..."]
-        self.register_buffer("triangle_table", torch.as_tensor(
-            [
-                [-1, -1, -1, -1, -1, -1],
-                [1, 0, 2, -1, -1, -1],
-                [4, 0, 3, -1, -1, -1],
-                [1, 4, 2, 1, 3, 4],
-                [3, 1, 5, -1, -1, -1],
-                [2, 3, 0, 2, 5, 3],
-                [1, 4, 0, 1, 5, 4],
-                [4, 2, 5, -1, -1, -1],
-                [4, 5, 2, -1, -1, -1],
-                [4, 1, 0, 4, 5, 1],
-                [3, 2, 0, 3, 5, 2],
-                [1, 3, 5, -1, -1, -1],
-                [4, 1, 2, 4, 3, 1],
-                [3, 0, 4, -1, -1, -1],
-                [2, 0, 1, -1, -1, -1],
-                [-1, -1, -1, -1, -1, -1],
-            ],
-            dtype=torch.long,
-        ), persistent=False)
+        self.register_buffer(
+            "triangle_table",
+            torch.as_tensor(
+                [
+                    [-1, -1, -1, -1, -1, -1],
+                    [1, 0, 2, -1, -1, -1],
+                    [4, 0, 3, -1, -1, -1],
+                    [1, 4, 2, 1, 3, 4],
+                    [3, 1, 5, -1, -1, -1],
+                    [2, 3, 0, 2, 5, 3],
+                    [1, 4, 0, 1, 5, 4],
+                    [4, 2, 5, -1, -1, -1],
+                    [4, 5, 2, -1, -1, -1],
+                    [4, 1, 0, 4, 5, 1],
+                    [3, 2, 0, 3, 5, 2],
+                    [1, 3, 5, -1, -1, -1],
+                    [4, 1, 2, 4, 3, 1],
+                    [3, 0, 4, -1, -1, -1],
+                    [2, 0, 1, -1, -1, -1],
+                    [-1, -1, -1, -1, -1, -1],
+                ],
+                dtype=torch.long,
+            ),
+            persistent=False,
+        )
         self.num_triangles_table: Integer[Tensor, "..."]
         self.register_buffer(
-            "num_triangles_table", torch.as_tensor(
-            [0, 1, 1, 2, 1, 2, 2, 1, 1, 2, 2, 1, 2, 1, 1, 0], dtype=torch.long
-        ), persistent=False)
+            "num_triangles_table",
+            torch.as_tensor(
+                [0, 1, 1, 2, 1, 2, 2, 1, 1, 2, 2, 1, 2, 1, 1, 0], dtype=torch.long
+            ),
+            persistent=False,
+        )
         self.base_tet_edges: Integer[Tensor, "..."]
-        self.register_buffer("base_tet_edges", torch.as_tensor(
-            [0, 1, 0, 2, 0, 3, 1, 2, 1, 3, 2, 3], dtype=torch.long
-        ), persistent=False)
+        self.register_buffer(
+            "base_tet_edges",
+            torch.as_tensor([0, 1, 0, 2, 0, 3, 1, 2, 1, 3, 2, 3], dtype=torch.long),
+            persistent=False,
+        )
 
         tets = np.load(self.tets_path)
         self._grid_vertices: Float[Tensor, "..."]
-        self.register_buffer('_grid_vertices', torch.from_numpy(tets["vertices"]).float(), persistent=False)
+        self.register_buffer(
+            "_grid_vertices",
+            torch.from_numpy(tets["vertices"]).float(),
+            persistent=False,
+        )
         self.indices: Integer[Tensor, "..."]
-        self.register_buffer('indices', torch.from_numpy(tets["indices"]).long(), persistent=False)
+        self.register_buffer(
+            "indices", torch.from_numpy(tets["indices"]).long(), persistent=False
+        )
 
         self.grid_vertex_offsets: Optional[Float[Tensor, "Nv 3"]] = None
         if optimize_grid:
-            self.grid_vertex_offsets = nn.Parameter(torch.zeros_like(self._grid_vertices))
-            self.register_parameter('grid_vertex_offsets', self.grid_vertex_offsets)
-        
+            self.grid_vertex_offsets = nn.Parameter(
+                torch.zeros_like(self._grid_vertices)
+            )
+            self.register_parameter("grid_vertex_offsets", self.grid_vertex_offsets)
+
         self._all_edges: Optional[Integer[Tensor, "Ne 2"]] = None
-    
+
     @property
     def grid_vertices(self) -> Float[Tensor, "Nv 3"]:
         if not self.optimize_grid:
             return self._grid_vertices
         assert self.grid_vertex_offsets is not None
         return self._grid_vertices + (self.points_range[1] - self.points_range[0]) / (
-            self.resolution * 2
-        ) * torch.tanh(self.grid_vertex_offsets) # FIXME: hard-coded activation
+            self.resolution  # half tet size is approximately 1 / self.resolution
+        ) * torch.tanh(
+            self.grid_vertex_offsets
+        )  # FIXME: hard-coded activation
 
     @property
     def all_edges(self) -> Integer[Tensor, "Ne 2"]:
@@ -198,6 +223,25 @@ class MarchingTetrahedraHelper(IsosurfaceHelper):
 
         return verts, faces
 
-    def forward(self, level: Float[Tensor, "N3 1"]):
+    def forward(self, level: Float[Tensor, "N3 1"]) -> Mesh:
         v_pos, t_pos_idx = self._forward(self.grid_vertices, level, self.indices)
-        return Mesh(v_pos=v_pos, t_pos_idx=t_pos_idx)
+
+        sdf_f1x6x2 = level[:, 0][self.all_edges.reshape(-1)].reshape(-1, 2)
+        mask = torch.sign(sdf_f1x6x2[..., 0]) != torch.sign(sdf_f1x6x2[..., 1])
+        sdf_f1x6x2 = sdf_f1x6x2[mask]
+        sdf_diff = F.binary_cross_entropy_with_logits(
+            sdf_f1x6x2[..., 0], (sdf_f1x6x2[..., 1] > 0).float()
+        ) + F.binary_cross_entropy_with_logits(
+            sdf_f1x6x2[..., 1], (sdf_f1x6x2[..., 0] > 0).float()
+        )
+
+        mesh = Mesh(
+            v_pos=v_pos,
+            t_pos_idx=t_pos_idx,
+            # extras
+            grid_vertices=self.grid_vertices,
+            grid_sdf=level,
+            grid_sdf_diff=sdf_diff,
+        )
+
+        return mesh

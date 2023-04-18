@@ -4,6 +4,9 @@ from packaging import version
 
 import torch
 
+from threestudio.utils.config import config_to_primitive
+from threestudio.utils.typing import *
+
 def parse_version(ver: str):
     return version.parse(ver)
 
@@ -46,3 +49,23 @@ def load_module_weights(path, module_name=None, ignore_modules=None, map_locatio
         return state_dict_to_load
 
     return state_dict
+
+
+def C(value: Any, epoch: int, global_step: int) -> float:
+    if isinstance(value, int) or isinstance(value, float):
+        pass
+    else:
+        value = config_to_primitive(value)
+        if not isinstance(value, list):
+            raise TypeError('Scalar specification only supports list, got', type(value))
+        if len(value) == 3:
+            value = [0] + value
+        assert len(value) == 4
+        start_step, start_value, end_value, end_step = value
+        if isinstance(end_step, int):
+            current_step = global_step
+            value = start_value + (end_value - start_value) * max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
+        elif isinstance(end_step, float):
+            current_step = epoch
+            value = start_value + (end_value - start_value) * max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
+    return value

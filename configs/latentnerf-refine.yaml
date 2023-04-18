@@ -38,7 +38,6 @@ system:
   guidance:
     half_precision_weights: true
     guidance_scale: 100.
-    grad_clip: null
   
   loss:
     lambda_sds: 1.

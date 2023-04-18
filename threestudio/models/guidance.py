@@ -1,11 +1,10 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.cuda.amp import custom_bwd, custom_fwd
 
-from transformers import AutoTokenizer
 from diffusers import (
     AutoencoderKL,
     UNet2DConditionModel,
@@ -20,6 +19,7 @@ from diffusers.utils.import_utils import is_xformers_available
 import threestudio
 from threestudio.utils.base import BaseModule
 from threestudio.utils.typing import *
+from threestudio.utils.misc import C
 
 
 class SpecifyGradient(torch.autograd.Function):
@@ -45,9 +45,12 @@ class StableDiffusionGuidance(BaseModule):
         pretrained_model_name_or_path: str = 'runwayml/stable-diffusion-v1-5'
         use_xformers: bool = False
         guidance_scale: float = 100.
-        grad_clip: Optional[float] = None
+        grad_clip: Optional[Any] = field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
-        use_weight: bool = True
+        
+        min_step_percent: float = 0.02
+        max_step_percent: float = 0.98
+
 
     cfg: Config
 
@@ -72,10 +75,12 @@ class StableDiffusionGuidance(BaseModule):
         )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * 0.02)
-        self.max_step = int(self.num_train_timesteps * 0.98)
+        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
+        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(self.device)
+
+        self.grad_clip_val: Optional[float] = None
 
         print(f"[INFO] loaded stable diffusion!")
 
@@ -251,9 +256,8 @@ class ScoreJacobianGuidance(BaseModule):
                 grad = -(Ds - zs) / sigma
 
         grad = torch.nan_to_num(grad)
-        # clip grad for stable training?
-        if self.cfg.grad_clip is not None:
-            grad = grad.clamp(-self.cfg.grad_clip, self.cfg.grad_clip)
+        if self.grad_clip_val is not None:
+            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents, grad)
@@ -275,3 +279,10 @@ class ScoreJacobianGuidance(BaseModule):
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clamp(0, 1)
         return image
+
+    def update_step(self, epoch: int, global_step: int):
+        # clip grad for stable training as demonstrated in
+        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
+        # http://arxiv.org/abs/2303.15413
+        if self.cfg.grad_clip is not None:
+            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)

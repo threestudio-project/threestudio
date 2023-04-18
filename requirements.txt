@@ -14,3 +14,4 @@ matplotlib
 imageio
 imageio[ffmpeg]
 trimesh
+git+https://github.com/NVlabs/nvdiffrast.git

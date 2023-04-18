@@ -1,8 +1,10 @@
 import os
+import json
 from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
+
 
 from transformers import AutoTokenizer, CLIPTextModel
 
@@ -33,6 +35,7 @@ class DreamFusionPromptProcessor(PromptProcessor):
         prompt: str = "a hamburger"
         negative_prompt: str = ""
         pretrained_model_name_or_path: str = 'runwayml/stable-diffusion-v1-5'
+        view_dependent_prompting: bool = True
         overhead_threshold: float = 60.
         front_threshold: float = 22.5
         back_threshold: float = 22.5
@@ -61,11 +64,42 @@ class DreamFusionPromptProcessor(PromptProcessor):
             DirectionConfig('overhead', ', overhead view', '', lambda ele, azi, dis: ele > self.cfg.overhead_threshold)
         ]
         self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
-        self.text_embeddings, self.uncond_text_embeddings = self.get_text_embeddings(
-            [f"{self.cfg.prompt} {d.prompt}" for d in self.directions],
-            [f"{self.cfg.negative_prompt} {d.negative_prompt}" for d in self.directions],
-        ) # TODO: better view selection logic
 
+        # load prompt library
+        with open(os.path.join('load/prompt_library.json'), 'r') as f:
+            self.prompt_library = json.load(f)
+
+        # use provided prompt or find prompt in library
+        self.prompt = self.preprocess_prompt(self.cfg.prompt)
+        # use provided negative prompt
+        self.negative_prompt = self.cfg.negative_prompt
+        threestudio.info(f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]")
+
+        self.text_embeddings, self.uncond_text_embeddings = self.get_text_embeddings(
+            [self.prompt], [self.negative_prompt]
+        )
+        # view-dependent text embeddings
+        self.text_embeddings_vd, self.uncond_text_embeddings_vd = self.get_text_embeddings(
+            [f"{self.prompt} {d.prompt}" for d in self.directions],
+            [f"{self.negative_prompt} {d.negative_prompt}" for d in self.directions],
+        )
+    
+    def preprocess_prompt(self, prompt: str) -> str:
+        if prompt.startswith('lib:'):
+            # find matches in the library
+            candidate = None
+            keywords = prompt[4:].lower().split('_')
+            for prompt in self.prompt_library['dreamfusion']:
+                if all([k in prompt.lower() for k in keywords]):
+                    if candidate is not None:
+                        raise ValueError(f"Multiple prompts matched with keywords {keywords} in library")
+                    candidate = prompt
+            if candidate is None:
+                raise ValueError(f"Cannot find prompt with keywords {keywords} in library")
+            return candidate
+        else:
+            return prompt
+    
     def get_text_embeddings(self, prompt: Union[str, List[str]], negative_prompt: Union[str, List[str]]) -> Tuple[Float[Tensor, "B 77 768"], Float[Tensor, "B 77 768"]]:
         if isinstance(prompt, str):
             prompt = [prompt]
@@ -92,15 +126,22 @@ class DreamFusionPromptProcessor(PromptProcessor):
         return text_embeddings, uncond_text_embeddings
 
     def forward(self, elevation: Float[Tensor, "B"], azimuth: Float[Tensor, "B"], camera_distances: Float[Tensor, "B"], **kwargs) -> Float[Tensor, "BB 77 768"]:
-        # Get direction
-        direction_idx = torch.zeros_like(elevation, dtype=torch.long)
-        for d in self.directions:
-            direction_idx[d.condition(elevation, azimuth, camera_distances)] = self.direction2idx[d.name]
+        batch_size = elevation.shape[0]
 
-        # Get text embeddings
-        text_embeddings = self.text_embeddings[direction_idx]
-        uncond_text_embeddings = self.uncond_text_embeddings[direction_idx]
+        if self.cfg.view_dependent_prompting:
+            # Get direction
+            direction_idx = torch.zeros_like(elevation, dtype=torch.long)
+            for d in self.directions:
+                direction_idx[d.condition(elevation, azimuth, camera_distances)] = self.direction2idx[d.name]
 
+            # Get text embeddings
+            text_embeddings = self.text_embeddings_vd[direction_idx]
+            uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]
+        else:
+            text_embeddings = self.text_embeddings.expand(batch_size, -1, -1)
+            uncond_text_embeddings = self.uncond_text_embeddings.expand(batch_size, -1, -1)
+
+        # IMPORTANT: we return (cond, uncond), which is in different order than other implementations!
         return torch.cat([text_embeddings, uncond_text_embeddings], dim=0)
         
 

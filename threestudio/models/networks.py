@@ -108,8 +108,6 @@ class VanillaMLP(nn.Module):
     def __init__(self, dim_in: int, dim_out: int, config: dict):
         super().__init__()
         self.n_neurons, self.n_hidden_layers = config['n_neurons'], config['n_hidden_layers']
-        self.sphere_init, self.weight_norm = config.get('sphere_init', False), config.get('weight_norm', False)
-        self.sphere_init_radius = config.get('sphere_init_radius', 0.5)
         layers = [self.make_linear(dim_in, self.n_neurons, is_first=True, is_last=False), self.make_activation()]
         for i in range(self.n_hidden_layers - 1):
             layers += [self.make_linear(self.n_neurons, self.n_neurons, is_first=False, is_last=False), self.make_activation()]
@@ -126,31 +124,11 @@ class VanillaMLP(nn.Module):
         return x
     
     def make_linear(self, dim_in, dim_out, is_first, is_last):
-        layer = nn.Linear(dim_in, dim_out, bias=True)
-        if self.sphere_init:
-            if is_last:
-                torch.nn.init.constant_(layer.bias, -self.sphere_init_radius)
-                torch.nn.init.normal_(layer.weight, mean=math.sqrt(math.pi) / math.sqrt(dim_in), std=0.0001)
-            elif is_first:
-                torch.nn.init.constant_(layer.bias, 0.0)
-                torch.nn.init.constant_(layer.weight[:, 3:], 0.0)
-                torch.nn.init.normal_(layer.weight[:, :3], 0.0, math.sqrt(2) / math.sqrt(dim_out))
-            else:
-                torch.nn.init.constant_(layer.bias, 0.0)
-                torch.nn.init.normal_(layer.weight, 0.0, math.sqrt(2) / math.sqrt(dim_out))
-        else:
-            torch.nn.init.constant_(layer.bias, 0.0)
-            torch.nn.init.kaiming_uniform_(layer.weight, nonlinearity='relu')
-        
-        if self.weight_norm:
-            layer = nn.utils.weight_norm(layer)
+        layer = nn.Linear(dim_in, dim_out, bias=False)
         return layer   
 
     def make_activation(self):
-        if self.sphere_init:
-            return nn.Softplus(beta=100)
-        else:
-            return nn.ReLU(inplace=True)
+        return nn.ReLU(inplace=True)
 
 
 class TCNNNetwork(nn.Module):

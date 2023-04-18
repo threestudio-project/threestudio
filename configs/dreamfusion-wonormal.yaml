@@ -19,7 +19,7 @@ system:
 
   material_type: "no-material"
   
-  background_type: "solid-color-background"
+  background_type: "neural-environment-map-background"
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -31,9 +31,8 @@ system:
   
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    half_precision_weights: true
+    half_precision_weights: false
     guidance_scale: 100.
-    grad_clip: null
   
   loss:
     lambda_sds: 1.
@@ -46,21 +45,21 @@ system:
       lr: 0.01
       betas: [0.9, 0.99]
       eps: 1.e-15
-  scheduler:
-    name: SequentialLR
-    interval: step
-    warmup_steps: 100
-    milestones:
-      - ${system.scheduler.warmup_steps}
-    schedulers:
-      - name: LinearLR # linear warm-up in the first system.warmup_steps steps
-        args:
-          start_factor: 0.1
-          end_factor: 1.0
-          total_iters: ${system.scheduler.warmup_steps}
-      - name: ExponentialLR
-        args:
-          gamma: ${calc_exp_lr_decay_rate:0.1,${sub:${trainer.max_steps},${system.scheduler.warmup_steps}}}
+  # scheduler:
+  #   name: SequentialLR
+  #   interval: step
+  #   warmup_steps: 100
+  #   milestones:
+  #     - ${system.scheduler.warmup_steps}
+  #   schedulers:
+  #     - name: LinearLR # linear warm-up in the first system.warmup_steps steps
+  #       args:
+  #         start_factor: 0.1
+  #         end_factor: 1.0
+  #         total_iters: ${system.scheduler.warmup_steps}
+  #     - name: ExponentialLR
+  #       args:
+  #         gamma: ${calc_exp_lr_decay_rate:0.1,${sub:${trainer.max_steps},${system.scheduler.warmup_steps}}}
 
 trainer:
   max_steps: 10000
@@ -69,7 +68,7 @@ trainer:
   val_check_interval: 1000
   limit_val_batches: 1
   enable_progress_bar: true
-  precision: 16-mixed
+  precision: 32
 
 checkpoint:
   save_last: true
