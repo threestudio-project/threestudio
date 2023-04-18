@@ -9,7 +9,7 @@ Two types of typing checking can be used:
 """
 
 # Basic types
-from typing import Any, Optional, Union, Iterable, Callable, Type, Dict, List, Tuple, Literal, TypeVar, NewType, NamedTuple
+from typing import Any, Optional, Union, Iterable, Callable, Type, Dict, List, Tuple, Literal, TypeVar, NewType, NamedTuple, Sized
 
 # Config type
 from omegaconf import DictConfig

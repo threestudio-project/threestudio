@@ -33,6 +33,7 @@ class DreamFusionPromptProcessor(PromptProcessor):
         prompt: str = "a hamburger"
         negative_prompt: str = ""
         pretrained_model_name_or_path: str = 'runwayml/stable-diffusion-v1-5'
+        view_dependent_prompting: bool = True
         overhead_threshold: float = 60.
         front_threshold: float = 22.5
         back_threshold: float = 22.5
@@ -43,7 +44,6 @@ class DreamFusionPromptProcessor(PromptProcessor):
         self.tokenizer = AutoTokenizer.from_pretrained(self.cfg.pretrained_model_name_or_path, subfolder='tokenizer')
         os.environ['TOKENIZERS_PARALLELISM'] = 'false'
         self.text_encoder = CLIPTextModel.from_pretrained(self.cfg.pretrained_model_name_or_path, subfolder='text_encoder').to(self.device)
-        
         
         for p in self.text_encoder.parameters():
             p.requires_grad_(False)
@@ -62,9 +62,13 @@ class DreamFusionPromptProcessor(PromptProcessor):
         ]
         self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
         self.text_embeddings, self.uncond_text_embeddings = self.get_text_embeddings(
+            [self.cfg.prompt], [self.cfg.negative_prompt]
+        )
+        # view-dependent text embeddings
+        self.text_embeddings_vd, self.uncond_text_embeddings_vd = self.get_text_embeddings(
             [f"{self.cfg.prompt} {d.prompt}" for d in self.directions],
             [f"{self.cfg.negative_prompt} {d.negative_prompt}" for d in self.directions],
-        ) # TODO: better view selection logic
+        )
 
     def get_text_embeddings(self, prompt: Union[str, List[str]], negative_prompt: Union[str, List[str]]) -> Tuple[Float[Tensor, "B 77 768"], Float[Tensor, "B 77 768"]]:
         if isinstance(prompt, str):
@@ -92,14 +96,21 @@ class DreamFusionPromptProcessor(PromptProcessor):
         return text_embeddings, uncond_text_embeddings
 
     def forward(self, elevation: Float[Tensor, "B"], azimuth: Float[Tensor, "B"], camera_distances: Float[Tensor, "B"], **kwargs) -> Float[Tensor, "BB 77 768"]:
-        # Get direction
-        direction_idx = torch.zeros_like(elevation, dtype=torch.long)
-        for d in self.directions:
-            direction_idx[d.condition(elevation, azimuth, camera_distances)] = self.direction2idx[d.name]
+        batch_size = elevation.shape[0]
 
-        # Get text embeddings
-        text_embeddings = self.text_embeddings[direction_idx]
-        uncond_text_embeddings = self.uncond_text_embeddings[direction_idx]
+        if self.cfg.view_dependent_prompting:
+            # Get direction
+            direction_idx = torch.zeros_like(elevation, dtype=torch.long)
+            for d in self.directions:
+                direction_idx[d.condition(elevation, azimuth, camera_distances)] = self.direction2idx[d.name]
 
+            # Get text embeddings
+            text_embeddings = self.text_embeddings_vd[direction_idx]
+            uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]
+        else:
+            text_embeddings = self.text_embeddings.expand(batch_size, -1, -1)
+            uncond_text_embeddings = self.uncond_text_embeddings.expand(batch_size, -1, -1)
+
+        # IMPORTANT: we return (cond, uncond), which is in different order than other implementations!
         return torch.cat([text_embeddings, uncond_text_embeddings], dim=0)
         

@@ -12,9 +12,17 @@ from threestudio.models.materials import BaseMaterial
 from threestudio.models.background import BaseBackground
 from threestudio.utils.typing import *
 from threestudio.utils.ops import chunk_batch
+from threestudio.utils.rasterize import NVDiffRasterizerContext
+from threestudio.utils.misc import get_device
 
 
 class Renderer(BaseModule):
+    @dataclass
+    class Config(BaseModule.Config):
+        radius: float = 1.0
+
+    cfg: Config
+
     def configure(self, geometry: BaseImplicitGeometry, material: BaseMaterial, background: BaseBackground) -> None:
         # keep references to submodules using namedtuple, avoid being registered as modules
         class SubModules(NamedTuple):
@@ -22,6 +30,16 @@ class Renderer(BaseModule):
             material: BaseMaterial
             background: BaseBackground
         self.sub_modules = SubModules(geometry, material, background)
+
+        # set up bounding box
+        self.bbox: Float[Tensor, "2 3"]
+        self.register_buffer("bbox", torch.as_tensor(
+            [
+                [-self.cfg.radius, -self.cfg.radius, -self.cfg.radius],
+                [self.cfg.radius, self.cfg.radius, self.cfg.radius],
+            ],
+            dtype=torch.float32,
+        ))        
     
     def forward(self, *args, **kwargs) -> Dict[str, Float[Tensor, "..."]]:
         raise NotImplementedError
@@ -51,7 +69,6 @@ class Rasterizer(Renderer):
 class NeRFVolumeRenderer(VolumeRenderer):
     @dataclass
     class Config(VolumeRenderer.Config):
-        radius: float = 1.0
         num_samples_per_ray: int = 512
         randomized: bool = True
         eval_chunk_size: int = 8192
@@ -60,14 +77,6 @@ class NeRFVolumeRenderer(VolumeRenderer):
 
     def configure(self, geometry: BaseImplicitGeometry, material: BaseMaterial, background: BaseBackground) -> None:
         super().configure(geometry, material, background)
-        self.bbox: Float[Tensor, "2 3"]
-        self.register_buffer("bbox", torch.as_tensor(
-            [
-                [-self.cfg.radius, -self.cfg.radius, -self.cfg.radius],
-                [self.cfg.radius, self.cfg.radius, self.cfg.radius],
-            ],
-            dtype=torch.float32,
-        ))
         self.estimator = nerfacc.OccGridEstimator(roi_aabb=self.bbox.view(-1), resolution=32, levels=1)
         self.render_step_size = 1.732 * 2 * self.cfg.radius / self.cfg.num_samples_per_ray
         self.randomized = self.cfg.randomized
@@ -172,5 +181,36 @@ class NeuSVolumeRenderer(VolumeRenderer):
 class DeferredVolumeRenderer(VolumeRenderer):
     pass
 
+
+@threestudio.register('nvdiff-rasterizer')
 class NVDiffRasterizer(Rasterizer):
-    pass
+    @dataclass
+    class Config(VolumeRenderer.Config):
+        context_type: str = "gl"
+        eval_chunk_size: int = 8192
+    
+    cfg: Config
+
+    def configure(self, geometry: BaseImplicitGeometry, material: BaseMaterial, background: BaseBackground) -> None:
+        super().configure(geometry, material, background)
+        self.ctx = NVDiffRasterizerContext(self.cfg.context_type, get_device())
+    
+    def forward(self, mvp_mtx: Float[Tensor, "B 4 4"], height: int, width: int, **kwargs) -> Dict[str, Float[Tensor, "..."]]:
+        batch_size = mvp_mtx.shape[0]
+        mesh = self.geometry.isosurface()
+
+        v_pos_clip: Float[Tensor, "B Nv 4"] = self.ctx.vertex_transform(mesh.v_pos, mvp_mtx)
+        rast, _ = self.ctx.rasterize(v_pos_clip, mesh.t_pos_idx, (height, width))
+        mask = rast[...,3:] > 0
+        silhouette = self.ctx.antialias(mask.float(), rast, v_pos_clip, mesh.t_pos_idx)
+        normal, _ = self.ctx.interpolate_one(mesh.v_nrm, rast, mesh.t_pos_idx)
+        normal = torch.lerp(torch.zeros_like(normal), (normal + 1.) / 2., mask.float())
+        normal = self.ctx.antialias(normal, rast, v_pos_clip, mesh.t_pos_idx)
+
+        out = {
+            'silhouette': silhouette,
+            'normal': normal,
+            'mesh': mesh
+        }
+        
+        return out

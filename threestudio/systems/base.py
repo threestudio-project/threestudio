@@ -2,11 +2,11 @@ import re
 from dataclasses import dataclass, field
 import pytorch_lightning as pl
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
-from threestudio.utils.config import parse_structured, config_to_primitive
+from threestudio.utils.config import parse_structured
 from threestudio.utils.base import Updateable
 from threestudio.utils.saving import SaverMixin
 from threestudio.utils.typing import *
-from threestudio.utils.misc import load_module_weights
+from threestudio.utils.misc import load_module_weights, C
 
 class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     @dataclass
@@ -28,24 +28,8 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     def configure(self, *args, **kwargs) -> None:
         pass
     
-    def C(self, value):
-        if isinstance(value, int) or isinstance(value, float):
-            pass
-        else:
-            value = config_to_primitive(value)
-            if not isinstance(value, list):
-                raise TypeError('Scalar specification only supports list, got', type(value))
-            if len(value) == 3:
-                value = [0] + value
-            assert len(value) == 4
-            start_step, start_value, end_value, end_step = value
-            if isinstance(end_step, int):
-                current_step = self.global_step
-                value = start_value + (end_value - start_value) * max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
-            elif isinstance(end_step, float):
-                current_step = self.current_epoch
-                value = start_value + (end_value - start_value) * max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
-        return value
+    def C(self, value: Any) -> float:
+        return C(value, self.current_epoch, self.global_step)
 
     def configure_optimizers(self):
         optim = parse_optimizer(self.cfg.optimizer, self)

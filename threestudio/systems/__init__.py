@@ -1,1 +1,1 @@
-from . import dreamfusion, latentnerf
+from . import dreamfusion, latentnerf, fantasia3d

@@ -194,11 +194,11 @@ def get_rays(
     return rays_o, rays_d
 
 
-def get_projection_matrix(fov: Float[Tensor, "B"], near: float, far: float) -> Float[Tensor, "B 4 4"]:
-    batch_size = fov.shape[0]
+def get_projection_matrix(fovy: Float[Tensor, "B"], aspect_wh: float, near: float, far: float) -> Float[Tensor, "B 4 4"]:
+    batch_size = fovy.shape[0]
     proj_mtx = torch.zeros(batch_size, 4, 4, dtype=torch.float32)
-    proj_mtx[:, 0, 0] = 1.0 / torch.tan(fov / 2.0)
-    proj_mtx[:, 1, 1] = 1.0 / torch.tan(fov / 2.0)
+    proj_mtx[:, 0, 0] = 1.0 / (torch.tan(fovy / 2.0) * aspect_wh)
+    proj_mtx[:, 1, 1] = -1.0 / torch.tan(fovy / 2.0) # add a negative sign here as the y axis is flipped in nvdiffrast output
     proj_mtx[:, 2, 2] = -(far + near) / (far - near)
     proj_mtx[:, 2, 3] = -2.0 * far * near / (far - near)
     proj_mtx[:, 3, 2] = -1.0
