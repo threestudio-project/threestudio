@@ -35,6 +35,12 @@ python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_
 python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger" system.weights=path/to/latentnerf/weights
 ```
 
+### Score Jacobian Chaining
+```bash
+# train with sjc guidance in latent space
+python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger" 
+```
+
 ## Tips
 - To resume a model and continue training, please load the `parsed.yaml` in the trial directory and set `resume` to the checkpoint path. Example:
 ```bash

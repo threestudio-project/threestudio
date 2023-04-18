@@ -131,7 +131,7 @@ class RandomCameraDataset(Dataset):
         
         azimuth_deg: Float[Tensor, "B"] = torch.linspace(0, 360., self.n_test_views) - 180.
         elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, 15.)
-        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.camera_distance_range[0] + self.cfg.camera_distance_range[1]))
+        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.camera_distance_range[0] + self.cfg.camera_distance_range[1]) / 2)
 
         elevation = elevation_deg * math.pi / 180
         azimuth = azimuth_deg * math.pi / 180
@@ -226,7 +226,6 @@ class RandomCameraDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         return self.general_loader(self.val_dataset, batch_size=1)
-        # return self.general_loader(self.train_dataset, batch_size=1, collate_fn=self.train_dataset.collate)
 
     def test_dataloader(self) -> DataLoader:
         return self.general_loader(self.test_dataset, batch_size=1) 
