@@ -12,6 +12,7 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     @dataclass
     class Config:
         loss: dict = field(default_factory=dict)
+        freq: dict = field(default_factory=dict)
         optimizer: dict = field(default_factory=dict)
         scheduler: Optional[dict] = None
         weights: Optional[str] = None

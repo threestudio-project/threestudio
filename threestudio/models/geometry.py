@@ -136,6 +136,7 @@ class ImplicitVolume(BaseImplicitGeometry):
             "n_hidden_layers": 1
         })
         normal_type: Optional[str] = "finite_difference" # in ['pred', 'finite_difference']
+        finite_difference_eps: Optional[float] = 0.001
 
     cfg: Config
 
@@ -213,7 +214,7 @@ class ImplicitVolume(BaseImplicitGeometry):
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":
-                eps = 1.e-3
+                eps = self.cfg.finite_difference_eps
                 offsets: Float[Tensor, "6 3"] = torch.as_tensor([[eps, 0., 0.], [-eps, 0., 0.], [0., eps, 0.], [0., -eps, 0.], [0., 0., eps], [0., 0., -eps]]).to(points_unscaled)
                 points_offset: Float[Tensor, "... 6 3"] = (points_unscaled[...,None,:] + offsets).clamp(-self.cfg.radius, self.cfg.radius)
                 density_offset: Float[Tensor, "... 6 1"] = self.forward_density(points_offset)

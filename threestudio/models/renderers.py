@@ -81,7 +81,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
         self.render_step_size = 1.732 * 2 * self.cfg.radius / self.cfg.num_samples_per_ray
         self.randomized = self.cfg.randomized
 
-    def forward(self, rays_o: Float[Tensor, "B H W 3"], rays_d: Float[Tensor, "B H W 3"], light_positions: Float[Tensor, "B 3"], **kwargs) -> Dict[str, Float[Tensor, "..."]]:
+    def forward(self, rays_o: Float[Tensor, "B H W 3"], rays_d: Float[Tensor, "B H W 3"], light_positions: Float[Tensor, "B 3"], bg_color: Optional[Tensor] = None, **kwargs) -> Dict[str, Float[Tensor, "..."]]:
         batch_size, height, width = rays_o.shape[:3]
         rays_o_flatten: Float[Tensor, "Nr 3"] = rays_o.reshape(-1, 3)
         rays_d_flatten: Float[Tensor, "Nr 3"] = rays_d.reshape(-1, 3)
@@ -113,7 +113,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
 
         if self.training:
             geo_out = self.geometry(positions, output_normal=self.material.requires_normal)
-            rgb_fg_all = self.material(viewdirs=t_dirs, positions=positions, light_positions=t_light_positions, **geo_out)
+            rgb_fg_all = self.material(viewdirs=t_dirs, positions=positions, light_positions=t_light_positions, **geo_out, **kwargs)
             comp_rgb_bg = self.background(dirs=rays_d_flatten)
         else:
             geo_out = chunk_batch(self.geometry, self.cfg.eval_chunk_size, positions, output_normal=self.material.requires_normal)
@@ -126,7 +126,14 @@ class NeRFVolumeRenderer(VolumeRenderer):
         opacity: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(weights[...,0], values=None, ray_indices=ray_indices, n_rays=n_rays)
         depth: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(weights[...,0], values=t_positions, ray_indices=ray_indices, n_rays=n_rays)
         comp_rgb_fg: Float[Tensor, "Nr Nc"] = nerfacc.accumulate_along_rays(weights[...,0], values=rgb_fg_all, ray_indices=ray_indices, n_rays=n_rays)
-        comp_rgb = comp_rgb_fg + comp_rgb_bg * (1.0 - opacity)    
+        
+        if bg_color is None:
+            bg_color = comp_rgb_bg
+        else:
+            if bg_color.shape == (batch_size, height, width, 3):
+                bg_color = bg_color.reshape(-1, 3)
+
+        comp_rgb = comp_rgb_fg + bg_color * (1.0 - opacity)    
 
         out = {
             'comp_rgb': comp_rgb.view(batch_size, height, width, -1),

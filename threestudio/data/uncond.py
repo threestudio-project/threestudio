@@ -30,12 +30,16 @@ class RandomCameraDataModuleConfig:
     elevation_range: Tuple[float, float] = (-10, 90)
     azimuth_range: Tuple[float, float] = (-180, 180)
     camera_distance_range: Tuple[float, float] = (1, 1.5)
-    fovy_range: Tuple[float, float] = (40, 70) # in degrees, in vertical direction (along height)
+    fovy_range: Tuple[float, float] = (40, 80) # in degrees, in vertical direction (along height)
     camera_perturb: float = 0.1
     center_perturb: float = 0.2
     up_perturb: float = 0.02
     light_position_perturb: float = 1.0
     light_distance_range: Tuple[float, float] = (0.8, 1.5)
+    default_elevation_deg: float = 0.
+    default_azimuth_deg: float = -180.
+    default_camera_distance: float = 1.2
+    default_fovy_deg: float = 60.
 
 class RandomCameraIterableDataset(IterableDataset):
     def __init__(self, cfg: Any) -> None:
@@ -130,11 +134,14 @@ class RandomCameraDataset(Dataset):
         self.cfg: RandomCameraDataModuleConfig = cfg
         self.split = split
 
-        self.n_test_views = 120
+        if split == 'val':
+            self.n_test_views = 5
+        else:
+            self.n_test_views = 120
         
         azimuth_deg: Float[Tensor, "B"] = torch.linspace(0, 360., self.n_test_views) - 180.
-        elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, 15.)
-        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.camera_distance_range[0] + self.cfg.camera_distance_range[1]) / 2.)
+        elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, self.cfg.default_elevation_deg)
+        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.default_camera_distance)
 
         elevation = elevation_deg * math.pi / 180
         azimuth = azimuth_deg * math.pi / 180
@@ -154,7 +161,7 @@ class RandomCameraDataset(Dataset):
         up: Float[Tensor, "B 3"] = torch.as_tensor([0, 0, 1], dtype=torch.float32)[None,:].repeat(self.cfg.eval_batch_size, 1)
 
         # sample fovs from a uniform distribution bounded by fov_range
-        fovy_deg: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.fovy_range[0] + self.cfg.fovy_range[1]) / 2)
+        fovy_deg: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.default_fovy_deg)
         fovy = fovy_deg * math.pi / 180
         light_positions: Float[Tensor, "B 3"] = camera_positions
 
@@ -181,7 +188,7 @@ class RandomCameraDataset(Dataset):
         self.camera_distances = camera_distances
     
     def __len__(self):
-        return 1 if self.split == 'val' else self.n_test_views
+        return self.n_test_views
     
     def __getitem__(self, index):
         return {
