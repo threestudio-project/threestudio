@@ -133,8 +133,10 @@ class RandomCameraDataset(Dataset):
         self.n_test_views = 120
         
         azimuth_deg: Float[Tensor, "B"] = torch.linspace(0, 360., self.n_test_views) - 180.
-        elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, 15.)
-        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.camera_distance_range[0] + self.cfg.camera_distance_range[1]) / 2.)
+        elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, 0.)
+        # using the maximum distance for evaluation
+        # camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.camera_distance_range[0] + self.cfg.camera_distance_range[1]) / 2.)
+        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.camera_distance_range[1])
 
         elevation = elevation_deg * math.pi / 180
         azimuth = azimuth_deg * math.pi / 180
@@ -153,8 +155,8 @@ class RandomCameraDataset(Dataset):
         # default camera up direction as +z
         up: Float[Tensor, "B 3"] = torch.as_tensor([0, 0, 1], dtype=torch.float32)[None,:].repeat(self.cfg.eval_batch_size, 1)
 
-        # sample fovs from a uniform distribution bounded by fov_range
-        fovy_deg: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.fovy_range[0] + self.cfg.fovy_range[1]) / 2)
+        # using the largest fovy for evaluation
+        fovy_deg: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.fovy_range[1])
         fovy = fovy_deg * math.pi / 180
         light_positions: Float[Tensor, "B 3"] = camera_positions
 
