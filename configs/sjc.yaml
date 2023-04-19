@@ -37,9 +37,10 @@ system:
     num_samples_per_ray: 256
     grid_prune: false
   
-  prompt_processor_type: "sjc-prompt-processor"
+  prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
     prompt: "A high quality photo of a delicious burger"
+    view_dependent_prompt_front: true
   
   guidance_type: "sjc-guidance"
   guidance:

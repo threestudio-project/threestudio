@@ -200,6 +200,8 @@ class ScoreJacobianGuidance(BaseModule):
         self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
         self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
 
+        self.grad_clip_val = None
+
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(self.device)
         self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)
         print(f"[INFO] loaded stable diffusion!")
