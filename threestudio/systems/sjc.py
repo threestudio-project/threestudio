@@ -8,15 +8,7 @@ from threestudio.utils.typing import *
 from threestudio.utils.ops import dot, binary_cross_entropy
 import numpy as np
 
-import matplotlib.pyplot as plt
-
 __all__ = ["ScoreJacobianChaining"]
-
-colormap = plt.get_cmap('Spectral')
-
-def blend_rgba(img):
-    img = img[..., :3] * img[..., -1:] + (1. - img[..., -1:])  # blend A to RGB
-    return img
 
 @threestudio.register("sjc-system")
 class ScoreJacobianChaining(BaseSystem):
@@ -102,17 +94,12 @@ class ScoreJacobianChaining(BaseSystem):
     
     def vis_depth(self, pred_depth):
         depth = pred_depth.detach().cpu().numpy()
-        del pred_depth
-
-        depth = np.log(1. + depth + 1e-12)
-        depth = depth / np.log(1+10.)
-        depth = colormap(depth)
-        depth = blend_rgba(depth)
+        depth = np.log(1. + depth + 1e-12) / np.log(1 + 10.)
         return depth
 
     def validation_step(self, batch, batch_idx):
         out = self(batch, decode=True)
-        comp_depth = out['depth'] + 10 * (1 - out['opacity'])
+        comp_depth = out['depth'] + 10 * (1 - out['opacity']) # 10 for background
         vis_depth = self.vis_depth(comp_depth.squeeze(-1))
 
         self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", [
@@ -122,7 +109,7 @@ class ScoreJacobianChaining(BaseSystem):
         ] if 'comp_normal' in out else []) + [
             {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
         ] + [
-            {'type': 'rgb', 'img': vis_depth[0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}},
+            {'type': 'grayscale', 'img': vis_depth[0], 'kwargs': {'cmap': 'spectral', 'data_range': (0, 1)}},
         ])
     
     def on_validation_epoch_end(self):
