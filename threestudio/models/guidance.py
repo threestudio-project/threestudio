@@ -10,6 +10,7 @@ from diffusers import (
     UNet2DConditionModel,
     PNDMScheduler,
     DDIMScheduler,
+    DDPMScheduler,
     StableDiffusionPipeline,
 )
 from diffusers.utils import randn_tensor
@@ -46,8 +47,10 @@ class StableDiffusionGuidance(BaseModule):
         guidance_scale: float = 100.
         grad_clip: Optional[Any] = field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
+        
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
+        use_weight: bool = True
 
     cfg: Config
 
@@ -86,7 +89,7 @@ class StableDiffusionGuidance(BaseModule):
         rgb: Float[Tensor, "B H W C"],
         text_embeddings: Float[Tensor, "BB 77 768"],
         rgb_as_latents=False,
-        grad_scale=1.0
+        grad_scale=1.0,
     ):
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
@@ -121,10 +124,140 @@ class StableDiffusionGuidance(BaseModule):
             noise_pred_text - noise_pred_uncond
         )
 
-        # w(t), sigma_t^2
-        w = 1 - self.alphas[t]
-        # w = self.alphas[t] ** 0.5 * (1 - self.alphas[t])
+        if self.cfg.use_weight:
+            # w(t), sigma_t^2
+            w = 1 - self.alphas[t]
+        else:
+            w = 1
+
         grad = grad_scale * w * (noise_pred - noise)
+        grad = torch.nan_to_num(grad)
+        # clip grad for stable training?
+        if self.cfg.grad_clip is not None:
+            grad = grad.clamp(-self.cfg.grad_clip, self.cfg.grad_clip)
+
+        # since we omitted an item in grad, we need to use the custom function to specify the gradient
+        loss = SpecifyGradient.apply(latents, grad)
+        # latents.backward(grad, retain_graph=True)
+
+        return {
+            'sds': loss,
+            'grad_norm': grad.norm(),
+        }
+    
+    def encode_images(self, imgs: Float[Tensor, "B 3 512 512"]) -> Float[Tensor, "B 4 64 64"]:
+        imgs = 2 * imgs - 1
+        posterior = self.vae.encode(imgs).latent_dist
+        latents = posterior.sample() * self.vae.config.scaling_factor
+        return latents    
+
+    def decode_latents(self, latents: Float[Tensor, "B 4 H W"]) -> Float[Tensor, "B 3 512 512"]:
+        latents = F.interpolate(latents, (64, 64), mode="bilinear", align_corners=False)
+        latents = 1 / self.vae.config.scaling_factor * latents
+        image = self.vae.decode(latents).sample
+        image = (image / 2 + 0.5).clamp(0, 1)
+        return image
+
+
+@threestudio.register('sjc-guidance')
+class ScoreJacobianGuidance(BaseModule):
+    @dataclass
+    class Config(BaseModule.Config):
+        pretrained_model_name_or_path: str = 'runwayml/stable-diffusion-v1-5'
+        use_xformers: bool = False
+        guidance_scale: float = 100.
+        grad_clip: Optional[float] = None
+        half_precision_weights: bool = True
+        var_red: bool = True
+        min_step_percent: float = 0.01
+        max_step_percent: float = 0.97
+
+    cfg: Config
+
+    def configure(self) -> None:
+        print(f"[INFO] loading stable diffusion...")
+
+        weights_dtype = torch.float16 if self.cfg.half_precision_weights else torch.float32
+        # Create model
+        self.vae = AutoencoderKL.from_pretrained(self.cfg.pretrained_model_name_or_path, subfolder="vae", torch_dtype=weights_dtype).to(self.device)
+        self.unet = UNet2DConditionModel.from_pretrained(self.cfg.pretrained_model_name_or_path, subfolder="unet", torch_dtype=weights_dtype).to(self.device)
+
+        for p in self.vae.parameters():
+            p.requires_grad_(False)
+        for p in self.unet.parameters():
+            p.requires_grad_(False)
+
+        if self.cfg.use_xformers and is_xformers_available():
+            self.unet.enable_xformers_memory_efficient_attention()
+
+        self.scheduler = DDPMScheduler.from_pretrained(
+            self.cfg.pretrained_model_name_or_path, subfolder="scheduler", torch_dtype=weights_dtype,
+            beta_start=0.00085,
+            beta_end=0.0120,
+            beta_schedule="scaled_linear",
+        )
+
+        self.num_train_timesteps = self.scheduler.config.num_train_timesteps
+        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
+        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+
+        self.grad_clip_val = None
+
+        self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(self.device)
+        self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)
+        print(f"[INFO] loaded stable diffusion!")
+
+    def forward(
+        self,
+        rgb: Float[Tensor, "B H W C"],
+        text_embeddings: Float[Tensor, "BB 77 768"],
+        rgb_as_latents=False
+    ):
+        rgb_BCHW = rgb.permute(0, 3, 1, 2)
+        latents: Float[Tensor, "B 4 64 64"]
+        if rgb_as_latents:
+            latents = F.interpolate(rgb_BCHW, (64, 64), mode="bilinear", align_corners=False)
+        else:
+            rgb_BCHW_512 = F.interpolate(
+                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+            )
+            # encode image into latents with vae
+            latents = self.encode_images(rgb_BCHW_512)
+
+        # timestep ~ U(0.01, 0.97) to avoid very high/low noise level
+        t = torch.randint(
+            self.min_step, self.max_step + 1, [1], dtype=torch.long, device=self.device
+        )
+
+        sigma = self.us[t]
+
+        # predict the noise residual with unet, NO grad!
+        with torch.no_grad():
+            # add noise
+            noise = torch.randn_like(latents) # TODO: use torch generator
+            y = latents
+
+            zs = y + sigma * noise
+            scaled_zs = zs / torch.sqrt(1 + sigma ** 2)
+
+            # pred noise
+            latent_model_input = torch.cat([scaled_zs] * 2, dim=0)
+            noise_pred = self.unet(
+                latent_model_input, t, encoder_hidden_states=text_embeddings
+            ).sample
+
+            # perform guidance (high scale from paper!)
+            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred = noise_pred_text + self.cfg.guidance_scale * (
+                noise_pred_text - noise_pred_uncond
+            )
+
+            Ds = zs - sigma * noise_pred
+
+            if self.cfg.var_red:
+                grad = -(Ds - y) / sigma
+            else:
+                grad = -(Ds - zs) / sigma
 
         grad = torch.nan_to_num(grad)
         if self.grad_clip_val is not None:
@@ -135,7 +268,7 @@ class StableDiffusionGuidance(BaseModule):
         # latents.backward(grad, retain_graph=True)
 
         return {
-            'sds': loss
+            'sds': loss,
         }
     
     def encode_images(self, imgs: Float[Tensor, "B 3 512 512"]) -> Float[Tensor, "B 4 64 64"]:
