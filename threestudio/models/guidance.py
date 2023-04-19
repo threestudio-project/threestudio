@@ -50,7 +50,7 @@ class StableDiffusionGuidance(BaseModule):
         
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-
+        use_weight: bool = True
 
     cfg: Config
 
@@ -126,11 +126,10 @@ class StableDiffusionGuidance(BaseModule):
         if self.cfg.use_weight:
             # w(t), sigma_t^2
             w = 1 - self.alphas[t]
-            # w = self.alphas[t] ** 0.5 * (1 - self.alphas[t])
-            grad = w * (noise_pred - noise)
         else:
-            grad = noise_pred - noise
+            w = 1
 
+        grad = w * (noise_pred - noise)
         grad = torch.nan_to_num(grad)
         # clip grad for stable training?
         if self.cfg.grad_clip is not None:
@@ -169,6 +168,8 @@ class ScoreJacobianGuidance(BaseModule):
         grad_clip: Optional[float] = None
         half_precision_weights: bool = True
         var_red: bool = True
+        min_step_percent: float = 0.01
+        max_step_percent: float = 0.97
 
     cfg: Config
 
@@ -196,8 +197,8 @@ class ScoreJacobianGuidance(BaseModule):
         )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * 0.01)
-        self.max_step = int(self.num_train_timesteps * 0.97)
+        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
+        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(self.device)
         self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)

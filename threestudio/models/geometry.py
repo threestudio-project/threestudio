@@ -368,7 +368,7 @@ class ImplicitSDF(BaseImplicitGeometry):
 class VolumeGrid(BaseImplicitGeometry):
     @dataclass
     class Config(BaseImplicitGeometry.Config):
-        grid_size: List[int] = field(default_factory=list)
+        grid_size: Tuple[int,int,int] = field(default_factory=lambda: (100, 100, 100))
         n_feature_dims: int = 3
         density_activation: Optional[str] = "softplus"
         density_bias: Union[float, str] = 'blob'
@@ -381,8 +381,6 @@ class VolumeGrid(BaseImplicitGeometry):
     def configure(self) -> None:
         super().configure()
         self.grid_size = self.cfg.grid_size
-
-        assert len(self.grid_size) == 3, "grid_size must be a list of length 3"
 
         self.grid = nn.Parameter(torch.zeros(1, self.cfg.n_feature_dims + 1, *self.grid_size))
         if self.cfg.density_bias == 'blob':
@@ -460,7 +458,6 @@ class VolumeGrid(BaseImplicitGeometry):
         density = out[..., 0:1]
         density = density * torch.exp(self.density_scale)
         
-        # breakpoint()
         density = get_activation(self.cfg.density_activation)(
             density + self.get_density_bias(points_unscaled)
         )

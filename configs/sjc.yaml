@@ -29,8 +29,8 @@ system:
   background:
     n_output_dims: 4
     color_activation: none
-    h: 4
-    w: 4
+    height: 4
+    width: 4
 
   renderer_type: "nerf-volume-renderer"
   renderer:
