@@ -30,16 +30,15 @@ class RandomCameraDataModuleConfig:
     elevation_range: Tuple[float, float] = (-10, 90)
     azimuth_range: Tuple[float, float] = (-180, 180)
     camera_distance_range: Tuple[float, float] = (1, 1.5)
-    fovy_range: Tuple[float, float] = (40, 80) # in degrees, in vertical direction (along height)
+    fovy_range: Tuple[float, float] = (40, 70) # in degrees, in vertical direction (along height)
     camera_perturb: float = 0.1
     center_perturb: float = 0.2
     up_perturb: float = 0.02
     light_position_perturb: float = 1.0
     light_distance_range: Tuple[float, float] = (0.8, 1.5)
-    default_elevation_deg: float = 0.
-    default_azimuth_deg: float = -180.
-    default_camera_distance: float = 1.2
-    default_fovy_deg: float = 60.
+    default_elevation_deg: float = 15.
+    default_camera_distance: float = 1.25
+    default_fovy_deg: float = 55.
 
 class RandomCameraIterableDataset(IterableDataset):
     def __init__(self, cfg: Any) -> None:

@@ -93,11 +93,11 @@ class NoMaterial(BaseMaterial):
 class DiffuseWithPointLightMaterial(BaseMaterial):
     @dataclass
     class Config(BaseMaterial.Config):
-        ambient_light_color: Tuple[float, float, float] = (1.0, 1.0, 1.0)
-        diffuse_light_color: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+        ambient_light_color: Tuple[float, float, float] = (0.1, 0.1, 0.1)
+        diffuse_light_color: Tuple[float, float, float] = (0.9, 0.9, 0.9)
         ambient_only_steps: int = 1000
         diffuse_prob: float = 0.75
-        textureless_prob: float = 0.5
+        textureless_prob: float = 0.375
         albedo_activation: str = 'sigmoid'
 
     cfg: Config
@@ -112,7 +112,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
 
     def forward(self, features: Float[Tensor, "B ... Nf"], positions: Float[Tensor, "B ... 3"], shading_normal: Float[Tensor, "B ... 3"], light_positions: Float[Tensor, "B ... 3"], ambient_ratio: Optional[float] = None, shading: Optional[str] = None, **kwargs) -> Float[Tensor, "B ... 3"]:
         albedo = get_activation(self.cfg.albedo_activation)(features[..., :3])
-        if self.ambient_only or not self.training or shading == 'albedo':
+        if self.ambient_only:
             return albedo
         
         if ambient_ratio is not None:
@@ -126,6 +126,9 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         diffuse_light: Float[Tensor, "B ... 3"] = dot(shading_normal, light_directions).clamp(min=0.) * diffuse_light_color
         textureless_color = diffuse_light + ambient_light_color
         color = albedo * textureless_color
+
+        if not self.training:
+            shading = 'ambient'
 
         if shading is None:
             # adopt the same type of augmentation for the whole batch
