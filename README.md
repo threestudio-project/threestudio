@@ -43,6 +43,14 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
 ```
 
+### Score Jacobian Chaining
+```bash
+# train with sjc guidance in latent space
+python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger" 
+# train with sjc guidance in latent space, trump figure
+python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" seed=10 system.renderer.num_samples_per_ray=512 trainer.max_steps=30000 system.loss.lambda_emptiness=[15000,10000.0,200000.0,15001]
+```
+
 ## Tips
 - To resume a model and continue training, please load the `parsed.yaml` in the trial directory and set `resume` to the checkpoint path. Example:
 ```bash

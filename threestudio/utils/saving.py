@@ -6,6 +6,7 @@ import cv2
 import imageio
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.pyplot as plt
 import trimesh
 import json
 import torch
@@ -102,7 +103,7 @@ class SaverMixin:
         else:
             img = img.clip(data_range[0], data_range[1])
             img = (img - data_range[0]) / (data_range[1] - data_range[0])
-        assert cmap in [None, 'jet', 'magma']
+        assert cmap in [None, 'jet', 'magma', 'spectral']
         if cmap == None:
             img = (img * 255.).astype(np.uint8)
             img = np.repeat(img[...,None], 3, axis=2)
@@ -125,6 +126,15 @@ class SaverMixin:
             b = b.astype(np.uint16).clip(0, 255)
             img = colormap[a] + (colormap[b] - colormap[a]) * f[...,None]
             img = (img * 255.).astype(np.uint8)
+        elif cmap == 'spectral':
+            colormap = plt.get_cmap('Spectral')
+            def blend_rgba(image):
+                image = image[..., :3] * image[..., -1:] + (1. - image[..., -1:])  # blend A to RGB
+                return image
+            img = colormap(img)
+            img = blend_rgba(img)
+            img = (img * 255).astype(np.uint8)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         return img
 
     def save_grayscale_image(self, filename, img, data_range=DEFAULT_GRAYSCALE_KWARGS['data_range'], cmap=DEFAULT_GRAYSCALE_KWARGS['cmap']):

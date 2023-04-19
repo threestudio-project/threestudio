@@ -39,6 +39,7 @@ class DreamFusionPromptProcessor(PromptProcessor):
         overhead_threshold: float = 60.
         front_threshold: float = 22.5
         back_threshold: float = 22.5
+        view_dependent_prompt_front: bool = False
 
     cfg: Config
 
@@ -56,13 +57,7 @@ class DreamFusionPromptProcessor(PromptProcessor):
             prompt: str
             negative_prompt: str
             condition: Callable[[Float[Tensor, "B"], Float[Tensor, "B"], Float[Tensor, "B"]], Float[Tensor, "B"]]
-        self.directions: List[DirectionConfig] = [
-            DirectionConfig('side', ', side view', '', lambda ele, azi, dis: torch.ones_like(ele, dtype=torch.bool)),
-            DirectionConfig('front', ', front view', '', lambda ele, azi, dis: (azi > -self.cfg.front_threshold) & (azi < self.cfg.front_threshold)),
-            DirectionConfig('back', ', back view', '', lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold) | (azi < -180 + self.cfg.back_threshold)),
-            DirectionConfig('overhead', ', overhead view', '', lambda ele, azi, dis: ele > self.cfg.overhead_threshold)
-        ]
-        self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
+
 
         # load prompt library
         with open(os.path.join('load/prompt_library.json'), 'r') as f:
@@ -77,11 +72,32 @@ class DreamFusionPromptProcessor(PromptProcessor):
         self.text_embeddings, self.uncond_text_embeddings = self.get_text_embeddings(
             [self.prompt], [self.negative_prompt]
         )
+
         # view-dependent text embeddings
-        self.text_embeddings_vd, self.uncond_text_embeddings_vd = self.get_text_embeddings(
-            [f"{self.prompt} {d.prompt}" for d in self.directions],
-            [f"{self.negative_prompt} {d.negative_prompt}" for d in self.directions],
-        )
+        if self.cfg.view_dependent_prompt_front:
+            self.directions: List[DirectionConfig] = [
+                DirectionConfig('side', 'side view of', '', lambda ele, azi, dis: torch.ones_like(ele, dtype=torch.bool)),
+                DirectionConfig('front', 'front view of', '', lambda ele, azi, dis: (azi > -self.cfg.front_threshold) & (azi < self.cfg.front_threshold)),
+                DirectionConfig('back', 'backside view of', '', lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold) | (azi < -180 + self.cfg.back_threshold)),
+                DirectionConfig('overhead', 'overhead view of', '', lambda ele, azi, dis: ele > self.cfg.overhead_threshold)
+            ]
+            self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
+            self.text_embeddings_vd, self.uncond_text_embeddings_vd = self.get_text_embeddings(
+                [f"{d.prompt} {self.cfg.prompt} " for d in self.directions],
+                [f"{d.negative_prompt} {self.cfg.negative_prompt}" for d in self.directions],
+            ) 
+        else:
+            self.directions: List[DirectionConfig] = [
+                DirectionConfig('side', ', side view', '', lambda ele, azi, dis: torch.ones_like(ele, dtype=torch.bool)),
+                DirectionConfig('front', ', front view', '', lambda ele, azi, dis: (azi > -self.cfg.front_threshold) & (azi < self.cfg.front_threshold)),
+                DirectionConfig('back', ', back view', '', lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold) | (azi < -180 + self.cfg.back_threshold)),
+                DirectionConfig('overhead', ', overhead view', '', lambda ele, azi, dis: ele > self.cfg.overhead_threshold)
+            ]
+            self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
+            self.text_embeddings_vd, self.uncond_text_embeddings_vd = self.get_text_embeddings(
+                [f"{self.prompt} {d.prompt}" for d in self.directions],
+                [f"{self.negative_prompt} {d.negative_prompt}" for d in self.directions],
+            )
     
     def preprocess_prompt(self, prompt: str) -> str:
         if prompt.startswith('lib:'):
