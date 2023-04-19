@@ -9,6 +9,9 @@ data:
   random_camera:
     eval_height: 256
     eval_width: 256
+    default_elevation_deg: 0.
+    default_camera_distance: 1.2
+    default_fovy_deg: 60.
 
 system_type: "image-condition-dreamfusion-system"
 system:
@@ -39,7 +42,9 @@ system:
   material:
     diffuse_prob: 1.0
     textureless_prob: 0.2
-    ambient_only_steps: 0
+    ambient_light_color: [1.0,1.0,1.0]
+    diffuse_light_color: [0.0,0.0,0.0]
+    ambient_only_steps: 100
   
   # background_type: "solid-color-background"
   background_type: "neural-environment-map-background"
