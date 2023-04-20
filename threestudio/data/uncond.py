@@ -36,6 +36,9 @@ class RandomCameraDataModuleConfig:
     up_perturb: float = 0.02
     light_position_perturb: float = 1.0
     light_distance_range: Tuple[float, float] = (0.8, 1.5)
+    eval_elevation_deg: float = 0.
+    eval_camera_distance: float = 1.5
+    eval_fovy_deg: float = 60.
 
 class RandomCameraIterableDataset(IterableDataset):
     def __init__(self, cfg: Any) -> None:
@@ -130,13 +133,14 @@ class RandomCameraDataset(Dataset):
         self.cfg: RandomCameraDataModuleConfig = cfg
         self.split = split
 
-        self.n_test_views = 120
+        if split == 'val':
+            self.n_test_views = 5
+        else:
+            self.n_test_views = 120
         
         azimuth_deg: Float[Tensor, "B"] = torch.linspace(0, 360., self.n_test_views) - 180.
-        elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, 0.)
-        # using the maximum distance for evaluation
-        # camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, (self.cfg.camera_distance_range[0] + self.cfg.camera_distance_range[1]) / 2.)
-        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.camera_distance_range[1])
+        elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, self.cfg.eval_elevation_deg)
+        camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.eval_camera_distance)
 
         elevation = elevation_deg * math.pi / 180
         azimuth = azimuth_deg * math.pi / 180
@@ -155,8 +159,7 @@ class RandomCameraDataset(Dataset):
         # default camera up direction as +z
         up: Float[Tensor, "B 3"] = torch.as_tensor([0, 0, 1], dtype=torch.float32)[None,:].repeat(self.cfg.eval_batch_size, 1)
 
-        # using the largest fovy for evaluation
-        fovy_deg: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.fovy_range[1])
+        fovy_deg: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.eval_fovy_deg)
         fovy = fovy_deg * math.pi / 180
         light_positions: Float[Tensor, "B 3"] = camera_positions
 
@@ -183,7 +186,7 @@ class RandomCameraDataset(Dataset):
         self.camera_distances = camera_distances
     
     def __len__(self):
-        return 1 if self.split == 'val' else self.n_test_views
+        return self.n_test_views
     
     def __getitem__(self, index):
         return {

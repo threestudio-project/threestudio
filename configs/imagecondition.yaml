@@ -1,0 +1,134 @@
+name: "imagecondition"
+tag: "debug"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "single-image-datamodule"
+data:
+  image_path: ./data/hamburger_rgba.png
+  random_camera:
+    eval_height: 256
+    eval_width: 256
+    eval_elevation_deg: 0.
+    eval_camera_distance: 1.2
+    eval_fovy_deg: 60.
+
+system_type: "image-condition-dreamfusion-system"
+system:
+  geometry_type: "implicit-volume"
+  geometry:
+    normal_type: "finite_difference"
+    finite_difference_normal_eps: 0.004
+    mlp_network_config:
+      otype: "VanillaMLP"
+      activation: "ReLU"
+      output_activation: "none"
+      n_neurons: 64
+      n_hidden_layers: 2
+
+  # material_type: "neural-radiance-material"
+  # material:
+  #   input_feature_dims: ${system.geometry.n_feature_dims}
+  #   dir_encoding_config:
+  #     otype: "SphericalHarmonics"
+  #     degree: 4
+  #   mlp_network_config:
+  #     otype: "FullyFusedMLP"
+  #     activation: "ReLU"
+  #     n_neurons: 16
+  #     n_hidden_layers: 2
+
+  material_type: "diffuse-with-point-light-material"
+  material:
+    diffuse_prob: 1.0
+    textureless_prob: 0.2
+    ambient_light_color: [1.0,1.0,1.0]
+    diffuse_light_color: [0.0,0.0,0.0]
+    ambient_only_steps: 100
+  
+  # background_type: "solid-color-background"
+  background_type: "neural-environment-map-background"
+  background:
+    dir_encoding_config:
+      otype: ProgressiveBandFrequency
+      n_frequencies: 6
+    mlp_network_config:
+      otype: VanillaMLP
+      n_neurons: 32
+      n_hidden_layers: 1
+      activation: "ReLu"
+
+
+  renderer_type: "nerf-volume-renderer"
+  renderer:
+    num_samples_per_ray: 512
+  
+  prompt_processor_type: "dreamfusion-prompt-processor"
+  prompt_processor:
+    prompt: "a DSLR photo of a delicious hamburger"
+  
+  guidance_type: "stable-diffusion-guidance"
+  guidance:
+    half_precision_weights: true
+    guidance_scale: 100.
+    grad_clip: null
+  
+  freq:
+    n_ref: 2
+
+  loss:
+    lambda_sds: 0.1
+    lambda_rgb: 10.
+    lambda_mask: 10.
+    lambda_depth: [0.0, 0.0, 1.0, 10000]
+    lambda_orient: 0.0
+    lambda_sparsity: 0.0
+    lambda_opaque: 0.0
+  optimizer:
+    # params:
+    #   geometry.encoding:
+    #     lr: 0.01
+    #   geometry.network:
+    #     lr: 0.001
+    #   background.network:
+    #     lr: 0.001
+    # name: Adam
+    # args:
+    #   # lr: 0.001
+    #   betas: [0.9, 0.99]
+    #   eps: 1.e-15
+    
+    name: Adan
+    args:
+      eps: 1.0e-8
+      weight_decay: 2.0e-5
+      max_grad_norm: 5.0
+      foreach: False
+
+    params:
+      geometry.encoding:
+        lr: 0.05
+      geometry.network:
+        lr: 0.005
+      background.network:
+        lr: 0.005
+    
+  scheduler:
+    name: ConstantLR
+    args:
+      factor: 1.0
+      total_iters: ${trainer.max_steps}
+
+trainer:
+  max_steps: 10000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 100
+  limit_val_batches: 6
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

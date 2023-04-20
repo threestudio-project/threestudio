@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import random
 
 import threestudio
 from threestudio.models.networks import get_encoding, get_mlp
@@ -96,7 +97,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         diffuse_light_color: Tuple[float, float, float] = (0.9, 0.9, 0.9)
         ambient_only_steps: int = 1000
         diffuse_prob: float = 0.75
-        textureless_prob: float = 0.5
+        textureless_prob: float = 0.375
         albedo_activation: str = 'sigmoid'
 
     cfg: Config
@@ -109,24 +110,44 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         self.register_buffer('diffuse_light_color', torch.as_tensor(self.cfg.diffuse_light_color, dtype=torch.float32))
         self.ambient_only = False
 
-    def forward(self, features: Float[Tensor, "B ... Nf"], positions: Float[Tensor, "B ... 3"], shading_normal: Float[Tensor, "B ... 3"], light_positions: Float[Tensor, "B ... 3"], **kwargs) -> Float[Tensor, "B ... 3"]:
+    def forward(self, features: Float[Tensor, "B ... Nf"], positions: Float[Tensor, "B ... 3"], shading_normal: Float[Tensor, "B ... 3"], light_positions: Float[Tensor, "B ... 3"], ambient_ratio: Optional[float] = None, shading: Optional[str] = None, **kwargs) -> Float[Tensor, "B ... 3"]:
         albedo = get_activation(self.cfg.albedo_activation)(features[..., :3])
         if self.ambient_only:
             return albedo
+        
+        if ambient_ratio is not None:
+            diffuse_light_color = (1 - ambient_ratio) * torch.ones_like(self.diffuse_light_color)
+            ambient_light_color = ambient_ratio * torch.ones_like(self.ambient_light_color)
+        else:
+            diffuse_light_color = self.diffuse_light_color
+            ambient_light_color = self.ambient_light_color
+
         light_directions: Float[Tensor, "B ... 3"] = F.normalize(light_positions - positions, dim=-1)
-        diffuse_light: Float[Tensor, "B ... 3"] = dot(shading_normal, light_directions).clamp(min=0.) * self.diffuse_light_color
-        textureless_color = diffuse_light + self.ambient_light_color
+        diffuse_light: Float[Tensor, "B ... 3"] = dot(shading_normal, light_directions).clamp(min=0.) * diffuse_light_color
+        textureless_color = diffuse_light + ambient_light_color
         color = albedo * textureless_color
 
         if not self.training:
-            return color
+            shading = 'diffuse'
 
-        # adopt the same type of augmentation for the whole batch
-        if torch.rand([]) > self.cfg.diffuse_prob:
+        if shading is None:
+            # adopt the same type of augmentation for the whole batch
+            rand = random.random()
+            if rand > self.cfg.diffuse_prob:
+                shading = 'albedo'
+            elif rand < self.cfg.textureless_prob:
+                shading = 'textureless'
+            else:
+                shading = 'diffuse'
+
+        if shading == 'albedo':
             return albedo
-        if torch.rand([]) < self.cfg.textureless_prob:
+        elif shading == 'textureless':
             return textureless_color
-        return color
+        elif shading == 'diffuse':
+            return color
+        else:
+            raise ValueError(f'Unknown shading type {shading}')
 
     def update_step(self, epoch: int, global_step: int):
         if global_step < self.cfg.ambient_only_steps:
