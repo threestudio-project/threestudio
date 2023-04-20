@@ -69,7 +69,7 @@ class ImageConditionDreamFusion(BaseSystem):
         else:
             bg_color = torch.rand_like(batch['rays_o'])
             ambient_ratio = 1.0
-            shading = 'ambient'
+            shading = 'diffuse'
             batch['shading'] = shading
         
         batch['bg_color'] = bg_color
@@ -101,7 +101,7 @@ class ImageConditionDreamFusion(BaseSystem):
                 loss += self.C(self.cfg.loss.lambda_depth) * F.mse_loss(valid_gt_depth, valid_pred_depth)
         else:
             text_embeddings = self.prompt_processor(**batch)
-            guidance_out = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=False, grad_scale=self.C(self.cfg.loss.lambda_sds))
+            guidance_out = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=False)
 
             loss += guidance_out['sds']
 

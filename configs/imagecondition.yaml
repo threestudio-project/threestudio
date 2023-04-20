@@ -9,16 +9,16 @@ data:
   random_camera:
     eval_height: 256
     eval_width: 256
-    default_elevation_deg: 0.
-    default_camera_distance: 1.2
-    default_fovy_deg: 60.
+    eval_elevation_deg: 0.
+    eval_camera_distance: 1.2
+    eval_fovy_deg: 60.
 
 system_type: "image-condition-dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
     normal_type: "finite_difference"
-    finite_difference_eps: 0.004
+    finite_difference_normal_eps: 0.004
     mlp_network_config:
       otype: "VanillaMLP"
       activation: "ReLU"
