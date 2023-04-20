@@ -40,7 +40,7 @@ I by far have implemented the early training stage of Fantasia3D, which regards 
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry"
 # Fantasia3D highly relies on the initialized SDF shape
 # change the shape initialization to match your input prompt
-python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
 ```
 
 ### Score Jacobian Chaining
@@ -49,6 +49,12 @@ python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger" 
 # train with sjc guidance in latent space, trump figure
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" seed=10 system.renderer.num_samples_per_ray=512 trainer.max_steps=30000 system.loss.lambda_emptiness=[15000,10000.0,200000.0,15001]
+```
+
+### Image-Condition DreamFusion
+```bash
+# train with single image reference and stable-diffusion sds guidance
+python launch.py --config configs/imagecondition.yaml --train --gpu 0
 ```
 
 ## Tips
