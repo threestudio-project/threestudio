@@ -128,7 +128,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         color = albedo * textureless_color
 
         if not self.training:
-            shading = 'ambient'
+            shading = 'diffuse'
 
         if shading is None:
             # adopt the same type of augmentation for the whole batch
@@ -138,14 +138,16 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
             elif rand < self.cfg.textureless_prob:
                 shading = 'textureless'
             else:
-                shading = 'ambient'
+                shading = 'diffuse'
 
         if shading == 'albedo':
             return albedo
         elif shading == 'textureless':
             return textureless_color
-        else:
+        elif shading == 'diffuse':
             return color
+        else:
+            raise ValueError(f'Unknown shading type {shading}')
 
     def update_step(self, epoch: int, global_step: int):
         if global_step < self.cfg.ambient_only_steps:

@@ -76,6 +76,8 @@ def get_activation(name) -> Callable:
         return lambda x: torch.sigmoid(x)
     elif name == "tanh":
         return lambda x: torch.tanh(x)
+    elif name == "shifted_softplus":
+        return lambda x: F.softplus(x - 1.)
     else:
         try:
             return getattr(F, name)

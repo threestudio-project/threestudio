@@ -13,6 +13,7 @@ from threestudio.utils.ops import dot, binary_cross_entropy
 class ImageConditionDreamFusion(BaseSystem):
     @dataclass
     class Config(BaseSystem.Config):
+        freq: dict = field(default_factory=dict)
         geometry_type: str = "implicit-volume"
         geometry: dict = field(default_factory=dict)
         material_type: str = "diffuse-with-point-light-material"

@@ -88,8 +88,7 @@ class StableDiffusionGuidance(BaseModule):
         self,
         rgb: Float[Tensor, "B H W C"],
         text_embeddings: Float[Tensor, "BB 77 768"],
-        rgb_as_latents=False,
-        grad_scale=1.0,
+        rgb_as_latents=False
     ):
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
@@ -130,7 +129,7 @@ class StableDiffusionGuidance(BaseModule):
         else:
             w = 1
 
-        grad = grad_scale * w * (noise_pred - noise)
+        grad = w * (noise_pred - noise)
         grad = torch.nan_to_num(grad)
         # clip grad for stable training?
         if self.cfg.grad_clip is not None:

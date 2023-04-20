@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
 
-from pytorch_lightning.utilities.rank_zero import rank_zero_debug
+import threestudio
 
 
 def get_scheduler(name):
@@ -34,7 +34,7 @@ def get_parameters(model, name):
 def parse_optimizer(config, model):
     if hasattr(config, 'params'):
         params = [{'params': get_parameters(model, name), 'name': name, **args} for name, args in config.params.items()]
-        rank_zero_debug('Specify optimizer params:', config.params)
+        threestudio.debug(f'Specify optimizer params: {config.params}')
     else:
         params = model.parameters()
     if config.name in ['FusedAdam']:

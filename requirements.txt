@@ -1,5 +1,5 @@
 lightning==2.0.0
-omegaconf
+omegaconf==2.3.0
 ninja
 jaxtyping
 typeguard
