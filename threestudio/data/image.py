@@ -26,6 +26,7 @@ class SingleImageDataModuleConfig:
     image_path: str = ""
     use_random_camera: bool = True
     random_camera: dict = field(default_factory=dict)
+    rays_noise_scale: float = 2e-3
     batch_size: int = 1
 
 class SingleImageDataBase():
@@ -86,7 +87,7 @@ class SingleImageDataBase():
         directions: Float[Tensor, "1 H W 3"] = directions_unit_focal[None]
         directions[:,:,:,:2] = directions[:,:,:,:2] / focal_length
 
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
+        rays_o, rays_d = get_rays(directions, c2w, keepdim=True, noise_scale=self.cfg.rays_noise_scale)
         
         proj_mtx: Float[Tensor, "4 4"] = get_projection_matrix(fovy, self.cfg.width / self.cfg.height, 0.1, 100.) # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "4 4"] = get_mvp_matrix(c2w, proj_mtx)

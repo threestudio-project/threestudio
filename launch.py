@@ -35,7 +35,7 @@ def main() -> None:
 
     from threestudio.utils.config import ExperimentConfig, load_config
     from threestudio.utils.callbacks import CustomProgressBar
-    from threestudio.utils.callbacks import ConfigSnapshotCallback
+    from threestudio.utils.callbacks import ConfigSnapshotCallback, CodeSnapshotCallback
 
     # parse YAML config to OmegaConf
     cfg: ExperimentConfig
@@ -57,6 +57,7 @@ def main() -> None:
             ModelCheckpoint(dirpath=os.path.join(cfg.trial_dir, 'ckpts'), **cfg.checkpoint),
             LearningRateMonitor(logging_interval="step"),
             CustomProgressBar(refresh_rate=1),
+            CodeSnapshotCallback(os.path.join(cfg.trial_dir, 'code'), use_version=False),
             ConfigSnapshotCallback(args.config, cfg, os.path.join(cfg.trial_dir, 'configs'), use_version=False), # TODO: better config saving
         ]
 
