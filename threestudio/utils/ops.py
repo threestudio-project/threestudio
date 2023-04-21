@@ -70,8 +70,14 @@ def get_activation(name) -> Callable:
             torch.pow(torch.clamp(x, min=0.0031308), 1.0 / 2.4) * 1.055 - 0.055,
             12.92 * x,
         ).clamp(0.0, 1.0)
+    elif name == "exp":
+        return lambda x: torch.exp(x)
+    elif name == "shifted_exp":
+        return lambda x: torch.exp(x - 1.)
     elif name == "trunc_exp":
         return trunc_exp
+    elif name == "shifted_trunc_exp":
+        return lambda x: trunc_exp(x - 1.)
     elif name == "sigmoid":
         return lambda x: torch.sigmoid(x)
     elif name == "tanh":
