@@ -68,6 +68,14 @@ class DreamFusion(BaseSystem):
             self.log('train/loss_orient', loss_orient)
             loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
+        # distortion loss proposed in MipNeRF360
+        # an efficient implementation from https://github.com/sunset1995/torch_efficient_distloss
+        if self.C(self.cfg.loss.lambda_distortion) > 0:
+            from torch_efficient_distloss import flatten_eff_distloss        
+            loss_distortion = flatten_eff_distloss(out['weights'][...,0], out['t_points'][...,0], out['t_intervals'][...,0], out['ray_indices'])
+            self.log('train/loss_distortion', loss_distortion)
+            loss += loss_distortion * self.C(self.cfg.loss.lambda_distortion)            
+
         loss_sparsity = (out['opacity']**2 + 0.01).sqrt().mean()
         self.log('train/loss_sparsity', loss_sparsity)
         loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
