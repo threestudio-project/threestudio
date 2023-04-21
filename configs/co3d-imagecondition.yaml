@@ -17,7 +17,7 @@ data:
   box_crop: true
   box_crop_mask_thr: 0.4
   box_crop_context: 0.1 # The amount of additional padding added to each dimention of the cropping bounding box, relative to vox size.
-  train_num_rays: -1
+  train_num_rays: 4096
   train_split: 'train'
   val_split: 'val'
   test_split: 'test'
@@ -65,17 +65,17 @@ system:
     diffuse_light_color: [0.0,0.0,0.0]
     ambient_only_steps: ${system.freq.ref_only_steps}
   
-  background_type: "solid-color-background"
-  # background_type: "neural-environment-map-background"
-  # background:
-  #   dir_encoding_config:
-  #     otype: ProgressiveBandFrequency
-  #     n_frequencies: 6
-  #   mlp_network_config:
-  #     otype: VanillaMLP
-  #     n_neurons: 32
-  #     n_hidden_layers: 1
-  #     activation: "ReLU"
+  # background_type: "solid-color-background"
+  background_type: "neural-environment-map-background"
+  background:
+    dir_encoding_config:
+      otype: ProgressiveBandFrequency
+      n_frequencies: 6
+    mlp_network_config:
+      otype: VanillaMLP
+      n_neurons: 32
+      n_hidden_layers: 1
+      activation: "ReLU"
 
 
   renderer_type: "nerf-volume-renderer"
@@ -94,12 +94,12 @@ system:
     grad_clip: null
   
   freq:
-    n_ref: 1
-    ref_only_steps: 10000
+    n_ref: 2
+    ref_only_steps: 1000
 
   loss:
     lambda_sds: 0.1
-    lambda_rgb: 1.
+    lambda_rgb: 10.
     lambda_mask: 1.
     lambda_depth: 0.
     # lambda_depth: [0.0, 0.0, 1.0, 10000]

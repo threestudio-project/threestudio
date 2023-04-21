@@ -392,12 +392,12 @@ class Co3dDatasetBase():
             pass
 
         i_all = np.arange(num_frames)
-        i_test = i_all[::10]
-        i_val = i_test
-        i_train = np.array([i for i in i_all if not i in i_test])
-        # i_train = [0, 50, 100]
-        # i_test = np.array([i for i in i_all if not i in i_train])
+        # i_test = i_all[::10]
         # i_val = i_test
+        # i_train = np.array([i for i in i_all if not i in i_test])
+        i_train = [0, 50, 100]
+        i_test = np.array([i for i in i_all if not i in i_train])
+        i_val = i_test
 
         i_split = {
             'train': i_train,
