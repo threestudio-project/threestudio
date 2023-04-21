@@ -1,20 +1,24 @@
-name: "dreamfusion"
+name: "magic3d"
 tag: "debug"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "random-camera-datamodule"
+data:
+  camera_distance_range: [1.5, 2.0]
+  light_sample_strategy: 'magic3d'
 
 system_type: "dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    radius: 1.4
-    normal_type: "finite_difference" # bad convergence using analytic normal
+    radius: 2.
+    normal_type: "finite_difference" # original paper uses pred
 
   material_type: "diffuse-with-point-light-material"
   material:
     ambient_only_steps: 1001
+    soft_shading: true
   
   background_type: "neural-environment-map-background"
 

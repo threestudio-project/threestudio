@@ -90,6 +90,8 @@ class StableDiffusionGuidance(BaseModule):
         text_embeddings: Float[Tensor, "BB 77 768"],
         rgb_as_latents=False
     ):
+        batch_size = rgb.shape[0]
+
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
         if rgb_as_latents:
@@ -103,7 +105,7 @@ class StableDiffusionGuidance(BaseModule):
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
-            self.min_step, self.max_step + 1, [1], dtype=torch.long, device=self.device
+            self.min_step, self.max_step + 1, [batch_size], dtype=torch.long, device=self.device
         )
 
         # predict the noise residual with unet, NO grad!
@@ -114,7 +116,7 @@ class StableDiffusionGuidance(BaseModule):
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
             noise_pred = self.unet(
-                latent_model_input, t, encoder_hidden_states=text_embeddings
+                latent_model_input, torch.cat([t] * 2), encoder_hidden_states=text_embeddings
             ).sample
 
         # perform guidance (high scale from paper!)
@@ -125,15 +127,15 @@ class StableDiffusionGuidance(BaseModule):
 
         if self.cfg.use_weight:
             # w(t), sigma_t^2
-            w = 1 - self.alphas[t]
+            w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
         else:
             w = 1
 
         grad = w * (noise_pred - noise)
         grad = torch.nan_to_num(grad)
         # clip grad for stable training?
-        if self.cfg.grad_clip is not None:
-            grad = grad.clamp(-self.cfg.grad_clip, self.cfg.grad_clip)
+        if self.grad_clip_val is not None:
+            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
         loss = SpecifyGradient.apply(latents, grad)
@@ -156,6 +158,13 @@ class StableDiffusionGuidance(BaseModule):
         image = self.vae.decode(latents).sample
         image = (image / 2 + 0.5).clamp(0, 1)
         return image
+    
+    def update_step(self, epoch: int, global_step: int):
+        # clip grad for stable training as demonstrated in
+        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
+        # http://arxiv.org/abs/2303.15413
+        if self.cfg.grad_clip is not None:
+            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)    
 
 
 @threestudio.register('sjc-guidance')

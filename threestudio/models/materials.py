@@ -97,8 +97,9 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         diffuse_light_color: Tuple[float, float, float] = (0.9, 0.9, 0.9)
         ambient_only_steps: int = 1000
         diffuse_prob: float = 0.75
-        textureless_prob: float = 0.375
+        textureless_prob: float = 0.5
         albedo_activation: str = 'sigmoid'
+        soft_shading: bool = False
 
     cfg: Config
     requires_normal: bool = True
@@ -116,9 +117,15 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
             return albedo
         
         if ambient_ratio is not None:
+            # if ambient ratio is specified, use it
             diffuse_light_color = (1 - ambient_ratio) * torch.ones_like(self.diffuse_light_color)
             ambient_light_color = ambient_ratio * torch.ones_like(self.ambient_light_color)
+        elif self.training and self.cfg.soft_shading:
+            # otherwise if in training and soft shading is enabled, random a ambient ratio
+            diffuse_light_color = torch.full_like(self.diffuse_light_color, torch.rand([]))
+            ambient_light_color = 1. - diffuse_light_color
         else:
+            # otherwise use the default fixed values
             diffuse_light_color = self.diffuse_light_color
             ambient_light_color = self.ambient_light_color
 
@@ -127,17 +134,17 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         textureless_color = diffuse_light + ambient_light_color
         color = albedo * textureless_color
 
-        if not self.training:
-            shading = 'diffuse'
-
         if shading is None:
-            # adopt the same type of augmentation for the whole batch
-            rand = random.random()
-            if rand > self.cfg.diffuse_prob:
-                shading = 'albedo'
-            elif rand < self.cfg.textureless_prob:
-                shading = 'textureless'
+            if self.training:
+                # adopt the same type of augmentation for the whole batch
+                if torch.rand([]) > self.cfg.diffuse_prob:
+                    shading = 'albedo'
+                elif torch.rand([]) < self.cfg.textureless_prob:
+                    shading = 'textureless'
+                else:
+                    shading = 'diffuse'
             else:
+                # return diffuse color by default in evaluation
                 shading = 'diffuse'
 
         if shading == 'albedo':

@@ -39,6 +39,7 @@ class RandomCameraDataModuleConfig:
     eval_elevation_deg: float = 0.
     eval_camera_distance: float = 1.5
     eval_fovy_deg: float = 60.
+    light_sample_strategy: str = 'dreamfusion'
 
 class RandomCameraIterableDataset(IterableDataset):
     def __init__(self, cfg: Any) -> None:
@@ -51,16 +52,27 @@ class RandomCameraIterableDataset(IterableDataset):
             yield {}
     
     def collate(self, batch) -> Dict[str, Any]:
-        # sample elevation angles from a uniform distribution bounded by elevation_range
-        elevation_deg: Float[Tensor, "B"] = torch.rand(self.cfg.batch_size) * (self.cfg.elevation_range[1] - self.cfg.elevation_range[0]) + self.cfg.elevation_range[0]
+        # sample elevation angles
+        elevation_deg: Float[Tensor, "B"]
+        elevation: Float[Tensor, "B"]
+        if torch.rand([]) < 0.5:
+            # sample elevation angles uniformly with a probability 0.5 (biased towards poles)
+            elevation_deg = torch.rand(self.cfg.batch_size) * (self.cfg.elevation_range[1] - self.cfg.elevation_range[0]) + self.cfg.elevation_range[0]
+            elevation = elevation_deg * math.pi / 180
+        else:
+            # otherwise sample uniformly on sphere
+            elevation_range_percent = [(self.cfg.elevation_range[0] + 90.) / 180., (self.cfg.elevation_range[1] + 90.) / 180.]
+            # inverse transform sampling
+            elevation = torch.asin(2 * (torch.rand(self.cfg.batch_size) * (elevation_range_percent[1] - elevation_range_percent[0]) + elevation_range_percent[0]) - 1.)
+            elevation_deg = elevation / math.pi * 180.
+        
         # sample azimuth angles from a uniform distribution bounded by azimuth_range
         # azimuth_deg: Float[Tensor, "B"] = torch.rand(self.cfg.batch_size) * (self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0]) + self.cfg.azimuth_range[0]
         azimuth_deg: Float[Tensor, "B"] = (torch.rand(self.cfg.batch_size) + torch.arange(self.cfg.batch_size)) / self.cfg.batch_size * (self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0]) + self.cfg.azimuth_range[0]
+        azimuth = azimuth_deg * math.pi / 180
+        
         # sample distances from a uniform distribution bounded by distance_range
         camera_distances: Float[Tensor, "B"] = torch.rand(self.cfg.batch_size) * (self.cfg.camera_distance_range[1] - self.cfg.camera_distance_range[0]) + self.cfg.camera_distance_range[0]
-
-        elevation = elevation_deg * math.pi / 180
-        azimuth = azimuth_deg * math.pi / 180
 
         # convert spherical coordinates to cartesian coordinates
         # right hand coordinate system, x back, y right, z up
@@ -89,12 +101,31 @@ class RandomCameraIterableDataset(IterableDataset):
         # sample fovs from a uniform distribution bounded by fov_range
         fovy_deg: Float[Tensor, "B"] = torch.rand(self.cfg.batch_size) * (self.cfg.fovy_range[1] - self.cfg.fovy_range[0]) + self.cfg.fovy_range[0]
         fovy = fovy_deg * math.pi / 180
-        # sample light direction from a normal distribution with mean camera_position and std light_position_perturb
-        light_direction: Float[Tensor, "B 3"] = camera_positions + torch.randn(self.cfg.batch_size, 3) * self.cfg.light_position_perturb
+
         # sample light distance from a uniform distribution bounded by light_distance_range
         light_distances: Float[Tensor, "B"] = torch.rand(self.cfg.batch_size) * (self.cfg.light_distance_range[1] - self.cfg.light_distance_range[0]) + self.cfg.light_distance_range[0]
-        # get light position by scaling light direction by light distance
-        light_positions: Float[Tensor, "B 3"] = F.normalize(light_direction, dim=-1) * light_distances[:,None]
+
+        if self.cfg.light_sample_strategy == 'dreamfusion':
+            # sample light direction from a normal distribution with mean camera_position and std light_position_perturb
+            light_direction: Float[Tensor, "B 3"] = F.normalize(camera_positions + torch.randn(self.cfg.batch_size, 3) * self.cfg.light_position_perturb, dim=-1)
+            # get light position by scaling light direction by light distance
+            light_positions: Float[Tensor, "B 3"] = light_direction * light_distances[:,None]
+        elif self.cfg.light_sample_strategy == 'magic3d':
+            # sample light direction within restricted angle range (pi/3)
+            local_z = F.normalize(camera_positions, dim=-1)
+            local_x = F.normalize(torch.stack([local_z[:,1], -local_z[:,0], torch.zeros_like(local_z[:,0])], dim=-1), dim=-1)
+            local_y = F.normalize(torch.cross(local_z, local_x, dim=-1), dim=-1)
+            rot = torch.stack([local_x, local_y, local_z], dim=-1)
+            light_azimuth = torch.rand(self.cfg.batch_size) * math.pi - 2 * math.pi # [-pi, pi]
+            light_elevation = torch.rand(self.cfg.batch_size) * math.pi / 3 + math.pi / 6 # [pi/6, pi/2]
+            light_positions_local = torch.stack([
+                light_distances * torch.cos(light_elevation) * torch.cos(light_azimuth),
+                light_distances * torch.cos(light_elevation) * torch.sin(light_azimuth),
+                light_distances * torch.sin(light_elevation)
+            ], dim=-1)
+            light_positions = (rot @ light_positions_local[:,:,None])[:,:,0]
+        else:
+            raise ValueError(f'Unknown light sample strategy: {self.cfg.light_sample_strategy}')
 
         lookat: Float[Tensor, "B 3"] = F.normalize(center - camera_positions, dim=-1)
         right: Float[Tensor, "B 3"] = F.normalize(torch.cross(lookat, up), dim=-1)
@@ -197,10 +228,17 @@ class RandomCameraDataset(Dataset):
             'light_positions': self.light_positions[index],
             'elevation': self.elevation[index],
             'azimuth': self.azimuth[index],
-            'camera_distances': self.camera_distances[index],
+            'camera_distances': self.camera_distances[index]
+        }
+
+    def collate(self, batch):
+        batch = torch.utils.data.default_collate(batch)
+        batch.update({
             'height': self.cfg.eval_height,
             'width': self.cfg.eval_width
-        }
+        })
+        return batch
+
 
 @register('random-camera-datamodule')
 class RandomCameraDataModule(pl.LightningDataModule):
@@ -225,16 +263,16 @@ class RandomCameraDataModule(pl.LightningDataModule):
     def general_loader(self, dataset, batch_size, collate_fn=None) -> DataLoader:
         return DataLoader(
             dataset, 
-            num_workers=batch_size, # type: ignore
+            num_workers=1, # type: ignore
             batch_size=batch_size,
             collate_fn=collate_fn
         )
     
     def train_dataloader(self) -> DataLoader:
-        return self.general_loader(self.train_dataset, batch_size=self.cfg.batch_size, collate_fn=self.train_dataset.collate)
+        return self.general_loader(self.train_dataset, batch_size=None, collate_fn=self.train_dataset.collate)
 
     def val_dataloader(self) -> DataLoader:
-        return self.general_loader(self.val_dataset, batch_size=1)
+        return self.general_loader(self.val_dataset, batch_size=1, collate_fn=self.val_dataset.collate)
 
     def test_dataloader(self) -> DataLoader:
-        return self.general_loader(self.test_dataset, batch_size=1) 
+        return self.general_loader(self.test_dataset, batch_size=1, collate_fn=self.test_dataset.collate) 
