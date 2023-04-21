@@ -149,7 +149,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         if self.cfg.normal_type == "pred":
             self.normal_network = get_mlp(self.encoding.n_output_dims, 3, self.cfg.mlp_network_config)
     
-    def get_activated_density(self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]):
+    def get_activated_density(self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]) -> Tuple[Float[Tensor, "*N 1"], Float[Tensor, "*N 1"]]:
         if self.cfg.detach_blob_points:
             points = points.detach()
         density_bias: Union[float, Float[Tensor, "*N 1"]]
