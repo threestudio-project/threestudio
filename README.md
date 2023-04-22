@@ -35,12 +35,15 @@ python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_
 python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger" system.weights=path/to/latentnerf/weights
 ```
 ### Fantasia3D (WIP)
-I by far have implemented the early training stage of Fantasia3D, which regards the downsampled normal and silhouette as the latent feature map and optimizes using SDS.
+I by far have implemented the geometry training stage of Fantasia3D, which first regards the downsampled normal and silhouette as the latent feature map and then uses high-resolution normal map as RGB input.
 ```bash
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry"
 # Fantasia3D highly relies on the initialized SDF shape
+# the default shape is a sphere with radius 0.5
 # change the shape initialization to match your input prompt
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
+# lower the guidance scale to get cleaner but less-detailed results
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry" system.guidance.guidance_scale=30.
 ```
 
 ### Score Jacobian Chaining

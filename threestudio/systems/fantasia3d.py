@@ -29,6 +29,8 @@ class Fantasia3D(BaseSystem):
         prompt_processor_type: str = "dreamfusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
 
+        latent_steps: int = 2500
+
     cfg: Config
 
     def configure(self):
@@ -64,8 +66,13 @@ class Fantasia3D(BaseSystem):
 
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
-        guidance_inp = torch.cat([out['normal'] * 2. - 1., out['silhouette']], dim=-1)
-        guidance_out = self.guidance(guidance_inp, text_embeddings, rgb_as_latents=True) 
+
+        if self.global_step < self.cfg.latent_steps:
+            guidance_inp = torch.cat([out['normal'] * 2. - 1., out['silhouette']], dim=-1)
+            guidance_out = self.guidance(guidance_inp, text_embeddings, rgb_as_latents=True) 
+        else:
+            guidance_inp = out['normal'] * 2. - 1.
+            guidance_out = self.guidance(guidance_inp, text_embeddings, rgb_as_latents=False)
 
         loss += guidance_out['sds'] * self.C(self.cfg.loss.lambda_sds)
 
