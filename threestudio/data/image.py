@@ -99,6 +99,8 @@ class SingleImageDataBase():
         self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
         self.camera_distance = camera_distance
 
+    def get_all_images(self):
+        return self.rgb
 
 class SingleImageIterableDataset(IterableDataset, SingleImageDataBase):
     def __init__(self, cfg: Any, split: str) -> None:

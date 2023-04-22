@@ -1,4 +1,4 @@
-name: "debug"
+name: "co3d-imagecondition"
 tag: "debug"
 exp_root_dir: "outputs"
 seed: 0
@@ -8,7 +8,7 @@ data:
   root_dir: /home/zzx/lab_data/Dataset/co3d/data/apple/189_20393_38136
   height: 256
   width: 256
-  scale_radius: 4.0
+  scale_radius: 3.0
   load_preprocessed: false
   cam_scale_factor: 0.95 # inherited from plenoxels
   max_num_frames: 300 # use less frames for debugging
@@ -21,6 +21,8 @@ data:
   train_split: 'train'
   val_split: 'val'
   test_split: 'test'
+  render_path: 'circle'
+  train_views: [0, 50, 100]
   random_camera:
     eval_height: 256
     eval_width: 256
@@ -104,7 +106,7 @@ system:
     lambda_depth: 0.
     # lambda_depth: [0.0, 0.0, 1.0, 10000]
     lambda_normal_smooth: 0.0
-    lambda_orient: 0.0
+    lambda_orient: 1.0
     # lambda_orient: [1000, 0.0, 10, 6000]
     lambda_sparsity: 0.0
     lambda_opaque: 0.01
@@ -134,8 +136,8 @@ system:
         lr: 0.05
       geometry.network:
         lr: 0.005
-      # background.network:
-      #   lr: 0.005
+      background.network:
+        lr: 0.005
     
   scheduler:
     name: ConstantLR

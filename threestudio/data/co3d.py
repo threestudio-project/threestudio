@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 import torch
 from torch.utils.data import Dataset, DataLoader, IterableDataset
 import torchvision.transforms.functional as TF
-from pytorch3d.implicitron.dataset.json_index_dataset import _load_depth
 
 import pytorch_lightning as pl
 import cv2
@@ -21,6 +20,25 @@ from threestudio.utils.typing import *
 from threestudio.utils.config import parse_structured
 from threestudio.data.uncond import RandomCameraDataset, RandomCameraIterableDataset, RandomCameraDataModuleConfig
 import warnings
+
+def _load_16big_png_depth(depth_png) -> np.ndarray:
+    with Image.open(depth_png) as depth_pil:
+        # the image is stored with 16-bit depth but PIL reads it as I (32 bit).
+        # we cast it to uint16, then reinterpret as float16, then cast to float32
+        depth = (
+            np.frombuffer(np.array(depth_pil, dtype=np.uint16), dtype=np.float16)
+            .astype(np.float32)
+            .reshape((depth_pil.size[1], depth_pil.size[0]))
+        )
+    return depth
+
+def _load_depth(path, scale_adjustment) -> np.ndarray:
+    if not path.lower().endswith(".png"):
+        raise ValueError('unsupported depth file name "%s"' % path)
+
+    d = _load_16big_png_depth(path) * scale_adjustment
+    d[~np.isfinite(d)] = 0.0
+    return d[None]  # fake feature channel
 
 # Code adapted from https://github.com/eldar/snes/blob/473ff2b1f6/3rdparty/co3d/dataset/co3d_dataset.py
 def _get_1d_bounds(arr):
@@ -170,6 +188,7 @@ class Co3dDataModuleConfig:
     box_crop_mask_thr: float = 0.4
     box_crop_context: float = 0.3
     train_num_rays: int = -1
+    train_views: Optional[list] = None
     train_split: str = 'train'
     val_split: str = 'val'
     test_split: str = 'test'
@@ -177,6 +196,7 @@ class Co3dDataModuleConfig:
     use_random_camera: bool = True
     random_camera: dict = field(default_factory=dict)
     rays_noise_scale: float = 0.0
+    render_path: str = 'circle'
 
 
 class Co3dDatasetBase():
@@ -211,10 +231,10 @@ class Co3dDatasetBase():
             if temporal_data["sequence_name"] == scene_number:
                 frame_data.append(temporal_data)
             
-        used = []
         self.all_directions = []
         self.all_fg_masks = []
-        for (i, frame) in enumerate(frame_data):
+        for frame in frame_data:
+            if 'unseen' in frame['meta']['frame_type']: continue
             img = cv2.imread(os.path.join(self.cfg.root_dir, "..", "..", frame["image"]["path"]))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) / 255.0
 
@@ -259,7 +279,6 @@ class Co3dDatasetBase():
             if any([np.all(pose == _pose) for _pose in extrinsics]):
                 continue
 
-            used.append(i)
             image_sizes.append(image_size)
             intrinsics.append(intrinsic)
             extrinsics.append(pose)
@@ -392,12 +411,20 @@ class Co3dDatasetBase():
             pass
 
         i_all = np.arange(num_frames)
-        # i_test = i_all[::10]
-        # i_val = i_test
-        # i_train = np.array([i for i in i_all if not i in i_test])
-        i_train = [0, 50, 100]
-        i_test = np.array([i for i in i_all if not i in i_train])
-        i_val = i_test
+
+        if self.cfg.train_views is None:
+            i_test = i_all[::10]
+            i_val = i_test
+            i_train = np.array([i for i in i_all if not i in i_test])
+        else:
+            # use provided views
+            i_train = self.cfg.train_views
+            i_test = np.array([i for i in i_all if not i in i_train])
+            i_val = i_test
+
+        if self.split == 'train':
+            print("[INFO] num of train views: ", len(i_train))
+            print("[INFO] train view ids = ", i_train)
 
         i_split = {
             'train': i_train,
@@ -431,24 +458,29 @@ class Co3dDatasetBase():
         
         # self.all_c2w, self.all_images, self.all_fg_masks = \
         #         self.all_c2w.float(), \
-        #         self.all_images.float().to(self.rank), \
-        #         self.all_fg_masks.float().to(self.rank)
+        #         self.all_images.float(), \
+        #         self.all_fg_masks.float()
         
         self.all_depths = self.all_depths.float().to(self.rank)
 
-        
+    def get_all_images(self):
+        return self.all_images
 
 class Co3dDataset(Dataset, Co3dDatasetBase):
     def __init__(self, cfg, split):
         self.setup(cfg, split)
 
     def __len__(self):
-        # return len(self.random_pose_generator)
-        return len(self.all_images)
-    
-    def __getitem__(self, index):
-        # return self.random_pose_generator[index]
-    
+        if self.split == 'test':
+            if self.cfg.render_path == 'circle':
+                return len(self.random_pose_generator)
+            else:
+                return len(self.all_images)
+        else:
+            return len(self.random_pose_generator)
+            # return len(self.all_images)
+        
+    def prepare_data(self, index):
         # prepare batch data here
         c2w = self.all_c2w[index]
         light_positions = c2w[..., :3, -1]
@@ -486,6 +518,14 @@ class Co3dDataset(Dataset, Co3dDatasetBase):
 
         return batch
 
+    def __getitem__(self, index):
+        if self.split == 'test':
+            if self.cfg.render_path == 'circle':
+                return self.random_pose_generator[index]
+            else:
+                return self.prepare_data(index)
+        else:
+            return self.random_pose_generator[index]
 
 class Co3dIterableDataset(IterableDataset, Co3dDatasetBase):
     def __init__(self, cfg, split):
