@@ -50,7 +50,8 @@ class StableDiffusionGuidance(BaseModule):
         
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        use_weight: bool = True
+
+        weighting_strategy: str = 'sds'
 
     cfg: Config
 
@@ -125,11 +126,15 @@ class StableDiffusionGuidance(BaseModule):
             noise_pred_text - noise_pred_uncond
         )
 
-        if self.cfg.use_weight:
+        if self.cfg.weighting_strategy == 'sds':
             # w(t), sigma_t^2
             w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
-        else:
+        elif self.cfg.weighting_strategy == 'sjc':
             w = 1
+        elif self.cfg.weighting_strategy == 'fantasia3d':
+            w = (self.alphas[t]**0.5 * (1 - self.alphas[t])).view(-1, 1, 1, 1)
+        else:
+            raise ValueError(f"Unknown weighting strategy: {self.cfg.weighting_strategy}")
 
         grad = w * (noise_pred - noise)
         grad = torch.nan_to_num(grad)

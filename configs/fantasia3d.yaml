@@ -6,7 +6,7 @@ seed: 0
 
 data_type: "random-camera-datamodule"
 data:
-  batch_size: 2
+  batch_size: 1
   width: 512
   height: 512
   camera_distance_range: [3, 3]
@@ -14,8 +14,11 @@ data:
   camera_perturb: 0.
   center_perturb: 0.
   up_perturb: 0.
-  elevation_range: [-15, 45]
+  elevation_range: [-10, 45]
   azimuth_range: [-180, 180]
+  batch_uniform_azimuth: true
+  eval_camera_distance: 3.
+  eval_fovy_deg: 45.
 
 system_type: "fantasia3d-system"
 system:
@@ -26,20 +29,19 @@ system:
     shape_init: sphere
     shape_init_params: 0.5
 
-
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
     prompt: "a delicious hamburger"
-    view_dependent_prompting: false
+    view_dependent_prompting: true
   
   guidance_type: "stable-diffusion-guidance"
   guidance:
     half_precision_weights: true
-    guidance_scale: 30.
+    guidance_scale: 100.
     max_step_percent: 0.5
+    weighting_strategy: fantasia3d
   
   loss:
-    lambda_sdf: 1.
     lambda_sds: 1.
     lambda_sdf_reg: 0.0
 
