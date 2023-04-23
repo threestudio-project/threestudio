@@ -142,32 +142,41 @@ def chunk_batch(func: Callable, chunk_size: int, *args, **kwargs) -> Any:
         return out_merged
 
 
-def get_ray_directions(H: int, W: int, focal: float) -> Float[Tensor, "H W 3"]:
+def get_ray_directions(H: int, W: int, focal: Union[float, Tuple[float, float]], principal: Optional[Tuple[float, float]] = None, use_pixel_centers: bool = True) -> Float[Tensor, "H W 3"]:
     """
     Get ray directions for all pixels in camera coordinate.
     Reference: https://www.scratchapixel.com/lessons/3d-basic-rendering/
                ray-tracing-generating-camera-rays/standard-coordinate-systems
 
     Inputs:
-        H, W, focal: image height, width and focal length
+        H, W, focal, principal, use_pixel_centers: image height, width, focal length, principal point and whether use pixel centers
     Outputs:
         directions: (H, W, 3), the direction of the rays in camera coordinate
     """
+    pixel_center = 0.5 if use_pixel_centers else 0
+
+    if isinstance(focal, float):
+        fx, fy = focal, focal
+        cx, cy = W / 2, H / 2
+    else:
+        fx, fy = focal
+        cx, cy = principal
+
     i, j = torch.meshgrid(
-        torch.arange(W, dtype=torch.float32) + 0.5,
-        torch.arange(H, dtype=torch.float32) + 0.5,
+        torch.arange(W, dtype=torch.float32) + pixel_center,
+        torch.arange(H, dtype=torch.float32) + pixel_center,
         indexing="xy",
     )
 
     directions: Float[Tensor, "H W 3"] = torch.stack(
-        [(i - W / 2) / focal, -(j - H / 2) / focal, -torch.ones_like(i)], -1
+        [(i - cx) / fx, -(j - cy) / fy, -torch.ones_like(i)], -1
     )
 
     return directions
 
 
 def get_rays(
-    directions: Float[Tensor, "... 3"], c2w: Float[Tensor, "... 3 4"], keepdim=False
+    directions: Float[Tensor, "... 3"], c2w: Float[Tensor, "... 3 4"], keepdim=False, noise_scale=0.0
 ) -> Tuple[Float[Tensor, "... 3"], Float[Tensor, "... 3"]]:
     # Rotate ray directions from camera coordinate to the world coordinate
     assert directions.shape[-1] == 3
@@ -194,6 +203,12 @@ def get_rays(
         assert c2w.ndim == 3 # (B, 4, 4)
         rays_d = (directions[:, :, :, None, :] * c2w[:, None, None, :3, :3]).sum(-1) # (B, H, W, 3)
         rays_o = c2w[:, None, None, :, 3].expand(rays_d.shape)
+
+    # add camera noise to avoid grid-like artifect
+    # https://github.com/ashawkey/stable-dreamfusion/blob/49c3d4fa01d68a4f027755acf94e1ff6020458cc/nerf/utils.py#L373
+    if noise_scale > 0:
+        rays_o = rays_o + torch.randn(3, device=rays_o.device) * noise_scale
+        rays_d = rays_d + torch.randn(3, device=rays_d.device) * noise_scale
 
     rays_d = F.normalize(rays_d, dim=-1)
     if not keepdim:

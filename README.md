@@ -55,6 +55,8 @@ python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_process
 ```bash
 # train with single image reference and stable-diffusion sds guidance
 python launch.py --config configs/imagecondition.yaml --train --gpu 0
+# train with few-view images reference (e.g. from co3d dataset) and stable-diffusion sds guidance
+python launch.py --config configs/co3d-imagecondition.yaml --train --gpu 0
 ```
 
 ## Tips
