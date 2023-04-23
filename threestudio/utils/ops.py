@@ -205,6 +205,7 @@ def get_rays(
         rays_o = c2w[:, None, None, :, 3].expand(rays_d.shape)
 
     # add camera noise to avoid grid-like artifect
+    # https://github.com/ashawkey/stable-dreamfusion/blob/49c3d4fa01d68a4f027755acf94e1ff6020458cc/nerf/utils.py#L373
     if noise_scale > 0:
         rays_o = rays_o + torch.randn(3, device=rays_o.device) * noise_scale
         rays_d = rays_d + torch.randn(3, device=rays_d.device) * noise_scale
