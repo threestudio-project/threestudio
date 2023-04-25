@@ -450,3 +450,106 @@ class VolumeGrid(BaseImplicitGeometry):
     def forward_level(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
         density = self.forward_density(points)
         return -(density - self.cfg.isosurface_threshold)
+
+
+@threestudio.register("sdf-grid")
+class SDFGrid(BaseImplicitGeometry):
+    @dataclass
+    class Config(BaseImplicitGeometry.Config):
+        grid_size: Tuple[int,int,int] = field(default_factory=lambda: (100, 100, 100))
+        n_feature_dims: int = 3
+        normal_type: Optional[str] = "finite_difference" # in ['finite_difference']
+        shape_init: Optional[str] = None
+        shape_init_params: Optional[Any] = None
+        force_shape_init: bool = False           
+
+    cfg: Config
+
+    def configure(self) -> None:
+        super().configure()
+        self.grid_size = self.cfg.grid_size
+        self.sdf_grid = nn.Parameter(torch.zeros(1, 1, *self.grid_size))
+        self.feature_grid = nn.Parameter(torch.zeros(1, self.cfg.n_feature_dims, *self.grid_size))
+
+    def get_trilinear_feature(self, points: Float[Tensor, "*N Di"], grid: Float[Tensor, "1 Df G1 G2 G3"]) -> Float[Tensor, "*N Df"]:
+        points_shape = points.shape[:-1]
+        df = grid.shape[1]
+        di = points.shape[-1]
+        out = F.grid_sample(grid, points.view(1, 1, 1, -1, di), align_corners=True, mode='bilinear')
+        out = out.reshape(df, -1).T.reshape(*points_shape, df)
+        return out
+    
+    def initialize_shape(self) -> None:
+        if self.cfg.shape_init is None and not self.cfg.force_shape_init:
+            return
+        
+        # do not initialize shape if weights are provided
+        if self.cfg.weights is not None and not self.cfg.force_shape_init:
+            return
+        
+        # Initialize SDF to a given shape when no weights are provided or force_shape_init is True
+        optim = torch.optim.Adam(self.parameters(), lr=1e-3)
+        from tqdm import tqdm
+        for _ in tqdm(range(1000), desc=f"Initializing SDF to a(n) {self.cfg.shape_init}:"):
+            points_rand = torch.rand((10000, 3), dtype=torch.float32).to(self.device) * 2. - 1.
+            if self.cfg.shape_init == "ellipsoid":
+                assert isinstance(self.cfg.shape_init_params, Sized) and len(self.cfg.shape_init_params) == 3
+                size = torch.as_tensor(self.cfg.shape_init_params).to(points_rand)
+                sdf_gt = ((points_rand / size)**2).sum(dim=-1, keepdim=True).sqrt() - 1.0 # pseudo signed distance of an ellipsoid
+            elif self.cfg.shape_init == "sphere":
+                assert isinstance(self.cfg.shape_init_params, float)
+                radius = self.cfg.shape_init_params
+                sdf_gt = ((points_rand ** 2).sum(dim=-1, keepdim=True).sqrt() - radius)
+            elif self.cfg.shape_init == "mesh":
+                raise NotImplementedError
+            else:
+                raise ValueError(f"Unknown shape initialization type: {self.cfg.shape_init}")
+            sdf_pred = self.forward_sdf(points_rand)
+            loss = F.mse_loss(sdf_pred, sdf_gt)
+            optim.zero_grad()
+            loss.backward()
+            optim.step()    
+
+    def forward(
+        self, points: Float[Tensor, "*N Di"], output_normal: bool = False
+    ) -> Dict[str, Float[Tensor, "..."]]:
+        points_unscaled = points # points in the original scale
+        points = contract_to_unisphere(points, self.bbox, self.unbounded) # points normalized to (0, 1)
+        points = points * 2 - 1 # convert to [-1, 1] for grid sample
+
+        sdf = self.get_trilinear_feature(points, self.sdf_grid)
+        features = self.get_trilinear_feature(points, self.feature_grid)
+
+        output = {
+            'sdf': sdf,
+            'features': features
+        }
+
+        if output_normal:
+            if self.cfg.normal_type == "finite_difference":
+                eps = 1.e-3
+                offsets: Float[Tensor, "6 3"] = torch.as_tensor([[eps, 0., 0.], [-eps, 0., 0.], [0., eps, 0.], [0., -eps, 0.], [0., 0., eps], [0., 0., -eps]]).to(points_unscaled)
+                points_offset: Float[Tensor, "... 6 3"] = (points_unscaled[...,None,:] + offsets).clamp(-self.cfg.radius, self.cfg.radius)
+                sdf_offset: Float[Tensor, "... 6 1"] = self.forward_sdf(points_offset)
+                normal = 0.5 * (sdf_offset[...,0::2,0] - sdf_offset[...,1::2,0]) / eps
+                normal = F.normalize(normal, dim=-1)
+            else:
+                raise AttributeError(f"Unknown normal type {self.cfg.normal_type}")
+            output.update({
+                'normal': normal,
+                'shading_normal': normal
+            })
+        return output
+    
+    def forward_sdf(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
+        points_unscaled = points
+        points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
+        points = points * 2 - 1 # convert to [-1, 1] for grid sample
+
+        sdf = self.get_trilinear_feature(points, self.sdf_grid)
+
+        return sdf
+
+    def forward_level(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
+        sdf = self.forward_sdf(points)
+        return sdf - self.cfg.isosurface_threshold
