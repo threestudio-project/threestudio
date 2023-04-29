@@ -174,7 +174,7 @@ class RandomCameraDataset(Dataset):
         else:
             self.n_test_views = 120
         
-        azimuth_deg: Float[Tensor, "B"] = torch.linspace(0, 360., self.n_test_views) - 180.
+        azimuth_deg: Float[Tensor, "B"] = torch.linspace(0, 360., self.n_test_views)
         elevation_deg: Float[Tensor, "B"] = torch.full_like(azimuth_deg, self.cfg.eval_elevation_deg)
         camera_distances: Float[Tensor, "B"] = torch.full_like(elevation_deg, self.cfg.eval_camera_distance)
 
