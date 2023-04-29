@@ -278,6 +278,7 @@ class RandomCameraDataModule(pl.LightningDataModule):
 
     def val_dataloader(self) -> DataLoader:
         return self.general_loader(self.val_dataset, batch_size=1, collate_fn=self.val_dataset.collate)
+        # return self.general_loader(self.train_dataset, batch_size=None, collate_fn=self.train_dataset.collate)
 
     def test_dataloader(self) -> DataLoader:
         return self.general_loader(self.test_dataset, batch_size=1, collate_fn=self.test_dataset.collate) 

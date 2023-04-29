@@ -23,9 +23,18 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         self._save_dir: Optional[str] = None
         self.configure()
         if self.cfg.weights is not None:
-            self.load_state_dict(load_module_weights(self.cfg.weights, ignore_modules=self.cfg.weights_ignore_modules, map_location='cpu'), strict=False)
+            state_dict, epoch, global_step = load_module_weights(self.cfg.weights, ignore_modules=self.cfg.weights_ignore_modules, map_location='cpu')
+            self.load_state_dict(state_dict, strict=False)
+            self.do_update_step(epoch, global_step) # restore states
+        self.post_configure()
     
-    def configure(self, *args, **kwargs) -> None:
+    def configure(self) -> None:
+        pass
+    
+    def post_configure(self) -> None:
+        """
+        executed after weights are loaded
+        """
         pass
     
     def C(self, value: Any) -> float:
