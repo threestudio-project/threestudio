@@ -52,11 +52,17 @@ class ImageConditionDreamFusion(BaseSystem):
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(self.cfg.prompt_processor)
 
+        # visualize all training images
+        all_images = self.trainer.datamodule.train_dataloader().dataset.get_all_images()
+        self.save_image_grid("all_training_images.png", [
+            {'type': 'rgb', 'img': image, 'kwargs': {'data_format': 'HWC'}} for image in all_images
+        ])
+
     def training_step(self, batch, batch_idx):
         # opt = self.optimizers()
         # opt.zero_grad()
 
-        do_ref = self.global_step < 100 or self.global_step % self.cfg.freq.n_ref == 0
+        do_ref = self.global_step < self.cfg.freq.ref_only_steps or self.global_step % self.cfg.freq.n_ref == 0
         loss = 0.
 
         if not do_ref:
@@ -67,10 +73,11 @@ class ImageConditionDreamFusion(BaseSystem):
                 bg_color = torch.rand(3).to(self.device)
             ambient_ratio = 0.1 + 0.9 * random.random()
         else:
-            bg_color = torch.rand_like(batch['rays_o'])
+            # bg_color = torch.rand_like(batch['rays_o'])
             ambient_ratio = 1.0
             shading = 'diffuse'
             batch['shading'] = shading
+            bg_color = None
         
         batch['bg_color'] = bg_color
         batch['ambient_ratio'] = ambient_ratio
@@ -88,7 +95,10 @@ class ImageConditionDreamFusion(BaseSystem):
 
             # mask loss
             loss += self.C(self.cfg.loss.lambda_mask) * F.mse_loss(gt_mask.float(), out['opacity'])
-            # loss += self.C(self.cfg.loss.lambda_mask) * binary_cross_entropy(gt_mask.float(), out['opacity'])
+             
+            # opacity_clamped = out['opacity'].clamp(1e-3, 1-1e-3)
+            # gt_mask_clamped = gt_mask.float().clamp(1e-3, 1-1e-3)
+            # loss += self.C(self.cfg.loss.lambda_mask) * binary_cross_entropy(gt_mask_clamped, opacity_clamped)
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
@@ -112,6 +122,15 @@ class ImageConditionDreamFusion(BaseSystem):
             self.log('train/loss_orient', loss_orient)
             loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
+        if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
+            if 'normal' not in out:
+                raise ValueError("Normal is required for normal smooth loss, no normal is found in the output.")
+            normal = out['normal']
+            loss_normal_smooth = (normal[:, 1:, :, :] - normal[:, :-1, :, :]).square().mean() + \
+                                (normal[:, :, 1:, :] - normal[:, :, :-1, :]).square().mean()
+            self.log('train/loss_normal_smooth', loss_normal_smooth)
+            loss += self.C(self.cfg.loss.lambda_normal_smooth) * loss_normal_smooth
+
         loss_sparsity = (out['opacity']**2 + 0.01).sqrt().mean()
         self.log('train/loss_sparsity', loss_sparsity)
         loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
@@ -124,6 +143,8 @@ class ImageConditionDreamFusion(BaseSystem):
         for name, value in self.cfg.loss.items():
             self.log(f'train_params/{name}', self.C(value))
 
+        self.log('train/loss', loss, prog_bar=True)
+
         return {
             'loss': loss
         }
@@ -134,11 +155,15 @@ class ImageConditionDreamFusion(BaseSystem):
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
-        self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", [
+        self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", ([
+            {'type': 'rgb', 'img': batch['rgb'][0], 'kwargs': {'data_format': 'HWC'}}
+        ] if 'rgb' in batch else []) + [
             {'type': 'rgb', 'img': out['comp_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
         ] + ([
             {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
         ] if 'comp_normal' in out else []) + [
+            {'type': 'grayscale', 'img': out['depth'][0], 'kwargs':{}}
+        ] + [
             {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
         ])
     
@@ -147,11 +172,15 @@ class ImageConditionDreamFusion(BaseSystem):
 
     def test_step(self, batch, batch_idx):
         out = self(batch)
-        self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", [
+        self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", ([
+            {'type': 'rgb', 'img': batch['rgb'][0], 'kwargs': {'data_format': 'HWC'}}
+        ] if 'rgb' in batch else []) + [
             {'type': 'rgb', 'img': out['comp_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
         ] + ([
             {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
         ] if 'comp_normal' in out else []) + [
+            {'type': 'grayscale', 'img': out['depth'][0], 'kwargs':{}}
+        ] + [
             {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
         ])
 
@@ -163,6 +192,8 @@ class ImageConditionDreamFusion(BaseSystem):
             save_format='mp4',
             fps=30
         )
+        mesh = self.geometry.isosurface()
+        self.save_mesh('mesh.obj', v_pos=mesh.v_pos, t_pos_idx=mesh.t_pos_idx)
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         # remove stable diffusion weights

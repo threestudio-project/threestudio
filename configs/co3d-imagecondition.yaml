@@ -1,11 +1,28 @@
-name: "imagecondition"
+name: "co3d-imagecondition"
 tag: "debug"
 exp_root_dir: "outputs"
 seed: 0
 
-data_type: "single-image-datamodule"
+data_type: "co3d-datamodule"
 data:
-  image_path: ./data/hamburger_rgba.png
+  root_dir: /home/zzx/lab_data/Dataset/co3d/data/apple/189_20393_38136
+  height: 256
+  width: 256
+  scale_radius: 3.0
+  load_preprocessed: false
+  cam_scale_factor: 0.95 # inherited from plenoxels
+  max_num_frames: 300 # use less frames for debugging
+  v2_mode: true
+  use_mask: true
+  box_crop: true
+  box_crop_mask_thr: 0.4
+  box_crop_context: 0.1 # The amount of additional padding added to each dimention of the cropping bounding box, relative to vox size.
+  train_num_rays: 4096
+  train_split: 'train'
+  val_split: 'val'
+  test_split: 'test'
+  render_path: 'circle'
+  train_views: [0, 50, 100]
   random_camera:
     eval_height: 256
     eval_width: 256
@@ -19,9 +36,10 @@ system:
   geometry:
     isosurface_method: 'mc-cpu'
     isosurface_resolution: 128
-    isosurface_threshold: 5.0
+    isosurface_threshold: 0.0
     normal_type: "finite_difference"
     finite_difference_normal_eps: 0.004
+    n_feature_dims: 32
     mlp_network_config:
       otype: "VanillaMLP"
       activation: "ReLU"
@@ -68,7 +86,8 @@ system:
   
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
-    prompt: "a DSLR photo of a delicious hamburger"
+    # prompt: "a DSLR photo of a delicious hamburger"
+    prompt: "an apple"
   
   guidance_type: "stable-diffusion-guidance"
   guidance:
@@ -78,25 +97,27 @@ system:
   
   freq:
     n_ref: 2
-    ref_only_steps: 100
+    ref_only_steps: 1000
 
   loss:
     lambda_sds: 0.1
     lambda_rgb: 10.
     lambda_mask: 1.
-    lambda_depth: [0.0, 0.0, 1.0, 10000]
+    lambda_depth: 0.
+    # lambda_depth: [0.0, 0.0, 1.0, 10000]
     lambda_normal_smooth: 0.0
-    lambda_orient: 0.0
+    lambda_orient: 1.0
+    # lambda_orient: [1000, 0.0, 10, 6000]
     lambda_sparsity: 0.0
-    lambda_opaque: 0.0
+    lambda_opaque: 0.01
   optimizer:
     # params:
     #   geometry.encoding:
     #     lr: 0.01
     #   geometry.network:
     #     lr: 0.001
-    #   background.network:
-    #     lr: 0.001
+    #   # background.network:
+    #   #   lr: 0.001
     # name: Adam
     # args:
     #   # lr: 0.001

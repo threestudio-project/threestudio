@@ -206,7 +206,6 @@ class NVDiffRasterizer(Rasterizer):
     @dataclass
     class Config(VolumeRenderer.Config):
         context_type: str = "gl"
-        eval_chunk_size: int = 8192
     
     cfg: Config
 

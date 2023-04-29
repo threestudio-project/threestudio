@@ -1,28 +1,30 @@
-name: "dreamfusion-wonormal"
+name: "magic3d"
 tag: "debug"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "random-camera-datamodule"
+data:
+  camera_distance_range: [1.5, 2.0]
+  light_sample_strategy: 'magic3d'
 
 system_type: "dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    normal_type: null
-    mlp_network_config:
-      otype: "VanillaMLP"
-      activation: "ReLU"
-      output_activation: "none"
-      n_neurons: 64
-      n_hidden_layers: 1
+    radius: 2.
+    normal_type: "finite_difference" # original paper uses pred
 
-  material_type: "no-material"
+  material_type: "diffuse-with-point-light-material"
+  material:
+    ambient_only_steps: 1001
+    soft_shading: true
   
   background_type: "neural-environment-map-background"
 
   renderer_type: "nerf-volume-renderer"
   renderer:
+    radius: ${system.geometry.radius}
     num_samples_per_ray: 512
   
   prompt_processor_type: "dreamfusion-prompt-processor"
@@ -31,7 +33,7 @@ system:
   
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    half_precision_weights: false
+    half_precision_weights: true
     guidance_scale: 100.
   
   loss:
@@ -39,12 +41,21 @@ system:
     lambda_orient: 0.0
     lambda_sparsity: 0.0
     lambda_opaque: 0.0
+    lambda_distortion: 0.0
   optimizer:
     name: Adam
     args:
       lr: 0.01
       betas: [0.9, 0.99]
       eps: 1.e-15
+    params:
+      geometry.encoding:
+        lr: 0.01
+      geometry.network:
+        lr: 0.01
+      background:
+        lr: 0.001
+
   # scheduler:
   #   name: SequentialLR
   #   interval: step
@@ -65,10 +76,10 @@ trainer:
   max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 1000
+  val_check_interval: 200
   limit_val_batches: 1
   enable_progress_bar: true
-  precision: 32
+  precision: 16-mixed
 
 checkpoint:
   save_last: true

@@ -137,6 +137,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         })
         normal_type: Optional[str] = "finite_difference" # in ['pred', 'finite_difference']
         finite_difference_normal_eps: float = 0.01
+        detach_blob_points: bool = False
 
     cfg: Config
 
@@ -148,22 +149,23 @@ class ImplicitVolume(BaseImplicitGeometry):
         if self.cfg.normal_type == "pred":
             self.normal_network = get_mlp(self.encoding.n_output_dims, 3, self.cfg.mlp_network_config)
     
-    def get_activated_density(self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]):
+    def get_activated_density(self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]) -> Tuple[Float[Tensor, "*N 1"], Float[Tensor, "*N 1"]]:
+        if self.cfg.detach_blob_points:
+            points = points.detach()
         density_bias: Union[float, Float[Tensor, "*N 1"]]
         if self.cfg.density_bias == 'blob_dreamfusion':
-            # post-activation density bias
+            # pre-activation density bias
             density_bias = self.cfg.density_blob_scale * torch.exp(-0.5 * (points ** 2).sum(dim=-1) / self.cfg.density_blob_std ** 2)[...,None]
-            density = get_activation(self.cfg.density_activation)(density) + density_bias
         elif self.cfg.density_bias == 'blob_magic3d':
             # pre-activation density bias
-            density_bias = self.cfg.density_blob_scale * (1 - torch.sqrt((points.detach() ** 2).sum(dim=-1)) / self.cfg.density_blob_std)[...,None]
-            density = get_activation(self.cfg.density_activation)(density + density_bias)
+            density_bias = self.cfg.density_blob_scale * (1 - torch.sqrt((points ** 2).sum(dim=-1)) / self.cfg.density_blob_std)[...,None]
         elif isinstance(self.cfg.density_bias, float):
             density_bias = self.cfg.density_bias
-            density = get_activation(self.cfg.density_activation)(density + density_bias)
         else:
             raise ValueError(f"Unknown density bias {self.cfg.density_bias}")
-        return density
+        raw_density: Union[float, Float[Tensor, "*N 1"]] = density + density_bias
+        density = get_activation(self.cfg.density_activation)(raw_density)
+        return raw_density, density
 
     def forward(
         self, points: Float[Tensor, "*N Di"], output_normal: bool = False
@@ -180,7 +182,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         enc = self.encoding(points.view(-1, self.cfg.n_input_dims))
         out = self.network(enc).view(*points.shape[:-1], self.n_output_dims)
         density, features = out[..., 0:1], out[..., 1:]
-        density = self.get_activated_density(points_unscaled, density)
+        raw_density, density = self.get_activated_density(points_unscaled, density)
 
         output = {
             'density': density,
@@ -189,6 +191,7 @@ class ImplicitVolume(BaseImplicitGeometry):
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":
+                # TODO: use raw density
                 eps = self.cfg.finite_difference_normal_eps
                 offsets: Float[Tensor, "6 3"] = torch.as_tensor([[eps, 0., 0.], [-eps, 0., 0.], [0., eps, 0.], [0., -eps, 0.], [0., 0., eps], [0., 0., -eps]]).to(points_unscaled)
                 points_offset: Float[Tensor, "... 6 3"] = (points_unscaled[...,None,:] + offsets).clamp(-self.cfg.radius, self.cfg.radius)
@@ -199,7 +202,9 @@ class ImplicitVolume(BaseImplicitGeometry):
                 normal = self.normal_network(enc).view(*points.shape[:-1], 3)
                 normal = F.normalize(normal, dim=-1)
             elif self.cfg.normal_type == "analytic":
-                normal = -torch.autograd.grad(density, points_unscaled, grad_outputs=torch.ones_like(density), create_graph=True)[0]
+                # use raw_density instead of density for numerical stability
+                # https://github.com/google-research/multinerf/blob/30005650e9e6a1d8a0f561aa848ea65d855fc787/internal/models.py#L488-L492
+                normal = -torch.autograd.grad(raw_density, points_unscaled, grad_outputs=torch.ones_like(raw_density), create_graph=True)[0]
                 normal = F.normalize(normal, dim=-1)
             else:
                 raise AttributeError(f"Unknown normal type {self.cfg.normal_type}")
@@ -219,7 +224,7 @@ class ImplicitVolume(BaseImplicitGeometry):
             points.reshape(-1, self.cfg.n_input_dims)
         )).reshape(*points.shape[:-1], self.n_output_dims)[..., 0:1]
 
-        density = self.get_activated_density(points_unscaled, density)
+        _, density = self.get_activated_density(points_unscaled, density)
         return density
 
     def forward_level(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:

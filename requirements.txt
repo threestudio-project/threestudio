@@ -15,3 +15,10 @@ imageio
 imageio[ffmpeg]
 trimesh
 git+https://github.com/NVlabs/nvdiffrast.git
+torch_efficient_distloss
+# deepfloyd
+git+https://github.com/facebookresearch/xformers.git@main#egg=xformers
+bitsandbytes
+sentencepiece
+safetensors
+huggingface_hub

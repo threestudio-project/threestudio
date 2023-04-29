@@ -56,7 +56,7 @@ class CodeSnapshotCallback(VersionedCallback):
     def get_file_list(self):
         return [
             b.decode() for b in
-            set(subprocess.check_output('git ls-files', shell=True).splitlines()) |
+            set(subprocess.check_output('git ls-files -- ":!:load/*" ":!:data/*"', shell=True).splitlines()) | # hard code, TODO: use config to exclude folders or files
             set(subprocess.check_output('git ls-files --others --exclude-standard', shell=True).splitlines())
         ]
     
