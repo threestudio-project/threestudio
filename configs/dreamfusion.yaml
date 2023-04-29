@@ -18,9 +18,13 @@ system:
     
     density_bias: "blob_dreamfusion"
     density_activation: shifted_softplus
+    density_blob_scale: 5.
+    density_blob_std: 0.2     
     # or try
     # density_bias: "blob_magic3d"
     # density_activation: softplus
+    # density_blob_scale: 10.
+    # density_blob_std: 0.5    
 
     # coarse to fine hash grid encoding
     # to ensure smooth analytic normals
