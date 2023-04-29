@@ -331,7 +331,10 @@ class DeepFloydGuidance(BaseModule):
         # Create model
         # FIXME: device map behavior
         self.pipe = IFPipeline.from_pretrained(
-            self.cfg.pretrained_model_name_or_path, text_encoder=None, variant="fp16", torch_dtype=torch.float16, device_map="auto"
+            self.cfg.pretrained_model_name_or_path,
+            text_encoder=None, safety_checker=None, watermarker=None,
+            variant="fp16", torch_dtype=torch.float16,
+            device_map="auto"
         )
         self.unet = self.pipe.unet
 
@@ -364,6 +367,7 @@ class DeepFloydGuidance(BaseModule):
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
 
         assert rgb_as_latents == False, f"No latent space in {self.__class__.__name__}"
+        latents = rgb_BCHW * 2. - 1. # diffusion works in [-1, 1]
         latents = F.interpolate(rgb_BCHW, (64, 64), mode="bilinear", align_corners=False)
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
