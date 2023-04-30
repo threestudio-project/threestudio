@@ -41,7 +41,7 @@ class Fantasia3D(BaseSystem):
         self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        render_out = self.renderer(**batch)
+        render_out = self.renderer(**batch, render_normal=True, render_rgb=False)
         return {
             **render_out,
         }
@@ -68,33 +68,27 @@ class Fantasia3D(BaseSystem):
         text_embeddings = self.prompt_processor(**batch)
 
         if self.global_step < self.cfg.latent_steps:
-            guidance_inp = torch.cat([out['normal'] * 2. - 1., out['silhouette']], dim=-1)
+            guidance_inp = torch.cat([out['comp_normal'] * 2. - 1., out['opacity']], dim=-1)
             guidance_out = self.guidance(guidance_inp, text_embeddings, rgb_as_latents=True) 
         else:
-            guidance_inp = out['normal'] * 2. - 1.
+            guidance_inp = out['comp_normal'] * 2. - 1.
             guidance_out = self.guidance(guidance_inp, text_embeddings, rgb_as_latents=False)
 
         loss += guidance_out['sds'] * self.C(self.cfg.loss.lambda_sds)
 
-        # loss += out['mesh'].extras['sdf_diff'].mean() * self.C(self.cfg.loss.lambda_sdf_reg)
-
         for name, value in self.cfg.loss.items():
             self.log(f'train_params/{name}', self.C(value))
 
-        # return {
-        #     'loss': loss
-        # }
         opt.zero_grad()
         self.manual_backward(loss)
-        # import pdb; pdb.set_trace();
         opt.step()
 
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", [
-            {'type': 'grayscale', 'img': out['silhouette'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
-            {'type': 'rgb', 'img': out['normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
+            {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
+            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
         ])
     
     def on_validation_epoch_end(self):
@@ -103,8 +97,8 @@ class Fantasia3D(BaseSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", [
-            {'type': 'grayscale', 'img': out['silhouette'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
-            {'type': 'rgb', 'img': out['normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
+            {'type': 'grayscale', 'img': out['opacity'][0,:,:,0], 'kwargs': {'cmap': None, 'data_range': (0, 1)}},
+            {'type': 'rgb', 'img': out['comp_normal'][0], 'kwargs': {'data_format': 'HWC', 'data_range': (0, 1)}}
         ])
 
     def on_test_epoch_end(self):

@@ -28,6 +28,13 @@ python launch.py --config configs/dreamfusion.yaml --train --gpu 0 system.prompt
 # train with simple surface color without material assumption
 python launch.py --config configs/dreamfusion-wonormal.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
 ```
+### Magic3D
+```bash
+# train the coarse stage using implicit volume geometry
+python launch.py --config configs/magic3d-coarse.yaml --train --gpu 0 system.prompt_processor.prompt="lib:delicious_hamburger"
+# refine using DMTet and differentiable rasterization
+python launch.py --config configs/magic3d-refine.yaml --train --gpu 0 system.prompt_processor.prompt="lib:delicious_hamburger" system.weights=path/to/coarse/stage/last.ckpt
+```
 ### Latent-NeRF
 ```bash
 # train in stable-diffusion latent space

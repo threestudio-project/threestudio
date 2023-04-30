@@ -1,10 +1,8 @@
-import gc
 from collections import defaultdict
 import torch
 import torch.nn.functional as F
 from torch.autograd import Function
 from torch.cuda.amp import custom_bwd, custom_fwd
-import tinycudann as tcnn
 
 from threestudio.utils.typing import *
 
@@ -31,12 +29,6 @@ def scale_tensor(
     dat = (dat - inp_scale[0]) / (inp_scale[1] - inp_scale[0])
     dat = dat * (tgt_scale[1] - tgt_scale[0]) + tgt_scale[0]
     return dat
-
-
-def cleanup():
-    gc.collect()
-    torch.cuda.empty_cache()
-    tcnn.free_temporary_memory()
 
 
 class _TruncExp(Function):  # pylint: disable=abstract-method
@@ -131,9 +123,18 @@ def chunk_batch(func: Callable, chunk_size: int, *args, **kwargs) -> Any:
             out[k].append(v)
 
     if out_type is None:
-        return
+        return None
 
-    out_merged = {k: torch.cat(v, dim=0) for k, v in out.items()}
+    out_merged: Dict[Any, Optional[torch.Tensor]] = {}
+    for k, v in out.items():
+        if all([vv is None for vv in v]):
+            # allow None in return value
+            out_merged[k] = None
+        elif all([isinstance(vv, torch.Tensor) for vv in v]):
+            out_merged[k] = torch.cat(v, dim=0)
+        else:
+            raise TypeError(f"Unsupported types in return value of func: {[type(vv) for vv in v if not isinstance(vv, torch.Tensor)]}")
+
     if out_type is torch.Tensor:
         return out_merged[0]
     elif out_type in [tuple, list]:
@@ -245,3 +246,15 @@ def binary_cross_entropy(input, target):
     F.binary_cross_entropy is not numerically stable in mixed-precision training.
     """
     return -(target * torch.log(input) + (1 - target) * torch.log(1 - input)).mean()
+
+
+def tet_sdf_diff(vert_sdf: Float[Tensor, "Nv 1"], tet_edges: Integer[Tensor, "Ne 2"]) -> Float[Tensor, ""]:
+    sdf_f1x6x2 = vert_sdf[:, 0][tet_edges.reshape(-1)].reshape(-1, 2)
+    mask = torch.sign(sdf_f1x6x2[..., 0]) != torch.sign(sdf_f1x6x2[..., 1])
+    sdf_f1x6x2 = sdf_f1x6x2[mask]
+    sdf_diff = F.binary_cross_entropy_with_logits(
+        sdf_f1x6x2[..., 0], (sdf_f1x6x2[..., 1] > 0).float()
+    ) + F.binary_cross_entropy_with_logits(
+        sdf_f1x6x2[..., 1], (sdf_f1x6x2[..., 0] > 0).float()
+    )
+    return sdf_diff

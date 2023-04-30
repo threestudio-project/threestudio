@@ -54,6 +54,9 @@ class StableDiffusionGuidance(BaseModule):
 
         weighting_strategy: str = 'sds'
 
+        token_merging: bool = False
+        token_merging_params: Optional[dict] = field(default_factory=dict)
+
     cfg: Config
 
     def configure(self) -> None:
@@ -71,6 +74,10 @@ class StableDiffusionGuidance(BaseModule):
 
         if self.cfg.use_xformers and is_xformers_available():
             self.unet.enable_xformers_memory_efficient_attention()
+        
+        if self.cfg.token_merging:
+            import tomesd
+            tomesd.apply_patch(self.unet, **self.cfg.token_merging_params)
 
         self.scheduler = DDIMScheduler.from_pretrained(
             self.cfg.pretrained_model_name_or_path, subfolder="scheduler", torch_dtype=weights_dtype
@@ -186,6 +193,9 @@ class ScoreJacobianGuidance(BaseModule):
         min_step_percent: float = 0.01
         max_step_percent: float = 0.97
 
+        token_merging: bool = False
+        token_merging_params: Optional[dict] = field(default_factory=dict)        
+
     cfg: Config
 
     def configure(self) -> None:
@@ -204,6 +214,10 @@ class ScoreJacobianGuidance(BaseModule):
         if self.cfg.use_xformers and is_xformers_available():
             self.unet.enable_xformers_memory_efficient_attention()
 
+        if self.cfg.token_merging:
+            import tomesd
+            tomesd.apply_patch(self.unet, **self.cfg.token_merging_params)            
+
         self.scheduler = DDPMScheduler.from_pretrained(
             self.cfg.pretrained_model_name_or_path, subfolder="scheduler", torch_dtype=weights_dtype,
             beta_start=0.00085,
@@ -215,7 +229,7 @@ class ScoreJacobianGuidance(BaseModule):
         self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
         self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
 
-        self.grad_clip_val = None
+        self.grad_clip_val: Optional[float] = None
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(self.device)
         self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)
