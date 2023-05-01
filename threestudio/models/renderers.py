@@ -25,7 +25,8 @@ class Renderer(BaseModule):
 
     def configure(self, geometry: BaseImplicitGeometry, material: BaseMaterial, background: BaseBackground) -> None:
         # keep references to submodules using namedtuple, avoid being registered as modules
-        class SubModules(NamedTuple):
+        @dataclass
+        class SubModules:
             geometry: BaseImplicitGeometry
             material: BaseMaterial
             background: BaseBackground
@@ -41,7 +42,7 @@ class Renderer(BaseModule):
             dtype=torch.float32,
         ))        
     
-    def forward(self, *args, **kwargs) -> Dict[str, Float[Tensor, "..."]]:
+    def forward(self, *args, **kwargs) -> Dict[str, Any]:
         raise NotImplementedError
 
     @property
@@ -55,6 +56,15 @@ class Renderer(BaseModule):
     @property
     def background(self) -> BaseBackground:
         return self.sub_modules.background
+    
+    def set_geometry(self, geometry: BaseImplicitGeometry) -> None:
+        self.sub_modules.geometry = geometry
+    
+    def set_material(self, material: BaseMaterial) -> None:
+        self.sub_modules.material = material
+    
+    def set_background(self, background: BaseBackground) -> None:
+        self.sub_modules.background = background
 
 
 class VolumeRenderer(Renderer):
@@ -121,6 +131,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
         t_positions = (t_starts + t_ends) / 2.
         positions = t_origins + t_dirs * t_positions
         t_intervals = t_ends - t_starts
+
+        # TODO: still proceed if the scene is empty 
 
         if self.training:
             geo_out = self.geometry(positions, output_normal=self.material.requires_normal)
@@ -213,22 +225,48 @@ class NVDiffRasterizer(Rasterizer):
         super().configure(geometry, material, background)
         self.ctx = NVDiffRasterizerContext(self.cfg.context_type, get_device())
     
-    def forward(self, mvp_mtx: Float[Tensor, "B 4 4"], height: int, width: int, **kwargs) -> Dict[str, Float[Tensor, "..."]]:
+    def forward(self, mvp_mtx: Float[Tensor, "B 4 4"], camera_positions: Float[Tensor, "B 3"], light_positions: Float[Tensor, "B 3"], height: int, width: int, render_normal: bool = True, render_rgb: bool = True, **kwargs) -> Dict[str, Any]:
         batch_size = mvp_mtx.shape[0]
         mesh = self.geometry.isosurface()
 
         v_pos_clip: Float[Tensor, "B Nv 4"] = self.ctx.vertex_transform(mesh.v_pos, mvp_mtx)
         rast, _ = self.ctx.rasterize(v_pos_clip, mesh.t_pos_idx, (height, width))
         mask = rast[...,3:] > 0
-        silhouette = self.ctx.antialias(mask.float(), rast, v_pos_clip, mesh.t_pos_idx)
-        normal, _ = self.ctx.interpolate_one(mesh.v_nrm, rast, mesh.t_pos_idx)
-        normal = torch.lerp(torch.zeros_like(normal), (normal + 1.) / 2., mask.float())
-        normal = self.ctx.antialias(normal, rast, v_pos_clip, mesh.t_pos_idx)
+        mask_aa = self.ctx.antialias(mask.float(), rast, v_pos_clip, mesh.t_pos_idx)
 
         out = {
-            'silhouette': silhouette,
-            'normal': normal,
+            'opacity': mask_aa,
             'mesh': mesh
         }
-        
+
+        if render_normal:
+            gb_normal, _ = self.ctx.interpolate_one(mesh.v_nrm, rast, mesh.t_pos_idx)
+            gb_normal = F.normalize(gb_normal, dim=-1)
+            gb_normal_aa = torch.lerp(torch.zeros_like(gb_normal), (gb_normal + 1.) / 2., mask.float())
+            gb_normal_aa = self.ctx.antialias(gb_normal_aa, rast, v_pos_clip, mesh.t_pos_idx)
+            out.update({
+                'comp_normal': gb_normal_aa # in [0, 1]
+            })
+
+        if render_rgb:
+            selector = mask[...,0]
+
+            gb_pos, _ = self.ctx.interpolate_one(mesh.v_pos, rast, mesh.t_pos_idx)
+            gb_viewdirs = F.normalize(gb_pos - camera_positions[:,None,None,:], dim=-1)
+            gb_light_positions = light_positions[:,None,None,:].expand(-1, height, width, -1)
+
+            positions = gb_pos[selector]
+            geo_out = self.geometry(positions, output_normal=False)
+            rgb_fg = self.material(viewdirs=gb_viewdirs[selector], positions=positions, light_positions=gb_light_positions[selector], shading_normal=gb_normal[selector], **geo_out)
+            gb_rgb_fg = torch.zeros(batch_size, height, width, 3).to(rgb_fg)
+            gb_rgb_fg[selector] = rgb_fg
+
+            gb_rgb_bg = self.background(dirs=gb_viewdirs)
+            gb_rgb = torch.lerp(gb_rgb_bg, gb_rgb_fg, mask.float())
+            gb_rgb_aa = self.ctx.antialias(gb_rgb, rast, v_pos_clip, mesh.t_pos_idx)
+
+            out.update({
+                'comp_rgb': gb_rgb_aa
+            })
+
         return out

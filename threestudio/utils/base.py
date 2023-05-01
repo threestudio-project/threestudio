@@ -49,7 +49,9 @@ class BaseModule(nn.Module, Updateable):
         if self.cfg.weights is not None:
             # format: path/to/weights:module_name
             weights_path, module_name = self.cfg.weights.split(':')
-            self.load_state_dict(load_module_weights(weights_path, module_name=module_name, map_location='cpu'))
+            state_dict, epoch, global_step = load_module_weights(weights_path, module_name=module_name, map_location='cpu')
+            self.load_state_dict(state_dict)
+            self.do_update_step(epoch, global_step) # restore states
         # dummy tensor to indicate model state
         self._dummy: Float[Tensor, "..."]
         self.register_buffer('_dummy', torch.zeros(0).float(), persistent=False)

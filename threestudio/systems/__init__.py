@@ -1,1 +1,1 @@
-from . import dreamfusion, latentnerf, sjc, fantasia3d, imagedreamfusion, optimizer
+from . import dreamfusion, magic3d, latentnerf, sjc, fantasia3d, imagedreamfusion, optimizer

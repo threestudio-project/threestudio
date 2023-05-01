@@ -1,5 +1,5 @@
 name: "fantasia3d"
-tag: "debug"
+tag: "${system.prompt_processor.prompt}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -24,14 +24,15 @@ system_type: "fantasia3d-system"
 system:
   geometry_type: "implicit-sdf"
   geometry:
-    isosurface_optimize_grid: false
-    isosurface_resolution: 64
+    n_feature_dims: 0
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
     shape_init: sphere
     shape_init_params: 0.5
 
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
-    prompt: "a delicious hamburger"
+    prompt: "lib:sundae"
     view_dependent_prompting: true
   
   guidance_type: "stable-diffusion-guidance"
@@ -57,7 +58,7 @@ trainer:
   max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
-  val_check_interval: 100
+  val_check_interval: 200
   limit_val_batches: 1
   enable_progress_bar: true
   precision: 16
