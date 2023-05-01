@@ -71,9 +71,7 @@ system:
       betas: [0.9, 0.99]
       eps: 1.e-15
     params:
-      geometry.encoding:
-        lr: 0.01
-      geometry.network:
+      geometry:
         lr: 0.01
       background:
         lr: 0.01

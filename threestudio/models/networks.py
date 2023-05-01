@@ -5,8 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import tinycudann as tcnn
 
-from pytorch_lightning.utilities.rank_zero import rank_zero_debug
-
+import threestudio
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import config_to_primitive
 from threestudio.utils.typing import *
@@ -37,7 +36,7 @@ class ProgressiveBandFrequency(nn.Module, Updateable):
             self.mask = torch.ones(self.N_freqs, dtype=torch.float32)
         else:
             self.mask = (1. - torch.cos(math.pi * (global_step / self.n_masking_step * self.N_freqs - torch.arange(0, self.N_freqs)).clamp(0, 1))) / 2.
-            rank_zero_debug(f'Update mask: {global_step}/{self.n_masking_step} {self.mask}')
+            threestudio.debug(f'Update mask: {global_step}/{self.n_masking_step} {self.mask}')
 
 
 class TCNNEncoding(nn.Module):
@@ -53,13 +52,14 @@ class TCNNEncoding(nn.Module):
 
 
 class ProgressiveBandHashGrid(nn.Module, Updateable):
-    def __init__(self, in_channels, config):
+    def __init__(self, in_channels, config, dtype=torch.float32):
         super().__init__()
         self.n_input_dims = in_channels
         encoding_config = config.copy()
         encoding_config['otype'] = 'Grid'
         encoding_config['type'] = 'Hash'
-        self.encoding = TCNNEncoding(in_channels, encoding_config)
+        with torch.cuda.device(get_rank()):
+            self.encoding = tcnn.Encoding(in_channels, encoding_config, dtype=dtype)
         self.n_output_dims = self.encoding.n_output_dims
         self.n_level = config['n_levels']
         self.n_features_per_level = config['n_features_per_level']
@@ -75,7 +75,7 @@ class ProgressiveBandHashGrid(nn.Module, Updateable):
     def update_step(self, epoch, global_step):
         current_level = min(self.start_level + max(global_step - self.start_step, 0) // self.update_steps, self.n_level)
         if current_level > self.current_level:
-            rank_zero_debug(f'Update current level to {current_level}')
+            threestudio.debug(f'Update current level to {current_level}')
         self.current_level = current_level
         self.mask[:self.current_level * self.n_features_per_level] = 1.
 

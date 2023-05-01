@@ -3,11 +3,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import threestudio
 from threestudio.utils.typing import *
 from threestudio.models.mesh import Mesh
 
 
 class IsosurfaceHelper(nn.Module):
+    points_range: Tuple[float, float] = (0, 1)
     @property
     def grid_vertices(self) -> Float[Tensor, "N 3"]:
         raise NotImplementedError
@@ -17,7 +19,6 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
     def __init__(self, resolution: int) -> None:
         super().__init__()
         self.resolution = resolution
-        self.points_range = (0, 1)
         import mcubes
 
         self.mc_func: Callable = mcubes.marching_cubes
@@ -43,7 +44,9 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
             self._grid_vertices = verts
         return self._grid_vertices
 
-    def forward(self, level: Float[Tensor, "N3 1"]) -> Mesh:
+    def forward(self, level: Float[Tensor, "N3 1"], deformation: Optional[Float[Tensor, "N3 3"]] = None) -> Mesh:
+        if deformation is not None:
+            threestudio.warn(f"{self.__class__.__name__} does not support deformation. Ignoring.")
         level = -level.view(self.resolution, self.resolution, self.resolution)
         v_pos, t_pos_idx = self.mc_func(
             level.detach().cpu().numpy(), 0.0
@@ -57,12 +60,10 @@ class MarchingCubeCPUHelper(IsosurfaceHelper):
 
 
 class MarchingTetrahedraHelper(IsosurfaceHelper):
-    def __init__(self, resolution: int, optimize_grid: bool, tets_path: str):
+    def __init__(self, resolution: int, tets_path: str):
         super().__init__()
         self.resolution = resolution
-        self.optimize_grid = optimize_grid
         self.tets_path = tets_path
-        self.points_range = (0, 1)
 
         self.triangle_table: Float[Tensor, "..."]
         self.register_buffer(
@@ -117,25 +118,18 @@ class MarchingTetrahedraHelper(IsosurfaceHelper):
             "indices", torch.from_numpy(tets["indices"]).long(), persistent=False
         )
 
-        self.grid_vertex_offsets: Optional[Float[Tensor, "Nv 3"]] = None
-        if optimize_grid:
-            self.grid_vertex_offsets = nn.Parameter(
-                torch.zeros_like(self._grid_vertices)
-            )
-            self.register_parameter("grid_vertex_offsets", self.grid_vertex_offsets)
-
         self._all_edges: Optional[Integer[Tensor, "Ne 2"]] = None
+    
+    def normalize_grid_deformation(self, grid_vertex_offsets: Float[Tensor, "Nv 3"]) -> Float[Tensor, "Nv 3"]:
+        return (self.points_range[1] - self.points_range[0]) / (
+            self.resolution  # half tet size is approximately 1 / self.resolution
+        ) * torch.tanh(
+            grid_vertex_offsets
+        )  # FIXME: hard-coded activation
 
     @property
     def grid_vertices(self) -> Float[Tensor, "Nv 3"]:
-        if not self.optimize_grid:
-            return self._grid_vertices
-        assert self.grid_vertex_offsets is not None
-        return self._grid_vertices + (self.points_range[1] - self.points_range[0]) / (
-            self.resolution  # half tet size is approximately 1 / self.resolution
-        ) * torch.tanh(
-            self.grid_vertex_offsets
-        )  # FIXME: hard-coded activation
+        return self._grid_vertices
 
     @property
     def all_edges(self) -> Integer[Tensor, "Ne 2"]:
@@ -223,25 +217,22 @@ class MarchingTetrahedraHelper(IsosurfaceHelper):
 
         return verts, faces
 
-    def forward(self, level: Float[Tensor, "N3 1"]) -> Mesh:
-        v_pos, t_pos_idx = self._forward(self.grid_vertices, level, self.indices)
-
-        sdf_f1x6x2 = level[:, 0][self.all_edges.reshape(-1)].reshape(-1, 2)
-        mask = torch.sign(sdf_f1x6x2[..., 0]) != torch.sign(sdf_f1x6x2[..., 1])
-        sdf_f1x6x2 = sdf_f1x6x2[mask]
-        sdf_diff = F.binary_cross_entropy_with_logits(
-            sdf_f1x6x2[..., 0], (sdf_f1x6x2[..., 1] > 0).float()
-        ) + F.binary_cross_entropy_with_logits(
-            sdf_f1x6x2[..., 1], (sdf_f1x6x2[..., 0] > 0).float()
-        )
+    def forward(self, level: Float[Tensor, "N3 1"], deformation: Optional[Float[Tensor, "N3 3"]] = None) -> Mesh:
+        if deformation is not None:
+            grid_vertices = self.grid_vertices + self.normalize_grid_deformation(deformation)
+        else:
+            grid_vertices = self.grid_vertices
+        
+        v_pos, t_pos_idx = self._forward(grid_vertices, level, self.indices)
 
         mesh = Mesh(
             v_pos=v_pos,
             t_pos_idx=t_pos_idx,
             # extras
-            grid_vertices=self.grid_vertices,
-            grid_sdf=level,
-            grid_sdf_diff=sdf_diff,
+            grid_vertices=grid_vertices,
+            tet_edges=self.all_edges,
+            grid_level=level,
+            grid_deformation=deformation
         )
 
         return mesh
