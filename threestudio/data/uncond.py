@@ -38,7 +38,7 @@ class RandomCameraDataModuleConfig:
     light_distance_range: Tuple[float, float] = (0.8, 1.5)
     eval_elevation_deg: float = 0.
     eval_camera_distance: float = 1.5
-    eval_fovy_deg: float = 60.
+    eval_fovy_deg: float = 70.
     light_sample_strategy: str = 'dreamfusion'
     batch_uniform_azimuth: bool = True
 

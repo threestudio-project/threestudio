@@ -45,7 +45,7 @@ class BaseImplicitGeometry(BaseGeometry):
         radius: float = 1.0
         isosurface: bool = True
         isosurface_method: str = "mt"
-        isosurface_resolution: int = 64
+        isosurface_resolution: int = 128
         isosurface_threshold: Union[float, str] = 0.0
         isosurface_chunk: int = 0
         isosurface_coarse_to_fine: bool = False
@@ -118,7 +118,7 @@ class BaseImplicitGeometry(BaseGeometry):
                 # FIXME: highly empirical
                 if not fine_stage:
                     # large threshold for the coarse stage to remove outliars
-                    threshold = lambda level: level.mean() + 10 * level.std()
+                    threshold = lambda level: level.mean() + 5 * level.std()
                 else:
                     threshold = lambda level: level.mean()
             else:
@@ -527,7 +527,7 @@ class BaseExplicitGeometry(BaseGeometry):
 class TetrahedraSDFGrid(BaseExplicitGeometry):
     @dataclass
     class Config(BaseExplicitGeometry.Config):
-        isosurface_resolution: int = 64
+        isosurface_resolution: int = 128
         isosurface_deformable_grid: bool = True
 
         n_input_dims: int = 3
@@ -565,15 +565,17 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
             f"load/tets/{self.cfg.isosurface_resolution}_tets.npz"
         )
 
-        self.sdf: Float[Tensor, "Nv 1"] = nn.Parameter(torch.zeros((self.isosurface_helper.grid_vertices.shape[0], 1), dtype=torch.float32))
+        self.sdf: Float[Tensor, "Nv 1"]
         self.deformation: Optional[Float[Tensor, "Nv 3"]] = None
-        if self.cfg.isosurface_deformable_grid:
-            self.deformation = nn.Parameter(torch.zeros_like(self.isosurface_helper.grid_vertices))
         
-        if self.cfg.fix_geometry:
-            self.sdf.requires_grad_(False)
-            if self.deformation is not None:
-                self.deformation.requires_grad_(False)
+        if not self.cfg.fix_geometry:
+            self.register_parameter('sdf', nn.Parameter(torch.zeros((self.isosurface_helper.grid_vertices.shape[0], 1), dtype=torch.float32)))
+            if self.cfg.isosurface_deformable_grid:
+                self.register_parameter('deformation', nn.Parameter(torch.zeros_like(self.isosurface_helper.grid_vertices)))
+        else:
+            self.register_buffer('sdf', torch.zeros((self.isosurface_helper.grid_vertices.shape[0], 1), dtype=torch.float32))
+            if self.cfg.isosurface_deformable_grid:
+                self.register_buffer('deformation', torch.zeros_like(self.isosurface_helper.grid_vertices))
 
         if not self.cfg.geometry_only:
             self.encoding = get_encoding(self.cfg.n_input_dims, self.cfg.pos_encoding_config)

@@ -145,6 +145,8 @@ class Magic3D(BaseSystem):
         ])
 
     def on_test_epoch_end(self):
+        mesh = self.geometry.isosurface()
+        self.save_mesh(f"mesh.obj", mesh.v_pos, mesh.t_pos_idx)        
         self.save_img_sequence(
             f"it{self.global_step}-test",
             f"it{self.global_step}-test",

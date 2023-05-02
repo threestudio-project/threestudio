@@ -1,14 +1,14 @@
-name: "dreamfusion-df"
+name: "dreamfusion"
 tag: "${system.prompt_processor.prompt}"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "random-camera-datamodule"
 data:
-  # prevent GPU OOM in early stage
-  eval_height: 256
-  eval_width: 256
+  width: 64
+  height: 64
   eval_camera_distance: 2.0
+  eval_fovy_deg: 70.
 
 system_type: "dreamfusion-system"
 system:
@@ -17,10 +17,18 @@ system:
     radius: 1.4
     normal_type: "analytic"
     
-    density_bias: "blob_dreamfusion"
-    density_activation: exp
-    density_blob_scale: 5.
-    density_blob_std: 0.2     
+    # the density initialization proposed in the DreamFusion paper
+    # does not work very well
+    # density_bias: "blob_dreamfusion"
+    # density_activation: exp
+    # density_blob_scale: 5.
+    # density_blob_std: 0.2     
+
+    # use Magic3D density initialization instead
+    density_bias: "blob_magic3d"
+    density_activation: softplus
+    density_blob_scale: 10.
+    density_blob_std: 0.35
 
     # coarse to fine hash grid encoding
     # to ensure smooth analytic normals
@@ -53,13 +61,15 @@ system:
   guidance_type: "deep-floyd-guidance"
   guidance:
     guidance_scale: 20.
+    weighting_strategy: sds
+    min_step_percent: 0.02
+    max_step_percent: 0.98
   
   loss:
     lambda_sds: 1.
     lambda_orient: [0,100.,10000.,5000]
-    lambda_sparsity: 0.0
+    lambda_sparsity: 1.
     lambda_opaque: 0.0
-    lambda_distortion: 0.0
   optimizer:
     name: Adam
     args:

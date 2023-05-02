@@ -50,9 +50,6 @@ class DreamFusion(BaseSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(self.cfg.prompt_processor)
 
     def training_step(self, batch, batch_idx):
-        # opt = self.optimizers()
-        # opt.zero_grad()
-
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
         guidance_out = self.guidance(out['comp_rgb'], text_embeddings, rgb_as_latents=False) 
@@ -67,14 +64,6 @@ class DreamFusion(BaseSystem):
             loss_orient = (out['weights'].detach() * dot(out['normal'], out['t_dirs']).clamp_min(0.)**2).sum() / (out['opacity'] > 0).sum()
             self.log('train/loss_orient', loss_orient)
             loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
-
-        # distortion loss proposed in MipNeRF360
-        # an efficient implementation from https://github.com/sunset1995/torch_efficient_distloss
-        if self.C(self.cfg.loss.lambda_distortion) > 0:
-            from torch_efficient_distloss import flatten_eff_distloss        
-            loss_distortion = flatten_eff_distloss(out['weights'][...,0], out['t_points'][...,0], out['t_intervals'][...,0], out['ray_indices'])
-            self.log('train/loss_distortion', loss_distortion)
-            loss += loss_distortion * self.C(self.cfg.loss.lambda_distortion)            
 
         loss_sparsity = (out['opacity']**2 + 0.01).sqrt().mean()
         self.log('train/loss_sparsity', loss_sparsity)
@@ -91,10 +80,6 @@ class DreamFusion(BaseSystem):
         return {
             'loss': loss
         }
-        # self.manual_backward(loss)
-        # opt.step()
-        # sch = self.lr_schedulers()
-        # sch.step()
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
@@ -110,7 +95,6 @@ class DreamFusion(BaseSystem):
         pass
 
     def test_step(self, batch, batch_idx):
-        return
         out = self(batch)
         self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", [
             {'type': 'rgb', 'img': out['comp_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
@@ -121,10 +105,8 @@ class DreamFusion(BaseSystem):
         ])
 
     def on_test_epoch_end(self):
-        # import pdb; pdb.set_trace();
         mesh = self.geometry.isosurface()
         self.save_mesh(f"mesh.obj", mesh.v_pos, mesh.t_pos_idx)
-        return
         self.save_img_sequence(
             f"it{self.global_step}-test",
             f"it{self.global_step}-test",
