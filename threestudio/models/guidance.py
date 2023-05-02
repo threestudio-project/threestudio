@@ -320,6 +320,54 @@ class ScoreJacobianGuidance(BaseModule):
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
 
+"""
+# used by thresholding, experimental
+def custom_ddpm_step(ddpm, model_output: torch.FloatTensor, timestep: int, sample: torch.FloatTensor, generator=None, return_dict: bool = True):
+    self = ddpm
+    t = timestep
+
+    prev_t = self.previous_timestep(t)
+
+    if model_output.shape[1] == sample.shape[1] * 2 and self.variance_type in ["learned", "learned_range"]:
+        model_output, predicted_variance = torch.split(model_output, sample.shape[1], dim=1)
+    else:
+        predicted_variance = None
+
+    # 1. compute alphas, betas
+    alpha_prod_t = self.alphas_cumprod[t].item()
+    alpha_prod_t_prev = self.alphas_cumprod[prev_t].item() if prev_t >= 0 else 1.0
+    beta_prod_t = 1 - alpha_prod_t
+    beta_prod_t_prev = 1 - alpha_prod_t_prev
+    current_alpha_t = alpha_prod_t / alpha_prod_t_prev
+    current_beta_t = 1 - current_alpha_t
+
+    # 2. compute predicted original sample from predicted noise also called
+    # "predicted x_0" of formula (15) from https://arxiv.org/pdf/2006.11239.pdf
+    if self.config.prediction_type == "epsilon":
+        pred_original_sample = (sample - beta_prod_t ** (0.5) * model_output) / alpha_prod_t ** (0.5)
+    elif self.config.prediction_type == "sample":
+        pred_original_sample = model_output
+    elif self.config.prediction_type == "v_prediction":
+        pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
+    else:
+        raise ValueError(
+            f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample` or"
+            " `v_prediction`  for the DDPMScheduler."
+        )
+
+    # 3. Clip or threshold "predicted x_0"
+    if self.config.thresholding:
+        pred_original_sample = self._threshold_sample(pred_original_sample)
+    elif self.config.clip_sample:
+        pred_original_sample = pred_original_sample.clamp(
+            -self.config.clip_sample_range, self.config.clip_sample_range
+        )
+    
+    noise_thresholded = (sample - (alpha_prod_t ** 0.5) * pred_original_sample) / (beta_prod_t ** 0.5)
+    return noise_thresholded 
+"""
+
+
 @threestudio.register('deep-floyd-guidance')
 class DeepFloydGuidance(BaseModule):
     @dataclass
@@ -381,7 +429,7 @@ class DeepFloydGuidance(BaseModule):
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
 
         assert rgb_as_latents == False, f"No latent space in {self.__class__.__name__}"
-        latents = rgb_BCHW * 2. - 1. # diffusion works in [-1, 1]
+        rgb_BCHW = rgb_BCHW * 2. - 1. # scale to [-1, 1] to match the diffusion range
         latents = F.interpolate(rgb_BCHW, (64, 64), mode="bilinear", align_corners=False)
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
@@ -397,15 +445,26 @@ class DeepFloydGuidance(BaseModule):
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
             noise_pred = self.unet(
-                latent_model_input, torch.cat([t] * 2), encoder_hidden_states=text_embeddings
-            ).sample # (2, 6, 64, 64)
-            noise_pred = noise_pred.split(3, dim=1)[0]
+                latent_model_input, torch.cat([t]*2), encoder_hidden_states=text_embeddings
+            ).sample # (B, 6, 64, 64)
 
         # perform guidance (high scale from paper!)
         noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+        noise_pred_text, predicted_variance = noise_pred_text.split(3, dim=1)
+        noise_pred_uncond, _ = noise_pred_uncond.split(3, dim=1)
         noise_pred = noise_pred_text + self.cfg.guidance_scale * (
             noise_pred_text - noise_pred_uncond
         )
+
+        """
+        # thresholding, experimental
+        if self.cfg.thresholding:
+            assert batch_size == 1
+            noise_pred = torch.cat([noise_pred, predicted_variance], dim=1)
+            noise_pred = custom_ddpm_step(self.scheduler,
+                noise_pred, int(t.item()), latents_noisy, **self.pipe.prepare_extra_step_kwargs(None, 0.0)
+            )
+        """
 
         if self.cfg.weighting_strategy == 'sds':
             # w(t), sigma_t^2

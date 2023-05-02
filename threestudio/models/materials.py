@@ -132,7 +132,8 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         light_directions: Float[Tensor, "B ... 3"] = F.normalize(light_positions - positions, dim=-1)
         diffuse_light: Float[Tensor, "B ... 3"] = dot(shading_normal, light_directions).clamp(min=0.) * diffuse_light_color
         textureless_color = diffuse_light + ambient_light_color
-        color = albedo * textureless_color
+        # clamp albedo to [0, 1] to compute shading
+        color = albedo.clamp(0., 1.) * textureless_color
 
         if shading is None:
             if self.training:

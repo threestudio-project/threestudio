@@ -1,42 +1,48 @@
-name: "magic3d-df"
+name: "dreamfusion-df-noact"
 tag: "${system.prompt_processor.prompt}"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "random-camera-datamodule"
 data:
-  camera_distance_range: [1.5, 2.0]
-  light_sample_strategy: 'magic3d'
+  # prevent GPU OOM in early stage
+  eval_height: 256
+  eval_width: 256
   eval_camera_distance: 2.0
-  eval_fovy_deg: 70.
 
 system_type: "dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    radius: 2.
-    normal_type: "analytic" # original paper uses pred
+    radius: 1.4
+    normal_type: "analytic"
+    
+    density_bias: "blob_dreamfusion"
+    density_activation: exp
+    density_blob_scale: 5.
+    density_blob_std: 0.2     
+
+    # coarse to fine hash grid encoding
+    # to ensure smooth analytic normals
     pos_encoding_config:
       otype: ProgressiveBandHashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
-      per_level_scale: 1.4472692374403782 # max resolution 4096
+      per_level_scale: 1.447269237440378 # max resolution 4096
       start_level: 8 # resolution ~200
       start_step: 2000
-      update_steps: 500    
-    density_bias: "blob_magic3d"
-    density_activation: softplus
-    density_blob_scale: 10.
-    density_blob_std: 0.5       
+      update_steps: 500
 
   material_type: "diffuse-with-point-light-material"
   material:
     ambient_only_steps: 1001
-    soft_shading: true
+    albedo_activation: scale_-11_01
   
   background_type: "neural-environment-map-background"
+  background:
+    color_activation: scale_-11_01
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -50,7 +56,6 @@ system:
   guidance_type: "deep-floyd-guidance"
   guidance:
     guidance_scale: 20.
-    weighting_strategy: sjc
   
   loss:
     lambda_sds: 1.

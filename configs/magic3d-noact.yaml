@@ -1,4 +1,4 @@
-name: "magic3d-df"
+name: "magic3d-df-noact"
 tag: "${system.prompt_processor.prompt}"
 exp_root_dir: "outputs"
 seed: 0
@@ -35,8 +35,11 @@ system:
   material:
     ambient_only_steps: 1001
     soft_shading: true
+    albedo_activation: scale_-11_01
   
   background_type: "neural-environment-map-background"
+  background:
+    color_activation: scale_-11_01
 
   renderer_type: "nerf-volume-renderer"
   renderer:
