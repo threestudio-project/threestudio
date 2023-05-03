@@ -49,13 +49,14 @@ system:
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    weight_strategy: sds
+    weighting_strategy: sds
     guidance_scale: 100.
     min_step_percent: 0.02
     max_step_percent: 0.5
   
   loss:
     lambda_sds: 1.
+    lambda_normal_consistency: 10000.
 
   optimizer:
     name: Adam
@@ -63,15 +64,6 @@ system:
       lr: 0.01
       betas: [0.9, 0.99]
       eps: 1.e-15
-    params:
-      geometry.encoding:
-        lr: 0.01
-      geometry.feature_network:
-        lr: 0.01
-      geometry.sdf:
-        lr: 0.01
-      geometry.deformation:
-        lr: 0.01
 
 trainer:
   max_steps: 5000

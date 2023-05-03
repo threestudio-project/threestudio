@@ -7,6 +7,7 @@ data_type: "random-camera-datamodule"
 data:
   width: 64
   height: 64
+  camera_distance_range: [1.5, 2.0]
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
@@ -14,7 +15,7 @@ system_type: "dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    radius: 1.4
+    radius: 2.0
     normal_type: "analytic"
     
     # the density initialization proposed in the DreamFusion paper
@@ -28,7 +29,7 @@ system:
     density_bias: "blob_magic3d"
     density_activation: softplus
     density_blob_scale: 10.
-    density_blob_std: 0.35
+    density_blob_std: 0.5
 
     # coarse to fine hash grid encoding
     # to ensure smooth analytic normals
@@ -68,7 +69,7 @@ system:
   loss:
     lambda_sds: 1.
     lambda_orient: [0,100.,10000.,5000]
-    lambda_sparsity: 1.
+    lambda_sparsity: 10.
     lambda_opaque: 0.0
   optimizer:
     name: Adam

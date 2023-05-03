@@ -566,16 +566,20 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         )
 
         self.sdf: Float[Tensor, "Nv 1"]
-        self.deformation: Optional[Float[Tensor, "Nv 3"]] = None
+        self.deformation: Optional[Float[Tensor, "Nv 3"]]
         
         if not self.cfg.fix_geometry:
             self.register_parameter('sdf', nn.Parameter(torch.zeros((self.isosurface_helper.grid_vertices.shape[0], 1), dtype=torch.float32)))
             if self.cfg.isosurface_deformable_grid:
                 self.register_parameter('deformation', nn.Parameter(torch.zeros_like(self.isosurface_helper.grid_vertices)))
+            else:
+                self.deformation = None
         else:
             self.register_buffer('sdf', torch.zeros((self.isosurface_helper.grid_vertices.shape[0], 1), dtype=torch.float32))
             if self.cfg.isosurface_deformable_grid:
                 self.register_buffer('deformation', torch.zeros_like(self.isosurface_helper.grid_vertices))
+            else:
+                self.deformation = None
 
         if not self.cfg.geometry_only:
             self.encoding = get_encoding(self.cfg.n_input_dims, self.cfg.pos_encoding_config)

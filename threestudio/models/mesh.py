@@ -14,6 +14,7 @@ class Mesh:
         self.t_pos_idx = t_pos_idx
         self._v_nrm = None
         self._v_tng = None
+        self._edges = None
         self.extras: Dict[str, Any] = {}
         for k, v in kwargs.items():
             self.add_extra(k, v)
@@ -32,6 +33,12 @@ class Mesh:
         if self._v_tng is None:
             self._v_tng = self.compute_vertex_tangent()
         return self._v_tng
+
+    @property
+    def edges(self):
+        if self._edges is None:
+            self._edges = self.compute_edges()
+        return self._edges
 
     def compute_vertex_normal(self):
 
@@ -99,3 +106,15 @@ class Mesh:
             assert torch.all(torch.isfinite(tangents))
 
         return tangents      
+
+    def compute_edges(self):
+        # Compute edges
+        edges = torch.cat([self.t_pos_idx[:, [0,1]], self.t_pos_idx[:, [1,2]], self.t_pos_idx[:, [2,0]]], dim=0)
+        edges = edges.sort()[0]
+        edges = torch.unique(edges, dim=0)
+        return edges
+    
+    def normal_consistency(self) -> Float[Tensor, ""]:
+        edge_nrm: Float[Tensor, "Ne 2 3"] = self.v_nrm[self.edges]
+        nc = (1. - torch.cosine_similarity(edge_nrm[:,0], edge_nrm[:,1], dim=-1)).mean()
+        return nc
