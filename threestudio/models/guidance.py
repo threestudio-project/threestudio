@@ -416,7 +416,7 @@ class DeepFloydGuidance(BaseModule):
 
         self.grad_clip_val: Optional[float] = None
 
-        print(f"[INFO] loaded stable diffusion!")
+        print(f"[INFO] loaded deep floyd!")
 
     def forward(
         self,
