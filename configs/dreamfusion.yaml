@@ -47,8 +47,11 @@ system:
   material_type: "diffuse-with-point-light-material"
   material:
     ambient_only_steps: 1001
+    albedo_activation: scale_-11_01
   
   background_type: "neural-environment-map-background"
+  background:
+    color_activation: scale_-11_01
 
   renderer_type: "nerf-volume-renderer"
   renderer:
