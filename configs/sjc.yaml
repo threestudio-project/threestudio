@@ -34,13 +34,11 @@ system:
 
   renderer_type: "nerf-volume-renderer"
   renderer:
-    num_samples_per_ray: 256
+    num_samples_per_ray: 512
     grid_prune: false
   
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
-    front_threshold: 22.5
-    back_threshold: 22.5
     prompt: "A high quality photo of a delicious burger"
     view_dependent_prompt_front: true
   

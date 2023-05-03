@@ -98,6 +98,10 @@ class DreamFusion(BaseSystem):
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
+        self.save_json(f"it{self.global_step}-{batch_idx}.json", {
+            'elevation': batch['elevation'].tolist(),
+            'azimuth': batch['azimuth'].tolist(),
+        })
         self.save_image_grid(f"it{self.global_step}-{batch_idx}.png", [
             {'type': 'rgb', 'img': out['comp_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
         ] + ([
@@ -110,8 +114,12 @@ class DreamFusion(BaseSystem):
         pass
 
     def test_step(self, batch, batch_idx):
-        return
+        # return
         out = self(batch)
+        self.save_json(f"it{self.global_step}-test/{batch_idx}.json", {
+            'elevation': batch['elevation'].tolist(),
+            'azimuth': batch['azimuth'].tolist(),
+        })
         self.save_image_grid(f"it{self.global_step}-test/{batch_idx}.png", [
             {'type': 'rgb', 'img': out['comp_rgb'][0], 'kwargs': {'data_format': 'HWC'}},
         ] + ([
@@ -122,9 +130,9 @@ class DreamFusion(BaseSystem):
 
     def on_test_epoch_end(self):
         # import pdb; pdb.set_trace();
-        mesh = self.geometry.isosurface()
-        self.save_mesh(f"mesh.obj", mesh.v_pos, mesh.t_pos_idx)
-        return
+        # mesh = self.geometry.isosurface()
+        # self.save_mesh(f"mesh.obj", mesh.v_pos, mesh.t_pos_idx)
+        # return
         self.save_img_sequence(
             f"it{self.global_step}-test",
             f"it{self.global_step}-test",
