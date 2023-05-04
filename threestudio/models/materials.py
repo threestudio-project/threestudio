@@ -122,7 +122,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
             ambient_light_color = ambient_ratio * torch.ones_like(self.ambient_light_color)
         elif self.training and self.cfg.soft_shading:
             # otherwise if in training and soft shading is enabled, random a ambient ratio
-            diffuse_light_color = torch.full_like(self.diffuse_light_color, torch.rand([]))
+            diffuse_light_color = torch.full_like(self.diffuse_light_color, random.random())
             ambient_light_color = 1. - diffuse_light_color
         else:
             # otherwise use the default fixed values
@@ -138,9 +138,9 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         if shading is None:
             if self.training:
                 # adopt the same type of augmentation for the whole batch
-                if torch.rand([]) > self.cfg.diffuse_prob:
+                if random.random() > self.cfg.diffuse_prob:
                     shading = 'albedo'
-                elif torch.rand([]) < self.cfg.textureless_prob:
+                elif random.random() < self.cfg.textureless_prob:
                     shading = 'textureless'
                 else:
                     shading = 'diffuse'
