@@ -29,7 +29,7 @@ system:
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
-      per_level_scale: 1.447269237440378 # 2048
+      per_level_scale: 1.4472692374403782 # max resolution 4096
     fix_geometry: false # optimize grid sdf and deformation
     
   material_type: "diffuse-with-point-light-material"
@@ -45,16 +45,18 @@ system:
   
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
-    prompt: "lib:delicious_hamburger"
+    prompt: ???
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    half_precision_weights: true
+    weighting_strategy: sds
     guidance_scale: 100.
+    min_step_percent: 0.02
     max_step_percent: 0.5
   
   loss:
     lambda_sds: 1.
+    lambda_normal_consistency: 10000.
 
   optimizer:
     name: Adam

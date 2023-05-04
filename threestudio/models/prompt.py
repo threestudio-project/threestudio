@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, CLIPTextModel, T5EncoderModel
 import threestudio
 from threestudio.utils.base import BaseModule
 from threestudio.utils.typing import *
-from threestudio.utils.ops import cleanup
+from threestudio.utils.misc import cleanup
 
 
 class PromptProcessor(BaseModule):

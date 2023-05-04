@@ -76,6 +76,8 @@ def get_activation(name) -> Callable:
         return lambda x: torch.tanh(x)
     elif name == "shifted_softplus":
         return lambda x: F.softplus(x - 1.)
+    elif name == "scale_-11_01":
+        return lambda x: x * 0.5 + 0.5
     else:
         try:
             return getattr(F, name)

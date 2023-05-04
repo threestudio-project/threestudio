@@ -113,6 +113,10 @@ class Magic3D(BaseSystem):
             loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
             self.log('train/loss_opaque', loss_opaque)
             loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+        else:
+            loss_normal_consistency = out['mesh'].normal_consistency()
+            self.log('train/loss_normal_consistency', loss_normal_consistency)
+            loss += loss_normal_consistency * self.C(self.cfg.loss.lambda_normal_consistency)
 
         for name, value in self.cfg.loss.items():
             self.log(f'train_params/{name}', self.C(value))
@@ -145,6 +149,8 @@ class Magic3D(BaseSystem):
         ])
 
     def on_test_epoch_end(self):
+        mesh = self.geometry.isosurface()
+        self.save_mesh(f"mesh.obj", mesh.v_pos, mesh.t_pos_idx)        
         self.save_img_sequence(
             f"it{self.global_step}-test",
             f"it{self.global_step}-test",
