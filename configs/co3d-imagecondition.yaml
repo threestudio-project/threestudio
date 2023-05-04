@@ -66,7 +66,7 @@ system:
     ambient_light_color: [1.0,1.0,1.0]
     diffuse_light_color: [0.0,0.0,0.0]
     ambient_only_steps: ${system.freq.ref_only_steps}
-  
+
   # background_type: "solid-color-background"
   background_type: "neural-environment-map-background"
   background:
@@ -83,18 +83,18 @@ system:
   renderer_type: "nerf-volume-renderer"
   renderer:
     num_samples_per_ray: 512
-  
+
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
     # prompt: "a DSLR photo of a delicious hamburger"
     prompt: "an apple"
-  
+
   guidance_type: "stable-diffusion-guidance"
   guidance:
     half_precision_weights: true
     guidance_scale: 100.
     grad_clip: null
-  
+
   freq:
     n_ref: 2
     ref_only_steps: 1000
@@ -123,7 +123,7 @@ system:
     #   # lr: 0.001
     #   betas: [0.9, 0.99]
     #   eps: 1.e-15
-    
+
     name: Adan
     args:
       eps: 1.0e-8
@@ -138,7 +138,7 @@ system:
         lr: 0.005
       background.network:
         lr: 0.005
-    
+
   scheduler:
     name: ConstantLR
     args:

@@ -2,8 +2,14 @@
 - Python >= 3.8
 - PyTorch >= 1.12 (PyTorch 2.0 not tested)
 - `pip install -r requirements.txt` (change torch source url and version accroding to your CUDA version, requires torch>=1.12)
-- `pip install -r requirements-dev.txt` for linters and formatters, and set the default linter in vscode to mypy
 - Accept the license on the model card of [DeepFloyd](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub by `huggingface-cli login`.
+
+## Development
+- `pip install -r requirements-dev.txt`
+- Install editorconfig extension in VSCode.
+- Set the default linter in VSCode to mypy to enable static type checking.
+- Set the default formatter in VSCode to black. You could either manually format the document or let the editor format the document each time it is saved by setting `"editor.formatOnSave": true`.
+- Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
 
 ## Known Problems
 - Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
@@ -25,8 +31,6 @@
 ```bash
 # train with diffuse material and point lighting
 python launch.py --config configs/dreamfusion.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
-# train with simple surface color without material assumption
-python launch.py --config configs/dreamfusion-wonormal.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
 ```
 ### Magic3D
 ```bash
@@ -57,7 +61,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 ### Score Jacobian Chaining
 ```bash
 # train with sjc guidance in latent space
-python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger" 
+python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger"
 # train with sjc guidance in latent space, trump figure
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" seed=10 system.renderer.num_samples_per_ray=512 trainer.max_steps=30000 system.loss.lambda_emptiness=[15000,10000.0,200000.0,15001]
 ```

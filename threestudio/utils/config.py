@@ -1,18 +1,21 @@
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
+
 from omegaconf import OmegaConf
+
 from threestudio.utils.typing import *
 
-
 # ============ Register OmegaConf Recolvers ============= #
-OmegaConf.register_new_resolver('calc_exp_lr_decay_rate', lambda factor, n: factor**(1./n))
-OmegaConf.register_new_resolver('add', lambda a, b: a + b)
-OmegaConf.register_new_resolver('sub', lambda a, b: a - b)
-OmegaConf.register_new_resolver('mul', lambda a, b: a * b)
-OmegaConf.register_new_resolver('div', lambda a, b: a / b)
-OmegaConf.register_new_resolver('idiv', lambda a, b: a // b)
-OmegaConf.register_new_resolver('basename', lambda p: os.path.basename(p))
+OmegaConf.register_new_resolver(
+    "calc_exp_lr_decay_rate", lambda factor, n: factor ** (1.0 / n)
+)
+OmegaConf.register_new_resolver("add", lambda a, b: a + b)
+OmegaConf.register_new_resolver("sub", lambda a, b: a - b)
+OmegaConf.register_new_resolver("mul", lambda a, b: a * b)
+OmegaConf.register_new_resolver("div", lambda a, b: a / b)
+OmegaConf.register_new_resolver("idiv", lambda a, b: a // b)
+OmegaConf.register_new_resolver("basename", lambda p: os.path.basename(p))
 # ======================================================= #
 
 
@@ -69,15 +72,16 @@ def load_config(*yaml_files: str, cli_args: list = []) -> Any:
     scfg = parse_structured(ExperimentConfig, cfg)
     return scfg
 
+
 def config_to_primitive(config, resolve: bool = True) -> Any:
     return OmegaConf.to_container(config, resolve=resolve)
 
 
 def dump_config(path: str, config) -> None:
-    with open(path, 'w') as fp:
+    with open(path, "w") as fp:
         OmegaConf.save(config=config, f=fp)
+
 
 def parse_structured(fields: Any, cfg: Optional[Union[dict, DictConfig]] = None) -> Any:
     scfg = OmegaConf.structured(fields(**cfg))
     return scfg
-    
