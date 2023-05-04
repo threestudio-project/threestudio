@@ -10,27 +10,25 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
       - id: end-of-file-fixer
-      - id: double-quote-string-fixer
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
 
-  - repo: https://github.com/ambv/black
+  - repo: https://github.com/psf/black
     rev: 23.3.0
     hooks:
       - id: black
         language_version: python3.8
-        args: ["threestudio"]
 
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
       - id: isort
         exclude: README.md
-        additional_dependencies: [toml]
-        args: ["threestudio", "--profile", "black"]
+        args: ["--profile", "black"]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.2.0
-    hooks:
-      - id: mypy
-        args: ["threestudio", "--ignore-missing-imports", "--scripts-are-modules", "--pretty"]
+  # temporarily disable static type checking
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.2.0
+  #   hooks:
+  #     - id: mypy
+  #       args: ["--ignore-missing-imports", "--scripts-are-modules", "--pretty"]

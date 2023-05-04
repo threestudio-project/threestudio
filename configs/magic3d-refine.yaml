@@ -31,18 +31,18 @@ system:
       base_resolution: 16
       per_level_scale: 1.4472692374403782 # max resolution 4096
     fix_geometry: false # optimize grid sdf and deformation
-    
+
   material_type: "diffuse-with-point-light-material"
   material:
     ambient_only_steps: 0
     soft_shading: true
-  
+
   background_type: "neural-environment-map-background" # consistent with coarse
-  
+
   renderer_type: "nvdiff-rasterizer"
   renderer:
     context_type: gl
-  
+
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
     prompt: ???
@@ -53,7 +53,7 @@ system:
     guidance_scale: 100.
     min_step_percent: 0.02
     max_step_percent: 0.5
-  
+
   loss:
     lambda_sds: 1.
     lambda_normal_consistency: 10000.

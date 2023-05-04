@@ -1,16 +1,18 @@
+import gc
 import os
 import re
-import gc
-from packaging import version
 
-import torch
 import tinycudann as tcnn
+import torch
+from packaging import version
 
 from threestudio.utils.config import config_to_primitive
 from threestudio.utils.typing import *
 
+
 def parse_version(ver: str):
     return version.parse(ver)
+
 
 def get_rank():
     # SLURM_PROCID can be set even if SLURM is not managing the multiprocessing,
@@ -22,23 +24,29 @@ def get_rank():
             return int(rank)
     return 0
 
-def get_device():
-    return torch.device(f'cuda:{get_rank()}')
 
-def load_module_weights(path, module_name=None, ignore_modules=None, map_location=None, return_state=False) -> Tuple[dict, int, int]:
+def get_device():
+    return torch.device(f"cuda:{get_rank()}")
+
+
+def load_module_weights(
+    path, module_name=None, ignore_modules=None, map_location=None, return_state=False
+) -> Tuple[dict, int, int]:
     if module_name is not None and ignore_modules is not None:
-        raise ValueError('module_name and ignore_modules cannot be both set')
+        raise ValueError("module_name and ignore_modules cannot be both set")
     if map_location is None:
         map_location = get_device()
-    
+
     ckpt = torch.load(path, map_location=map_location)
-    state_dict = ckpt['state_dict']
+    state_dict = ckpt["state_dict"]
     state_dict_to_load = state_dict
-        
+
     if ignore_modules is not None:
         state_dict_to_load = {}
         for k, v in state_dict.items():
-            ignore = any([k.startswith(ignore_module + '.') for ignore_module in ignore_modules])
+            ignore = any(
+                [k.startswith(ignore_module + ".") for ignore_module in ignore_modules]
+            )
             if ignore:
                 continue
             state_dict_to_load[k] = v
@@ -46,12 +54,12 @@ def load_module_weights(path, module_name=None, ignore_modules=None, map_locatio
     if module_name is not None:
         state_dict_to_load = {}
         for k, v in state_dict.items():
-            m = re.match(rf'^{module_name}\.(.*)$', k)
+            m = re.match(rf"^{module_name}\.(.*)$", k)
             if m is None:
                 continue
             state_dict_to_load[m.group(1)] = v
 
-    return state_dict_to_load, ckpt['epoch'], ckpt['global_step']
+    return state_dict_to_load, ckpt["epoch"], ckpt["global_step"]
 
 
 def C(value: Any, epoch: int, global_step: int) -> float:
@@ -60,17 +68,21 @@ def C(value: Any, epoch: int, global_step: int) -> float:
     else:
         value = config_to_primitive(value)
         if not isinstance(value, list):
-            raise TypeError('Scalar specification only supports list, got', type(value))
+            raise TypeError("Scalar specification only supports list, got", type(value))
         if len(value) == 3:
             value = [0] + value
         assert len(value) == 4
         start_step, start_value, end_value, end_step = value
         if isinstance(end_step, int):
             current_step = global_step
-            value = start_value + (end_value - start_value) * max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
+            value = start_value + (end_value - start_value) * max(
+                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
+            )
         elif isinstance(end_step, float):
             current_step = epoch
-            value = start_value + (end_value - start_value) * max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
+            value = start_value + (end_value - start_value) * max(
+                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
+            )
     return value
 
 

@@ -17,13 +17,13 @@ system:
   geometry:
     radius: 2.0
     normal_type: "analytic"
-    
+
     # the density initialization proposed in the DreamFusion paper
     # does not work very well
     # density_bias: "blob_dreamfusion"
     # density_activation: exp
     # density_blob_scale: 5.
-    # density_blob_std: 0.2     
+    # density_blob_std: 0.2
 
     # use Magic3D density initialization instead
     density_bias: "blob_magic3d"
@@ -48,7 +48,7 @@ system:
   material:
     ambient_only_steps: 1001
     albedo_activation: scale_-11_01
-  
+
   background_type: "neural-environment-map-background"
   background:
     color_activation: scale_-11_01
@@ -57,18 +57,18 @@ system:
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
-  
+
   prompt_processor_type: "deep-floyd-prompt-processor"
   prompt_processor:
     prompt: "a hamburger"
-  
+
   guidance_type: "deep-floyd-guidance"
   guidance:
     guidance_scale: 20.
     weighting_strategy: sds
     min_step_percent: 0.02
     max_step_percent: 0.98
-  
+
   loss:
     lambda_sds: 1.
     lambda_orient: [0,100.,10000.,5000]

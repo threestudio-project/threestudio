@@ -9,17 +9,32 @@ Two types of typing checking can be used:
 """
 
 # Basic types
-from typing import Any, Optional, Union, Iterable, Callable, Type, Dict, List, Tuple, Literal, TypeVar, NewType, NamedTuple, Sized
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    NamedTuple,
+    NewType,
+    Optional,
+    Sized,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
+
+# Tensor dtype
+# for jaxtyping usage, see https://github.com/google/jaxtyping/blob/main/API.md
+from jaxtyping import Bool, Complex, Float, Inexact, Int, Integer, Num, Shaped, UInt
 
 # Config type
 from omegaconf import DictConfig
 
 # PyTorch Tensor type
 from torch import Tensor
-
-# Tensor dtype
-# for jaxtyping usage, see https://github.com/google/jaxtyping/blob/main/API.md
-from jaxtyping import Shaped, Bool, Num, Inexact, Float, Complex, Integer, UInt, Int
 
 # Runtime type checking decorator
 from typeguard import typechecked as typechecker

@@ -23,22 +23,22 @@ system:
       n_hidden_layers: 1
 
   material_type: "sd-latent-adapter-material"
-  
+
   background_type: "neural-environment-map-background"
 
   renderer_type: "nerf-volume-renderer"
   renderer:
     num_samples_per_ray: 512
-  
+
   prompt_processor_type: "dreamfusion-prompt-processor"
   prompt_processor:
     prompt: "a hamburger"
-  
+
   guidance_type: "stable-diffusion-guidance"
   guidance:
     half_precision_weights: true
     guidance_scale: 100.
-  
+
   loss:
     lambda_sds: 1.
     lambda_sparsity: 0.0

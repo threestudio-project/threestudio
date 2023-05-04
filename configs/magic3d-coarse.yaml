@@ -24,38 +24,38 @@ system:
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
-      per_level_scale: 1.4472692374403782 # max resolution 4096  
+      per_level_scale: 1.4472692374403782 # max resolution 4096
     density_bias: "blob_magic3d"
     density_activation: softplus
     density_blob_scale: 10.
-    density_blob_std: 0.5 
+    density_blob_std: 0.5
     isosurface_resolution: 128
     isosurface_threshold: auto
-    isosurface_coarse_to_fine: true      
+    isosurface_coarse_to_fine: true
 
   material_type: "diffuse-with-point-light-material"
   material:
     ambient_only_steps: 1001
     soft_shading: true
-  
+
   background_type: "neural-environment-map-background"
 
   renderer_type: "nerf-volume-renderer"
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
-  
+
   prompt_processor_type: "deep-floyd-prompt-processor"
   prompt_processor:
     prompt: ???
-  
+
   guidance_type: "deep-floyd-guidance"
   guidance:
     weighting_strategy: sjc
     guidance_scale: 20.
     min_step_percent: 0.02
     max_step_percent: 0.98
-  
+
   loss:
     lambda_sds: 1.
     lambda_orient: 0.
