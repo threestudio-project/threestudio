@@ -2,7 +2,7 @@
 - Python >= 3.8
 - PyTorch >= 1.12 (PyTorch 2.0 not tested)
 - `pip install -r requirements.txt` (change torch source url and version accroding to your CUDA version, requires torch>=1.12)
-- `pip install -r requirements-dev.txt` for linters and formatters, and set the default linter in vscode to mypy
+- `pip install -r requirements-dev.txt` for linters and formatters, set the default linter in vscode to mypy and run `pre-commit install` to install pre-commit hooks which will automatically reformat the files before commit.
 - Accept the license on the model card of [DeepFloyd](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub by `huggingface-cli login`.
 
 ## Known Problems
