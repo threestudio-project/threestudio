@@ -25,8 +25,6 @@
 ```bash
 # train with diffuse material and point lighting
 python launch.py --config configs/dreamfusion.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
-# train with simple surface color without material assumption
-python launch.py --config configs/dreamfusion-wonormal.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
 ```
 ### Magic3D
 ```bash
