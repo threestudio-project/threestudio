@@ -2,8 +2,14 @@
 - Python >= 3.8
 - PyTorch >= 1.12 (PyTorch 2.0 not tested)
 - `pip install -r requirements.txt` (change torch source url and version accroding to your CUDA version, requires torch>=1.12)
-- `pip install -r requirements-dev.txt` for linters and formatters, set the default linter in vscode to mypy and run `pre-commit install` to install pre-commit hooks which will automatically reformat the files before commit.
 - Accept the license on the model card of [DeepFloyd](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub by `huggingface-cli login`.
+
+## Development
+- `pip install -r requirements-dev.txt`
+- Install editorconfig extension in VSCode.
+- Set the default linter in VSCode to mypy to enable static type checking.
+- Set the default formatter in VSCode to black. You could either manually format the document or let the editor format the document each time it is saved by setting `"editor.formatOnSave": true`.
+- Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
 
 ## Known Problems
 - Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
