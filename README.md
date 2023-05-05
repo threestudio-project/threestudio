@@ -1,53 +1,74 @@
-## Setup
-- Python >= 3.8
-- PyTorch >= 1.12 (PyTorch 2.0 not tested)
-- `pip install -r requirements.txt` (change torch source url and version accroding to your CUDA version, requires torch>=1.12)
-- Accept the license on the model card of [DeepFloyd](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub by `huggingface-cli login`.
+# threestudio
 
-## Development
-- `pip install -r requirements-dev.txt`
-- Install editorconfig extension in VSCode.
-- Set the default linter in VSCode to mypy to enable static type checking.
-- Set the default formatter in VSCode to black. You could either manually format the document or let the editor format the document each time it is saved by setting `"editor.formatOnSave": true`.
-- Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
+threestudio is a unified framework for 3D content creation from text prompts, single images, and few-shot images, by lifting 2D text-to-image generation models.
 
-## Known Problems
-- Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
-- Gradients of Vanilla MLP parameters are empty if autocast is enabled in AMP (temporarily fixed by disabling autocast).
-- FullyFused MLP causes NaNs in 32 precision. Aggressive gradient clipping could solve the issue (e.g., `system.guidance.grad_clip=0.1`).
+## Installation
 
-## Precision
-- mixed precision training: `trainer.precision=16-mixed`; `system.guidance.half_precision_weights=true`; either `VanillaMLP` and `FullyFusedMLP` can be used.
-- float32 precision training: `trainer.precision=32`; `system.guidance.half_precision_weights=false`; only `VanillaMLP` can be used.
+The following steps have been tested on Ubuntu20.04.
 
-## Structure
-- All methods should be implemented as a subclass of `BaseSystem` (in `systems/base.py`). For the DreamFusion system, there're 6 modules: geometry, material, background, renderer, guidance, prompt_processor. All modules are subclass of `BaseModule` (in `utils/base.py`).
-- All systems, modules, and data modules have their configurations in their own dataclass named `Config`.
-- Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm is better than the one used in `instant-nsr-pl` as (1) it natually supports default values for properties; (2) it effectively prevents wrong assignments of these properties (say typos in the yaml file) and inappropriate usage at runtime.
-- This projects use both static and runtime type checking. For more details, see `utils/typing.py`.
+- You must have a NVIDIA graphics card with at least 6GB VRAM and have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
+- Install `Python >= 3.8`.
+- (Optional, Recommended) Create a virtual environment:
 
-## Run
+```sh
+python3 -m virtualenv venv
+. venv/bin/activate
+```
+
+- Install `PyTorch >= 1.12`. We have tested on `torch1.12.1+cu113` and `torch2.0.0+cu118`, but other versions should also work fine.
+
+```sh
+# torch1.12.1+cu113
+pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 --extra-index-url https://download.pytorch.org/whl/cu113
+# or torch2.0.0+cu118
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+```
+
+- (Optional, Recommended) Install ninja to speed up building CUDA extensions:
+
+```sh
+pip install ninja
+```
+
+- Install dependencies:
+
+```sh
+pip install -r requirements.txt
+```
+
+- (Optional, Recommended) The best-performing models in threestudio uses the newly-released T2I model [DeepFloyd](https://github.com/deep-floyd/IF) which currently requires signing a license agreement. If you would like use these models, you need to [accept the license on the model card of DeepFloyd](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub in terminal by `huggingface-cli login`.
+
+## Running
+
 ### DreamFusion
+
 ```bash
 # train with diffuse material and point lighting
 python launch.py --config configs/dreamfusion.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
 ```
+
 ### Magic3D
+
 ```bash
 # train the coarse stage using implicit volume geometry
 python launch.py --config configs/magic3d-coarse.yaml --train --gpu 0 system.prompt_processor.prompt="lib:delicious_hamburger"
 # refine using DMTet and differentiable rasterization
 python launch.py --config configs/magic3d-refine.yaml --train --gpu 0 system.prompt_processor.prompt="lib:delicious_hamburger" system.weights=path/to/coarse/stage/last.ckpt
 ```
+
 ### Latent-NeRF
+
 ```bash
 # train in stable-diffusion latent space
 python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
 # refine in RGB space
 python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger" system.weights=path/to/latentnerf/weights
 ```
+
 ### Fantasia3D (WIP)
+
 I by far have implemented the geometry training stage of Fantasia3D, which first regards the downsampled normal and silhouette as the latent feature map and then uses high-resolution normal map as RGB input.
+
 ```bash
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry"
 # Fantasia3D highly relies on the initialized SDF shape
@@ -59,6 +80,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 ```
 
 ### Score Jacobian Chaining
+
 ```bash
 # train with sjc guidance in latent space
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger"
@@ -67,6 +89,7 @@ python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_process
 ```
 
 ### Image-Condition DreamFusion
+
 ```bash
 # train with single image reference and stable-diffusion sds guidance
 python launch.py --config configs/imagecondition.yaml --train --gpu 0
@@ -74,11 +97,42 @@ python launch.py --config configs/imagecondition.yaml --train --gpu 0
 python launch.py --config configs/co3d-imagecondition.yaml --train --gpu 0
 ```
 
+## Contributing to threestudio
+
+- Fork the repository and create your branch from `main`.
+- Install development dependencies:
+
+```sh
+pip install -r requirements-dev.txt
+```
+
+- If you are using VSCode as the text editor: (1) Install `editorconfig` extension. (2) Set the default linter to mypy to enable static type checking. (3) Set the default formatter to black. You could either manually format the document or let the editor format the document each time it is saved by setting `"editor.formatOnSave": true`.
+
+- Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
+
+- Make changes to the code and open a pull request.
+
+## Known Problems
+
+- Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
+- Gradients of Vanilla MLP parameters are empty if autocast is enabled in AMP (temporarily fixed by disabling autocast).
+- FullyFused MLP may cause NaNs in 32 precision.
+
+## Structure
+
+- All methods should be implemented as a subclass of `BaseSystem` (in `systems/base.py`). For the DreamFusion system, there're 6 modules: geometry, material, background, renderer, guidance, prompt_processor. All modules are subclass of `BaseModule` (in `utils/base.py`).
+- All systems, modules, and data modules have their configurations in their own dataclass named `Config`.
+- Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm is better than the one used in `instant-nsr-pl` as (1) it natually supports default values for properties; (2) it effectively prevents wrong assignments of these properties (say typos in the yaml file) and inappropriate usage at runtime.
+- This projects use both static and runtime type checking. For more details, see `utils/typing.py`.
+
 ## Tips
+
 - To resume a model and continue training, please load the `parsed.yaml` in the trial directory and set `resume` to the checkpoint path. Example:
+
 ```bash
 python launch.py --config path/to/your/trial/output/parsed.yaml --train --gpu 0 resume=path/to/your/checkpoint
 ```
+
 - Press ctrl+c **once** will stop training and continue to testing. Press ctrl+c the second time to fully quit the program.
 - To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem` and `BaseModule` (including all geometry, materials, guidance, prompt processors, and renderers) are by default inherit to `Updateable`.
 - For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's exactly one match. The used prompt will be printed to console.
