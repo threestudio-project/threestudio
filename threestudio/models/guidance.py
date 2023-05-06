@@ -43,7 +43,7 @@ class StableDiffusionGuidance(BaseModule):
     @dataclass
     class Config(BaseModule.Config):
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
-        use_xformers: bool = False
+        enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
         enable_attention_slicing: bool = False
         enable_channels_last_format: bool = False
@@ -83,13 +83,15 @@ class StableDiffusionGuidance(BaseModule):
             **pipe_kwargs,
         )
 
-        if self.cfg.use_xformers and is_xformers_available():
+        if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
                 threestudio.info(
-                    "PyTorch2.0 uses memory efficient attention by default, xformers is not needed."
+                    "PyTorch2.0 uses memory efficient attention by default."
                 )
             elif not is_xformers_available():
-                threestudio.warn("xformers is not available, not enabled.")
+                threestudio.warn(
+                    "xformers is not available, memory efficient attention not enabled."
+                )
             else:
                 self.pipe.enable_xformers_memory_efficient_attention()
 
@@ -281,13 +283,15 @@ class ScoreJacobianGuidance(StableDiffusionGuidance):
             **pipe_kwargs,
         )
 
-        if self.cfg.use_xformers and is_xformers_available():
+        if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
                 threestudio.info(
-                    "PyTorch2.0 uses memory efficient attention by default, xformers is not needed."
+                    "PyTorch2.0 uses memory efficient attention by default."
                 )
             elif not is_xformers_available():
-                threestudio.warn("xformers is not available, not enabled.")
+                threestudio.warn(
+                    "xformers is not available, memory efficient attention not enabled."
+                )
             else:
                 self.pipe.enable_xformers_memory_efficient_attention()
 
@@ -455,7 +459,7 @@ class DeepFloydGuidance(BaseModule):
     class Config(BaseModule.Config):
         pretrained_model_name_or_path: str = "DeepFloyd/IF-I-XL-v1.0"
         # FIXME: xformers error
-        use_xformers: bool = False
+        enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
         enable_attention_slicing: bool = False
         enable_channels_last_format: bool = True
@@ -493,15 +497,19 @@ class DeepFloydGuidance(BaseModule):
             device_map="auto",
         )
 
-        if self.cfg.use_xformers and is_xformers_available():
+        if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
                 threestudio.info(
-                    "PyTorch2.0 uses memory efficient attention by default, xformers is not needed."
+                    "PyTorch2.0 uses memory efficient attention by default."
                 )
             elif not is_xformers_available():
-                threestudio.warn("xformers is not available, not enabled.")
+                threestudio.warn(
+                    "xformers is not available, memory efficient attention not enabled."
+                )
             else:
-                # may raise error, see https://github.com/deep-floyd/IF/issues/52 to track this problem
+                threestudio.warn(
+                    f"Use DeepFloyd with xformers may raise error, see https://github.com/deep-floyd/IF/issues/52 to track this problem."
+                )
                 self.pipe.enable_xformers_memory_efficient_attention()
 
         if self.cfg.enable_sequential_cpu_offload:
