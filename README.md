@@ -24,7 +24,7 @@ pip install torch==1.12.1+cu113 torchvision==0.13.1+cu113 --extra-index-url http
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 ```
 
-- (Optional, Recommended) Install ninja to speed up building CUDA extensions:
+- (Optional, Recommended) Install ninja to speed up the compilation of CUDA extensions:
 
 ```sh
 pip install ninja
@@ -36,50 +36,107 @@ pip install ninja
 pip install -r requirements.txt
 ```
 
-- (Optional, Recommended) The best-performing models in threestudio uses the newly-released T2I model [DeepFloyd](https://github.com/deep-floyd/IF) which currently requires signing a license agreement. If you would like use these models, you need to [accept the license on the model card of DeepFloyd](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub in terminal by `huggingface-cli login`.
+- (Optional, Recommended) The best-performing models in threestudio uses the newly-released T2I model [DeepFloyd IF](https://github.com/deep-floyd/IF) which currently requires signing a license agreement. If you would like use these models, you need to [accept the license on the model card of DeepFloyd IF](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub in terminal by `huggingface-cli login`.
 
-## Running
+- For contributors, see [here](https://github.com/bennyguo/threestudio#contributing-to-threestudio).
+
+## Quickstart
+
+Here we show some basic usage of threestudio. First let's train a DreamFusion model to create a classic pancake bunny.
+
+```sh
+# if you have agreed the license of DeepFloyd IF and have >20GB VRAM
+# please try this configuration for higher quality
+python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
+# otherwise you could try with the Stable Diffusion model, which fits in 6GB VRAM
+python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
+```
+
+The training lasts for 10,000 iterations. You can find visualizations of the current status in the trial directory which defaults to `[exp_root_dir]/[name]/[tag]@[timestamp]`, where `exp_root_dir` (`outputs/` by default), `name` and `tag` can be set in the configuration file. A 360-degree video will be generated after the training is completed. In training, press `ctrl+c` one time will stop training and head directly to the test stage which generates the video. Press `ctrl+c` the second time to fully quit the program. If you want to resume from a checkpoint, do:
+
+```sh
+# resume training from the last checkpoint, you may replace last.ckpt with any other checkpoints
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/configs/last.ckpt
+# if the training has completed, you can still continue training for a longer time by setting trainer.max_steps
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/configs/last.ckpt trainer.max_steps=20000
+# you can only perform testing using resumed checkpoints
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 resume=path/to/trial/configs/last.ckpt
+# note that the above commands use parsed configuration files from previous trials
+# which will continue using the same trial directory
+# if you want to save to a new trial directory, replace parsed.yaml with raw.yaml in the command
+```
+
+See [here](https://github.com/bennyguo/threestudio#supported-models) for example running commands of all our supported models. Please refer to [here](https://github.com/bennyguo/threestudio#tips-on-improving-quality) for tips on getting higher-quality results, and [here](https://github.com/bennyguo/threestudio#vram-optimization) for reducing VRAM usage.
+
+## Supported Models
 
 ### DreamFusion
 
+**Notable differences from the paper**
+
+- We use open-source T2I models (StableDiffusion, DeepFloyd IF), while the paper uses Imagen.
+- We use a guiandance scale of 20 for DeepFloyd IF, while the paper uses 100 for Imagen.
+- We do not use sigmoid to normalize the albedo color but simply scale the color from `[-1,1]` to `[0,1]`, as we find this help convergence.
+- We use HashGrid encoding and uniformly sample points along rays, while the paper uses Integrated Positional Encoding and sampling strategy from MipNeRF360.
+- We adopt camera settings and density initialization strategy from Magic3D, which is slightly different from the DreamFusion paper.
+- Some hyperparameters are different, such as the weighting of loss terms.
+
+**Example running commands**
+
 ```bash
-# train with diffuse material and point lighting
-python launch.py --config configs/dreamfusion.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
+# uses DeepFloyd IF, requires ~15GB VRAM to extract text embeddings and ~10GB VRAM in training
+python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
+# uses StableDiffusion, requires ~6GB VRAM in training
+python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 ```
+
+**Tips**
+
+- DeepFloyd IF performs **way better than** StableDiffusion.
+- Validation shows albedo color before `system.material.ambient_only_steps` and shaded color after that.
+- Try increasing/decreasing `system.loss.lambda_sparsity` if your scene is stuffed with floaters/becoming empty.
+- Try increasing/decreasing `system.loss.lambda_orient` if you object is foggy/over-smoothed.
+- Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
+- DeepFloyd IF uses T5-XXL as its text encoder, which consumes ~15GB VRAM even when using 8-bit quantization. This is currently the bottleneck for training with less VRAM. If anyone knows how to run the text encoder with less VRAM, please file an issue. We're also trying to push the text encoder to [Replicate](https://replicate.com/) to enable extracting text embeddings via API, but are having some network connection issues. Please [contact bennyguo](mailto:imbennyguo@gmail.com) if you would like to help out.
 
 ### Magic3D
 
-```bash
-# train the coarse stage using implicit volume geometry
-python launch.py --config configs/magic3d-coarse.yaml --train --gpu 0 system.prompt_processor.prompt="lib:delicious_hamburger"
-# refine using DMTet and differentiable rasterization
-python launch.py --config configs/magic3d-refine.yaml --train --gpu 0 system.prompt_processor.prompt="lib:delicious_hamburger" system.weights=path/to/coarse/stage/last.ckpt
+**Notable differences from the paper**
+
+- We use open-source T2I models (StableDiffusion, DeepFloyd IF) for the coarse stage, while the paper uses eDiff-I.
+- In the coarse stage, we use a guiandance scale of 20 for DeepFloyd IF, while the paper uses 100 for eDiff-I.
+- There are many things that are ommited from the paper such as the weighting of loss terms and the DMTet grid resolution, which could be different.
+
+**Example running commands**
+
+First train the coarse stage NeRF:
+
+```sh
+# uses DeepFloyd IF, requires ~15GB VRAM to extract text embeddings and ~10GB VRAM in training
+python launch.py --config configs/magic3d-coarse-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
+# uses StableDiffusion, requires ~6GB VRAM in training
+python launch.py --config configs/magic3d-coarse-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 ```
 
-### Latent-NeRF
+Then convert the NeRF from the coarse stage to DMTet and train with differentiable rasterization:
 
-```bash
-# train in stable-diffusion latent space
-python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger"
-# refine in RGB space
-python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a hamburger" system.weights=path/to/latentnerf/weights
+```sh
+# the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.weights=path/to/coarse/stage/trial/ckpts/last.ckpt
 ```
 
-### Fantasia3D (WIP)
+**Tips**
 
-I by far have implemented the geometry training stage of Fantasia3D, which first regards the downsampled normal and silhouette as the latent feature map and then uses high-resolution normal map as RGB input.
-
-```bash
-python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry"
-# Fantasia3D highly relies on the initialized SDF shape
-# the default shape is a sphere with radius 0.5
-# change the shape initialization to match your input prompt
-python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
-# lower the guidance scale to get cleaner but less-detailed results
-python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry" system.guidance.guidance_scale=30.
-```
+- For the caorse stage, DeepFloyd IF performs **way better than** StableDiffusion.
+- Magic3D uses a neural network to predict the surface normal, which may not resemble the true geometric normal, so it's common to see that your object becomes extremely dark after `system.material.ambient_only_steps`.
+- Try increasing/decreasing `system.loss.lambda_sparsity` if your scene is stuffed with floaters/becoming empty.
+- Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
 
 ### Score Jacobian Chaining
+
+Notable differences from the paper: N/A.
+
+**Example running commands**
 
 ```bash
 # train with sjc guidance in latent space
@@ -87,6 +144,41 @@ python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_process
 # train with sjc guidance in latent space, trump figure
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" seed=10 system.renderer.num_samples_per_ray=512 trainer.max_steps=30000 system.loss.lambda_emptiness=[15000,10000.0,200000.0,15001]
 ```
+
+### Latent-NeRF
+
+Notable differences from the paper: N/A.
+
+We currently only implement Latent-NeRF for text-guided 3D generation. Sketch-Shape and Latent-Paint are not implemented yet.
+
+**Example running commands**
+
+```bash
+# train in StableDiffusion latent space
+python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
+# refine in RGB space
+python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
+```
+
+### Fantasia3D
+
+Notable differences from the paper: N/A.
+
+We currently only implement the geometry stage of Fantasia3D.
+
+**Example running commands**
+
+```bash
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry"
+# Fantasia3D highly relies on the initialized SDF shape
+# the default shape is a sphere with radius 0.5
+# change the shape initialization to match your input prompt
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
+```
+
+**Tips**
+
+- If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
 
 ### Image-Condition DreamFusion
 
@@ -96,6 +188,28 @@ python launch.py --config configs/imagecondition.yaml --train --gpu 0
 # train with few-view images reference (e.g. from co3d dataset) and stable-diffusion sds guidance
 python launch.py --config configs/co3d-imagecondition.yaml --train --gpu 0
 ```
+
+**If you would like to contribute a new method to threestudio, see [here](https://github.com/bennyguo/threestudio#contributing-to-threestudio).**
+
+## Tips on Improving Quality
+
+It's important to note that existing techniques that lift 2D T2I models to 3D cannot consistently produce satisfying results. Results from the great papers like DreamFusion and Magic3D are (to some extend) cherry-pickled, so don't be frustrated if you did not get what you expected in your first trial. Here are some tips that may help you improve the generation quality:
+
+- **Increase batch size**. Large batch sizes help convergence and improve the 3D consistency of the geometry. State-of-the-art methods claims using large batch sizes: DreamFusion uses a batch size of 4; Magic3D uses a batch size of 32; Fantasia3D uses a batch size of 24; some results shown above uses a batch size of 8. You can easily change the batch size by setting `data.batch_size=N`. Increasing the batch size requires more VRAM. If you have limited VRAM but still want the benefit of large batch sizes, you may use [gradient accumulation provided by PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients) by setting `trainer.accumulate_grad_batches=N`. This will accumulate the gradient of several batches and achieve a large effective batch size. Note that if you use gradient accumulation, you may need to multiply all step values by N times in your config, such as values that have the name `X_steps` and `trainer.val_check_interval`, since now N batches equal to a large batch.
+- **Train longer.** This helps if you can already obtain reasonable results and would like to enhance the details. If the result is still a mess after several thousand steps, training for a longer time often won't help. You can set the total training iterations by `trainer.max_steps=N`.
+- **Try different seeds.** This is a simple solution if your results have correct overall geometry but suffer from the multi-face Janus problem. You can change the seed by setting `seed=N`. Good luck!
+- **Tuning regularization weights.** Some methods have regularizaion terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/bennyguo/threestudio#supported-models) for more detailed instructions.
+
+## VRAM Optimization
+
+If you encounter CUDA OOM error, try the following in order (roughly sorted by recommendation) to meet your VRAM requirement.
+
+- If you only encounter OOM at validation/test time, you can set `system.cleanup_after_validation_step=true` and `system.cleanup_after_test_step=true` to free memory after each validation/test step. This will slow down validation/testing.
+- Use a smaller batch size or use gradient accumulation as demonstrated [here](https://github.com/bennyguo/threestudio#tips-on-improving-quality).
+- If you are using PyTorch1.x, enable [memory efficient attention](https://huggingface.co/docs/diffusers/optimization/fp16#memory-efficient-attention) by setting `system.guidance.enable_memory_efficient_attention=true`. PyTorch2.0 has built-in support for this optimization and is enabled by default.
+- Enable [attention slicing](https://huggingface.co/docs/diffusers/optimization/fp16#sliced-attention-for-additional-memory-savings) by setting `system.guidance.enable_attention_slicing=true`. This will slow down training by ~20%.
+- If you are using StableDiffusionGuidance, you can use [Token Merging](https://github.com/dbolya/tomesd) to **drastically** speed up computation and save memory. You can easily enable Token Merging by setting `system.guidance.token_merging=true`. You can also customize the Token Merging behavior by setting the parameters [here](https://github.com/dbolya/tomesd/blob/main/tomesd/patch.py#L183-L213) to `system.guidance.token_merging_params`. Note that Token Merging may degrade generation quality.
+- Enable [sequential CPU offload](https://huggingface.co/docs/diffusers/optimization/fp16#offloading-to-cpu-with-accelerate-for-memory-savings) by setting `system.guidance.enable_sequential_cpu_offload=true`. This could save a lot of VRAM but will make the training **extremely slow**.
 
 ## Contributing to threestudio
 
@@ -117,6 +231,7 @@ pip install -r requirements-dev.txt
 - Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
 - Gradients of Vanilla MLP parameters are empty if autocast is enabled in AMP (temporarily fixed by disabling autocast).
 - FullyFused MLP may cause NaNs in 32 precision.
+- StableDiffusionGuidance is much more slower with PyTorch2.0.
 
 ## Structure
 
@@ -124,15 +239,8 @@ pip install -r requirements-dev.txt
 - All systems, modules, and data modules have their configurations in their own dataclass named `Config`.
 - Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm is better than the one used in `instant-nsr-pl` as (1) it natually supports default values for properties; (2) it effectively prevents wrong assignments of these properties (say typos in the yaml file) and inappropriate usage at runtime.
 - This projects use both static and runtime type checking. For more details, see `utils/typing.py`.
-
-## Tips
-
-- To resume a model and continue training, please load the `parsed.yaml` in the trial directory and set `resume` to the checkpoint path. Example:
-
-```bash
-python launch.py --config path/to/your/trial/output/parsed.yaml --train --gpu 0 resume=path/to/your/checkpoint
-```
-
-- Press ctrl+c **once** will stop training and continue to testing. Press ctrl+c the second time to fully quit the program.
 - To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem` and `BaseModule` (including all geometry, materials, guidance, prompt processors, and renderers) are by default inherit to `Updateable`.
+
+## Prompt Library
+
 - For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's exactly one match. The used prompt will be printed to console.
