@@ -1,5 +1,5 @@
-name: "magic3d-coarse"
-tag: "${system.prompt_processor.prompt}"
+name: "magic3d-coarse-if"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -8,7 +8,7 @@ data:
   width: 64
   height: 64
   camera_distance_range: [1.5, 2.0]
-  light_sample_strategy: 'magic3d'
+  light_sample_strategy: "magic3d"
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
@@ -35,7 +35,7 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 1001
+    ambient_only_steps: 2001
     soft_shading: true
 
   background_type: "neural-environment-map-background"
@@ -47,10 +47,12 @@ system:
 
   prompt_processor_type: "deep-floyd-prompt-processor"
   prompt_processor:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
     prompt: ???
 
   guidance_type: "deep-floyd-guidance"
   guidance:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
     weighting_strategy: sjc
     guidance_scale: 20.
     min_step_percent: 0.02
@@ -59,7 +61,7 @@ system:
   loss:
     lambda_sds: 1.
     lambda_orient: 0.
-    lambda_sparsity: 10.
+    lambda_sparsity: 1.
     lambda_opaque: 0.
   optimizer:
     name: Adam
