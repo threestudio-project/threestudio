@@ -10,6 +10,7 @@ data:
   center_perturb: 0.0
   up_perturb: 0.0
   light_position_perturb: 0.0
+  eval_elevation_deg: 20.0
 
 system_type: "sjc-system"
 system:
@@ -60,6 +61,11 @@ system:
     name: Adamax
     args:
       lr: 0.05
+    params:
+      geometry:
+        lr: 0.05
+      background:
+        lr: 0.0001
 
 trainer:
   max_steps: 10000

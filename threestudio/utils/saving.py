@@ -45,6 +45,7 @@ class SaverMixin:
     DEFAULT_RGB_KWARGS = {'data_format': 'CHW', 'data_range': (0, 1)}
     DEFAULT_UV_KWARGS = {'data_format': 'CHW', 'data_range': (0, 1), 'cmap': 'checkerboard'}
     DEFAULT_GRAYSCALE_KWARGS = {'data_range': None, 'cmap': 'jet'}
+    DEFAULT_GRID_KWARGS = {'align': 'max'}
 
     def get_rgb_image_(self, img, data_format, data_range, rgba=False):
         img = self.convert_data(img)
@@ -141,9 +142,9 @@ class SaverMixin:
         img = self.get_grayscale_image_(img, data_range, cmap)
         cv2.imwrite(self.get_save_path(filename), img)
 
-    def get_image_grid_(self, imgs):
+    def get_image_grid_(self, imgs, align):
         if isinstance(imgs[0], list):
-            return np.concatenate([self.get_image_grid_(row) for row in imgs], axis=0)
+            return np.concatenate([self.get_image_grid_(row, align) for row in imgs], axis=0)
         cols = []
         for col in imgs:
             assert col['type'] in ['rgb', 'uv', 'grayscale']
@@ -159,10 +160,28 @@ class SaverMixin:
                 grayscale_kwargs = self.DEFAULT_GRAYSCALE_KWARGS.copy()
                 grayscale_kwargs.update(col['kwargs'])
                 cols.append(self.get_grayscale_image_(col['img'], **grayscale_kwargs))
+        
+        if align == 'max':
+            h = max([col.shape[0] for col in cols])
+            w = max([col.shape[1] for col in cols])
+        elif align == 'min':
+            h = min([col.shape[0] for col in cols])
+            w = min([col.shape[1] for col in cols])
+        elif isinstance(align, int):
+            h = align
+            w = align
+        elif isinstance(align, tuple) and isinstance(align[0], int) and isinstance(align[1], int):
+            h, w = align
+        else:
+            raise ValueError(f'Unsupported image grid align: {align}, should be min, max, int or (int, int)')
+        
+        for i in range(len(cols)):
+            if cols[i].shape[0] != h or cols[i].shape[1] != w:
+                cols[i] = cv2.resize(cols[i], (w, h), interpolation=cv2.INTER_LINEAR)
         return np.concatenate(cols, axis=1)
     
-    def save_image_grid(self, filename, imgs):
-        img = self.get_image_grid_(imgs)
+    def save_image_grid(self, filename, imgs, align=DEFAULT_GRID_KWARGS['align']):
+        img = self.get_image_grid_(imgs, align=align)
         cv2.imwrite(self.get_save_path(filename), img)
     
     def save_image(self, filename, img):
