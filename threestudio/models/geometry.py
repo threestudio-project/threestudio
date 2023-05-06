@@ -62,7 +62,7 @@ class BaseImplicitGeometry(BaseGeometry):
         isosurface_resolution: int = 128
         isosurface_threshold: Union[float, str] = 0.0
         isosurface_chunk: int = 0
-        isosurface_coarse_to_fine: bool = False
+        isosurface_coarse_to_fine: bool = True
         isosurface_deformable_grid: bool = False
 
     cfg: Config
@@ -341,6 +341,8 @@ class ImplicitVolume(BaseImplicitGeometry):
                     grad_outputs=torch.ones_like(raw_density),
                     create_graph=True,
                 )[0]
+                if not grad_enabled:
+                    normal = normal.detach()
                 normal = F.normalize(normal, dim=-1)
             else:
                 raise AttributeError(f"Unknown normal type {self.cfg.normal_type}")
