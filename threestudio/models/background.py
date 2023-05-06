@@ -64,8 +64,6 @@ class TexturedBackground(BaseBackground):
         xy = (x ** 2 + y ** 2) ** 0.5
         azimuth = torch.atan2(y, x) / (torch.pi * 2) + 0.5
         elevation = torch.atan2(z, xy) / torch.pi + 0.5
-        # azimuth = torch.atan2(xy, z) / torch.pi  
-        # elevation = torch.atan2(y, x) / (torch.pi * 2) + 0.5  
         uv = torch.stack([azimuth, elevation], -1) 
         return uv
     
