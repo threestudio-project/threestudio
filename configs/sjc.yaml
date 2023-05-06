@@ -1,9 +1,9 @@
 name: sjc
-tag: "debug"
-exp_root_dir: "outputs"
+tag: debug
+exp_root_dir: outputs
 seed: 0
 
-data_type: "random-camera-datamodule"
+data_type: random-camera-datamodule
 data: 
   camera_distance_range: [1.50, 1.50] 
   camera_perturb: 0.0
@@ -12,9 +12,9 @@ data:
   light_position_perturb: 0.0
   eval_elevation_deg: 20.0
 
-system_type: "sjc-system"
+system_type: sjc-system
 system:
-  geometry_type: "volume-grid"
+  geometry_type: volume-grid
   geometry:
     normal_type: null
     grid_size: [100, 100, 100]
@@ -33,22 +33,25 @@ system:
     height: 4
     width: 4
 
-  renderer_type: "nerf-volume-renderer"
+  renderer_type: nerf-volume-renderer
   renderer:
     num_samples_per_ray: 512
     grid_prune: false
   
-  prompt_processor_type: "dreamfusion-prompt-processor"
+  prompt_processor_type: dreamfusion-prompt-processor
   prompt_processor:
     prompt: "A high quality photo of a delicious burger"
     view_dependent_prompt_front: true
   
-  guidance_type: "sjc-guidance"
+  guidance_type: stable-diffusion-guidance
   guidance:
     half_precision_weights: true
     guidance_scale: 100.
     grad_clip: null
+    use_sjc: true
     var_red: true
+    min_step_percent: 0.01
+    max_step_percent: 0.97
 
   loss:
     lambda_sds: 1.
@@ -71,7 +74,7 @@ trainer:
   max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 100
+  val_check_interval: 200
   limit_val_batches: 1
   enable_progress_bar: true
   precision: 16-mixed

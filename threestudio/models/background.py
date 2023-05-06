@@ -62,9 +62,11 @@ class TexturedBackground(BaseBackground):
     def spherical_xyz_to_uv(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B 2"]:
         x, y, z = dirs[..., 0], dirs[..., 1], dirs[..., 2]
         xy = (x ** 2 + y ** 2) ** 0.5
-        u = torch.atan2(xy, z) / torch.pi  
-        v = torch.atan2(y, x) / (torch.pi * 2) + 0.5  
-        uv = torch.stack([u, v], -1) 
+        azimuth = torch.atan2(y, x) / (torch.pi * 2) + 0.5
+        elevation = torch.atan2(z, xy) / torch.pi + 0.5
+        # azimuth = torch.atan2(xy, z) / torch.pi  
+        # elevation = torch.atan2(y, x) / (torch.pi * 2) + 0.5  
+        uv = torch.stack([azimuth, elevation], -1) 
         return uv
     
     def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B Nc"]:

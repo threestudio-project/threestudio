@@ -53,7 +53,7 @@ system:
   guidance_type: "deep-floyd-guidance"
   guidance:
     guidance_scale: 20.
-    weighting_strategy: sjc
+    weighting_strategy: uniform 
   
   loss:
     lambda_sds: 1.

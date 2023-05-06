@@ -42,7 +42,7 @@ class ScoreJacobianChaining(BaseSystem):
             **render_out,
         }
         if decode:
-            out['decoded_rgb'] = self.guidance.decode_latents(out['comp_rgb'].permute(0,3,1,2)).permute(0,2,3,1)
+            out['decoded_rgb'] = self.guidance.decode_latents(out['comp_rgb'].permute(0,3,1,2), latent_height=128, latent_width=128).permute(0,2,3,1)
         return out
 
     def on_fit_start(self) -> None:
