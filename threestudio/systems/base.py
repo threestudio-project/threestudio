@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
@@ -6,7 +5,7 @@ import pytorch_lightning as pl
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
-from threestudio.utils.misc import C, load_module_weights
+from threestudio.utils.misc import C, cleanup, load_module_weights
 from threestudio.utils.saving import SaverMixin
 from threestudio.utils.typing import *
 
@@ -19,6 +18,10 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         scheduler: Optional[dict] = None
         weights: Optional[str] = None
         weights_ignore_modules: Optional[List[str]] = None
+        cleanup_after_validation_step: bool = False
+        cleanup_after_test_step: bool = False
+
+    cfg: Config
 
     def __init__(self, cfg) -> None:
         super().__init__()
@@ -66,6 +69,11 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     def validation_step(self, batch, batch_idx):
         raise NotImplementedError
 
+    def on_validation_batch_end(self, outputs, batch, batch_idx):
+        if self.cfg.cleanup_after_validation_step:
+            # cleanup to save vram
+            cleanup()
+
     def on_validation_epoch_end(self):
         """
         Gather metrics from all devices, compute mean.
@@ -75,6 +83,11 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
 
     def test_step(self, batch, batch_idx):
         raise NotImplementedError
+
+    def on_test_batch_end(self, outputs, batch, batch_idx):
+        if self.cfg.cleanup_after_test_step:
+            # cleanup to save vram
+            cleanup()
 
     def on_test_epoch_end(self):
         """
