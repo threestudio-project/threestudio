@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, help="path to config file")
@@ -17,6 +18,12 @@ def main() -> None:
         "--verbose", action="store_true", help="if true, set logging level to DEBUG"
     )
 
+    parser.add_argument(
+        "--typecheck",
+        action="store_true",
+        help="whether to enable dynamic type checking",
+    )
+
     args, extras = parser.parse_known_args()
 
     # set CUDA_VISIBLE_DEVICES then import pytorch-lightning
@@ -29,8 +36,11 @@ def main() -> None:
     from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 
-    # from typeguard import install_import_hook
-    # install_import_hook(['threestudio'])
+    if args.typecheck:
+        from jaxtyping import install_import_hook
+
+        install_import_hook("threestudio", "typeguard.typechecked")
+
     import threestudio
     from threestudio.utils.callbacks import (
         CodeSnapshotCallback,
@@ -69,7 +79,7 @@ def main() -> None:
                 cfg,
                 os.path.join(cfg.trial_dir, "configs"),
                 use_version=False,
-            ),  # TODO: better config saving
+            ),
         ]
 
     loggers = []
