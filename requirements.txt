@@ -21,3 +21,4 @@ bitsandbytes
 sentencepiece
 safetensors
 huggingface_hub
+libigl
