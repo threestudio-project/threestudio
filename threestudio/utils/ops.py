@@ -290,7 +290,8 @@ def tet_sdf_diff(
     )
     return sdf_diff
 
-#https://github.com/eladrich/latent-nerf/blob/f49ecefcd48972e69a28e3116fe95edf0fac4dc8/src/latent_nerf/models/mesh_utils.py
+
+# https://github.com/eladrich/latent-nerf/blob/f49ecefcd48972e69a28e3116fe95edf0fac4dc8/src/latent_nerf/models/mesh_utils.py
 class MeshOBJ:
     dx = torch.zeros(3).float()
     dx[0] = 1
@@ -310,9 +311,10 @@ class MeshOBJ:
         e1 = vf[:, 1, :] - vf[:, 0, :]
         e2 = vf[:, 2, :] - vf[:, 0, :]
         self.face_normals = np.cross(e1, e2)
-        self.face_normals = self.face_normals / np.linalg.norm(self.face_normals, axis=-1)[:, None]
+        self.face_normals = (
+            self.face_normals / np.linalg.norm(self.face_normals, axis=-1)[:, None]
+        )
         self.face_normals_tensor = torch.from_numpy(self.face_normals)
-
 
     def normalize_mesh(self, target_scale=0.5):
         verts = self.v
@@ -330,22 +332,28 @@ class MeshOBJ:
         device = query.device
         shp = query.shape
         query_np = query.detach().cpu().reshape(-1, 3).numpy()
-        target_alphas = fast_winding_number_for_meshes(self.v.astype(np.float32), self.f, query_np)
+        target_alphas = fast_winding_number_for_meshes(
+            self.v.astype(np.float32), self.f, query_np
+        )
         return torch.from_numpy(target_alphas).reshape(shp[:-1]).to(device)
 
     def gaussian_weighted_distance(self, query: torch.Tensor, sigma):
         device = query.device
         shp = query.shape
         query_np = query.detach().cpu().reshape(-1, 3).numpy()
-        distances, _, _ = point_mesh_squared_distance(query_np, self.v.astype(np.float32), self.f)
+        distances, _, _ = point_mesh_squared_distance(
+            query_np, self.v.astype(np.float32), self.f
+        )
         distances = torch.from_numpy(distances).reshape(shp[:-1]).to(device)
         weight = torch.exp(-(distances / (2 * sigma**2)))
         return weight
 
+
 def ce_pq_loss(p, q, weight=None):
     def clamp(v, T=0.0001):
         return v.clamp(T, 1 - T)
-    p=p.view(q.shape)
+
+    p = p.view(q.shape)
     ce = -1 * (p * torch.log(clamp(q)) + (1 - p) * torch.log(clamp(1 - q)))
     if weight is not None:
         ce *= weight
@@ -361,18 +369,29 @@ class ShapeLoss(nn.Module):
         self.shape_path = guide_shape
         v, _, _, f, _, _ = read_obj(self.shape_path, float)
         mesh = MeshOBJ(v, f)
-        matrix_rot = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]]) @ np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
+        matrix_rot = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]]) @ np.array(
+            [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]
+        )
         self.sketchshape = mesh.normalize_mesh(self.mesh_scale)
-        self.sketchshape = MeshOBJ(np.ascontiguousarray((matrix_rot@self.sketchshape.v.transpose(1, 0)).transpose(1, 0)), f)
+        self.sketchshape = MeshOBJ(
+            np.ascontiguousarray(
+                (matrix_rot @ self.sketchshape.v.transpose(1, 0)).transpose(1, 0)
+            ),
+            f,
+        )
 
     def forward(self, xyzs, sigmas):
         mesh_occ = self.sketchshape.winding_number(xyzs)
         if self.proximal_surface > 0:
-            weight = 1 - self.sketchshape.gaussian_weighted_distance(xyzs, self.proximal_surface)
+            weight = 1 - self.sketchshape.gaussian_weighted_distance(
+                xyzs, self.proximal_surface
+            )
         else:
             weight = None
         indicator = (mesh_occ > 0.5).float()
         nerf_occ = 1 - torch.exp(-self.delta * sigmas)
         nerf_occ = nerf_occ.clamp(min=0, max=1.1)
-        loss = ce_pq_loss(nerf_occ, indicator, weight=weight)  # order is important for CE loss + second argument may not be optimized
+        loss = ce_pq_loss(
+            nerf_occ, indicator, weight=weight
+        )  # order is important for CE loss + second argument may not be optimized
         return loss
