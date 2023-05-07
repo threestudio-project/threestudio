@@ -99,9 +99,17 @@ Common configurations for implicit geometry:
 | ---- | ---- | ----------- |
 
 ### volume-grid
+An explicit geometry parameterized with a feature volume. The feature volume has a shape of `(n_feature_dims + 1) x grid_size`, one channel for density and the rest for material. The density is first scaled, then biased and finally activated.
 
 | name | type | description |
 | ---- | ---- | ----------- |
+| grid_size | tuple(int, int, int) | The resolution of the feature volume. Default: (100, 100, 100) |
+| n_feature_dims | int | The feature dimensions for its material. Default: 3 |
+| density_activation | Optional[str] | The activation to get the density value. Default: "softplus" |
+| density_bias | Union[float, str] | The initialization of the density. A float value indicates uniform initialization and `blob` indicates a ball centered at the center. Default: "blob" |
+| density_blob_scale | float | The parameter for blob initialization. Default: 5.0 |
+| density_blob_std | float | The parameter for blob initialization. Default: 0.5 |
+| normal_type | Optional[str] | The way to compute the normal from density. If set to "pred", the normal is produced with another volume in the shape of `3 x grid_size`. Default: "finite_difference" |
 
 Common configurations for explicit geometry:
 
