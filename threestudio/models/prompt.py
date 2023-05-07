@@ -8,14 +8,14 @@ from diffusers import IFPipeline
 from transformers import AutoTokenizer, CLIPTextModel, T5EncoderModel
 
 import threestudio
-from threestudio.utils.base import BaseModule
+from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import cleanup
 from threestudio.utils.typing import *
 
 
-class PromptProcessor(BaseModule):
+class PromptProcessor(BaseObject):
     @dataclass
-    class Config(BaseModule.Config):
+    class Config(BaseObject.Config):
         prompt: str = "a hamburger"
         negative_prompt: str = ""
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
@@ -172,7 +172,7 @@ class PromptProcessor(BaseModule):
     ) -> Tuple[Float[Tensor, "B ..."], Float[Tensor, "B ..."]]:
         raise NotImplementedError
 
-    def forward(
+    def __call__(
         self,
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],

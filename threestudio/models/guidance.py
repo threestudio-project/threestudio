@@ -17,7 +17,7 @@ from diffusers.utils.import_utils import is_xformers_available
 from torch.cuda.amp import custom_bwd, custom_fwd
 
 import threestudio
-from threestudio.utils.base import BaseModule
+from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
 
@@ -39,9 +39,9 @@ class SpecifyGradient(torch.autograd.Function):
 
 
 @threestudio.register("stable-diffusion-guidance")
-class StableDiffusionGuidance(BaseModule):
+class StableDiffusionGuidance(BaseObject):
     @dataclass
-    class Config(BaseModule.Config):
+    class Config(BaseObject.Config):
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
@@ -76,12 +76,11 @@ class StableDiffusionGuidance(BaseModule):
             "feature_extractor": None,
             "requires_safety_checker": False,
             "torch_dtype": self.weights_dtype,
-            "device_map": "auto",
         }
         self.pipe = StableDiffusionPipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             **pipe_kwargs,
-        )
+        ).to(self.device)
 
         if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
@@ -169,14 +168,13 @@ class StableDiffusionGuidance(BaseModule):
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
 
-    def forward(
+    def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
         text_embeddings: Float[Tensor, "BB 77 768"],
         rgb_as_latents=False,
     ):
         batch_size = rgb.shape[0]
-
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
         if rgb_as_latents:
@@ -338,7 +336,7 @@ class ScoreJacobianGuidance(StableDiffusionGuidance):
         self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)
         print(f"[INFO] loaded stable diffusion!")
 
-    def forward(
+    def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
         text_embeddings: Float[Tensor, "BB 77 768"],
@@ -454,9 +452,9 @@ def custom_ddpm_step(ddpm, model_output: torch.FloatTensor, timestep: int, sampl
 
 
 @threestudio.register("deep-floyd-guidance")
-class DeepFloydGuidance(BaseModule):
+class DeepFloydGuidance(BaseObject):
     @dataclass
-    class Config(BaseModule.Config):
+    class Config(BaseObject.Config):
         pretrained_model_name_or_path: str = "DeepFloyd/IF-I-XL-v1.0"
         # FIXME: xformers error
         enable_memory_efficient_attention: bool = False
@@ -554,7 +552,7 @@ class DeepFloydGuidance(BaseModule):
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
         ).sample.to(input_dtype)
 
-    def forward(
+    def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
         text_embeddings: Float[Tensor, "BB 77 768"],
