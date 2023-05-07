@@ -41,7 +41,7 @@ class StableDiffusionGuidance(BaseObject):
     cfg: Config
 
     def configure(self) -> None:
-        print(f"[INFO] loading stable diffusion...")
+        threestudio.info(f"Loading Stable Diffusion ...")
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
@@ -123,7 +123,8 @@ class StableDiffusionGuidance(BaseObject):
             self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)
 
         self.grad_clip_val: Optional[float] = None
-        print(f"[INFO] loaded stable diffusion!")
+
+        threestudio.info(f"Loaded Stable Diffusion!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def forward_unet(
@@ -297,51 +298,3 @@ class StableDiffusionGuidance(BaseObject):
         # http://arxiv.org/abs/2303.15413
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
-
-
-"""
-# used by thresholding, experimental
-def custom_ddpm_step(ddpm, model_output: torch.FloatTensor, timestep: int, sample: torch.FloatTensor, generator=None, return_dict: bool = True):
-    self = ddpm
-    t = timestep
-
-    prev_t = self.previous_timestep(t)
-
-    if model_output.shape[1] == sample.shape[1] * 2 and self.variance_type in ["learned", "learned_range"]:
-        model_output, predicted_variance = torch.split(model_output, sample.shape[1], dim=1)
-    else:
-        predicted_variance = None
-
-    # 1. compute alphas, betas
-    alpha_prod_t = self.alphas_cumprod[t].item()
-    alpha_prod_t_prev = self.alphas_cumprod[prev_t].item() if prev_t >= 0 else 1.0
-    beta_prod_t = 1 - alpha_prod_t
-    beta_prod_t_prev = 1 - alpha_prod_t_prev
-    current_alpha_t = alpha_prod_t / alpha_prod_t_prev
-    current_beta_t = 1 - current_alpha_t
-
-    # 2. compute predicted original sample from predicted noise also called
-    # "predicted x_0" of formula (15) from https://arxiv.org/pdf/2006.11239.pdf
-    if self.config.prediction_type == "epsilon":
-        pred_original_sample = (sample - beta_prod_t ** (0.5) * model_output) / alpha_prod_t ** (0.5)
-    elif self.config.prediction_type == "sample":
-        pred_original_sample = model_output
-    elif self.config.prediction_type == "v_prediction":
-        pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
-    else:
-        raise ValueError(
-            f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample` or"
-            " `v_prediction`  for the DDPMScheduler."
-        )
-
-    # 3. Clip or threshold "predicted x_0"
-    if self.config.thresholding:
-        pred_original_sample = self._threshold_sample(pred_original_sample)
-    elif self.config.clip_sample:
-        pred_original_sample = pred_original_sample.clamp(
-            -self.config.clip_sample_range, self.config.clip_sample_range
-        )
-
-    noise_thresholded = (sample - (alpha_prod_t ** 0.5) * pred_original_sample) / (beta_prod_t ** 0.5)
-    return noise_thresholded
-"""

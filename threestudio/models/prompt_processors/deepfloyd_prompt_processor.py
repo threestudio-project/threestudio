@@ -23,14 +23,13 @@ class DeepFloydPromptProcessor(PromptProcessor):
 
     def configure_text_encoder(self) -> None:
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-        # FIXME: behavior of auto device map
         self.text_encoder = T5EncoderModel.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             subfolder="text_encoder",
             load_in_8bit=True,
             variant="8bit",
             device_map="auto",
-        )
+        )  # FIXME: behavior of auto device map in multi-GPU training
         self.pipe = IFPipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             text_encoder=self.text_encoder,  # pass the previously instantiated 8bit text encoder

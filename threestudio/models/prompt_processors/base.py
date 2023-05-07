@@ -31,7 +31,9 @@ class PromptProcessor(BaseObject):
         raise NotImplementedError
 
     def configure(self) -> None:
+        threestudio.info(f"Loading text encoder ...")
         self.configure_text_encoder()
+        threestudio.info(f"Loaded text encoder!")
 
         @dataclass
         class DirectionConfig:
