@@ -8,7 +8,7 @@ data:
   width: 512
   height: 512
   camera_distance_range: [1.5, 2.0]
-  light_sample_strategy: 'magic3d'
+  light_sample_strategy: "magic3d"
   fovy_range: [30, 45]
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.

@@ -8,8 +8,6 @@ from threestudio.systems.base import BaseSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
-__all__ = ["ScoreJacobianChaining"]
-
 
 @threestudio.register("sjc-system")
 class ScoreJacobianChaining(BaseSystem):
@@ -17,13 +15,13 @@ class ScoreJacobianChaining(BaseSystem):
     class Config(BaseSystem.Config):
         geometry_type: str = "volume-grid"
         geometry: dict = field(default_factory=dict)
-        material_type: str = "diffuse-with-point-light-material"
+        material_type: str = "no-material"
         material: dict = field(default_factory=dict)
-        background_type: str = "neural-environment-map-background"
+        background_type: str = "textured-background"
         background: dict = field(default_factory=dict)
         renderer_type: str = "nerf-volume-renderer"
         renderer: dict = field(default_factory=dict)
-        guidance_type: str = "-diffusion-guidance"
+        guidance_type: str = "stable-diffusion-guidance"
         guidance: dict = field(default_factory=dict)
         prompt_processor_type: str = "dreamfusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
@@ -51,7 +49,7 @@ class ScoreJacobianChaining(BaseSystem):
         }
         if decode:
             out["decoded_rgb"] = self.guidance.decode_latents(
-                out["comp_rgb"].permute(0, 3, 1, 2)
+                out["comp_rgb"].permute(0, 3, 1, 2), latent_height=128, latent_width=128
             ).permute(0, 2, 3, 1)
         return out
 
@@ -66,6 +64,11 @@ class ScoreJacobianChaining(BaseSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
+
+    def on_test_start(self) -> None:
+        # check if guidance is initialized, such as when loading from checkpoint
+        if not hasattr(self, "guidance"):
+            self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
@@ -85,7 +88,7 @@ class ScoreJacobianChaining(BaseSystem):
         self.log("train/loss_emptiness", loss_emptiness)
         loss += loss_emptiness
 
-        # DONT USE THIS LOSS, I think it is wrong
+        # About the depth loss, see https://github.com/pals-ttic/sjc/issues/21
         if self.C(self.cfg.loss.lambda_depth) > 0:
             _, h, w, _ = out["comp_rgb"].shape
             comp_depth = (out["depth"] + 10 * (1 - out["opacity"])).squeeze(-1)
@@ -100,13 +103,15 @@ class ScoreJacobianChaining(BaseSystem):
             border_depth_mean = (comp_depth.sum() - center_depth.sum()) / (
                 h * w - center_h * center_w
             )
-            loss_depth = -torch.log(
-                center_depth_mean - border_depth_mean + 1e-6
-            ) * self.C(self.cfg.loss.lambda_depth)
+            log_input = center_depth_mean - border_depth_mean + 1e-12
+            loss_depth = (
+                torch.sign(log_input)
+                * torch.log(log_input)
+                * self.C(self.cfg.loss.lambda_depth)
+            )
 
             self.log("train/loss_depth", loss_depth)
-            if center_depth_mean > border_depth_mean:
-                loss += loss_depth
+            loss += loss_depth
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
@@ -157,6 +162,7 @@ class ScoreJacobianChaining(BaseSystem):
                     "kwargs": {"cmap": "spectral", "data_range": (0, 1)},
                 },
             ],
+            align=512,
         )
 
     def on_validation_epoch_end(self):
@@ -191,6 +197,7 @@ class ScoreJacobianChaining(BaseSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
+            align=1024,
         )
 
     def on_test_epoch_end(self):

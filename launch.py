@@ -2,7 +2,6 @@ import argparse
 import logging
 import os
 
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, help="path to config file")

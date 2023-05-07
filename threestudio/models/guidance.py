@@ -18,7 +18,7 @@ from torch.cuda.amp import custom_bwd, custom_fwd
 
 import threestudio
 from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import C
+from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
 
 
@@ -44,6 +44,9 @@ class StableDiffusionGuidance(BaseModule):
     class Config(BaseModule.Config):
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         use_xformers: bool = False
+        enable_sequential_cpu_offload: bool = False
+        enable_attention_slicing: bool = False
+        enable_channels_last_format: bool = False
         guidance_scale: float = 100.0
         grad_clip: Optional[
             Any
@@ -53,6 +56,8 @@ class StableDiffusionGuidance(BaseModule):
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
+        use_sjc: bool = False
+        var_red: bool = True
         weighting_strategy: str = "sds"
 
         token_merging: bool = False
@@ -63,39 +68,72 @@ class StableDiffusionGuidance(BaseModule):
     def configure(self) -> None:
         print(f"[INFO] loading stable diffusion...")
 
-        weights_dtype = (
+        self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
         )
+
+        pipe_kwargs = {
+            "tokenizer": None,
+            "safety_checker": None,
+            "feature_extractor": None,
+            "requires_safety_checker": False,
+            "torch_dtype": self.weights_dtype,
+            "device_map": "auto",
+        }
+        self.pipe = StableDiffusionPipeline.from_pretrained(
+            self.cfg.pretrained_model_name_or_path,
+            **pipe_kwargs,
+        )
+
+        if self.cfg.use_xformers and is_xformers_available():
+            if parse_version(torch.__version__) >= parse_version("2"):
+                threestudio.info(
+                    "PyTorch2.0 uses memory efficient attention by default, xformers is not needed."
+                )
+            elif not is_xformers_available():
+                threestudio.warn("xformers is not available, not enabled.")
+            else:
+                self.pipe.enable_xformers_memory_efficient_attention()
+
+        if self.cfg.enable_sequential_cpu_offload:
+            self.pipe.enable_sequential_cpu_offload()
+
+        if self.cfg.enable_attention_slicing:
+            self.pipe.enable_attention_slicing(1)
+
+        if self.cfg.enable_channels_last_format:
+            self.pipe.unet.to(memory_format=torch.channels_last)
+
         # Create model
-        self.vae = AutoencoderKL.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="vae",
-            torch_dtype=weights_dtype,
-        ).to(self.device)
-        self.unet = UNet2DConditionModel.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="unet",
-            torch_dtype=weights_dtype,
-        ).to(self.device)
+        self.vae = self.pipe.vae
+        self.unet = self.pipe.unet
 
         for p in self.vae.parameters():
             p.requires_grad_(False)
         for p in self.unet.parameters():
             p.requires_grad_(False)
 
-        if self.cfg.use_xformers and is_xformers_available():
-            self.unet.enable_xformers_memory_efficient_attention()
-
         if self.cfg.token_merging:
             import tomesd
 
             tomesd.apply_patch(self.unet, **self.cfg.token_merging_params)
 
-        self.scheduler = DDIMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="scheduler",
-            torch_dtype=weights_dtype,
-        )
+        if self.cfg.use_sjc:
+            # score jacobian chaining use DDPM
+            self.scheduler = DDPMScheduler.from_pretrained(
+                self.cfg.pretrained_model_name_or_path,
+                subfolder="scheduler",
+                torch_dtype=self.weights_dtype,
+                beta_start=0.00085,
+                beta_end=0.0120,
+                beta_schedule="scaled_linear",
+            )
+        else:
+            self.scheduler = DDIMScheduler.from_pretrained(
+                self.cfg.pretrained_model_name_or_path,
+                subfolder="scheduler",
+                torch_dtype=self.weights_dtype,
+            )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
@@ -104,11 +142,124 @@ class StableDiffusionGuidance(BaseModule):
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
         )
+        if self.cfg.use_sjc:
+            # score jacobian chaining need mu
+            self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)
 
         self.grad_clip_val: Optional[float] = None
-
         print(f"[INFO] loaded stable diffusion!")
 
+    @torch.cuda.amp.autocast(enabled=False)
+    def forward_unet(
+        self,
+        latents: Float[Tensor, "..."],
+        t: Float[Tensor, "..."],
+        encoder_hidden_states: Float[Tensor, "..."],
+    ) -> Float[Tensor, "..."]:
+        input_dtype = latents.dtype
+        return self.unet(
+            latents.to(self.weights_dtype),
+            t.to(self.weights_dtype),
+            encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
+        ).sample.to(input_dtype)
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def encode_images(
+        self, imgs: Float[Tensor, "B 3 512 512"]
+    ) -> Float[Tensor, "B 4 64 64"]:
+        input_dtype = imgs.dtype
+        imgs = imgs * 2.0 - 1.0
+        posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
+        latents = posterior.sample() * self.vae.config.scaling_factor
+        return latents.to(input_dtype)
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def decode_latents(
+        self, latents: Float[Tensor, "B 4 H W"], latent_height: int=64, latent_width: int=64
+    ) -> Float[Tensor, "B 3 512 512"]:
+        input_dtype = latents.dtype
+        latents = F.interpolate(latents, (latent_height, latent_width), mode="bilinear", align_corners=False)
+        latents = 1 / self.vae.config.scaling_factor * latents
+        image = self.vae.decode(latents.to(self.weights_dtype)).sample
+        image = (image * 0.5 + 0.5).clamp(0, 1)
+        return image.to(input_dtype)
+
+    def compute_grad_sds(
+        self,
+        latents: Float[Tensor, "B 4 64 64"],
+        text_embeddings: Float[Tensor, "BB 77 768"],
+        t: Int[Tensor, "B"],
+    ):
+        # predict the noise residual with unet, NO grad!
+        with torch.no_grad():
+            # add noise
+            noise = torch.randn_like(latents)  # TODO: use torch generator
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+            # pred noise
+            latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
+            noise_pred = self.forward_unet(
+                latent_model_input,
+                torch.cat([t] * 2),
+                encoder_hidden_states=text_embeddings,
+            )
+
+        # perform guidance (high scale from paper!)
+        noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+        noise_pred = noise_pred_text + self.cfg.guidance_scale * (
+            noise_pred_text - noise_pred_uncond
+        )
+
+        if self.cfg.weighting_strategy == "sds":
+            # w(t), sigma_t^2
+            w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
+        elif self.cfg.weighting_strategy == "uniform":
+            w = 1
+        elif self.cfg.weighting_strategy == "fantasia3d":
+            w = (self.alphas[t] ** 0.5 * (1 - self.alphas[t])).view(-1, 1, 1, 1)
+        else:
+            raise ValueError(
+                f"Unknown weighting strategy: {self.cfg.weighting_strategy}"
+            )
+
+        grad = w * (noise_pred - noise)
+        return grad
+
+    def compute_grad_sjc(
+        self,
+        latents: Float[Tensor, "B 4 64 64"],
+        text_embeddings: Float[Tensor, "BB 77 768"],
+        t: Int[Tensor, "B"],
+    ):
+        sigma = self.us[t]
+        # predict the noise residual with unet, NO grad!
+        with torch.no_grad():
+            # add noise
+            noise = torch.randn_like(latents)  # TODO: use torch generator
+            y = latents
+
+            zs = y + sigma * noise
+            scaled_zs = zs / torch.sqrt(1 + sigma**2)
+
+            # pred noise
+            latent_model_input = torch.cat([scaled_zs] * 2, dim=0)
+            noise_pred = self.forward_unet(
+                latent_model_input, t, encoder_hidden_states=text_embeddings
+            )
+
+            # perform guidance (high scale from paper!)
+            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred = noise_pred_text + self.cfg.guidance_scale * (
+                noise_pred_text - noise_pred_uncond
+            )
+
+            Ds = zs - sigma * noise_pred
+
+            if self.cfg.var_red:
+                grad = -(Ds - y) / sigma
+            else:
+                grad = -(Ds - zs) / sigma
+
+        return grad
     def forward(
         self,
         rgb: Float[Tensor, "B H W C"],
@@ -139,38 +290,11 @@ class StableDiffusionGuidance(BaseModule):
             device=self.device,
         )
 
-        # predict the noise residual with unet, NO grad!
-        with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
-            latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
-            latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
-            noise_pred = self.unet(
-                latent_model_input,
-                torch.cat([t] * 2),
-                encoder_hidden_states=text_embeddings,
-            ).sample
-
-        # perform guidance (high scale from paper!)
-        noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-        noise_pred = noise_pred_text + self.cfg.guidance_scale * (
-            noise_pred_text - noise_pred_uncond
-        )
-
-        if self.cfg.weighting_strategy == "sds":
-            # w(t), sigma_t^2
-            w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
-        elif self.cfg.weighting_strategy == "sjc":
-            w = 1
-        elif self.cfg.weighting_strategy == "fantasia3d":
-            w = (self.alphas[t] ** 0.5 * (1 - self.alphas[t])).view(-1, 1, 1, 1)
+        if self.cfg.use_sjc:
+            grad = self.compute_grad_sjc(latents, text_embeddings, t)
         else:
-            raise ValueError(
-                f"Unknown weighting strategy: {self.cfg.weighting_strategy}"
-            )
+            grad = self.compute_grad_sds(latents, text_embeddings, t)
 
-        grad = w * (noise_pred - noise)
         grad = torch.nan_to_num(grad)
         # clip grad for stable training?
         if self.grad_clip_val is not None:
@@ -184,185 +308,7 @@ class StableDiffusionGuidance(BaseModule):
             "sds": loss,
             "grad_norm": grad.norm(),
         }
-
-    def encode_images(
-        self, imgs: Float[Tensor, "B 3 512 512"]
-    ) -> Float[Tensor, "B 4 64 64"]:
-        imgs = 2 * imgs - 1
-        posterior = self.vae.encode(imgs).latent_dist
-        latents = posterior.sample() * self.vae.config.scaling_factor
-        return latents
-
-    def decode_latents(
-        self, latents: Float[Tensor, "B 4 H W"]
-    ) -> Float[Tensor, "B 3 512 512"]:
-        latents = F.interpolate(latents, (64, 64), mode="bilinear", align_corners=False)
-        latents = 1 / self.vae.config.scaling_factor * latents
-        image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clamp(0, 1)
-        return image
-
-    def update_step(self, epoch: int, global_step: int):
-        # clip grad for stable training as demonstrated in
-        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
-        # http://arxiv.org/abs/2303.15413
-        if self.cfg.grad_clip is not None:
-            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
-
-
-@threestudio.register("sjc-guidance")
-class ScoreJacobianGuidance(BaseModule):
-    @dataclass
-    class Config(BaseModule.Config):
-        pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
-        use_xformers: bool = False
-        guidance_scale: float = 100.0
-        grad_clip: Optional[float] = None
-        half_precision_weights: bool = True
-        var_red: bool = True
-        min_step_percent: float = 0.01
-        max_step_percent: float = 0.97
-
-        token_merging: bool = False
-        token_merging_params: Optional[dict] = field(default_factory=dict)
-
-    cfg: Config
-
-    def configure(self) -> None:
-        print(f"[INFO] loading stable diffusion...")
-
-        weights_dtype = (
-            torch.float16 if self.cfg.half_precision_weights else torch.float32
-        )
-        # Create model
-        self.vae = AutoencoderKL.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="vae",
-            torch_dtype=weights_dtype,
-        ).to(self.device)
-        self.unet = UNet2DConditionModel.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="unet",
-            torch_dtype=weights_dtype,
-        ).to(self.device)
-
-        for p in self.vae.parameters():
-            p.requires_grad_(False)
-        for p in self.unet.parameters():
-            p.requires_grad_(False)
-
-        if self.cfg.use_xformers and is_xformers_available():
-            self.unet.enable_xformers_memory_efficient_attention()
-
-        if self.cfg.token_merging:
-            import tomesd
-
-            tomesd.apply_patch(self.unet, **self.cfg.token_merging_params)
-
-        self.scheduler = DDPMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="scheduler",
-            torch_dtype=weights_dtype,
-            beta_start=0.00085,
-            beta_end=0.0120,
-            beta_schedule="scaled_linear",
-        )
-
-        self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
-
-        self.grad_clip_val: Optional[float] = None
-
-        self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
-            self.device
-        )
-        self.us: Float[Tensor, "..."] = torch.sqrt((1 - self.alphas) / self.alphas)
-        print(f"[INFO] loaded stable diffusion!")
-
-    def forward(
-        self,
-        rgb: Float[Tensor, "B H W C"],
-        text_embeddings: Float[Tensor, "BB 77 768"],
-        rgb_as_latents=False,
-    ):
-        rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 64 64"]
-        if rgb_as_latents:
-            latents = F.interpolate(
-                rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
-            )
-        else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-            )
-            # encode image into latents with vae
-            latents = self.encode_images(rgb_BCHW_512)
-
-        # timestep ~ U(0.01, 0.97) to avoid very high/low noise level
-        t = torch.randint(
-            self.min_step, self.max_step + 1, [1], dtype=torch.long, device=self.device
-        )
-
-        sigma = self.us[t]
-
-        # predict the noise residual with unet, NO grad!
-        with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
-            y = latents
-
-            zs = y + sigma * noise
-            scaled_zs = zs / torch.sqrt(1 + sigma**2)
-
-            # pred noise
-            latent_model_input = torch.cat([scaled_zs] * 2, dim=0)
-            noise_pred = self.unet(
-                latent_model_input, t, encoder_hidden_states=text_embeddings
-            ).sample
-
-            # perform guidance (high scale from paper!)
-            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-            noise_pred = noise_pred_text + self.cfg.guidance_scale * (
-                noise_pred_text - noise_pred_uncond
-            )
-
-            Ds = zs - sigma * noise_pred
-
-            if self.cfg.var_red:
-                grad = -(Ds - y) / sigma
-            else:
-                grad = -(Ds - zs) / sigma
-
-        grad = torch.nan_to_num(grad)
-        if self.grad_clip_val is not None:
-            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
-
-        # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)
-        # latents.backward(grad, retain_graph=True)
-
-        return {
-            "sds": loss,
-        }
-
-    def encode_images(
-        self, imgs: Float[Tensor, "B 3 512 512"]
-    ) -> Float[Tensor, "B 4 64 64"]:
-        imgs = 2 * imgs - 1
-        posterior = self.vae.encode(imgs).latent_dist
-        latents = posterior.sample() * self.vae.config.scaling_factor
-        return latents
-
-    def decode_latents(
-        self, latents: Float[Tensor, "B 4 H W"]
-    ) -> Float[Tensor, "B 3 512 512"]:
-        latents = F.interpolate(latents, (64, 64), mode="bilinear", align_corners=False)
-        latents = 1 / self.vae.config.scaling_factor * latents
-        image = self.vae.decode(latents).sample
-        image = (image / 2 + 0.5).clamp(0, 1)
-        return image
-
+        
     def update_step(self, epoch: int, global_step: int):
         # clip grad for stable training as demonstrated in
         # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
@@ -426,7 +372,10 @@ class DeepFloydGuidance(BaseModule):
         pretrained_model_name_or_path: str = "DeepFloyd/IF-I-XL-v1.0"
         # FIXME: xformers error
         use_xformers: bool = False
-        guidance_scale: float = 100.0
+        enable_sequential_cpu_offload: bool = False
+        enable_attention_slicing: bool = False
+        enable_channels_last_format: bool = True
+        guidance_scale: float = 20.0
         grad_clip: Optional[
             Any
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
@@ -441,7 +390,10 @@ class DeepFloydGuidance(BaseModule):
 
     def configure(self) -> None:
         print(f"[INFO] loading deep floyd ...")
-        assert self.cfg.half_precision_weights
+
+        self.weights_dtype = (
+            torch.float16 if self.cfg.half_precision_weights else torch.float32
+        )
 
         # Create model
         # FIXME: device map behavior
@@ -450,17 +402,37 @@ class DeepFloydGuidance(BaseModule):
             text_encoder=None,
             safety_checker=None,
             watermarker=None,
-            variant="fp16",
-            torch_dtype=torch.float16,
+            feature_extractor=None,
+            requires_safety_checker=False,
+            variant="fp16" if self.cfg.half_precision_weights else None,
+            torch_dtype=self.weights_dtype,
             device_map="auto",
         )
+
+        if self.cfg.use_xformers and is_xformers_available():
+            if parse_version(torch.__version__) >= parse_version("2"):
+                threestudio.info(
+                    "PyTorch2.0 uses memory efficient attention by default, xformers is not needed."
+                )
+            elif not is_xformers_available():
+                threestudio.warn("xformers is not available, not enabled.")
+            else:
+                # may raise error, see https://github.com/deep-floyd/IF/issues/52 to track this problem
+                self.pipe.enable_xformers_memory_efficient_attention()
+
+        if self.cfg.enable_sequential_cpu_offload:
+            self.pipe.enable_sequential_cpu_offload()
+
+        if self.cfg.enable_attention_slicing:
+            self.pipe.enable_attention_slicing(1)
+
+        if self.cfg.enable_channels_last_format:
+            self.pipe.unet.to(memory_format=torch.channels_last)
+
         self.unet = self.pipe.unet
 
         for p in self.unet.parameters():
             p.requires_grad_(False)
-
-        if self.cfg.use_xformers and is_xformers_available():
-            self.unet.enable_xformers_memory_efficient_attention()
 
         self.scheduler = self.pipe.scheduler
 
@@ -475,6 +447,20 @@ class DeepFloydGuidance(BaseModule):
         self.grad_clip_val: Optional[float] = None
 
         print(f"[INFO] loaded deep floyd!")
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def forward_unet(
+        self,
+        latents: Float[Tensor, "..."],
+        t: Float[Tensor, "..."],
+        encoder_hidden_states: Float[Tensor, "..."],
+    ) -> Float[Tensor, "..."]:
+        input_dtype = latents.dtype
+        return self.unet(
+            latents.to(self.weights_dtype),
+            t.to(self.weights_dtype),
+            encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
+        ).sample.to(input_dtype)
 
     def forward(
         self,
@@ -508,11 +494,11 @@ class DeepFloydGuidance(BaseModule):
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
-            noise_pred = self.unet(
+            noise_pred = self.forward_unet(
                 latent_model_input,
                 torch.cat([t] * 2),
                 encoder_hidden_states=text_embeddings,
-            ).sample  # (B, 6, 64, 64)
+            )  # (B, 6, 64, 64)
 
         # perform guidance (high scale from paper!)
         noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
@@ -535,7 +521,7 @@ class DeepFloydGuidance(BaseModule):
         if self.cfg.weighting_strategy == "sds":
             # w(t), sigma_t^2
             w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
-        elif self.cfg.weighting_strategy == "sjc":
+        elif self.cfg.weighting_strategy == "uniform":
             w = 1
         elif self.cfg.weighting_strategy == "fantasia3d":
             w = (self.alphas[t] ** 0.5 * (1 - self.alphas[t])).view(-1, 1, 1, 1)
