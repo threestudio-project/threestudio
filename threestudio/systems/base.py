@@ -11,6 +11,7 @@ from threestudio.utils.saving import SaverMixin
 from threestudio.utils.typing import *
 
 
+
 class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     @dataclass
     class Config:
