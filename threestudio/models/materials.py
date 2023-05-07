@@ -236,6 +236,7 @@ class StableDiffusionLatentAdapterMaterial(BaseMaterial):
         self, features: Float[Tensor, "B ... 4"], **kwargs
     ) -> Float[Tensor, "B ... 3"]:
         assert features.shape[-1] == 4
-        color = torch.tanh(features) @ self.adapter
+        color = features @ self.adapter
+        color = (color + 1) / 2
         color = color.clamp(0.0, 1.0)
         return color
