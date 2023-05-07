@@ -9,6 +9,7 @@ from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
+
 @threestudio.register("fantasia3d-system")
 class Fantasia3D(BaseSystem):
     @dataclass

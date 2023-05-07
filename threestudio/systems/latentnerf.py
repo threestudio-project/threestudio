@@ -8,6 +8,7 @@ from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
+
 @threestudio.register("latentnerf-system")
 class LatentNeRF(BaseSystem):
     @dataclass
