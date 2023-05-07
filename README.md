@@ -44,6 +44,8 @@ pip install -r requirements.txt
 
 Here we show some basic usage of threestudio. First let's train a DreamFusion model to create a classic pancake bunny.
 
+**IMPORTANT NOTE: Multi-GPU training is not fully tested and can be erroneous at the moment.**
+
 ```sh
 # if you have agreed the license of DeepFloyd IF and have >20GB VRAM
 # please try this configuration for higher quality
