@@ -61,32 +61,32 @@
 
 Common configurations:
 
-| name                          | type                | description |
-| ----------------------------- | ------------------- | ----------- |
-| loss                          | dict                |             |
-| optimizer                     | dict                |             |
-| scheduler                     | Optional[dict]      |             |
-| weights                       | Optional[str]       |             |
-| weights_ignore_modules        | Optional[List[str]] |             |
-| cleanup_after_validation_step | bool                |             |
-| cleanup_after_validation_step | bool                |             |
+| name                          | type                | description                                                                                                                  |
+| ----------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| loss                          | dict                | Dict that contains loss-related configurations. Default: {}                                                                  |
+| optimizer                     | dict                | Optimizer configurations. Default: {}                                                                                        |
+| scheduler                     | Optional[dict]      | Learning rate scheduler configurations. If None, does not use a scheduler. Default: None                                     |
+| weights                       | Optional[str]       | Path to the weights to be loaded. This is different from `resume` in that this does not resume training state. Default: None |
+| weights_ignore_modules        | Optional[List[str]] | List of modules that should be ignored when loading weights. Default: None                                                   |
+| cleanup_after_validation_step | bool                | Whether to empty cache after each validation step. This will slow down validation. Default: False                            |
+| cleanup_after_test_step       | bool                | Whether to empty cache after each test step. This will slow down testing. Default: False                                     |
 
 ### dreamfusion-system
 
-| name                  | type | description |
-| --------------------- | ---- | ----------- |
-| geometry_type         | str  |             |
-| geometry              | dict |             |
-| material_type         | str  |             |
-| matrial               | dict |             |
-| background_type       | str  |             |
-| background            | dict |             |
-| renderer_type         | str  |             |
-| renderer              | dict |             |
-| guidance_type         | str  |             |
-| guidance              | dict |             |
-| prompt_processor_type | str  |             |
-| prompt_processor      | dict |             |
+| name                  | type | description                                                                               |
+| --------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| geometry_type         | str  | Type of the geometry used in the system. See []() for supported geometry.                 |
+| geometry              | dict | Configurations of the geometry.                                                           |
+| material_type         | str  | Type of the material used in the system. See []() for supported material.                 |
+| matrial               | dict | Configurations of the material.                                                           |
+| background_type       | str  | Type of the background used in the system. See []() for supported background.             |
+| background            | dict | Configurations of the background.                                                         |
+| renderer_type         | str  | Type of the renderer used in the system. See []() for supported renderer.                 |
+| renderer              | dict | Configurations of the renderer.                                                           |
+| guidance_type         | str  | Type of the guidance used in the system. See []() for supported guidance.                 |
+| guidance              | dict | Configurations of the guidance.                                                           |
+| prompt_processor_type | str  | Type of the prompt processor used in the system. See []() for supported prompt processor. |
+| prompt_processor      | dict | Configurations of the prompt processor.                                                   |
 
 ### magic3d-system
 
@@ -102,18 +102,46 @@ Common configurations:
 
 Common configurations for implicit geometry:
 
-| name | type | description |
-| ---- | ---- | ----------- |
+| name                       | type             | description                                                                                                                                                                                      |
+| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| radius                     | float            | Half side length of the scene bounding box. Default: 1.0                                                                                                                                         |
+| isosurface                 | bool             | Whether to enable surface extraction. Default: True                                                                                                                                              |
+| isosusrface_method         | str              | Method for surface extraction, in ["mc", "mt"]. "mc" uses the marching cubes algorithm, not differentiable; "mt" uses the marching tetrahedra algorithm, differentiable. Default: "mt"           |
+| isosurface_resolution      | int              | Grid resolution for surface extraction. Default: 128                                                                                                                                             |
+| isosurface_threshold       | Union[float,str] | The threshold value to determine the surface location of the implicit field, in [float, "auto"]. If "auto", use the mean value of the field as the threshold. Default: 0                         |
+| isosurface_chunk           | int              | Chunk size when computing the field value on grid vertices, used to prevent OOM. If 0, does not use chunking. Default: 0                                                                         |
+| isosurface_coarse_to_fine  | bool             | Whether to extract the surface in a coarse-to-fine manner. If True, will first extract a coarse surface to get a tight bounding box, which is then used to extract a fine surface. Default: True |
+| isosurface_deformable_grid | bool             | Whether to optimize positions of grid vertices for surface extraction. Only support `isosurface_method=mt`. Default: False                                                                       |
 
 ### implicit-volume
 
-| name | type | description |
-| ---- | ---- | ----------- |
+| name                         | type             | description                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| n_input_dims                 | int              | Number of input dimensions. Default: 3 (xyz)                                                                                                                                                                                                                                                                                    |
+| n_feature_dims               | int              | Number of dimensions for the output features. Note that this should be aligned with the material used. Default: 3 (albedo)                                                                                                                                                                                                      |
+| density_activation           | str              | Density activation function. See `get_activation` in `utils/ops.py` for all supported activation functions. Default: "softplus"                                                                                                                                                                                                 |
+| density_bias                 | Union[float,str] | Offset value to be added to the pre-activated density, in [float, "blob_dreamfusion", "blob_magic3d"]. If "blob_dreamfusion", uses the blob density bias proposed in DreamFusion; if "blob_magic3d", uses the blob density bias proposed in Magic3D. Default: "blob_magic3d"                                                    |
+| density_blob_scale           | float            | Controls the magnitude of the blob density if `density_bias` in ["blob_dreamfusion", "blob_magic3d"]. Default: 10                                                                                                                                                                                                               |
+| density_blob_std             | float            | Controls the divergence of the blob density if `density_bias` in ["blob_dreamfusion", "blob_magic3d"]. Default: 0.5                                                                                                                                                                                                             |
+| pos_encoding_config          | dict             | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                                                                                                              |
+| mlp_network_config           | dict             | Configurations for the MLP head for geometry attribute prediction (density, feature ...). See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                                                                                                 |
+| normal_type                  | str              | How the normal is computed, in ["analytic", "finite_difference", "pred"]. If "analytic", uses PyTorch auto-differentiation to compute the analytic normal; if "finite_difference", uses finite difference to compute the approximate normal; if "pred", uses an MLP network to predict the normal. Default: "finite_difference" |
+| finite_difference_normal_eps | float            | The small epsilon value in finite difference to estimate the normal, used when `normal_type="finite_difference"`. Default: 0.01                                                                                                                                                                                                 |
+| isosurface_threshold         | Union[float,str] | Inherit from common configurations, but default to "auto". Default: "auto"                                                                                                                                                                                                                                                      |
 
 ### implicit-sdf
 
-| name | type | description |
-| ---- | ---- | ----------- |
+| name                         | type          | description                                                                                                                                                                                                                        |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| n_input_dims                 | int           | Number of input dimensions. Default: 3 (xyz)                                                                                                                                                                                       |
+| n_feature_dims               | int           | Number of dimensions for the output features. Note that this should be aligned with the material used. Default: 3 (albedo)                                                                                                         |
+| pos_encoding_config          | dict          | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                 |
+| mlp_network_config           | dict          | Configurations for the MLP head for geometry attribute prediction (sdf, feature ...). See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                        |
+| normal_type                  | str           | How the normal is computed, in ["finite_difference", "pred"]. If "finite_difference", uses finite difference to compute the approximate normal; if "pred", uses an MLP network to predict the normal. Default: "finite_difference" |
+| finite_difference_normal_eps | float         | The small epsilon value in finite difference to estimate the normal, used when `normal_type="finite_difference"`. Default: 0.01                                                                                                    |
+| shape_init                   | Optional[str] | The shape to initializa the SDF as, in [None, "sphere", "ellipsoid"]. If None, does not initialize; if "sphere", initialized as a sphere; if "ellipsoid", initialized as an ellipsoid. Default: None                               |
+| shape_init_params            | Optional[Any] | Parameters to specify the SDF initialization. If `shape_init="sphere"`, a float is used for the sphere radius; if `shape_init="ellipsoid"`, a tuple of three floats is used for the radius along x/y/z axis. Default: None         |
+| force_shape_init             | bool          | Whether to force initialization of the SDf even if weights are provided. Default:False                                                                                                                                             |
 
 ### volume-grid
 An explicit geometry parameterized with a feature volume. The feature volume has a shape of `(n_feature_dims + 1) x grid_size`, one channel for density and the rest for material. The density is first scaled, then biased and finally activated.
@@ -135,8 +163,17 @@ Common configurations for explicit geometry:
 
 ### tetrahedra-sdf-grid
 
-| name | type | description |
-| ---- | ---- | ----------- |
+| name                       | type          | description                                                                                                                                                                                                                |
+| -------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| isosurface_resolution      | int           | Tetrahedra grid resolution for surface extraction. Default: 128                                                                                                                                                            |
+| isosurface_deformable_grid | bool          | Whether to optimize positions of tetrahedra grid vertices for surface extraction. Default: True                                                                                                                            |
+| pos_encoding_config        | dict          | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                         |
+| mlp_network_config         | dict          | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                              |
+| shape_init                 | Optional[str] | The shape to initializa the SDF as, in [None, "sphere", "ellipsoid"]. If None, does not initialize; if "sphere", initialized as a sphere; if "ellipsoid", initialized as an ellipsoid. Default: None                       |
+| shape_init_params          | Optional[Any] | Parameters to specify the SDF initialization. If `shape_init="sphere"`, a float is used for the sphere radius; if `shape_init="ellipsoid"`, a tuple of three floats is used for the radius along x/y/z axis. Default: None |
+| force_shape_init           | bool          | Whether to force initialization of the SDf even if weights are provided. Default:False                                                                                                                                     |
+| geometry_only              | bool          | Whether to only model the SDF. If True, the feature prediction is ommited. Default:False                                                                                                                                   |
+| fix_geometry               | bool          | Whether to optimize the geometry. If True, the SDF (and grid vertices if `isosurface_deformable_grid=True`) is fixed. Default: False                                                                                       |
 
 ## Material
 
