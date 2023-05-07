@@ -115,17 +115,49 @@ Common configurations for explicit geometry:
 
 ## Material
 
+The material should output colors or color latents conditioned on the sampled positions, view directions, and sometimes light directions and normals.
+
 ### neural-radiance-material
+
+A material with view dependent effects, parameterized with a network(MLP), similar with that in NeRF.
+
+| name | type | description |
+| ---- | ---- | ----------- |
+| input_feature_dims | int | The dimensions of the input feature. Default: 8 |
+| color_activation | str | The activation mapping the network output to the color. Default: "sigmoid" |
+| dir_encoding_config | dict | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3} |
+| mlp_network_config | dict | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
 
 ### no-material
 
+A material without view dependet effects, just map features to colors.
+
+| name | type | description |
+| ---- | ---- | ----------- |
+| n_output_dims | int | The dimensions of the material color, e.g. 3 for RGB and 4 for latent. Default: 3 |
+| color_activation | str | The activation mapping the network output or the feature to the color. Default: "sigmoid" |
+| mlp_network_config | Optional[dict] | The config of the MLP network. Set to `None` to directly map the input feature to the color with `color_activation`, otherwise the feature first goes through an MLP. Default: None |
+| input_feature_dims | Optional[int] | The dimensions of the input feature. Required when use an MLP. Default: None |
+
 ### diffuse-with-point-light-material
 
+| name | type | description |
+| ---- | ---- | ----------- |
+
 ### sd-latent-adapter-material
+
+| name | type | description |
+| ---- | ---- | ----------- |
 
 ## Background
 
 The background should output colors or color latents conditioned on the ray directions.
+
+**Common configurations for background**
+
+| name | type | description |
+| ---- | ---- | ----------- |
+| n_output_dims | int | The dimension of the background color, e.g. 3 for RGB and 4 for latent. Default: 3 |
 
 ### solid-color-background
 
@@ -133,7 +165,6 @@ A background with a solid color.
 
 | name | type | description |
 | ---- | ---- | ----------- |
-| n_output_dims | int | The color dimension of the background,e.g. 3 for RGB and 4 for latent. Default: 3 |
 | color| tuple| The initialized color of the background with each value in [0,1], should match `n_output_dims`. Default: (1.0, 1.0, 1.0) |
 | learned | bool | Whether to optimize the background. Default: True |
 
@@ -143,10 +174,9 @@ A background with colors parameterized with a texture map.
 
 | name | type | description |
 | ---- | ---- | ----------- |
-| n_output_dims | int | The color dimension of the background,e.g. 3 for RGB and 4 for latent. Default: 3 |
 | height | int | The height of the texture map. Default: 64 |
 | width | int | The width of the texture map. Default: 64 |
-| color_activation | str | The activation applied on the texture map. Default: "sigmoid" |
+| color_activation | str | The activation mapping the texture feature to the color. Default: "sigmoid" |
 
 ### neural-environment-map-background
 
@@ -154,8 +184,7 @@ A background parameterized with a neural network (MLP).
 
 | name | type | description |
 | ---- | ---- | ----------- |
-| n_output_dims | int | The color dimension of the background,e.g. 3 for RGB and 4 for latent. Default: 3 |
-| color_activation | str | The activation applied on the network output. Default: "sigmoid" |
+| color_activation | str | The activation mapping the network output to the color. Default: "sigmoid" |
 | dir_encoding_config | dict | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3} |
 | mlp_network_config | dict | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
 | random_aug | bool | Whether to use random color augmentation. May be able to improve the correctness of the model. Default: False |
@@ -169,9 +198,37 @@ A background parameterized with a neural network (MLP).
 
 ## Guidance
 
+Given an image or its latent input, the guide should provide its gradient conditioned on a text input so that the image can be optimized with gradient descent to better match the text.
+
+**Common configurations for guidance**
+
+| name | type | description |
+| ---- | ---- | ----------- |
+| enable_memory_efficient_attention | bool | Whether to enable memory efficient attention in xformers. This will lead to lower GPU memory usage and a potential speed up at inference. Speed up at training time is not guaranteed. Default: false |
+| enable_sequential_cpu_offload | bool | Whether to offload all models to CPU. This will use `accelerate`, significantly reducing memory usage but slower. Default: False |
+| enable_attention_slicing | bool | Whether to use sliced attention computation. This will save some memory in exchange for a small speed decrease. Default: False |
+| enable_channels_last_format | bool | Whether to use Channels Last format for the unet. Default: False (Stable Diffusion) / True (DeepFloyd) |
+| pretrained_model_name_or_path | str | The pretrained model path in huggingface. Default: runwayml/stable-diffusion-v1-5 (Stable Diffusion) / DeepFloyd/IF-I-XL-v1.0 (DeepFloyd) |
+| guidance_scale | float | Classifier free guidance. Default: 100.0 (Stable Diffusion) / 20.0 (DeepFloyd) |
+| grad_clip | Optional[Any] | The gradient clip value. None or float or a list in the form of [start_step, start_value, end_value, end_step]. Default: None |
+| half_precision_weights | bool | Whether to use float16 for the diffusion model. Default: True |
+| min_step_percent | float | The precent range (min value) of the random timesteps to add noise and denoise. Default: 0.02 |
+| max_step_percent | float | The precent range (max value) of the random timesteps to add noise and denoise. Default: 0.98 |
+| weighting_strategy | str | The choice of w(t) of the sds loss. Default: "sds" |
+
+For the first three options, you can check more details in  [pipe_stable_diffusion.py](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py) and [pipeline_if.py](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/deepfloyd_if/pipeline_if.py) in diffusers.
+
 ### stable-diffusion-guidance
+| name | type | description |
+| ---- | ---- | ----------- |
+| use_sjc | bool | Whether to use score jacobian chaining (SJC) instead of SDS. Default: False |
+| var_red | bool | Whether to use Eq. 16 in [SJC paper](https://arxiv.org/pdf/2212.00774.pdf). Default: True |
+| token_merging | bool | Whether to use token merging. This will speed up the unet forward and slightly affect the performance. Default: False |
+| token_merging_params | Optional[dict] | The config for token merging. Default: {} |
 
 ### deep-floyd-guidance
+
+No specific configuration.
 
 ## Prompt Processor
 
