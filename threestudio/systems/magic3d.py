@@ -161,7 +161,7 @@ class Magic3D(BaseSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.global_step}-{batch_idx}.png",
+            f"it{self.true_global_step}-{batch_idx}.png",
             [
                 {
                     "type": "rgb",
@@ -195,7 +195,7 @@ class Magic3D(BaseSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.global_step}-test/{batch_idx}.png",
+            f"it{self.true_global_step}-test/{batch_idx}.png",
             [
                 {
                     "type": "rgb",
@@ -225,8 +225,8 @@ class Magic3D(BaseSystem):
 
     def on_test_epoch_end(self):
         self.save_img_sequence(
-            f"it{self.global_step}-test",
-            f"it{self.global_step}-test",
+            f"it{self.true_global_step}-test",
+            f"it{self.true_global_step}-test",
             "(\d+)\.png",
             save_format="mp4",
             fps=30,

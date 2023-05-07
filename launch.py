@@ -67,6 +67,7 @@ def main() -> None:
     n_gpus = len(args.gpu.split(","))
 
     import pytorch_lightning as pl
+    import torch
     from pytorch_lightning import Trainer
     from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
@@ -133,12 +134,20 @@ def main() -> None:
         callbacks=callbacks, logger=loggers, inference_mode=False, **cfg.trainer
     )
 
+    def set_system_status(system, ckpt_path):
+        ckpt = torch.load(ckpt_path, map_location="cpu")
+        system.set_resume_status(ckpt["epoch"], ckpt["global_step"])
+
     if args.train:
         trainer.fit(system, datamodule=dm, ckpt_path=cfg.resume)
         trainer.test(system, datamodule=dm)
     elif args.validate:
+        # manually set epoch and global_step as they cannot be automatically resumed
+        set_system_status(system, cfg.resume)
         trainer.validate(system, datamodule=dm, ckpt_path=cfg.resume)
     elif args.test:
+        # manually set epoch and global_step as they cannot be automatically resumed
+        set_system_status(system, cfg.resume)
         trainer.test(system, datamodule=dm, ckpt_path=cfg.resume)
 
 

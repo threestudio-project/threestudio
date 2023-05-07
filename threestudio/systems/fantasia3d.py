@@ -73,7 +73,7 @@ class Fantasia3D(BaseSystem):
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
 
-        if self.global_step < self.cfg.latent_steps:
+        if self.true_global_step < self.cfg.latent_steps:
             guidance_inp = torch.cat(
                 [out["comp_normal"] * 2.0 - 1.0, out["opacity"]], dim=-1
             )
@@ -98,7 +98,7 @@ class Fantasia3D(BaseSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.global_step}-{batch_idx}.png",
+            f"it{self.true_global_step}-{batch_idx}.png",
             [
                 {
                     "type": "grayscale",
@@ -119,7 +119,7 @@ class Fantasia3D(BaseSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.global_step}-test/{batch_idx}.png",
+            f"it{self.true_global_step}-test/{batch_idx}.png",
             [
                 {
                     "type": "grayscale",
@@ -136,8 +136,8 @@ class Fantasia3D(BaseSystem):
 
     def on_test_epoch_end(self):
         self.save_img_sequence(
-            f"it{self.global_step}-test",
-            f"it{self.global_step}-test",
+            f"it{self.true_global_step}-test",
+            f"it{self.true_global_step}-test",
             "(\d+)\.png",
             save_format="mp4",
             fps=30,

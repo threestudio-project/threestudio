@@ -280,8 +280,7 @@ Here we just briefly introduce the code structure of this project. We will make 
 
 ## Known Problems
 
-- Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
-- Gradients of Vanilla MLP parameters are empty if autocast is enabled in AMP (temporarily fixed by disabling autocast).
+- Gradients of Vanilla MLP parameters are empty in AMP (temporarily fixed by disabling autocast).
 - FullyFused MLP may cause NaNs in 32 precision.
 
 ## Citing threestudio

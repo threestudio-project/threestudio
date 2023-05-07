@@ -27,6 +27,8 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         super().__init__()
         self.cfg = parse_structured(self.Config, cfg)
         self._save_dir: Optional[str] = None
+        self._resume_eval: bool = False
+        self._resume_eval_status: dict = {"global_step": 0, "current_epoch": 0}
         self.configure()
         if self.cfg.weights is not None:
             state_dict, epoch, global_step = load_module_weights(
@@ -40,6 +42,25 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
             )  # restore states
         self.post_configure()
 
+    def set_resume_status(self, current_epoch: int, global_step: int):
+        self._resume_eval = True
+        self._resume_eval_status["current_epoch"] = current_epoch
+        self._resume_eval_status["global_step"] = global_step
+
+    @property
+    def true_global_step(self):
+        if self._resume_eval:
+            return self._resume_eval_status["global_step"]
+        else:
+            return self.global_step
+
+    @property
+    def true_current_epoch(self):
+        if self._resume_eval:
+            return self._resume_eval_status["current_epoch"]
+        else:
+            return self.current_epoch
+
     def configure(self) -> None:
         pass
 
@@ -50,7 +71,7 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         pass
 
     def C(self, value: Any) -> float:
-        return C(value, self.current_epoch, self.global_step)
+        return C(value, self.true_current_epoch, self.true_global_step)
 
     def configure_optimizers(self):
         optim = parse_optimizer(self.cfg.optimizer, self)
@@ -107,15 +128,15 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
 
     def on_train_batch_start(self, batch, batch_idx, unused=0):
         self.preprocess_data(batch, "train")
-        self.do_update_step(self.current_epoch, self.global_step)
+        self.do_update_step(self.true_current_epoch, self.true_global_step)
 
     def on_validation_batch_start(self, batch, batch_idx, dataloader_idx=0):
         self.preprocess_data(batch, "validation")
-        self.do_update_step(self.current_epoch, self.global_step)
+        self.do_update_step(self.true_current_epoch, self.true_global_step)
 
     def on_test_batch_start(self, batch, batch_idx, dataloader_idx=0):
         self.preprocess_data(batch, "test")
-        self.do_update_step(self.current_epoch, self.global_step)
+        self.do_update_step(self.true_current_epoch, self.true_global_step)
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         pass
