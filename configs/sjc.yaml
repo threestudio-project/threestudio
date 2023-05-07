@@ -56,7 +56,7 @@ system:
   loss:
     lambda_sds: 1.
     center_ratio: 0.78125 # 50/64
-    lambda_depth: 0 # or 100
+    lambda_depth: 0 # or 10
     lambda_emptiness: [5000, 1.e+4, 2.e+5, 5001]
     emptiness_scale: 10
 
