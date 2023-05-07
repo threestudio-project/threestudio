@@ -25,7 +25,7 @@ class LatentNeRF(BaseSystem):
         prompt_processor_type: str = "dreamfusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
 
-        guide_shape: Optional[str]
+        guide_shape: Optional[str] = None
         refinement: bool = False
 
     cfg: Config
@@ -120,8 +120,8 @@ class LatentNeRF(BaseSystem):
         self.log("train/loss_opaque", loss_opaque)
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
 
-        if self.C(self.cfg.loss.lambda_shape) > 0 and out["positions"].shape[0] > 0:
-            loss_shape = self.shapeloss(out["positions"], out["density"])
+        if self.C(self.cfg.loss.lambda_shape) > 0 and out["points"].shape[0] > 0:
+            loss_shape = self.shapeloss(out["points"], out["density"])
             self.log("train/loss_shape", loss_shape)
             loss += loss_shape * self.C(self.cfg.loss.lambda_shape)
 

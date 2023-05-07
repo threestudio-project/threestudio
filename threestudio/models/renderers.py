@@ -250,7 +250,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                     "t_intervals": t_intervals,
                     "t_dirs": t_dirs,
                     "ray_indices": ray_indices,
-                    "positions": positions,
+                    "points": positions,
                     **geo_out,
                 }
             )
