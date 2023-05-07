@@ -15,13 +15,13 @@ class ScoreJacobianChaining(BaseSystem):
     class Config(BaseSystem.Config):
         geometry_type: str = "volume-grid"
         geometry: dict = field(default_factory=dict)
-        material_type: str = "diffuse-with-point-light-material"
+        material_type: str = "no-material"
         material: dict = field(default_factory=dict)
-        background_type: str = "neural-environment-map-background"
+        background_type: str = "textured-background"
         background: dict = field(default_factory=dict)
         renderer_type: str = "nerf-volume-renderer"
         renderer: dict = field(default_factory=dict)
-        guidance_type: str = "sjc-guidance"
+        guidance_type: str = "stable-diffusion-guidance"
         guidance: dict = field(default_factory=dict)
         prompt_processor_type: str = "dreamfusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
