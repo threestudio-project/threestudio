@@ -4,7 +4,7 @@ import torch
 
 import threestudio
 from threestudio.systems.base import BaseSystem
-from threestudio.utils.ops import binary_cross_entropy, dot
+from threestudio.utils.ops import binary_cross_entropy, dot, ShapeLoss
 from threestudio.utils.typing import *
 
 
@@ -43,6 +43,9 @@ class LatentNeRF(BaseSystem):
             background=self.background,
         )
         self.guidance = None
+        self.guide_shape = self.cfg.guide_shape
+        if self.guide_shape is not None:
+            self.shapeloss = ShapeLoss(self.guide_shape)
 
     def setup_guidance(self):
         if self.guidance is None:
@@ -116,6 +119,11 @@ class LatentNeRF(BaseSystem):
         loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
         self.log("train/loss_opaque", loss_opaque)
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+
+        if self.C(self.cfg.loss.lambda_shape) > 0 and out["positions"].shape[0] > 0:
+            loss_shape = self.shapeloss(out["positions"], out["density"])
+            self.log("train/loss_shape", loss_shape)
+            loss += loss_shape * self.C(self.cfg.loss.lambda_shape)
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))

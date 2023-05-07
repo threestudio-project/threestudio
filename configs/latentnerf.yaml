@@ -21,12 +21,12 @@ system:
   material_type: "no-material"
   material:
     n_output_dims: 4
-    color_activation: tanh
+    color_activation: none
 
   background_type: "neural-environment-map-background"
   background:
     n_output_dims: 4
-    color_activation: tanh
+    color_activation: none
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -41,9 +41,11 @@ system:
     half_precision_weights: true
     guidance_scale: 100.
 
+  guide_shape: ./load/shapes/teddy.obj
   loss:
     lambda_sds: 1.
     lambda_sparsity: 0.0
+    lambda_shape: 1.
     lambda_opaque: 0.0
     lambda_orient: 0.0
   optimizer:
