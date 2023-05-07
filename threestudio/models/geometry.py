@@ -220,7 +220,6 @@ class ImplicitVolume(BaseImplicitGeometry):
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
         finite_difference_normal_eps: float = 0.01
-        detach_blob_points: bool = False
 
         isosurface_threshold: Union[
             float, str
@@ -249,8 +248,6 @@ class ImplicitVolume(BaseImplicitGeometry):
     def get_activated_density(
         self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]
     ) -> Tuple[Float[Tensor, "*N 1"], Float[Tensor, "*N 1"]]:
-        if self.cfg.detach_blob_points:
-            points = points.detach()
         density_bias: Union[float, Float[Tensor, "*N 1"]]
         if self.cfg.density_bias == "blob_dreamfusion":
             # pre-activation density bias
@@ -404,6 +401,7 @@ class ImplicitSDF(BaseImplicitGeometry):
         normal_type: Optional[
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
+        finite_difference_normal_eps: float = 0.01
         shape_init: Optional[str] = None
         shape_init_params: Optional[Any] = None
         force_shape_init: bool = False
@@ -499,7 +497,7 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":
-                eps = 1.0e-3
+                eps = self.cfg.finite_difference_normal_eps
                 offsets: Float[Tensor, "6 3"] = torch.as_tensor(
                     [
                         [eps, 0.0, 0.0],
