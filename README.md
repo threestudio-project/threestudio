@@ -2,6 +2,10 @@
 
 threestudio is a unified framework for 3D content creation from text prompts, single images, and few-shot images, by lifting 2D text-to-image generation models.
 
+![mix](https://user-images.githubusercontent.com/19284678/236705385-7114e755-a05a-45a8-b5da-2a4525ecc231.gif)
+
+👆 Results obtained from methods implemented by threestudio: **| DreamFusion | Magic3D | SJC | Latent-NeRF | Fantasia3D |**
+
 ## Installation
 
 The following steps have been tested on Ubuntu20.04.
