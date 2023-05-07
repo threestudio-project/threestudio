@@ -72,6 +72,10 @@ See [here](https://github.com/bennyguo/threestudio#supported-models) for example
 
 ### DreamFusion
 
+**Results obtained by threestudio (DeepFloyd IF)**
+
+https://user-images.githubusercontent.com/19284678/236694848-38ae4ea4-554b-4c9d-b4c7-fba5bee3acb3.mp4
+
 **Notable differences from the paper**
 
 - We use open-source T2I models (StableDiffusion, DeepFloyd IF), while the paper uses Imagen.
@@ -100,6 +104,11 @@ python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.pro
 - DeepFloyd IF uses T5-XXL as its text encoder, which consumes ~15GB VRAM even when using 8-bit quantization. This is currently the bottleneck for training with less VRAM. If anyone knows how to run the text encoder with less VRAM, please file an issue. We're also trying to push the text encoder to [Replicate](https://replicate.com/) to enable extracting text embeddings via API, but are having some network connection issues. Please [contact bennyguo](mailto:imbennyguo@gmail.com) if you would like to help out.
 
 ### Magic3D
+
+**Results obtained by threestudio (DeepFloyd IF; first row: coarse, second row: refine)**
+
+https://user-images.githubusercontent.com/19284678/236694858-0ed6939e-cd7a-408f-a94b-406709ae90c0.mp4
+
 
 **Notable differences from the paper**
 
@@ -134,6 +143,11 @@ python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.
 
 ### Score Jacobian Chaining
 
+**Results obtained by threestudio (Stable Diffusion)**
+
+https://user-images.githubusercontent.com/19284678/236694871-87a247c1-2d3d-4cbf-89df-450bfeac3aca.mp4
+
+
 Notable differences from the paper: N/A.
 
 **Example running commands**
@@ -146,6 +160,11 @@ python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_process
 ```
 
 ### Latent-NeRF
+
+**Results obtained by threestudio (Stable Diffusion)**
+
+https://user-images.githubusercontent.com/19284678/236694876-5a270347-6a41-4429-8909-44c90c554e06.mp4
+
 
 Notable differences from the paper: N/A.
 
@@ -161,6 +180,11 @@ python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.
 ```
 
 ### Fantasia3D
+
+**Results obtained by threestudio (Stable Diffusion)**
+
+https://user-images.githubusercontent.com/19284678/236694880-33b0db21-4530-47f1-9c3b-c70357bc84b3.mp4
+
 
 Notable differences from the paper: N/A.
 
