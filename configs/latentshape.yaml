@@ -1,5 +1,5 @@
 name: "latentnerf"
-tag: "debug"
+tag: "${system.prompt_processor.prompt}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -43,9 +43,9 @@ system:
 
   guide_shape: ./load/shapes/teddy.obj
   loss:
-    lambda_sds: 1.
+    lambda_sds: 1.0
     lambda_sparsity: 0.0
-    lambda_shape: 1.
+    lambda_shape: 1.0
     lambda_opaque: 0.0
     lambda_orient: 0.0
   optimizer:
