@@ -1,34 +1,34 @@
-import numpy as np
-import os
 import gzip
 import json
-from typing import List
+import os
+import warnings
 from dataclasses import dataclass, field
+from typing import List
 
-import torch
-from torch.utils.data import Dataset, DataLoader, IterableDataset
-import torchvision.transforms.functional as TF
-
-import pytorch_lightning as pl
 import cv2
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torchvision.transforms.functional as TF
 from PIL import Image
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from threestudio import register
-from threestudio.utils.misc import get_rank
-from threestudio.utils.ops import (
-    get_ray_directions,
-    get_rays,
-    get_projection_matrix,
-    get_mvp_matrix,
-)
-from threestudio.utils.typing import *
-from threestudio.utils.config import parse_structured
 from threestudio.data.uncond import (
+    RandomCameraDataModuleConfig,
     RandomCameraDataset,
     RandomCameraIterableDataset,
-    RandomCameraDataModuleConfig,
 )
-import warnings
+from threestudio.utils.config import parse_structured
+from threestudio.utils.misc import get_rank
+from threestudio.utils.ops import (
+    get_mvp_matrix,
+    get_projection_matrix,
+    get_ray_directions,
+    get_rays,
+)
+from threestudio.utils.typing import *
+
 
 
 def _load_16big_png_depth(depth_png) -> np.ndarray:

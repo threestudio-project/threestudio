@@ -5,8 +5,9 @@ import torch.nn.functional as F
 
 import threestudio
 from threestudio.systems.base import BaseSystem
+from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-from threestudio.utils.ops import dot, binary_cross_entropy
+
 
 
 @threestudio.register("fantasia3d-system")

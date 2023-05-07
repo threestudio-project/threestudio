@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass, field
 
 import torch
@@ -108,6 +109,8 @@ class NeuralEnvironmentMapBackground(BaseBackground):
                 "n_hidden_layers": 2,
             }
         )
+        random_aug: bool = False
+        random_aug_prob: float = 0.5
 
     cfg: Config
 
@@ -121,8 +124,24 @@ class NeuralEnvironmentMapBackground(BaseBackground):
 
     def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B 3"]:
         # viewdirs must be normalized before passing to this function
-        dirs = (dirs + 1.0) / 2.0  # (-1, 1) => (0, 1)
-        dirs_embd = self.encoding(dirs.view(-1, 3))
-        color = self.network(dirs_embd).view(*dirs.shape[:-1], self.cfg.n_output_dims)
-        color = get_activation(self.cfg.color_activation)(color)
+        squeezed_dim = dirs.view(-1, 3).shape[0]
+        if (
+            self.training
+            and self.cfg.random_aug
+            and random.random() < self.cfg.random_aug_prob
+        ):
+            # use random background color with probability random_aug_prob
+            color = (
+                torch.rand(self.cfg.n_output_dims)
+                .to(dirs)[None, :]
+                .expand(squeezed_dim, -1)
+                .view(*dirs.shape[:-1], -1)
+            )
+        else:
+            dirs = (dirs + 1.0) / 2.0  # (-1, 1) => (0, 1)
+            dirs_embd = self.encoding(dirs.view(-1, 3))
+            color = self.network(dirs_embd).view(
+                *dirs.shape[:-1], self.cfg.n_output_dims
+            )
+            color = get_activation(self.cfg.color_activation)(color)
         return color

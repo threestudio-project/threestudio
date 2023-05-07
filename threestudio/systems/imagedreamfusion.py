@@ -1,13 +1,14 @@
+import random
 from dataclasses import dataclass, field
 
 import torch
 import torch.nn.functional as F
-import random
 
 import threestudio
 from threestudio.systems.base import BaseSystem
+from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-from threestudio.utils.ops import dot, binary_cross_entropy
+
 
 
 @threestudio.register("image-condition-dreamfusion-system")

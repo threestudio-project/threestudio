@@ -1,14 +1,14 @@
+import random
 from dataclasses import dataclass, field
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import random
 
 import threestudio
 from threestudio.models.networks import get_encoding, get_mlp
 from threestudio.utils.base import BaseModule
-from threestudio.utils.ops import get_activation, dot
+from threestudio.utils.ops import dot, get_activation
 from threestudio.utils.typing import *
 
 
@@ -163,7 +163,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         elif self.training and self.cfg.soft_shading:
             # otherwise if in training and soft shading is enabled, random a ambient ratio
             diffuse_light_color = torch.full_like(
-                self.diffuse_light_color, torch.rand([])
+                self.diffuse_light_color, random.random()
             )
             ambient_light_color = 1.0 - diffuse_light_color
         else:
@@ -184,9 +184,9 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         if shading is None:
             if self.training:
                 # adopt the same type of augmentation for the whole batch
-                if torch.rand([]) > self.cfg.diffuse_prob:
+                if random.random() > self.cfg.diffuse_prob:
                     shading = "albedo"
-                elif torch.rand([]) < self.cfg.textureless_prob:
+                elif random.random() < self.cfg.textureless_prob:
                     shading = "textureless"
                 else:
                     shading = "diffuse"

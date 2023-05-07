@@ -1,18 +1,18 @@
+import json
 import os
 import re
 import shutil
-import numpy as np
+
 import cv2
 import imageio
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import trimesh
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
-import matplotlib.pyplot as plt
-import trimesh
-import json
-import torch
 
 from threestudio.utils.typing import *
-
 
 class SaverMixin:
     _save_dir: Optional[str] = None

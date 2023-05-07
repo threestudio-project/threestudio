@@ -1,7 +1,6 @@
-import os
 import argparse
 import logging
-
+import os
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -27,16 +26,18 @@ def main() -> None:
 
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
-    from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
-    from pytorch_lightning.loggers import TensorBoardLogger, CSVLogger
+    from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+    from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 
     # from typeguard import install_import_hook
     # install_import_hook(['threestudio'])
     import threestudio
-
+    from threestudio.utils.callbacks import (
+        CodeSnapshotCallback,
+        ConfigSnapshotCallback,
+        CustomProgressBar,
+    )
     from threestudio.utils.config import ExperimentConfig, load_config
-    from threestudio.utils.callbacks import CustomProgressBar
-    from threestudio.utils.callbacks import ConfigSnapshotCallback, CodeSnapshotCallback
 
     # parse YAML config to OmegaConf
     cfg: ExperimentConfig

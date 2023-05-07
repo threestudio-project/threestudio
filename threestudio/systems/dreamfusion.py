@@ -4,8 +4,9 @@ import torch
 
 import threestudio
 from threestudio.systems.base import BaseSystem
+from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-from threestudio.utils.ops import dot, binary_cross_entropy
+
 
 
 @threestudio.register("dreamfusion-system")
@@ -60,9 +61,6 @@ class DreamFusion(BaseSystem):
         )
 
     def training_step(self, batch, batch_idx):
-        # opt = self.optimizers()
-        # opt.zero_grad()
-
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
         guidance_out = self.guidance(
@@ -85,20 +83,6 @@ class DreamFusion(BaseSystem):
             self.log("train/loss_orient", loss_orient)
             loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
-        # distortion loss proposed in MipNeRF360
-        # an efficient implementation from https://github.com/sunset1995/torch_efficient_distloss
-        if self.C(self.cfg.loss.lambda_distortion) > 0:
-            from torch_efficient_distloss import flatten_eff_distloss
-
-            loss_distortion = flatten_eff_distloss(
-                out["weights"][..., 0],
-                out["t_points"][..., 0],
-                out["t_intervals"][..., 0],
-                out["ray_indices"],
-            )
-            self.log("train/loss_distortion", loss_distortion)
-            loss += loss_distortion * self.C(self.cfg.loss.lambda_distortion)
-
         loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
         self.log("train/loss_sparsity", loss_sparsity)
         loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
@@ -112,20 +96,9 @@ class DreamFusion(BaseSystem):
             self.log(f"train_params/{name}", self.C(value))
 
         return {"loss": loss}
-        # self.manual_backward(loss)
-        # opt.step()
-        # sch = self.lr_schedulers()
-        # sch.step()
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
-        self.save_json(
-            f"it{self.global_step}-{batch_idx}.json",
-            {
-                "elevation": batch["elevation"].tolist(),
-                "azimuth": batch["azimuth"].tolist(),
-            },
-        )
         self.save_image_grid(
             f"it{self.global_step}-{batch_idx}.png",
             [
@@ -159,15 +132,7 @@ class DreamFusion(BaseSystem):
         pass
 
     def test_step(self, batch, batch_idx):
-        # return
         out = self(batch)
-        self.save_json(
-            f"it{self.global_step}-test/{batch_idx}.json",
-            {
-                "elevation": batch["elevation"].tolist(),
-                "azimuth": batch["azimuth"].tolist(),
-            },
-        )
         self.save_image_grid(
             f"it{self.global_step}-test/{batch_idx}.png",
             [
@@ -198,10 +163,8 @@ class DreamFusion(BaseSystem):
         )
 
     def on_test_epoch_end(self):
-        # import pdb; pdb.set_trace();
-        # mesh = self.geometry.isosurface()
-        # self.save_mesh(f"mesh.obj", mesh.v_pos, mesh.t_pos_idx)
-        # return
+        mesh = self.geometry.isosurface()
+        self.save_mesh(f"mesh.obj", mesh.v_pos, mesh.t_pos_idx)
         self.save_img_sequence(
             f"it{self.global_step}-test",
             f"it{self.global_step}-test",

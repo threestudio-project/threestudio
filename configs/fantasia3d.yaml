@@ -34,14 +34,14 @@ system:
   prompt_processor:
     prompt: "lib:sundae"
     view_dependent_prompting: true
-  
+
   guidance_type: "stable-diffusion-guidance"
   guidance:
     half_precision_weights: true
     guidance_scale: 100.
     max_step_percent: 0.5
     weighting_strategy: fantasia3d
-  
+
   loss:
     lambda_sds: 1.
     lambda_sdf_reg: 0.0

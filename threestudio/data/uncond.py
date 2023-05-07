@@ -1,27 +1,22 @@
-import os
-import json
 import math
-import numpy as np
-from PIL import Image
+import random
 from dataclasses import dataclass
 
+import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader, IterableDataset
-import torchvision.transforms.functional as TF
-
-import pytorch_lightning as pl
+from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from threestudio import register
-from threestudio.utils.typing import *
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_device
 from threestudio.utils.ops import (
+    get_mvp_matrix,
+    get_projection_matrix,
     get_ray_directions,
     get_rays,
-    get_projection_matrix,
-    get_mvp_matrix,
 )
+from threestudio.utils.typing import *
 
 
 @dataclass
@@ -44,9 +39,9 @@ class RandomCameraDataModuleConfig:
     up_perturb: float = 0.02
     light_position_perturb: float = 1.0
     light_distance_range: Tuple[float, float] = (0.8, 1.5)
-    eval_elevation_deg: float = 0.0
+    eval_elevation_deg: float = 15.0
     eval_camera_distance: float = 1.5
-    eval_fovy_deg: float = 60.0
+    eval_fovy_deg: float = 70.0
     light_sample_strategy: str = "dreamfusion"
     batch_uniform_azimuth: bool = True
 
@@ -67,7 +62,7 @@ class RandomCameraIterableDataset(IterableDataset):
         # sample elevation angles
         elevation_deg: Float[Tensor, "B"]
         elevation: Float[Tensor, "B"]
-        if torch.rand([]) < 0.5:
+        if random.random() < 0.5:
             # sample elevation angles uniformly with a probability 0.5 (biased towards poles)
             elevation_deg = (
                 torch.rand(self.cfg.batch_size)
@@ -94,9 +89,10 @@ class RandomCameraIterableDataset(IterableDataset):
             elevation_deg = elevation / math.pi * 180.0
 
         # sample azimuth angles from a uniform distribution bounded by azimuth_range
+        azimuth_deg: Float[Tensor, "B"]
         if self.cfg.batch_uniform_azimuth:
             # ensures sampled azimuth angles in a batch cover the whole range
-            azimuth_deg: Float[Tensor, "B"] = (
+            azimuth_deg = (
                 torch.rand(self.cfg.batch_size) + torch.arange(self.cfg.batch_size)
             ) / self.cfg.batch_size * (
                 self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0]
@@ -105,7 +101,7 @@ class RandomCameraIterableDataset(IterableDataset):
             ]
         else:
             # simple random sampling
-            azimuth_deg: Float[Tensor, "B"] = (
+            azimuth_deg = (
                 torch.rand(self.cfg.batch_size)
                 * (self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0])
                 + self.cfg.azimuth_range[0]

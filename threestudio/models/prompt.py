@@ -1,17 +1,16 @@
-import os
 import json
+import os
 from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
-
 from diffusers import IFPipeline
 from transformers import AutoTokenizer, CLIPTextModel, T5EncoderModel
 
 import threestudio
 from threestudio.utils.base import BaseModule
-from threestudio.utils.typing import *
 from threestudio.utils.misc import cleanup
+from threestudio.utils.typing import *
 
 
 class PromptProcessor(BaseModule):

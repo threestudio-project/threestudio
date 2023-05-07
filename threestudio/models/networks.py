@@ -1,16 +1,16 @@
 import math
 
+import tinycudann as tcnn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import tinycudann as tcnn
 
 import threestudio
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import config_to_primitive
-from threestudio.utils.typing import *
 from threestudio.utils.misc import get_rank
 from threestudio.utils.ops import get_activation
+from threestudio.utils.typing import *
 
 
 class ProgressiveBandFrequency(nn.Module, Updateable):

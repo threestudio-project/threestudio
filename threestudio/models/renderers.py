@@ -1,19 +1,18 @@
 from dataclasses import dataclass
 
+import nerfacc
 import torch
 import torch.nn.functional as F
 
-import nerfacc
-
 import threestudio
-from threestudio.utils.base import BaseModule
+from threestudio.models.background import BaseBackground
 from threestudio.models.geometry import BaseImplicitGeometry
 from threestudio.models.materials import BaseMaterial
-from threestudio.models.background import BaseBackground
-from threestudio.utils.typing import *
+from threestudio.utils.base import BaseModule
+from threestudio.utils.misc import get_device
 from threestudio.utils.ops import chunk_batch
 from threestudio.utils.rasterize import NVDiffRasterizerContext
-from threestudio.utils.misc import get_device
+from threestudio.utils.typing import *
 
 
 class Renderer(BaseModule):

@@ -4,8 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import threestudio
-from threestudio.utils.typing import *
 from threestudio.models.mesh import Mesh
+from threestudio.utils.typing import *
 
 
 class IsosurfaceHelper(nn.Module):

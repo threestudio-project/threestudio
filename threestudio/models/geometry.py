@@ -6,19 +6,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import threestudio
-from threestudio.models.mesh import Mesh
 from threestudio.models.isosurface import (
     IsosurfaceHelper,
     MarchingCubeCPUHelper,
     MarchingTetrahedraHelper,
 )
-from threestudio.utils.base import BaseModule
+from threestudio.models.mesh import Mesh
 from threestudio.models.networks import (
     create_network_with_input_encoding,
     get_encoding,
     get_mlp,
 )
-from threestudio.utils.ops import scale_tensor, get_activation, chunk_batch
+from threestudio.utils.base import BaseModule
+from threestudio.utils.ops import chunk_batch, get_activation, scale_tensor
 from threestudio.utils.typing import *
 
 
@@ -59,7 +59,7 @@ class BaseImplicitGeometry(BaseGeometry):
         radius: float = 1.0
         isosurface: bool = True
         isosurface_method: str = "mt"
-        isosurface_resolution: int = 64
+        isosurface_resolution: int = 128
         isosurface_threshold: Union[float, str] = 0.0
         isosurface_chunk: int = 0
         isosurface_coarse_to_fine: bool = False
@@ -153,7 +153,7 @@ class BaseImplicitGeometry(BaseGeometry):
                 # FIXME: highly empirical
                 if not fine_stage:
                     # large threshold for the coarse stage to remove outliars
-                    threshold = lambda level: level.mean() + 10 * level.std()
+                    threshold = lambda level: level.mean() + 5 * level.std()
                 else:
                     threshold = lambda level: level.mean()
             else:
@@ -716,7 +716,7 @@ class BaseExplicitGeometry(BaseGeometry):
 class TetrahedraSDFGrid(BaseExplicitGeometry):
     @dataclass
     class Config(BaseExplicitGeometry.Config):
-        isosurface_resolution: int = 64
+        isosurface_resolution: int = 128
         isosurface_deformable_grid: bool = True
 
         n_input_dims: int = 3
@@ -758,21 +758,43 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
             f"load/tets/{self.cfg.isosurface_resolution}_tets.npz",
         )
 
-        self.sdf: Float[Tensor, "Nv 1"] = nn.Parameter(
-            torch.zeros(
-                (self.isosurface_helper.grid_vertices.shape[0], 1), dtype=torch.float32
-            )
-        )
-        self.deformation: Optional[Float[Tensor, "Nv 3"]] = None
-        if self.cfg.isosurface_deformable_grid:
-            self.deformation = nn.Parameter(
-                torch.zeros_like(self.isosurface_helper.grid_vertices)
-            )
+        self.sdf: Float[Tensor, "Nv 1"]
+        self.deformation: Optional[Float[Tensor, "Nv 3"]]
 
-        if self.cfg.fix_geometry:
-            self.sdf.requires_grad_(False)
-            if self.deformation is not None:
-                self.deformation.requires_grad_(False)
+        if not self.cfg.fix_geometry:
+            self.register_parameter(
+                "sdf",
+                nn.Parameter(
+                    torch.zeros(
+                        (self.isosurface_helper.grid_vertices.shape[0], 1),
+                        dtype=torch.float32,
+                    )
+                ),
+            )
+            if self.cfg.isosurface_deformable_grid:
+                self.register_parameter(
+                    "deformation",
+                    nn.Parameter(
+                        torch.zeros_like(self.isosurface_helper.grid_vertices)
+                    ),
+                )
+            else:
+                self.deformation = None
+        else:
+            self.register_buffer(
+                "sdf",
+                torch.zeros(
+                    (self.isosurface_helper.grid_vertices.shape[0], 1),
+                    dtype=torch.float32,
+                ),
+            )
+            if self.cfg.isosurface_deformable_grid:
+                self.register_buffer(
+                    "deformation",
+                    torch.zeros_like(self.isosurface_helper.grid_vertices),
+                )
+            else:
+                self.deformation = None
 
         if not self.cfg.geometry_only:
             self.encoding = get_encoding(

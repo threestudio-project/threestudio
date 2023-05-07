@@ -1,9 +1,9 @@
 from . import (
     dreamfusion,
-    magic3d,
-    latentnerf,
-    sjc,
     fantasia3d,
     imagedreamfusion,
+    latentnerf,
+    magic3d,
     optimizer,
+    sjc,
 )

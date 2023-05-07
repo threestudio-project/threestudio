@@ -1,12 +1,15 @@
 import re
 from dataclasses import dataclass, field
+
 import pytorch_lightning as pl
+
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
-from threestudio.utils.config import parse_structured
 from threestudio.utils.base import Updateable
+from threestudio.utils.config import parse_structured
+from threestudio.utils.misc import C, load_module_weights
 from threestudio.utils.saving import SaverMixin
 from threestudio.utils.typing import *
-from threestudio.utils.misc import load_module_weights, C
+
 
 
 class BaseSystem(pl.LightningModule, Updateable, SaverMixin):

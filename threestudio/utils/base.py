@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-from threestudio.utils.typing import *
+
 import torch
 import torch.nn as nn
 
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_device, load_module_weights
+from threestudio.utils.typing import *
 
 
 class Configurable:
