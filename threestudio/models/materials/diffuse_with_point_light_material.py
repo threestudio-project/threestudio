@@ -104,7 +104,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         else:
             raise ValueError(f"Unknown shading type {shading}")
 
-    def update_step(self, epoch: int, global_step: int):
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         if global_step < self.cfg.ambient_only_steps:
             self.ambient_only = True
         else:

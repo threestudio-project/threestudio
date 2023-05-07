@@ -33,7 +33,7 @@ class ProgressiveBandFrequency(nn.Module, Updateable):
                 out += [func(freq * x) * mask]
         return torch.cat(out, -1)
 
-    def update_step(self, epoch, global_step):
+    def update_step(self, epoch, global_step, on_load_weights=False):
         if self.n_masking_step <= 0 or global_step is None:
             self.mask = torch.ones(self.N_freqs, dtype=torch.float32)
         else:
@@ -93,7 +93,7 @@ class ProgressiveBandHashGrid(nn.Module, Updateable):
         enc = enc * self.mask
         return enc
 
-    def update_step(self, epoch, global_step):
+    def update_step(self, epoch, global_step, on_load_weights=False):
         current_level = min(
             self.start_level
             + max(global_step - self.start_step, 0) // self.update_steps,

@@ -1,5 +1,5 @@
 name: sjc
-tag: debug
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: outputs
 seed: 0
 
@@ -40,14 +40,14 @@ system:
 
   prompt_processor_type: stable-diffusion-prompt-processor
   prompt_processor:
-    prompt: "A high quality photo of a delicious burger"
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: ???
     view_dependent_prompt_front: true
 
   guidance_type: stable-diffusion-guidance
   guidance:
-    half_precision_weights: true
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 100.
-    grad_clip: null
     use_sjc: true
     var_red: true
     min_step_percent: 0.01
@@ -55,8 +55,8 @@ system:
 
   loss:
     lambda_sds: 1.
-    center_ratio: 0.78125 # 50/64
-    lambda_depth: 0 # or 10
+    center_ratio: 0.78125 # = 50 / 64
+    lambda_depth: 0 # or try 10
     lambda_emptiness: [5000, 1.e+4, 2.e+5, 5001]
     emptiness_scale: 10
 
@@ -80,6 +80,6 @@ trainer:
   precision: 16-mixed
 
 checkpoint:
-  save_last: true
+  save_last: true # save at each validation tim
   save_top_k: -1
   every_n_train_steps: ${trainer.max_steps}

@@ -76,22 +76,11 @@ class NeRFVolumeRenderer(VolumeRenderer):
                     early_stop_eps=0,
                 )
         else:
-
-            def sigma_fn(t_starts, t_ends, ray_indices):
-                ray_indices = ray_indices.long()
-                t_origins = rays_o_flatten[ray_indices]
-                t_dirs = rays_d_flatten[ray_indices]
-                positions = (
-                    t_origins + t_dirs * (t_starts[..., None] + t_ends[..., None]) / 2.0
-                )
-                density = self.geometry.forward_density(positions)
-                return density[..., 0]
-
             with torch.no_grad():
                 ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
                     rays_o_flatten,
                     rays_d_flatten,
-                    sigma_fn=sigma_fn,
+                    sigma_fn=None,
                     render_step_size=self.render_step_size,
                     alpha_thre=0.0,
                     stratified=self.randomized,
@@ -205,7 +194,9 @@ class NeRFVolumeRenderer(VolumeRenderer):
 
         return out
 
-    def update_step(self, epoch: int, global_step: int) -> None:
+    def update_step(
+        self, epoch: int, global_step: int, on_load_weights: bool = False
+    ) -> None:
         if self.cfg.grid_prune:
 
             def occ_eval_fn(x):
@@ -213,7 +204,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 # approximate for 1 - torch.exp(-density * self.render_step_size) based on taylor series
                 return density * self.render_step_size
 
-            if self.training:
+            if self.training and not on_load_weights:
                 self.estimator.update_every_n_steps(
                     step=global_step, occ_eval_fn=occ_eval_fn
                 )

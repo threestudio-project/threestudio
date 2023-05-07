@@ -52,6 +52,8 @@ python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0 system.pro
 python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
 ```
 
+threestudio uses [OmegaConf](https://github.com/omry/omegaconf) for flexible configurations. You can easily change any configuration in the YAML file by specifying arguments without `--`, for example the specified prompt in the above cases. For all supported configurations, please see our [documentation](https://github.com/bennyguo/threestudio/blob/main/DOCUMENTATION.md).
+
 The training lasts for 10,000 iterations. You can find visualizations of the current status in the trial directory which defaults to `[exp_root_dir]/[name]/[tag]@[timestamp]`, where `exp_root_dir` (`outputs/` by default), `name` and `tag` can be set in the configuration file. A 360-degree video will be generated after the training is completed. In training, press `ctrl+c` one time will stop training and head directly to the test stage which generates the video. Press `ctrl+c` the second time to fully quit the program. If you want to resume from a checkpoint, do:
 
 ```sh
@@ -72,7 +74,7 @@ See [here](https://github.com/bennyguo/threestudio#supported-models) for example
 
 ### DreamFusion
 
-**Results obtained by threestudio (DeepFloyd IF)**
+**Results obtained by threestudio (DeepFloyd IF, batch size 8)**
 
 https://user-images.githubusercontent.com/19284678/236694848-38ae4ea4-554b-4c9d-b4c7-fba5bee3acb3.mp4
 
@@ -87,7 +89,7 @@ https://user-images.githubusercontent.com/19284678/236694848-38ae4ea4-554b-4c9d-
 
 **Example running commands**
 
-```bash
+```sh
 # uses DeepFloyd IF, requires ~15GB VRAM to extract text embeddings and ~10GB VRAM in training
 python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 # uses StableDiffusion, requires ~6GB VRAM in training
@@ -105,10 +107,9 @@ python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.pro
 
 ### Magic3D
 
-**Results obtained by threestudio (DeepFloyd IF; first row: coarse, second row: refine)**
+**Results obtained by threestudio (DeepFloyd IF, batch size 8; first row: coarse, second row: refine)**
 
 https://user-images.githubusercontent.com/19284678/236694858-0ed6939e-cd7a-408f-a94b-406709ae90c0.mp4
-
 
 **Notable differences from the paper**
 
@@ -122,7 +123,8 @@ First train the coarse stage NeRF:
 
 ```sh
 # uses DeepFloyd IF, requires ~15GB VRAM to extract text embeddings and ~10GB VRAM in training
-python launch.py --config configs/magic3d-coarse-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
+# here we adopt random background augmentation to improve geometry quality
+python launch.py --config configs/magic3d-coarse-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.background.random_aug=true
 # uses StableDiffusion, requires ~6GB VRAM in training
 python launch.py --config configs/magic3d-coarse-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 ```
@@ -147,16 +149,15 @@ python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.
 
 https://user-images.githubusercontent.com/19284678/236694871-87a247c1-2d3d-4cbf-89df-450bfeac3aca.mp4
 
-
 Notable differences from the paper: N/A.
 
 **Example running commands**
 
-```bash
+```sh
 # train with sjc guidance in latent space
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger"
 # train with sjc guidance in latent space, trump figure
-python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" trainer.max_steps=30000 system.loss.lambda_emptiness=[15000,10000.0,200000.0,15001] system.optimizer.params.background.lr=0.05 seed=42
+python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" trainer.max_steps=30000 system.loss.lambda_emptiness="[15000,10000.0,200000.0,15001]" system.optimizer.params.background.lr=0.05 seed=42
 ```
 
 ### Latent-NeRF
@@ -165,18 +166,22 @@ python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_process
 
 https://user-images.githubusercontent.com/19284678/236694876-5a270347-6a41-4429-8909-44c90c554e06.mp4
 
-
 Notable differences from the paper: N/A.
 
-We currently only implement Latent-NeRF for text-guided 3D generation. Sketch-Shape and Latent-Paint are not implemented yet.
+We currently only implement Latent-NeRF for text-guided and Sketch-Shape for (text,shape)-guided 3D generation. Latent-Paint is not implemented yet.
 
 **Example running commands**
 
-```bash
-# train in StableDiffusion latent space
+```sh
+# train Latent-NeRF in Stable Diffusion latent space
 python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
-# refine in RGB space
+# refine Latent-NeRF in RGB space
 python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
+
+# train Sketch-Shape in Stable Diffusion latent space
+python launch.py --config configs/sketchshape.yaml --train --gpu 0 system.guide_shape=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo"
+# refine Sketch-Shape in RGB space
+python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system.shape_guide=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
 ```
 
 ### Fantasia3D
@@ -185,15 +190,14 @@ python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.
 
 https://user-images.githubusercontent.com/19284678/236694880-33b0db21-4530-47f1-9c3b-c70357bc84b3.mp4
 
-
 Notable differences from the paper: N/A.
 
 We currently only implement the geometry stage of Fantasia3D.
 
 **Example running commands**
 
-```bash
-python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a ripe strawberry"
+```sh
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of an ice cream sundae"
 # Fantasia3D highly relies on the initialized SDF shape
 # the default shape is a sphere with radius 0.5
 # change the shape initialization to match your input prompt
@@ -204,16 +208,11 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
 
-### Image-Condition DreamFusion
-
-```bash
-# train with single image reference and stable-diffusion sds guidance
-python launch.py --config configs/imagecondition.yaml --train --gpu 0
-# train with few-view images reference (e.g. from co3d dataset) and stable-diffusion sds guidance
-python launch.py --config configs/co3d-imagecondition.yaml --train --gpu 0
-```
-
 **If you would like to contribute a new method to threestudio, see [here](https://github.com/bennyguo/threestudio#contributing-to-threestudio).**
+
+## Prompt Library
+
+For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's **exactly one match**. The used prompt will be printed to console. Also note that you can't use this syntax to point to every prompt in the library, as there are prompts that are subset of other prompts lmao. We will enhance the use of this feature.
 
 ## Tips on Improving Quality
 
@@ -235,6 +234,10 @@ If you encounter CUDA OOM error, try the following in order (roughly sorted by r
 - If you are using StableDiffusionGuidance, you can use [Token Merging](https://github.com/dbolya/tomesd) to **drastically** speed up computation and save memory. You can easily enable Token Merging by setting `system.guidance.token_merging=true`. You can also customize the Token Merging behavior by setting the parameters [here](https://github.com/dbolya/tomesd/blob/main/tomesd/patch.py#L183-L213) to `system.guidance.token_merging_params`. Note that Token Merging may degrade generation quality.
 - Enable [sequential CPU offload](https://huggingface.co/docs/diffusers/optimization/fp16#offloading-to-cpu-with-accelerate-for-memory-savings) by setting `system.guidance.enable_sequential_cpu_offload=true`. This could save a lot of VRAM but will make the training **extremely slow**.
 
+## Documentation
+
+threestudio use [OmegaConf](https://github.com/omry/omegaconf) to manage configurations. You can literally change anything inside the yaml configuration file or by adding command line arguments without `--`. We list all arguments that you can change in the configuration in our [documentation](https://github.com/bennyguo/threestudio/blob/main/DOCUMENTATION.md). Happy experimenting!
+
 ## Contributing to threestudio
 
 - Fork the repository and create your branch from `main`.
@@ -248,7 +251,17 @@ pip install -r requirements-dev.txt
 
 - Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
 
-- Make changes to the code and open a pull request.
+- Make changes to the code, update README and DOCUMENTATION if needed, and open a pull request.
+
+### Code Structure
+
+Here we just briefly introduce the code structure of this project. We will make more detailed documentation about this in the future.
+
+- All methods are implemented as a subclass of `BaseSystem` (in `systems/base.py`). There typically are six modules inside a system: geometry, material, background, renderer, guidance, and prompt_processor. All modules are subclass of `BaseModule` (in `utils/base.py`) except for guidance, and prompt_processor, which are subclass of `BaseObject` to prevent them from being treated as model parameters and better control their behavior in multi-GPU settings.
+- All systems, modules, and data modules have their configurations in their own dataclasses.
+- Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm (1) natually supports default values for properties; (2) effectively prevents wrong assignments of these properties (say typos in the yaml file) or inappropriate usage at runtime.
+- This projects use both static and runtime type checking. For more details, see `utils/typing.py`.
+- To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem`, `BaseModule` and `BaseObject` are by default inherit to `Updateable`.
 
 ## Known Problems
 
@@ -257,14 +270,15 @@ pip install -r requirements-dev.txt
 - FullyFused MLP may cause NaNs in 32 precision.
 - StableDiffusionGuidance is much more slower with PyTorch2.0.
 
-## Structure
+## Citing threestudio
 
-- All methods should be implemented as a subclass of `BaseSystem` (in `systems/base.py`). For the DreamFusion system, there're 6 modules: geometry, material, background, renderer, guidance, prompt_processor. All modules are subclass of `BaseModule` (in `utils/base.py`).
-- All systems, modules, and data modules have their configurations in their own dataclass named `Config`.
-- Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm is better than the one used in `instant-nsr-pl` as (1) it natually supports default values for properties; (2) it effectively prevents wrong assignments of these properties (say typos in the yaml file) and inappropriate usage at runtime.
-- This projects use both static and runtime type checking. For more details, see `utils/typing.py`.
-- To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem` and `BaseModule` (including all geometry, materials, guidance, prompt processors, and renderers) are by default inherit to `Updateable`.
+If you find threestudio helpful, please consider citing:
 
-## Prompt Library
-
-- For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's exactly one match. The used prompt will be printed to console.
+```
+@Misc{threestudio2023,
+  author =       {Yuan-Chen Guo and Ying-Tian Liu and Chen Wang and Zi-Xin Zou and Guan Luo and Chia-Hao Chen and Yan-Pei Cao and Song-Hai Zhang},
+  title =        {threestudio: A unified framework for 3D content generation},
+  howpublished = {\url{https://github.com/threestudio-project/threestudio}},
+  year =         {2023}
+}
+```

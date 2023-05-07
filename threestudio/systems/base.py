@@ -35,7 +35,9 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
                 map_location="cpu",
             )
             self.load_state_dict(state_dict, strict=False)
-            self.do_update_step(epoch, global_step)  # restore states
+            self.do_update_step(
+                epoch, global_step, on_load_weights=True
+            )  # restore states
         self.post_configure()
 
     def configure(self) -> None:
@@ -115,5 +117,14 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         self.preprocess_data(batch, "test")
         self.do_update_step(self.current_epoch, self.global_step)
 
-    def update_step(self, epoch: int, global_step: int):
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        pass
+
+    def on_before_optimizer_step(self, optimizer):
+        """
+        # some gradient-related debugging goes here, example:
+        from lightning.pytorch.utilities import grad_norm
+        norms = grad_norm(self.geometry, norm_type=2)
+        print(norms)
+        """
         pass

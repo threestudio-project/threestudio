@@ -53,7 +53,7 @@ system:
   guidance_type: "deep-floyd-guidance"
   guidance:
     pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
-    weighting_strategy: sjc
+    weighting_strategy: uniform
     guidance_scale: 20.
     min_step_percent: 0.02
     max_step_percent: 0.98

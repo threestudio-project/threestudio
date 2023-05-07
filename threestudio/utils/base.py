@@ -19,7 +19,9 @@ class Configurable:
 
 
 class Updateable:
-    def do_update_step(self, epoch: int, global_step: int):
+    def do_update_step(
+        self, epoch: int, global_step: int, on_load_weights: bool = False
+    ):
         for attr in self.__dir__():
             if attr.startswith("_"):
                 continue
@@ -28,10 +30,15 @@ class Updateable:
             except:
                 continue  # ignore attributes like property, which can't be retrived using getattr?
             if isinstance(module, Updateable):
-                module.do_update_step(epoch, global_step)
-        self.update_step(epoch, global_step)
+                module.do_update_step(
+                    epoch, global_step, on_load_weights=on_load_weights
+                )
+        self.update_step(epoch, global_step, on_load_weights=on_load_weights)
 
-    def update_step(self, epoch: int, global_step: int):
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        # override this method to implement custom update logic
+        # if on_load_weights is True, you should be careful doing things related to model evaluations,
+        # as the models and tensors are not guarenteed to be on the same device
         pass
 
 
@@ -75,7 +82,9 @@ class BaseModule(nn.Module, Updateable):
                 weights_path, module_name=module_name, map_location="cpu"
             )
             self.load_state_dict(state_dict)
-            self.do_update_step(epoch, global_step)  # restore states
+            self.do_update_step(
+                epoch, global_step, on_load_weights=True
+            )  # restore states
         # dummy tensor to indicate model state
         self._dummy: Float[Tensor, "..."]
         self.register_buffer("_dummy", torch.zeros(0).float(), persistent=False)

@@ -291,7 +291,7 @@ class StableDiffusionGuidance(BaseObject):
             "grad_norm": grad.norm(),
         }
 
-    def update_step(self, epoch: int, global_step: int):
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in
         # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
         # http://arxiv.org/abs/2303.15413

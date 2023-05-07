@@ -39,7 +39,6 @@ class DreamFusion(BaseSystem):
             material=self.material,
             background=self.background,
         )
-        # self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -171,22 +170,3 @@ class DreamFusion(BaseSystem):
             save_format="mp4",
             fps=30,
         )
-
-    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        # remove stable diffusion weights
-        # TODO: better way?
-        checkpoint["state_dict"] = {
-            k: v
-            for k, v in checkpoint["state_dict"].items()
-            if k.split(".")[0] not in ["prompt_processor", "guidance"]
-        }
-        return super().on_save_checkpoint(checkpoint)
-
-    def on_before_optimizer_step(self, optimizer):
-        # Compute the 2-norm for each layer
-        # If using mixed precision, the gradients are already unscaled here
-        # debug use
-        pass
-        # from lightning.pytorch.utilities import grad_norm
-        # norms = grad_norm(self.geometry, norm_type=2)
-        # print(norms)

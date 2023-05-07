@@ -1,5 +1,5 @@
 name: "fantasia3d"
-tag: "${system.prompt_processor.prompt}"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -31,19 +31,18 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    prompt: "lib:sundae"
-    view_dependent_prompting: true
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: ???
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    half_precision_weights: true
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 100.
     max_step_percent: 0.5
     weighting_strategy: fantasia3d
 
   loss:
     lambda_sds: 1.
-    lambda_sdf_reg: 0.0
 
   optimizer:
     name: Adam
@@ -56,12 +55,12 @@ trainer:
   max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
-  val_check_interval: 200
+  val_check_interval: 500
   limit_val_batches: 1
   enable_progress_bar: true
-  precision: 16
+  precision: 16-mixed
 
 checkpoint:
-  # save_last: true
+  save_last: true # save at each validation time
   save_top_k: -1
   every_n_train_steps: ${trainer.max_steps}

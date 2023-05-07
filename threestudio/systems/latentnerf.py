@@ -4,7 +4,7 @@ import torch
 
 import threestudio
 from threestudio.systems.base import BaseSystem
-from threestudio.utils.ops import binary_cross_entropy, dot, ShapeLoss
+from threestudio.utils.ops import ShapeLoss, binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
@@ -42,14 +42,12 @@ class LatentNeRF(BaseSystem):
             material=self.material,
             background=self.background,
         )
-        self.guidance = None
-        if self.cfg.guide_shape is not None:
-            self.guide_shape = self.cfg.guide_shape
-            self.shape_loss = ShapeLoss(self.guide_shape)
 
-    def setup_guidance(self):
-        if self.guidance is None:
+        if self.training or not self.cfg.refinement:
             self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+
+        if self.cfg.guide_shape is not None:
+            self.shape_loss = ShapeLoss(self.cfg.guide_shape)
 
     def forward(self, batch: Dict[str, Any], decode: bool = False) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -75,20 +73,8 @@ class LatentNeRF(BaseSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
-        self.setup_guidance()
-
-    def on_validation_start(self) -> None:
-        if not self.cfg.refinement:
-            self.setup_guidance()
-
-    def on_test_start(self) -> None:
-        if not self.cfg.refinement:
-            self.setup_guidance()
 
     def training_step(self, batch, batch_idx):
-        # opt = self.optimizers()
-        # opt.zero_grad()
-
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
         guidance_out = self.guidance(
@@ -120,7 +106,11 @@ class LatentNeRF(BaseSystem):
         self.log("train/loss_opaque", loss_opaque)
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
 
-        if self.C(self.cfg.loss.lambda_shape) > 0 and out["points"].shape[0] > 0:
+        if (
+            self.cfg.guide_shape is not None
+            and self.C(self.cfg.loss.lambda_shape) > 0
+            and out["points"].shape[0] > 0
+        ):
             loss_shape = self.shape_loss(out["points"], out["density"])
             self.log("train/loss_shape", loss_shape)
             loss += loss_shape * self.C(self.cfg.loss.lambda_shape)
@@ -129,10 +119,6 @@ class LatentNeRF(BaseSystem):
             self.log(f"train_params/{name}", self.C(value))
 
         return {"loss": loss}
-        # self.manual_backward(loss)
-        # opt.step()
-        # sch = self.lr_schedulers()
-        # sch.step()
 
     def validation_step(self, batch, batch_idx):
         out = self(batch, decode=True)
@@ -209,22 +195,3 @@ class LatentNeRF(BaseSystem):
         )
         mesh = self.geometry.isosurface()
         self.save_mesh("mesh.obj", v_pos=mesh.v_pos, t_pos_idx=mesh.t_pos_idx)
-
-    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        # remove stable diffusion weights
-        # TODO: better way?
-        checkpoint["state_dict"] = {
-            k: v
-            for k, v in checkpoint["state_dict"].items()
-            if k.split(".")[0] not in ["prompt_processor", "guidance"]
-        }
-        return super().on_save_checkpoint(checkpoint)
-
-    def on_before_optimizer_step(self, optimizer):
-        # Compute the 2-norm for each layer
-        # If using mixed precision, the gradients are already unscaled here
-        # debug use
-        pass
-        # from lightning.pytorch.utilities import grad_norm
-        # norms = grad_norm(self.geometry, norm_type=2)
-        # print(norms)

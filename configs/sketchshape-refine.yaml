@@ -1,5 +1,5 @@
-name: "latentnerf-refine"
-tag: "${system.prompt_processor.prompt}"
+name: "sketchshape-refine"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -8,19 +8,14 @@ data_type: "random-camera-datamodule"
 system_type: "latentnerf-system"
 system:
   refinement: true
-  weights: "path/to/latentnerf/checkpoint"
+  weights: ???
   weights_ignore_modules: ["material", "background"]
+  guide_shape: ???
 
   geometry_type: "implicit-volume"
   geometry:
     n_feature_dims: 4
     normal_type: null
-    mlp_network_config:
-      otype: "VanillaMLP"
-      activation: "ReLU"
-      output_activation: "none"
-      n_neurons: 64
-      n_hidden_layers: 1
 
   material_type: "sd-latent-adapter-material"
 
@@ -32,14 +27,15 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    prompt: "a hamburger"
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: ???
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    half_precision_weights: true
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 100.
+    weighting_strategy: sds
 
-  guide_shape: ./load/shapes/teddy.obj
   loss:
     lambda_sds: 1.
     lambda_sparsity: 0.0
@@ -72,12 +68,12 @@ trainer:
   max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
-  val_check_interval: 1000
+  val_check_interval: 200
   limit_val_batches: 1
   enable_progress_bar: true
   precision: 16-mixed
 
 checkpoint:
-  save_last: true
+  save_last: true # save at each validation time
   save_top_k: -1
   every_n_train_steps: ${trainer.max_steps}
