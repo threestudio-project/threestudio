@@ -1,0 +1,203 @@
+from dataclasses import dataclass, field
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+import threestudio
+from threestudio.models.isosurface import (
+    IsosurfaceHelper,
+    MarchingCubeCPUHelper,
+    MarchingTetrahedraHelper,
+)
+from threestudio.models.mesh import Mesh
+from threestudio.utils.base import BaseModule
+from threestudio.utils.ops import chunk_batch, scale_tensor
+from threestudio.utils.typing import *
+
+
+def contract_to_unisphere(
+    x: Float[Tensor, "... 3"], bbox: Float[Tensor, "2 3"], unbounded: bool = False
+) -> Float[Tensor, "... 3"]:
+    if unbounded:
+        x = scale_tensor(x, bbox, (0, 1))
+        x = x * 2 - 1  # aabb is at [-1, 1]
+        mag = x.norm(dim=-1, keepdim=True)
+        mask = mag.squeeze(-1) > 1
+        x[mask] = (2 - 1 / mag[mask]) * (x[mask] / mag[mask])
+        x = x / 4 + 0.5  # [-inf, inf] is at [0, 1]
+    else:
+        x = scale_tensor(x, bbox, (0, 1))
+    return x
+
+
+class BaseGeometry(BaseModule):
+    @dataclass
+    class Config(BaseModule.Config):
+        pass
+
+    cfg: Config
+
+    @staticmethod
+    def create_from(
+        other: "BaseGeometry", cfg: Optional[Union[dict, DictConfig]] = None, **kwargs
+    ) -> "BaseGeometry":
+        raise TypeError(
+            f"Cannot create {BaseGeometry.__name__} from {other.__class__.__name__}"
+        )
+
+
+class BaseImplicitGeometry(BaseGeometry):
+    @dataclass
+    class Config(BaseGeometry.Config):
+        radius: float = 1.0
+        isosurface: bool = True
+        isosurface_method: str = "mt"
+        isosurface_resolution: int = 128
+        isosurface_threshold: Union[float, str] = 0.0
+        isosurface_chunk: int = 0
+        isosurface_coarse_to_fine: bool = True
+        isosurface_deformable_grid: bool = False
+
+    cfg: Config
+
+    def configure(self) -> None:
+        self.bbox: Float[Tensor, "2 3"]
+        self.register_buffer(
+            "bbox",
+            torch.as_tensor(
+                [
+                    [-self.cfg.radius, -self.cfg.radius, -self.cfg.radius],
+                    [self.cfg.radius, self.cfg.radius, self.cfg.radius],
+                ],
+                dtype=torch.float32,
+            ),
+        )
+        self.isosurface_helper: Optional[IsosurfaceHelper] = None
+        if self.cfg.isosurface:
+            if self.cfg.isosurface_method == "mc-cpu":
+                self.isosurface_helper = MarchingCubeCPUHelper(
+                    self.cfg.isosurface_resolution
+                )
+            elif self.cfg.isosurface_method == "mt":
+                self.isosurface_helper = MarchingTetrahedraHelper(
+                    self.cfg.isosurface_resolution,
+                    f"load/tets/{self.cfg.isosurface_resolution}_tets.npz",
+                )
+            else:
+                raise AttributeError(
+                    "Unknown isosurface method {self.cfg.isosurface_method}"
+                )
+        self.unbounded: bool = False
+
+    def forward(
+        self, points: Float[Tensor, "*N Di"], output_normal: bool = False
+    ) -> Dict[str, Float[Tensor, "..."]]:
+        raise NotImplementedError
+
+    def forward_level(
+        self, points: Float[Tensor, "*N Di"], threshold: Union[float, Callable]
+    ) -> Tuple[Float[Tensor, "*N 1"], Optional[Float[Tensor, "*N 3"]]]:
+        raise NotImplementedError
+
+    def get_isosurface_threshold_value(
+        self, level: Float[Tensor, "*N 1"], threshold: Union[float, Callable]
+    ):
+        if isinstance(threshold, float):
+            threshold_val = threshold
+        elif isinstance(threshold, Callable):  # type: ignore
+            threshold_val = threshold(level)
+        else:
+            raise TypeError(f"Unsupported threshold type {type(threshold)}")
+        return threshold_val
+
+    def _isosurface(self, bbox: Float[Tensor, "2 3"], fine_stage: bool = False) -> Mesh:
+        def batch_func(x, threshold):
+            # scale to bbox as the input vertices are in [0, 1]
+            level, deformation = self.forward_level(
+                scale_tensor(
+                    x.to(bbox.device), self.isosurface_helper.points_range, bbox
+                ),
+                threshold,
+            )
+            level = level.to(
+                x.device
+            )  # move to the same device as the input (could be CPU)
+            if deformation is not None:
+                deformation = deformation.to(x.device)
+            return level, deformation
+
+        assert self.isosurface_helper is not None
+        if self.cfg.isosurface_chunk > 0:
+            assert isinstance(
+                self.cfg.isosurface_threshold, float
+            ), "isosurface_threshold must be float when isosurface_chunk > 0"
+            level, deformation = chunk_batch(
+                batch_func,
+                self.cfg.isosurface_chunk,
+                self.isosurface_helper.grid_vertices,
+                self.cfg.isosurface_threshold,
+            )
+        else:
+            threshold: Union[float, Callable]
+            if isinstance(self.cfg.isosurface_threshold, float):
+                threshold = self.cfg.isosurface_threshold
+            elif self.cfg.isosurface_threshold == "auto":
+                # automatic determining threshold for density field
+                # FIXME: highly empirical
+                if not fine_stage:
+                    # large threshold for the coarse stage to remove outliars
+                    threshold = lambda level: level.mean() + 5 * level.std()
+                else:
+                    threshold = lambda level: level.mean()
+            else:
+                raise TypeError(
+                    f"Unknown isosurface_threshold {self.cfg.isosurface_threshold}"
+                )
+            level, deformation = batch_func(
+                self.isosurface_helper.grid_vertices, threshold
+            )
+        mesh: Mesh = self.isosurface_helper(level, deformation=deformation)
+        mesh.v_pos = scale_tensor(
+            mesh.v_pos, self.isosurface_helper.points_range, bbox
+        )  # scale to bbox as the grid vertices are in [0, 1]
+        mesh.add_extra("bbox", bbox)
+        return mesh
+
+    def isosurface(self) -> Mesh:
+        if not self.cfg.isosurface:
+            raise NotImplementedError(
+                "Isosurface is disabled in the current configuration"
+            )
+        if self.cfg.isosurface_coarse_to_fine:
+            with torch.no_grad():
+                mesh_coarse = self._isosurface(self.bbox)
+            vmin, vmax = mesh_coarse.v_pos.amin(dim=0), mesh_coarse.v_pos.amax(dim=0)
+            vmin_ = (vmin - (vmax - vmin) * 0.1).max(self.bbox[0])
+            vmax_ = (vmax + (vmax - vmin) * 0.1).min(self.bbox[1])
+            mesh = self._isosurface(torch.stack([vmin_, vmax_], dim=0), fine_stage=True)
+        else:
+            mesh = self._isosurface(self.bbox)
+        return mesh
+
+
+class BaseExplicitGeometry(BaseGeometry):
+    @dataclass
+    class Config(BaseGeometry.Config):
+        radius: float = 1.0
+
+    cfg: Config
+
+    def configure(self) -> None:
+        self.bbox: Float[Tensor, "2 3"]
+        self.register_buffer(
+            "bbox",
+            torch.as_tensor(
+                [
+                    [-self.cfg.radius, -self.cfg.radius, -self.cfg.radius],
+                    [self.cfg.radius, self.cfg.radius, self.cfg.radius],
+                ],
+                dtype=torch.float32,
+            ),
+        )
