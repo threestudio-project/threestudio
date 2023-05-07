@@ -1,5 +1,5 @@
 name: "latentnerf"
-tag: "debug"
+tag: "${system.prompt_processor.prompt}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -17,16 +17,20 @@ system:
       output_activation: "none"
       n_neurons: 64
       n_hidden_layers: 1
+    density_bias: "blob_dreamfusion"
+    density_activation: trunc_exp
+    density_blob_scale: 5.
+    density_blob_std: 0.2
 
   material_type: "no-material"
   material:
     n_output_dims: 4
-    color_activation: tanh
+    color_activation: none
 
   background_type: "neural-environment-map-background"
   background:
     n_output_dims: 4
-    color_activation: tanh
+    color_activation: none
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -43,7 +47,7 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_sparsity: 0.0
+    lambda_sparsity: 5e-4
     lambda_opaque: 0.0
     lambda_orient: 0.0
   optimizer:
@@ -72,7 +76,7 @@ trainer:
   max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 1000
+  val_check_interval: 200
   limit_val_batches: 1
   enable_progress_bar: true
   precision: 16-mixed
