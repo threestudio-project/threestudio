@@ -5,7 +5,8 @@ from threestudio.utils.misc import parse_version
 from threestudio.utils.config import dump_config
 
 import pytorch_lightning
-if parse_version(pytorch_lightning.__version__) > parse_version('1.8'):
+
+if parse_version(pytorch_lightning.__version__) > parse_version("1.8"):
     from pytorch_lightning.callbacks import Callback
 else:
     from pytorch_lightning.callbacks.base import Callback
@@ -41,25 +42,38 @@ class VersionedCallback(Callback):
         if len(existing_versions) == 0:
             return 0
         return max(existing_versions) + 1
-    
+
     @property
     def savedir(self):
         if not self.use_version:
             return self.save_root
-        return os.path.join(self.save_root, self.version if isinstance(self.version, str) else f"version_{self.version}")
+        return os.path.join(
+            self.save_root,
+            self.version
+            if isinstance(self.version, str)
+            else f"version_{self.version}",
+        )
 
 
 class CodeSnapshotCallback(VersionedCallback):
     def __init__(self, save_root, version=None, use_version=True):
         super().__init__(save_root, version, use_version)
-    
+
     def get_file_list(self):
         return [
-            b.decode() for b in
-            set(subprocess.check_output('git ls-files -- ":!:load/*" ":!:data/*"', shell=True).splitlines()) | # hard code, TODO: use config to exclude folders or files
-            set(subprocess.check_output('git ls-files --others --exclude-standard', shell=True).splitlines())
+            b.decode()
+            for b in set(
+                subprocess.check_output(
+                    'git ls-files -- ":!:load/*" ":!:data/*"', shell=True
+                ).splitlines()
+            )
+            | set(  # hard code, TODO: use config to exclude folders or files
+                subprocess.check_output(
+                    "git ls-files --others --exclude-standard", shell=True
+                ).splitlines()
+            )
         ]
-    
+
     @rank_zero_only
     def save_code_snapshot(self):
         os.makedirs(self.savedir, exist_ok=True)
@@ -73,7 +87,9 @@ class CodeSnapshotCallback(VersionedCallback):
         try:
             self.save_code_snapshot()
         except:
-            rank_zero_warn("Code snapshot is not saved. Please make sure you have git installed and are in a git repository.")
+            rank_zero_warn(
+                "Code snapshot is not saved. Please make sure you have git installed and are in a git repository."
+            )
 
 
 class ConfigSnapshotCallback(VersionedCallback):
@@ -85,8 +101,8 @@ class ConfigSnapshotCallback(VersionedCallback):
     @rank_zero_only
     def save_config_snapshot(self):
         os.makedirs(self.savedir, exist_ok=True)
-        dump_config(os.path.join(self.savedir, 'parsed.yaml'), self.config)
-        shutil.copyfile(self.config_path, os.path.join(self.savedir, 'raw.yaml'))
+        dump_config(os.path.join(self.savedir, "parsed.yaml"), self.config)
+        shutil.copyfile(self.config_path, os.path.join(self.savedir, "raw.yaml"))
 
     def on_fit_start(self, trainer, pl_module):
         self.save_config_snapshot()

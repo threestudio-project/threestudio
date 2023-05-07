@@ -2,6 +2,7 @@ import os
 import argparse
 import logging
 
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, help="path to config file")
@@ -20,9 +21,9 @@ def main() -> None:
     args, extras = parser.parse_known_args()
 
     # set CUDA_VISIBLE_DEVICES then import pytorch-lightning
-    os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    n_gpus = len(args.gpu.split(','))
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    n_gpus = len(args.gpu.split(","))
 
     import pytorch_lightning as pl
     from pytorch_lightning import Trainer
@@ -49,32 +50,36 @@ def main() -> None:
 
     dm = threestudio.find(cfg.data_type)(cfg.data)
     system = threestudio.find(cfg.system_type)(cfg.system)
-    system.set_save_dir(os.path.join(cfg.trial_dir, 'save'))
+    system.set_save_dir(os.path.join(cfg.trial_dir, "save"))
 
     callbacks = []
     if args.train:
         callbacks += [
-            ModelCheckpoint(dirpath=os.path.join(cfg.trial_dir, 'ckpts'), **cfg.checkpoint),
+            ModelCheckpoint(
+                dirpath=os.path.join(cfg.trial_dir, "ckpts"), **cfg.checkpoint
+            ),
             LearningRateMonitor(logging_interval="step"),
             CustomProgressBar(refresh_rate=1),
-            CodeSnapshotCallback(os.path.join(cfg.trial_dir, 'code'), use_version=False),
-            ConfigSnapshotCallback(args.config, cfg, os.path.join(cfg.trial_dir, 'configs'), use_version=False), # TODO: better config saving
+            CodeSnapshotCallback(
+                os.path.join(cfg.trial_dir, "code"), use_version=False
+            ),
+            ConfigSnapshotCallback(
+                args.config,
+                cfg,
+                os.path.join(cfg.trial_dir, "configs"),
+                use_version=False,
+            ),  # TODO: better config saving
         ]
 
     loggers = []
     if args.train:
         loggers += [
-            TensorBoardLogger(
-                cfg.trial_dir, name='tb_logs'
-            ),
-            CSVLogger(cfg.trial_dir, name='csv_logs'),
+            TensorBoardLogger(cfg.trial_dir, name="tb_logs"),
+            CSVLogger(cfg.trial_dir, name="csv_logs"),
         ]
 
     trainer = Trainer(
-        callbacks=callbacks,
-        logger=loggers,
-        inference_mode=False,
-        **cfg.trainer
+        callbacks=callbacks, logger=loggers, inference_mode=False, **cfg.trainer
     )
 
     if args.train:
