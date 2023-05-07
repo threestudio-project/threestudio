@@ -10,7 +10,6 @@ from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
-
 @threestudio.register("image-condition-dreamfusion-system")
 class ImageConditionDreamFusion(BaseSystem):
     @dataclass
@@ -26,7 +25,7 @@ class ImageConditionDreamFusion(BaseSystem):
         renderer: dict = field(default_factory=dict)
         guidance_type: str = "stable-diffusion-guidance"
         guidance: dict = field(default_factory=dict)
-        prompt_processor_type: str = "dreamfusion-prompt-processor"
+        prompt_processor_type: str = "stable-diffusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
 
     cfg: Config

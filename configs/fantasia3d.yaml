@@ -3,7 +3,6 @@ tag: "${system.prompt_processor.prompt}"
 exp_root_dir: "outputs"
 seed: 0
 
-
 data_type: "random-camera-datamodule"
 data:
   batch_size: 1
@@ -30,7 +29,7 @@ system:
     shape_init: sphere
     shape_init_params: 0.5
 
-  prompt_processor_type: "dreamfusion-prompt-processor"
+  prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     prompt: "lib:sundae"
     view_dependent_prompting: true
@@ -52,7 +51,6 @@ system:
       lr: 0.001
       betas: [0.9, 0.99]
       eps: 1.e-15
-
 
 trainer:
   max_steps: 10000

@@ -23,7 +23,7 @@ class ScoreJacobianChaining(BaseSystem):
         renderer: dict = field(default_factory=dict)
         guidance_type: str = "stable-diffusion-guidance"
         guidance: dict = field(default_factory=dict)
-        prompt_processor_type: str = "dreamfusion-prompt-processor"
+        prompt_processor_type: str = "stable-diffusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
 
     cfg: Config

@@ -17,7 +17,7 @@ from diffusers.utils.import_utils import is_xformers_available
 from torch.cuda.amp import custom_bwd, custom_fwd
 
 import threestudio
-from threestudio.utils.base import BaseModule
+from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
 
@@ -39,11 +39,11 @@ class SpecifyGradient(torch.autograd.Function):
 
 
 @threestudio.register("stable-diffusion-guidance")
-class StableDiffusionGuidance(BaseModule):
+class StableDiffusionGuidance(BaseObject):
     @dataclass
-    class Config(BaseModule.Config):
+    class Config(BaseObject.Config):
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
-        use_xformers: bool = False
+        enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
         enable_attention_slicing: bool = False
         enable_channels_last_format: bool = False
@@ -78,20 +78,21 @@ class StableDiffusionGuidance(BaseModule):
             "feature_extractor": None,
             "requires_safety_checker": False,
             "torch_dtype": self.weights_dtype,
-            "device_map": "auto",
         }
         self.pipe = StableDiffusionPipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             **pipe_kwargs,
-        )
+        ).to(self.device)
 
-        if self.cfg.use_xformers and is_xformers_available():
+        if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
                 threestudio.info(
-                    "PyTorch2.0 uses memory efficient attention by default, xformers is not needed."
+                    "PyTorch2.0 uses memory efficient attention by default."
                 )
             elif not is_xformers_available():
-                threestudio.warn("xformers is not available, not enabled.")
+                threestudio.warn(
+                    "xformers is not available, memory efficient attention not enabled."
+                )
             else:
                 self.pipe.enable_xformers_memory_efficient_attention()
 
@@ -175,10 +176,15 @@ class StableDiffusionGuidance(BaseModule):
 
     @torch.cuda.amp.autocast(enabled=False)
     def decode_latents(
-        self, latents: Float[Tensor, "B 4 H W"], latent_height: int=64, latent_width: int=64
+        self,
+        latents: Float[Tensor, "B 4 H W"],
+        latent_height: int = 64,
+        latent_width: int = 64,
     ) -> Float[Tensor, "B 3 512 512"]:
         input_dtype = latents.dtype
-        latents = F.interpolate(latents, (latent_height, latent_width), mode="bilinear", align_corners=False)
+        latents = F.interpolate(
+            latents, (latent_height, latent_width), mode="bilinear", align_corners=False
+        )
         latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents.to(self.weights_dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
@@ -260,7 +266,8 @@ class StableDiffusionGuidance(BaseModule):
                 grad = -(Ds - zs) / sigma
 
         return grad
-    def forward(
+
+    def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
         text_embeddings: Float[Tensor, "BB 77 768"],
@@ -308,7 +315,7 @@ class StableDiffusionGuidance(BaseModule):
             "sds": loss,
             "grad_norm": grad.norm(),
         }
-        
+
     def update_step(self, epoch: int, global_step: int):
         # clip grad for stable training as demonstrated in
         # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
@@ -366,12 +373,12 @@ def custom_ddpm_step(ddpm, model_output: torch.FloatTensor, timestep: int, sampl
 
 
 @threestudio.register("deep-floyd-guidance")
-class DeepFloydGuidance(BaseModule):
+class DeepFloydGuidance(BaseObject):
     @dataclass
-    class Config(BaseModule.Config):
+    class Config(BaseObject.Config):
         pretrained_model_name_or_path: str = "DeepFloyd/IF-I-XL-v1.0"
         # FIXME: xformers error
-        use_xformers: bool = False
+        enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
         enable_attention_slicing: bool = False
         enable_channels_last_format: bool = True
@@ -409,15 +416,19 @@ class DeepFloydGuidance(BaseModule):
             device_map="auto",
         )
 
-        if self.cfg.use_xformers and is_xformers_available():
+        if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
                 threestudio.info(
-                    "PyTorch2.0 uses memory efficient attention by default, xformers is not needed."
+                    "PyTorch2.0 uses memory efficient attention by default."
                 )
             elif not is_xformers_available():
-                threestudio.warn("xformers is not available, not enabled.")
+                threestudio.warn(
+                    "xformers is not available, memory efficient attention not enabled."
+                )
             else:
-                # may raise error, see https://github.com/deep-floyd/IF/issues/52 to track this problem
+                threestudio.warn(
+                    f"Use DeepFloyd with xformers may raise error, see https://github.com/deep-floyd/IF/issues/52 to track this problem."
+                )
                 self.pipe.enable_xformers_memory_efficient_attention()
 
         if self.cfg.enable_sequential_cpu_offload:
@@ -462,7 +473,7 @@ class DeepFloydGuidance(BaseModule):
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
         ).sample.to(input_dtype)
 
-    def forward(
+    def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
         text_embeddings: Float[Tensor, "BB 77 768"],

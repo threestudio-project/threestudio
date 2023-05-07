@@ -1,6 +1,5 @@
 lightning==2.0.0
 omegaconf==2.3.0
-ninja
 jaxtyping
 typeguard
 git+https://github.com/KAIR-BAIR/nerfacc.git

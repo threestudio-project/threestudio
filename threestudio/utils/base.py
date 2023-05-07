@@ -35,6 +35,25 @@ class Updateable:
         pass
 
 
+class BaseObject(Updateable):
+    @dataclass
+    class Config:
+        pass
+
+    cfg: Config  # add this to every subclass of BaseObject to enable static type checking
+
+    def __init__(
+        self, cfg: Optional[Union[dict, DictConfig]] = None, *args, **kwargs
+    ) -> None:
+        super().__init__()
+        self.cfg = parse_structured(self.Config, cfg)
+        self.device = get_device()
+        self.configure(*args, **kwargs)
+
+    def configure(self, *args, **kwargs) -> None:
+        pass
+
+
 class BaseModule(nn.Module, Updateable):
     @dataclass
     class Config:

@@ -89,7 +89,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
     class Config(VolumeRenderer.Config):
         num_samples_per_ray: int = 512
         randomized: bool = True
-        eval_chunk_size: int = 8192
+        eval_chunk_size: int = 160000
         grid_prune: bool = True
 
     cfg: Config

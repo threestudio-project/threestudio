@@ -90,3 +90,12 @@ def cleanup():
     gc.collect()
     torch.cuda.empty_cache()
     tcnn.free_temporary_memory()
+
+
+def finish_with_cleanup(func: Callable):
+    def wrapper(*args, **kwargs):
+        out = func(*args, **kwargs)
+        cleanup()
+        return out
+
+    return wrapper

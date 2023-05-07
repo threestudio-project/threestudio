@@ -1,13 +1,17 @@
-name: "dreamfusion"
-tag: "${system.prompt_processor.prompt}"
+name: "dreamfusion-sd"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "random-camera-datamodule"
 data:
+  batch_size: 1
   width: 64
   height: 64
   camera_distance_range: [1.5, 2.0]
+  fovy_range: [40, 70]
+  elevation_range: [-10, 90]
+  light_sample_strategy: "dreamfusion"
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
@@ -46,34 +50,36 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 1001
-    albedo_activation: scale_-11_01
+    ambient_only_steps: 2001
+    albedo_activation: sigmoid
 
   background_type: "neural-environment-map-background"
   background:
-    color_activation: scale_-11_01
+    color_activation: sigmoid
 
   renderer_type: "nerf-volume-renderer"
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
 
-  prompt_processor_type: "deep-floyd-prompt-processor"
+  prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    prompt: "a hamburger"
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: ???
 
-  guidance_type: "deep-floyd-guidance"
+  guidance_type: "stable-diffusion-guidance"
   guidance:
-    guidance_scale: 20.
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    guidance_scale: 100.
     weighting_strategy: sds
     min_step_percent: 0.02
     max_step_percent: 0.98
 
   loss:
     lambda_sds: 1.
-    lambda_orient: [0,100.,10000.,5000]
-    lambda_sparsity: 10.
-    lambda_opaque: 0.0
+    lambda_orient: [0, 10., 1000., 5000]
+    lambda_sparsity: 1.
+    lambda_opaque: 0.
   optimizer:
     name: Adam
     args:
@@ -96,6 +102,6 @@ trainer:
   precision: 16-mixed
 
 checkpoint:
-  save_last: true
+  save_last: true # save at each validation time
   save_top_k: -1
   every_n_train_steps: ${trainer.max_steps}

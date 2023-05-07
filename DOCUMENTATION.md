@@ -1,0 +1,374 @@
+## Common Configurations
+
+| name          | type          | description                                                                                                                                                                                                                                                           |
+| ------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name          | str           | Name of the experiment. Default: "default"                                                                                                                                                                                                                            |
+| description   | str           | Descrption of the experiment. Default: ""                                                                                                                                                                                                                             |
+| tag           | str           | Tag of the experiment. Default: ""                                                                                                                                                                                                                                    |
+| seed          | str           | Global seed of the experiment. Used by `seed_everything` of PyTorch-Lightning. Default: 0                                                                                                                                                                             |
+| use_timestamp | bool          | Whether to use the current timestamp as the suffix of the tag. Default: True                                                                                                                                                                                          |
+| timestamp     | Optional[str] | The timestamp as the suffix of the tag. DO NOT set this manually. Default: None                                                                                                                                                                                       |
+| exp_root_dir  | str           | The root directory for outputs of all the experiments. Default: "outputs"                                                                                                                                                                                             |
+| exp_dir       | str           | The directory for outputs of the current experiment. DO NOT set this manually. It will be automatically set to `[exp_root_dir]/[name]`.                                                                                                                               |
+| trial_name    | str           | Name of the trial. DO NOT set this manually. It will be automatically set to `[tag]@[timestamp]`.                                                                                                                                                                     |
+| trial_dir     | str           | The directory for outputs for the current trial. DO NOT set this manually. It will be automatically set to `[exp_root_dir]/[name]/[trial_name].`                                                                                                                      |
+| resume        | Optional[str] | The path to the checkpoint file to resume from. Default: None                                                                                                                                                                                                         |
+| data_type     | str           | Type of the data module used. See []() for supported data modules. Default: ""                                                                                                                                                                                        |
+| data          | dict          | Configurations of the data module. Default: {}                                                                                                                                                                                                                        |
+| system_type   | str           | Type of the system used. See []() for supported systems. Default: ""                                                                                                                                                                                                  |
+| system        | dict          | Configurations of the system. Defaut: {}                                                                                                                                                                                                                              |
+| trainer       | dict          | Configurations of PyTorch-Lightning Trainer. See https://lightning.ai/docs/pytorch/stable/common/trainer.html#trainer-class-api for supported arguments. Exceptions: `logger` and `callbacks` are set in `launch.py`. Default: {}                                     |
+| checkpoint    | dict          | Configurations of PyTorch-Lightning ModelCheckpoint callback, which defines when the checkpoint will be saved. See https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html#modelcheckpoint for supported arguments. Default: {} |
+
+## Data
+
+### random-camera-datamodule
+
+| name                   | type               | description                                                                                                                                                                                                                                                                         |
+| ---------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| height                 | int                | Height of the rendered image in training. Default: 64                                                                                                                                                                                                                               |
+| width                  | int                | Width of the rendered image in training. Default: 64                                                                                                                                                                                                                                |
+| eval_height            | int                | Height of the rendered image in validation/testing. Default: 512                                                                                                                                                                                                                    |
+| eval_width             | int                | Width of the rendered image in validation/testing. Default: 512                                                                                                                                                                                                                     |
+| batch_size             | int                | Number of images per batch in training. Default: 1                                                                                                                                                                                                                                  |
+| eval_batch_size        | int                | Number of images per batch in validation/testing. DO NOT change this. Default: 1                                                                                                                                                                                                    |
+| elevation_range        | Tuple[float,float] | Camera elevation angle range to sample from in training, in degrees. Default: (-10,90)                                                                                                                                                                                              |
+| azimuth_range          | Tuple[float,float] | Camera azimuth angle range to sample from in training, in degrees. Default: (-180,180)                                                                                                                                                                                              |
+| camera_distance_range  | Tuple[float,float] | Camera distance range to sample from in training. Default: (1,1.5)                                                                                                                                                                                                                  |
+| fovy_range             | Tuple[float,float] | Camera field of view (FoV) range along the y direction (vertical direction) to sample from in training, in degrees. Default: (40,70)                                                                                                                                                |
+| camera_perturb         | float              | Random perturbation ratio for the sampled camera positions in training. The sampled camera positions will be perturbed by `N(0,1) * camera_perturb`. Default: 0.1                                                                                                                   |
+| center_perturb         | float              | Random perturbation ratio for the look-at point of the cameras in training. The look-at point wil be `N(0,1) * center_perturb`. Default: 0.2                                                                                                                                        |
+| up_perturb             | float              | Random pertubation ratio for the up direction of the cameras in training. The up direction will be `[0,0,1] + N(0,1) * up_perturb`. Default: 0.02                                                                                                                                   |
+| light_position_perturb | float              | Used to get random light directions from camera positions, only used when `light_sample_strategy="dreamfusion"`. The camera positions will be perturbed by `N(0,1) * light_position_perturb`, then the perturbed positions are used to determine the light directions. Default: 1.0 |
+| light_distance_range   | Tuple[float,float] | Point light distance range to sample from in training. Default: (0.8,1.5)                                                                                                                                                                                                           |
+| eval_elevation_deg     | float              | Camera elevation angle in validation/testing, in degrees. Default: 150                                                                                                                                                                                                              |
+| eval_camera_distance   | float              | Camera distance in validation/testing. Default: 15                                                                                                                                                                                                                                  |
+| eval_fovy_deg          | float              | Camera field of view (FoV) along the y direction (vertical direction) in validation/testing, in degrees. Default: 70                                                                                                                                                                |
+| light_sample_strategy  | str                | Strategy to sample point light positions in training, in ["dreamfusion", "magic3d"]. "dreamfusion" uses strategy described in the DreamFusion paper; "magic3d" uses strategy decribed in the Magic3D paper. Default: "dreamfusion"                                                  |
+| batch_uniform_azimuth  | bool               | Whether to ensure the uniformity of sampled azimuth angles in training as described in the Fantasia3D paper. If True, the `azimuth_range` is equally divided into `batch_size` bins and the azimuth angles are sampled from every bins. Default: True                               |
+
+### single-image-datamodule (TBD)
+
+| name | type | description |
+| ---- | ---- | ----------- |
+
+### co3d-datamodule (TBD)
+
+| name | type | description |
+| ---- | ---- | ----------- |
+
+## Systems
+
+Systems contain implementation of training/validation/testing logic for different methods.
+
+**Common configurations for systems**
+
+| name                          | type                | description                                                                                                                  |
+| ----------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| loss                          | dict                | Dict that contains loss-related configurations. Default: {}                                                                  |
+| optimizer                     | dict                | Optimizer configurations. Default: {}                                                                                        |
+| scheduler                     | Optional[dict]      | Learning rate scheduler configurations. If None, does not use a scheduler. Default: None                                     |
+| weights                       | Optional[str]       | Path to the weights to be loaded. This is different from `resume` in that this does not resume training state. Default: None |
+| weights_ignore_modules        | Optional[List[str]] | List of modules that should be ignored when loading weights. Default: None                                                   |
+| cleanup_after_validation_step | bool                | Whether to empty cache after each validation step. This will slow down validation. Default: False                            |
+| cleanup_after_test_step       | bool                | Whether to empty cache after each test step. This will slow down testing. Default: False                                     |
+
+### dreamfusion-system
+
+| name                  | type | description                                                                               |
+| --------------------- | ---- | ----------------------------------------------------------------------------------------- |
+| geometry_type         | str  | Type of the geometry used in the system. See []() for supported geometry.                 |
+| geometry              | dict | Configurations of the geometry.                                                           |
+| material_type         | str  | Type of the material used in the system. See []() for supported material.                 |
+| matrial               | dict | Configurations of the material.                                                           |
+| background_type       | str  | Type of the background used in the system. See []() for supported background.             |
+| background            | dict | Configurations of the background.                                                         |
+| renderer_type         | str  | Type of the renderer used in the system. See []() for supported renderer.                 |
+| renderer              | dict | Configurations of the renderer.                                                           |
+| guidance_type         | str  | Type of the guidance used in the system. See []() for supported guidance.                 |
+| guidance              | dict | Configurations of the guidance.                                                           |
+| prompt_processor_type | str  | Type of the prompt processor used in the system. See []() for supported prompt processor. |
+| prompt_processor      | dict | Configurations of the prompt processor.                                                   |
+
+### magic3d-system
+
+This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+
+| name                   | type | description                                                                                                                                                  |
+| ---------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| refinement             | bool | Whether to perform refinement (second stage in the Magic3D paper). Default: False                                                                            |
+| from_coarse            | bool | Whether to initialize geometry from the coarse stage (first stage in the Magic3D paper) for refinement. If True, `weights` must be specified. Default: False |
+| inherit_coarse_texture | bool | Whether to load the encoding and feature network from the coarse stage for refinement, used when `from_coarse=True`. Default: True                           |
+
+### sjc-system
+
+This system has all the configurations of `dreamfusion-system`.
+
+### latentnerf-system
+
+This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+
+| name       | type | description                                             |
+| ---------- | ---- | ------------------------------------------------------- |
+| refinement | bool | Whether to perform RGB space refinement. Default: False |
+
+### fantasia3d-system
+
+This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+
+| name         | type | description                                                                                                                                                                                                                                                                                                                    |
+| ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| latent_steps | int  | Number of steps for geometry optimization in latent space. In the first `latent_steps` steps, low resolution normal and mask are concatenated and fed to the latent diffusion model. After this high resolution normal is used to perform RGB space optimziation. Details are described in the Fantasia3D paper. Default: 2500 |
+
+### image-condition-dreamfusion-system (TBD)
+
+| name | type | description |
+| ---- | ---- | ----------- |
+
+## Geometry
+
+Geometry models properties for locations in space, including density, SDF, feature and normal.
+
+**Common configurations for implicit geometry**
+
+| name                       | type             | description                                                                                                                                                                                      |
+| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| radius                     | float            | Half side length of the scene bounding box. Default: 1.0                                                                                                                                         |
+| isosurface                 | bool             | Whether to enable surface extraction. Default: True                                                                                                                                              |
+| isosusrface_method         | str              | Method for surface extraction, in ["mc", "mt"]. "mc" uses the marching cubes algorithm, not differentiable; "mt" uses the marching tetrahedra algorithm, differentiable. Default: "mt"           |
+| isosurface_resolution      | int              | Grid resolution for surface extraction. Default: 128                                                                                                                                             |
+| isosurface_threshold       | Union[float,str] | The threshold value to determine the surface location of the implicit field, in [float, "auto"]. If "auto", use the mean value of the field as the threshold. Default: 0                         |
+| isosurface_chunk           | int              | Chunk size when computing the field value on grid vertices, used to prevent OOM. If 0, does not use chunking. Default: 0                                                                         |
+| isosurface_coarse_to_fine  | bool             | Whether to extract the surface in a coarse-to-fine manner. If True, will first extract a coarse surface to get a tight bounding box, which is then used to extract a fine surface. Default: True |
+| isosurface_deformable_grid | bool             | Whether to optimize positions of grid vertices for surface extraction. Only support `isosurface_method=mt`. Default: False                                                                       |
+
+### implicit-volume
+
+| name                         | type             | description                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| n_input_dims                 | int              | Number of input dimensions. Default: 3 (xyz)                                                                                                                                                                                                                                                                                    |
+| n_feature_dims               | int              | Number of dimensions for the output features. Note that this should be aligned with the material used. Default: 3 (albedo)                                                                                                                                                                                                      |
+| density_activation           | str              | Density activation function. See `get_activation` in `utils/ops.py` for all supported activation functions. Default: "softplus"                                                                                                                                                                                                 |
+| density_bias                 | Union[float,str] | Offset value to be added to the pre-activated density, in [float, "blob_dreamfusion", "blob_magic3d"]. If "blob_dreamfusion", uses the blob density bias proposed in DreamFusion; if "blob_magic3d", uses the blob density bias proposed in Magic3D. Default: "blob_magic3d"                                                    |
+| density_blob_scale           | float            | Controls the magnitude of the blob density if `density_bias` in ["blob_dreamfusion", "blob_magic3d"]. Default: 10                                                                                                                                                                                                               |
+| density_blob_std             | float            | Controls the divergence of the blob density if `density_bias` in ["blob_dreamfusion", "blob_magic3d"]. Default: 0.5                                                                                                                                                                                                             |
+| pos_encoding_config          | dict             | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                                                                                                              |
+| mlp_network_config           | dict             | Configurations for the MLP head for geometry attribute prediction (density, feature ...). See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                                                                                                 |
+| normal_type                  | str              | How the normal is computed, in ["analytic", "finite_difference", "pred"]. If "analytic", uses PyTorch auto-differentiation to compute the analytic normal; if "finite_difference", uses finite difference to compute the approximate normal; if "pred", uses an MLP network to predict the normal. Default: "finite_difference" |
+| finite_difference_normal_eps | float            | The small epsilon value in finite difference to estimate the normal, used when `normal_type="finite_difference"`. Default: 0.01                                                                                                                                                                                                 |
+| isosurface_threshold         | Union[float,str] | Inherit from common configurations, but default to "auto". Default: "auto"                                                                                                                                                                                                                                                      |
+
+### implicit-sdf
+
+| name                         | type          | description                                                                                                                                                                                                                        |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| n_input_dims                 | int           | Number of input dimensions. Default: 3 (xyz)                                                                                                                                                                                       |
+| n_feature_dims               | int           | Number of dimensions for the output features. Note that this should be aligned with the material used. Default: 3 (albedo)                                                                                                         |
+| pos_encoding_config          | dict          | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                 |
+| mlp_network_config           | dict          | Configurations for the MLP head for geometry attribute prediction (sdf, feature ...). See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                        |
+| normal_type                  | str           | How the normal is computed, in ["finite_difference", "pred"]. If "finite_difference", uses finite difference to compute the approximate normal; if "pred", uses an MLP network to predict the normal. Default: "finite_difference" |
+| finite_difference_normal_eps | float         | The small epsilon value in finite difference to estimate the normal, used when `normal_type="finite_difference"`. Default: 0.01                                                                                                    |
+| shape_init                   | Optional[str] | The shape to initializa the SDF as, in [None, "sphere", "ellipsoid"]. If None, does not initialize; if "sphere", initialized as a sphere; if "ellipsoid", initialized as an ellipsoid. Default: None                               |
+| shape_init_params            | Optional[Any] | Parameters to specify the SDF initialization. If `shape_init="sphere"`, a float is used for the sphere radius; if `shape_init="ellipsoid"`, a tuple of three floats is used for the radius along x/y/z axis. Default: None         |
+| force_shape_init             | bool          | Whether to force initialization of the SDf even if weights are provided. Default:False                                                                                                                                             |
+
+### volume-grid
+
+An explicit geometry parameterized with a feature volume. The feature volume has a shape of `(n_feature_dims + 1) x grid_size`, one channel for density and the rest for material. The density is first scaled, then biased and finally activated.
+
+| name               | type                 | description                                                                                                                                                            |
+| ------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| grid_size          | tuple[int, int, int] | The resolution of the feature volume. Default: (100, 100, 100)                                                                                                         |
+| n_feature_dims     | int                  | The feature dimensions for its material. Default: 3                                                                                                                    |
+| density_activation | Optional[str]        | The activation to get the density value. Default: "softplus"                                                                                                           |
+| density_bias       | Union[float, str]    | The initialization of the density. A float value indicates uniform initialization and `blob` indicates a ball centered at the center. Default: "blob"                  |
+| density_blob_scale | float                | The parameter for blob initialization. Default: 5.0                                                                                                                    |
+| density_blob_std   | float                | The parameter for blob initialization. Default: 0.5                                                                                                                    |
+| normal_type        | Optional[str]        | The way to compute the normal from density. If set to "pred", the normal is produced with another volume in the shape of `3 x grid_size`. Default: "finite_difference" |
+
+**Common configurations for explicit geometry**
+
+| name | type | description |
+| ---- | ---- | ----------- |
+
+### tetrahedra-sdf-grid
+
+| name                       | type          | description                                                                                                                                                                                                                |
+| -------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| isosurface_resolution      | int           | Tetrahedra grid resolution for surface extraction. Default: 128                                                                                                                                                            |
+| isosurface_deformable_grid | bool          | Whether to optimize positions of tetrahedra grid vertices for surface extraction. Default: True                                                                                                                            |
+| pos_encoding_config        | dict          | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                         |
+| mlp_network_config         | dict          | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                              |
+| shape_init                 | Optional[str] | The shape to initializa the SDF as, in [None, "sphere", "ellipsoid"]. If None, does not initialize; if "sphere", initialized as a sphere; if "ellipsoid", initialized as an ellipsoid. Default: None                       |
+| shape_init_params          | Optional[Any] | Parameters to specify the SDF initialization. If `shape_init="sphere"`, a float is used for the sphere radius; if `shape_init="ellipsoid"`, a tuple of three floats is used for the radius along x/y/z axis. Default: None |
+| force_shape_init           | bool          | Whether to force initialization of the SDf even if weights are provided. Default:False                                                                                                                                     |
+| geometry_only              | bool          | Whether to only model the SDF. If True, the feature prediction is ommited. Default:False                                                                                                                                   |
+| fix_geometry               | bool          | Whether to optimize the geometry. If True, the SDF (and grid vertices if `isosurface_deformable_grid=True`) is fixed. Default: False                                                                                       |
+
+## Material
+
+The material module outputs colors or color latents conditioned on the sampled positions, view directions, and sometimes light directions and normals.
+
+### neural-radiance-material
+
+A material with view dependent effects, parameterized with a network(MLP), similar with that in NeRF.
+
+| name                | type | description                                                                                                                   |
+| ------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------- |
+| input_feature_dims  | int  | The dimensions of the input feature. Default: 8                                                                               |
+| color_activation    | str  | The activation mapping the network output to the color. Default: "sigmoid"                                                    |
+| dir_encoding_config | dict | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3}     |
+| mlp_network_config  | dict | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
+
+### no-material
+
+A material without view dependet effects, just map features to colors.
+
+| name               | type           | description                                                                                                                                                                         |
+| ------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| n_output_dims      | int            | The dimensions of the material color, e.g. 3 for RGB and 4 for latent. Default: 3                                                                                                   |
+| color_activation   | str            | The activation mapping the network output or the feature to the color. Default: "sigmoid"                                                                                           |
+| mlp_network_config | Optional[dict] | The config of the MLP network. Set to `None` to directly map the input feature to the color with `color_activation`, otherwise the feature first goes through an MLP. Default: None |
+| input_feature_dims | Optional[int]  | The dimensions of the input feature. Required when use an MLP. Default: None                                                                                                        |
+
+### diffuse-with-point-light-material
+
+| name                | type                     | description                                                                                                                                                                           |
+| ------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ambient_light_color | Tuple[float,float,float] | The ambient light color for lambertian shading, used when `soft_shading=False`. Default: (0.1,0.1,0.1)                                                                                |
+| diffuse_light_color | Tuple[float,float,float] | The diffuse light color for lambertian shading, used when `soft_shading=False`. Default: (0.9,0.9,0.9)                                                                                |
+| ambient_only_steps  | int                      | Number of steps that use albedo color as input to the guidance. Default: 1000                                                                                                         |
+| diffuse_prob        | float                    | Use shaded color with a probability of `diffuse_prob` and albedo color with a probability of `1-diffuse_prob` after `ambient_only_steps`. Default: 0.75                               |
+| textureless_prob    | float                    | Use textureless shaded color with a probability of `textureless_prob` and lambertian shaded color with a probability of `1-textureless_prob`when using shaded color. Default: 0.5     |
+| albedo_activation   | str                      | Activation function for the albedo color. Default: "sigmoid"                                                                                                                          |
+| soft_shading        | bool                     | If True, uses a soft version of lambertian shading in training, which randomly samples the ambient light color and diffuse light color. Proposed in the Magic3D paper. Default: False |
+
+### sd-latent-adapter-material
+
+No specific configuration.
+
+## Background
+
+The background should output colors or color latents conditioned on the ray directions.
+
+**Common configurations for background**
+
+| name          | type | description                                                                        |
+| ------------- | ---- | ---------------------------------------------------------------------------------- |
+| n_output_dims | int  | The dimension of the background color, e.g. 3 for RGB and 4 for latent. Default: 3 |
+
+### solid-color-background
+
+A background with a solid color.
+
+| name    | type  | description                                                                                                              |
+| ------- | ----- | ------------------------------------------------------------------------------------------------------------------------ |
+| color   | tuple | The initialized color of the background with each value in [0,1], should match `n_output_dims`. Default: (1.0, 1.0, 1.0) |
+| learned | bool  | Whether to optimize the background. Default: True                                                                        |
+
+### textured-background
+
+A background with colors parameterized with a texture map.
+
+| name             | type | description                                                                 |
+| ---------------- | ---- | --------------------------------------------------------------------------- |
+| height           | int  | The height of the texture map. Default: 64                                  |
+| width            | int  | The width of the texture map. Default: 64                                   |
+| color_activation | str  | The activation mapping the texture feature to the color. Default: "sigmoid" |
+
+### neural-environment-map-background
+
+A background parameterized with a neural network (MLP).
+
+| name                | type  | description                                                                                                                   |
+| ------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------- |
+| color_activation    | str   | The activation mapping the network output to the color. Default: "sigmoid"                                                    |
+| dir_encoding_config | dict  | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3}     |
+| mlp_network_config  | dict  | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
+| random_aug          | bool  | Whether to use random color augmentation. May be able to improve the correctness of the model. Default: False                 |
+| random_aug_prob     | float | The probability to use random color augmentation. Default: 0.5.                                                               |
+
+## Renderers
+
+Renderers takes geometry, material, and background to produce images given camera and light specifications.
+
+**Common configurations for renderers**
+
+| name   | type  | description                                                                                                                 |
+| ------ | ----- | --------------------------------------------------------------------------------------------------------------------------- |
+| radius | float | Half side length of the scene bounding box. This should be the same as `radius` of the geometry in most cases. Default: 1.0 |
+
+### nerf-volume-renderer
+
+| name                | type  | description                                                                                               |
+| ------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
+| num_samples_per_ray | float | Number of sample points along each ray. Default: 1.0                                                      |
+| randomized          | bool  | Whether to randomly perturb the sample points in training. Default: True                                  |
+| eval_chunk_size     | int   | Number of sample points per chunk in validation/testing, to prevent OOM. Default: 160000                  |
+| grid_prune          | bool  | Whether to maintain an occupancy grid and prune sample points in empty space using NeRFAcc. Default: True |
+
+### nvdiff-rasterizer
+
+| name         | type | description                                                                                                                                                                                      |
+| ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| context_type | str  | Rasterization context type used by nvdiffrast, in ["gl", "cuda"]. See the [nvdiffrast documentation](https://nvlabs.github.io/nvdiffrast/#rasterizing-with-cuda-vs-opengl-new) for more details. |
+
+## Guidance
+
+Given an image or its latent input, the guide should provide its gradient conditioned on a text input so that the image can be optimized with gradient descent to better match the text.
+
+**Common configurations for guidance**
+
+| name                              | type          | description                                                                                                                                                                                           |
+| --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| enable_memory_efficient_attention | bool          | Whether to enable memory efficient attention in xformers. This will lead to lower GPU memory usage and a potential speed up at inference. Speed up at training time is not guaranteed. Default: false |
+| enable_sequential_cpu_offload     | bool          | Whether to offload all models to CPU. This will use `accelerate`, significantly reducing memory usage but slower. Default: False                                                                      |
+| enable_attention_slicing          | bool          | Whether to use sliced attention computation. This will save some memory in exchange for a small speed decrease. Default: False                                                                        |
+| enable_channels_last_format       | bool          | Whether to use Channels Last format for the unet. Default: False (Stable Diffusion) / True (DeepFloyd)                                                                                                |
+| pretrained_model_name_or_path     | str           | The pretrained model path in huggingface. Default: "runwayml/stable-diffusion-v1-5" (for `stable-diffusion-guidance`) / "DeepFloyd/IF-I-XL-v1.0" (for `deep-floyd-guidance`)                          |
+| guidance_scale                    | float         | The classifier free guidance scale. Default: 100.0 (for `stable-diffusion-guidance`) / 20.0 (for `deep-floyd-guidance`)                                                                               |
+| grad_clip                         | Optional[Any] | The gradient clip value. None or float or a list in the form of [start_step, start_value, end_value, end_step]. Default: None                                                                         |
+| half_precision_weights            | bool          | Whether to use float16 for the diffusion model. Default: True                                                                                                                                         |
+| min_step_percent                  | float         | The precent range (min value) of the random timesteps to add noise and denoise. Default: 0.02                                                                                                         |
+| max_step_percent                  | float         | The precent range (max value) of the random timesteps to add noise and denoise. Default: 0.98                                                                                                         |
+| weighting_strategy                | str           | The choice of w(t) of the sds loss, in ["sds", "uniform", "fantasia3d"]. Default: "sds"                                                                                                               |
+
+For the first three options, you can check more details in [pipe_stable_diffusion.py](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py) and [pipeline_if.py](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/deepfloyd_if/pipeline_if.py) in diffusers.
+
+### stable-diffusion-guidance
+
+| name                 | type           | description                                                                                                                                         |
+| -------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| use_sjc              | bool           | Whether to use score jacobian chaining (SJC) instead of SDS. Default: False                                                                         |
+| var_red              | bool           | Whether to use Eq. 16 in [SJC paper](https://arxiv.org/pdf/2212.00774.pdf). Default: True                                                           |
+| token_merging        | bool           | Whether to use token merging. This will speed up the unet forward and slightly affect the performance. Default: False                               |
+| token_merging_params | Optional[dict] | The config for token merging. See [here](https://github.com/dbolya/tomesd/blob/main/tomesd/patch.py#L183-L213) for supported arguments. Default: {} |
+
+### deep-floyd-guidance
+
+No specific configuration.
+
+## Prompt Processors
+
+Prompt processors take a user prompt and compute text embeddings for training. The type of the prompt processor should match that of the guidance.
+
+**Common configurations for prompt processors**
+
+| name                          | type  | description                                                                                                                                                                                                                                      |
+| ----------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| prompt                        | str   | The text prompt. Default: "a hamburger"                                                                                                                                                                                                          |
+| negative_prompt               | str   | The uncondition text input in Classifier Free Guidance. Default: ""                                                                                                                                                                              |
+| pretrained_model_name_or_path | str   | The pretrained model path in huggingface. Default: "runwayml/stable-diffusion-v1-5" (for `stable-diffusion-prompt-processor`) / "DeepFloyd/IF-I-XL-v1.0" (fpr `deep-floyd-prompt-processor`)                                                     |
+| view_dependent_prompting      | bool  | Whether to use view dependent prompt, i.e. add front/side/back/overhead view to the original prompt. Default: True                                                                                                                               |
+| overhead_threshold            | float | Consider the view as overhead when the elevation degree > overhead_threshold. Default: 60.0                                                                                                                                                      |
+| front_threshold               | float | Consider the view as front when the azimuth degree in [-front_threshold, front_threshold]. Default: 45.0                                                                                                                                         |
+| back_threshold                | float | Consider the view as back when the azimuth degree > 180 - back_threshold or < -180 + back_threshold. Default: 45.0                                                                                                                               |
+| view_dependent_prompt_front   | bool  | Whether to put the vide dependent prompt in front of the original prompt. If set to True, the final prompt will be `a front/back/side/overhead view of [prompt]`, otherwise it will be `[prompt], front/back/side/overhead view`. Default: False |
+
+### stable-diffusion-prompt-processor
+
+No specific configuration.
+
+### deep-floyd-prompt-processor
+
+No specific configuration.

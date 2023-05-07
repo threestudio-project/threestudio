@@ -36,7 +36,7 @@ system:
   renderer:
     num_samples_per_ray: 512
 
-  prompt_processor_type: "dreamfusion-prompt-processor"
+  prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     prompt: "a hamburger"
 

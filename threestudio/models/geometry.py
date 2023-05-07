@@ -62,7 +62,7 @@ class BaseImplicitGeometry(BaseGeometry):
         isosurface_resolution: int = 128
         isosurface_threshold: Union[float, str] = 0.0
         isosurface_chunk: int = 0
-        isosurface_coarse_to_fine: bool = False
+        isosurface_coarse_to_fine: bool = True
         isosurface_deformable_grid: bool = False
 
     cfg: Config
@@ -220,7 +220,6 @@ class ImplicitVolume(BaseImplicitGeometry):
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
         finite_difference_normal_eps: float = 0.01
-        detach_blob_points: bool = False
 
         isosurface_threshold: Union[
             float, str
@@ -249,8 +248,6 @@ class ImplicitVolume(BaseImplicitGeometry):
     def get_activated_density(
         self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]
     ) -> Tuple[Float[Tensor, "*N 1"], Float[Tensor, "*N 1"]]:
-        if self.cfg.detach_blob_points:
-            points = points.detach()
         density_bias: Union[float, Float[Tensor, "*N 1"]]
         if self.cfg.density_bias == "blob_dreamfusion":
             # pre-activation density bias
@@ -341,6 +338,8 @@ class ImplicitVolume(BaseImplicitGeometry):
                     grad_outputs=torch.ones_like(raw_density),
                     create_graph=True,
                 )[0]
+                if not grad_enabled:
+                    normal = normal.detach()
                 normal = F.normalize(normal, dim=-1)
             else:
                 raise AttributeError(f"Unknown normal type {self.cfg.normal_type}")
@@ -402,6 +401,7 @@ class ImplicitSDF(BaseImplicitGeometry):
         normal_type: Optional[
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
+        finite_difference_normal_eps: float = 0.01
         shape_init: Optional[str] = None
         shape_init_params: Optional[Any] = None
         force_shape_init: bool = False
@@ -497,7 +497,7 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":
-                eps = 1.0e-3
+                eps = self.cfg.finite_difference_normal_eps
                 offsets: Float[Tensor, "6 3"] = torch.as_tensor(
                     [
                         [eps, 0.0, 0.0],

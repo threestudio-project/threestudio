@@ -1,5 +1,5 @@
-name: "magic3d-refine"
-tag: "${system.prompt_processor.prompt}"
+name: "magic3d-refine-sd"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -43,12 +43,14 @@ system:
   renderer:
     context_type: gl
 
-  prompt_processor_type: "dreamfusion-prompt-processor"
+  prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     prompt: ???
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     weighting_strategy: sds
     guidance_scale: 100.
     min_step_percent: 0.02
