@@ -45,7 +45,7 @@ class LatentNeRF(BaseSystem):
         self.guidance = None
         if self.cfg.guide_shape is not None:
             self.guide_shape = self.cfg.guide_shape
-            self.shapeloss = ShapeLoss(self.guide_shape)
+            self.shape_loss = ShapeLoss(self.guide_shape)
 
     def setup_guidance(self):
         if self.guidance is None:
@@ -121,7 +121,7 @@ class LatentNeRF(BaseSystem):
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
 
         if self.C(self.cfg.loss.lambda_shape) > 0 and out["points"].shape[0] > 0:
-            loss_shape = self.shapeloss(out["points"], out["density"])
+            loss_shape = self.shape_loss(out["points"], out["density"])
             self.log("train/loss_shape", loss_shape)
             loss += loss_shape * self.C(self.cfg.loss.lambda_shape)
 
