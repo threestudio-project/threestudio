@@ -193,5 +193,3 @@ class LatentNeRF(BaseSystem):
             save_format="mp4",
             fps=30,
         )
-        mesh = self.geometry.isosurface()
-        self.save_mesh("mesh.obj", v_pos=mesh.v_pos, t_pos_idx=mesh.t_pos_idx)
