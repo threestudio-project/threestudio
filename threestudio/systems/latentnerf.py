@@ -25,7 +25,7 @@ class LatentNeRF(BaseSystem):
         prompt_processor_type: str = "dreamfusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
 
-        guide_shape: str = "./load/shape/guide.obj"
+        guide_shape: Optional[str]
         refinement: bool = False
 
     cfg: Config
@@ -43,8 +43,8 @@ class LatentNeRF(BaseSystem):
             background=self.background,
         )
         self.guidance = None
-        self.guide_shape = self.cfg.guide_shape
-        if self.guide_shape is not None:
+        if self.cfg.guide_shape is not None:
+            self.guide_shape = self.cfg.guide_shape
             self.shapeloss = ShapeLoss(self.guide_shape)
 
     def setup_guidance(self):
