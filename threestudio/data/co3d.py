@@ -30,6 +30,7 @@ from threestudio.utils.ops import (
 from threestudio.utils.typing import *
 
 
+
 def _load_16big_png_depth(depth_png) -> np.ndarray:
     with Image.open(depth_png) as depth_pil:
         # the image is stored with 16-bit depth but PIL reads it as I (32 bit).

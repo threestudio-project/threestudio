@@ -12,8 +12,13 @@ import os
 import numpy as np
 
 """
+<<<<<<< HEAD
 This code segment shows how to use Quartet: https://github.com/crawforddoran/quartet,
 to generate a tet grid
+=======
+This code segment shows how to use Quartet: https://github.com/crawforddoran/quartet, 
+to generate a tet grid 
+>>>>>>> 56ea5c4562d61c6b7e4d532d397c255a8ddd3a37
 1) Download, compile and run Quartet as described in the link above. Example usage `quartet meshes/cube.obj 0.5 cube_5.tet`
 2) Run the function below to generate a file `cube_32_tet.tet`
 """
