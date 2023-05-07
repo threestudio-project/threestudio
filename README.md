@@ -61,7 +61,7 @@ The training lasts for 10,000 iterations. You can find visualizations of the cur
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/configs/last.ckpt
 # if the training has completed, you can still continue training for a longer time by setting trainer.max_steps
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/configs/last.ckpt trainer.max_steps=20000
-# you can only perform testing using resumed checkpoints
+# you can also perform testing using resumed checkpoints
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 resume=path/to/trial/configs/last.ckpt
 # note that the above commands use parsed configuration files from previous trials
 # which will continue using the same trial directory
@@ -91,7 +91,8 @@ https://user-images.githubusercontent.com/19284678/236694848-38ae4ea4-554b-4c9d-
 
 ```sh
 # uses DeepFloyd IF, requires ~15GB VRAM to extract text embeddings and ~10GB VRAM in training
-python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
+# here we adopt random background augmentation to improve geometry quality
+python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.background.random_aug=true
 # uses StableDiffusion, requires ~6GB VRAM in training
 python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 ```
@@ -123,8 +124,7 @@ First train the coarse stage NeRF:
 
 ```sh
 # uses DeepFloyd IF, requires ~15GB VRAM to extract text embeddings and ~10GB VRAM in training
-# here we adopt random background augmentation to improve geometry quality
-python launch.py --config configs/magic3d-coarse-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.background.random_aug=true
+python launch.py --config configs/magic3d-coarse-if.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 # uses StableDiffusion, requires ~6GB VRAM in training
 python launch.py --config configs/magic3d-coarse-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 ```
@@ -212,11 +212,11 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 ## Prompt Library
 
-For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's **exactly one match**. The used prompt will be printed to console. Also note that you can't use this syntax to point to every prompt in the library, as there are prompts that are subset of other prompts lmao. We will enhance the use of this feature.
+For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html) in [this file](https://github.com/bennyguo/threestudio/blob/main/load/prompt_library.json). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's **exactly one match**. The used prompt will be printed to console. Also note that you can't use this syntax to point to every prompt in the library, as there are prompts that are subset of other prompts lmao. We will enhance the use of this feature.
 
 ## Tips on Improving Quality
 
-It's important to note that existing techniques that lift 2D T2I models to 3D cannot consistently produce satisfying results. Results from the great papers like DreamFusion and Magic3D are (to some extend) cherry-pickled, so don't be frustrated if you did not get what you expected in your first trial. Here are some tips that may help you improve the generation quality:
+It's important to note that existing techniques that lift 2D T2I models to 3D cannot consistently produce satisfying results. Results from the great papers like DreamFusion and Magic3D are (to some extend) cherry-pickled, so don't be frustrated if you did not get what you expected on your first trial. Here are some tips that may help you improve the generation quality:
 
 - **Increase batch size**. Large batch sizes help convergence and improve the 3D consistency of the geometry. State-of-the-art methods claims using large batch sizes: DreamFusion uses a batch size of 4; Magic3D uses a batch size of 32; Fantasia3D uses a batch size of 24; some results shown above uses a batch size of 8. You can easily change the batch size by setting `data.batch_size=N`. Increasing the batch size requires more VRAM. If you have limited VRAM but still want the benefit of large batch sizes, you may use [gradient accumulation provided by PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients) by setting `trainer.accumulate_grad_batches=N`. This will accumulate the gradient of several batches and achieve a large effective batch size. Note that if you use gradient accumulation, you may need to multiply all step values by N times in your config, such as values that have the name `X_steps` and `trainer.val_check_interval`, since now N batches equal to a large batch.
 - **Train longer.** This helps if you can already obtain reasonable results and would like to enhance the details. If the result is still a mess after several thousand steps, training for a longer time often won't help. You can set the total training iterations by `trainer.max_steps=N`.
@@ -268,7 +268,6 @@ Here we just briefly introduce the code structure of this project. We will make 
 - Validation/testing using resumed checkpoints have iteration=0, will be problematic if some settings are step-dependent.
 - Gradients of Vanilla MLP parameters are empty if autocast is enabled in AMP (temporarily fixed by disabling autocast).
 - FullyFused MLP may cause NaNs in 32 precision.
-- StableDiffusionGuidance is much more slower with PyTorch2.0.
 
 ## Citing threestudio
 
