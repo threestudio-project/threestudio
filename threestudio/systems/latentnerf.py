@@ -8,7 +8,6 @@ from threestudio.utils.ops import binary_cross_entropy, dot, ShapeLoss
 from threestudio.utils.typing import *
 
 
-
 @threestudio.register("latentnerf-system")
 class LatentNeRF(BaseSystem):
     @dataclass
@@ -26,6 +25,7 @@ class LatentNeRF(BaseSystem):
         prompt_processor_type: str = "dreamfusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
 
+        guide_shape: str = "./load/shape/guide.obj"
         refinement: bool = False
 
     cfg: Config
