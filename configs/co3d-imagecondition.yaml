@@ -18,10 +18,10 @@ data:
   box_crop_mask_thr: 0.4
   box_crop_context: 0.1 # The amount of additional padding added to each dimention of the cropping bounding box, relative to vox size.
   train_num_rays: 4096
-  train_split: 'train'
-  val_split: 'val'
-  test_split: 'test'
-  render_path: 'circle'
+  train_split: "train"
+  val_split: "val"
+  test_split: "test"
+  render_path: "circle"
   train_views: [0, 50, 100]
   random_camera:
     eval_height: 256
@@ -34,7 +34,7 @@ system_type: "image-condition-dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    isosurface_method: 'mc-cpu'
+    isosurface_method: "mc-cpu"
     isosurface_resolution: 128
     isosurface_threshold: 0.0
     normal_type: "finite_difference"
@@ -63,8 +63,8 @@ system:
   material:
     diffuse_prob: 1.0
     textureless_prob: 0.2
-    ambient_light_color: [1.0,1.0,1.0]
-    diffuse_light_color: [0.0,0.0,0.0]
+    ambient_light_color: [1.0, 1.0, 1.0]
+    diffuse_light_color: [0.0, 0.0, 0.0]
     ambient_only_steps: ${system.freq.ref_only_steps}
 
   # background_type: "solid-color-background"
@@ -79,12 +79,11 @@ system:
       n_hidden_layers: 1
       activation: "ReLU"
 
-
   renderer_type: "nerf-volume-renderer"
   renderer:
     num_samples_per_ray: 512
 
-  prompt_processor_type: "dreamfusion-prompt-processor"
+  prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     # prompt: "a DSLR photo of a delicious hamburger"
     prompt: "an apple"

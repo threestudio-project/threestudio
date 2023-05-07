@@ -38,7 +38,7 @@ system:
     num_samples_per_ray: 512
     grid_prune: false
 
-  prompt_processor_type: dreamfusion-prompt-processor
+  prompt_processor_type: stable-diffusion-prompt-processor
   prompt_processor:
     prompt: "A high quality photo of a delicious burger"
     view_dependent_prompt_front: true

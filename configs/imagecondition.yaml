@@ -17,7 +17,7 @@ system_type: "image-condition-dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    isosurface_method: 'mc-cpu'
+    isosurface_method: "mc-cpu"
     isosurface_resolution: 128
     isosurface_threshold: 5.0
     normal_type: "finite_difference"
@@ -45,8 +45,8 @@ system:
   material:
     diffuse_prob: 1.0
     textureless_prob: 0.2
-    ambient_light_color: [1.0,1.0,1.0]
-    diffuse_light_color: [0.0,0.0,0.0]
+    ambient_light_color: [1.0, 1.0, 1.0]
+    diffuse_light_color: [0.0, 0.0, 0.0]
     ambient_only_steps: ${system.freq.ref_only_steps}
 
   # background_type: "solid-color-background"
@@ -61,12 +61,11 @@ system:
       n_hidden_layers: 1
       activation: "ReLU"
 
-
   renderer_type: "nerf-volume-renderer"
   renderer:
     num_samples_per_ray: 512
 
-  prompt_processor_type: "dreamfusion-prompt-processor"
+  prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     prompt: "a DSLR photo of a delicious hamburger"
 

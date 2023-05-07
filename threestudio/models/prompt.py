@@ -202,8 +202,8 @@ class PromptProcessor(BaseObject):
         return torch.cat([text_embeddings, uncond_text_embeddings], dim=0)
 
 
-@threestudio.register("dreamfusion-prompt-processor")
-class DreamFusionPromptProcessor(PromptProcessor):
+@threestudio.register("stable-diffusion-prompt-processor")
+class StableDiffusionPromptProcessor(PromptProcessor):
     @dataclass
     class Config(PromptProcessor.Config):
         pass
