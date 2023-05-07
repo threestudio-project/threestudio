@@ -1,5 +1,5 @@
 name: "latentnerf-refine"
-tag: "${system.prompt_processor.prompt}"
+tag: "debug"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -21,10 +21,6 @@ system:
       output_activation: "none"
       n_neurons: 64
       n_hidden_layers: 1
-    density_bias: "blob_dreamfusion"
-    density_activation: trunc_exp
-    density_blob_scale: 5.
-    density_blob_std: 0.2
 
   material_type: "sd-latent-adapter-material"
 
@@ -43,9 +39,11 @@ system:
     half_precision_weights: true
     guidance_scale: 100.
 
+  guide_shape: ./load/shapes/teddy.obj
   loss:
-    lambda_sds: 1.
-    lambda_sparsity: 5e-4
+    lambda_sds: 1.0
+    lambda_sparsity: 0.0
+    lambda_shape: 1.0
     lambda_opaque: 0.0
     lambda_orient: 0.0
   optimizer:
@@ -74,7 +72,7 @@ trainer:
   max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
-  val_check_interval: 200
+  val_check_interval: 1000
   limit_val_batches: 1
   enable_progress_bar: true
   precision: 16-mixed
