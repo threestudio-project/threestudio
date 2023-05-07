@@ -47,16 +47,6 @@
 | light_sample_strategy  | str                | Strategy to sample point light positions in training, in ["dreamfusion", "magic3d"]. "dreamfusion" uses strategy described in the DreamFusion paper; "magic3d" uses strategy decribed in the Magic3D paper. Default: "dreamfusion"                                                  |
 | batch_uniform_azimuth  | bool               | Whether to ensure the uniformity of sampled azimuth angles in training as described in the Fantasia3D paper. If True, the `azimuth_range` is equally divided into `batch_size` bins and the azimuth angles are sampled from every bins. Default: True                               |
 
-### single-image-datamodule (TBD)
-
-| name | type | description |
-| ---- | ---- | ----------- |
-
-### co3d-datamodule (TBD)
-
-| name | type | description |
-| ---- | ---- | ----------- |
-
 ## Systems
 
 Systems contain implementation of training/validation/testing logic for different methods.
@@ -108,9 +98,10 @@ This system has all the configurations of `dreamfusion-system`.
 
 This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
 
-| name       | type | description                                             |
-| ---------- | ---- | ------------------------------------------------------- |
-| refinement | bool | Whether to perform RGB space refinement. Default: False |
+| name        | type          | description                                                                      |
+| ----------- | ------------- | -------------------------------------------------------------------------------- |
+| refinement  | bool          | Whether to perform RGB space refinement. Default: False                          |
+| guide_shape | Optional[str] | Path to the .obj file as the shape guidance, used in Sketch-Shape. Default: None |
 
 ### fantasia3d-system
 
@@ -119,11 +110,6 @@ This system has all the configurations of `dreamfusion-system`, along with the f
 | name         | type | description                                                                                                                                                                                                                                                                                                                    |
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | latent_steps | int  | Number of steps for geometry optimization in latent space. In the first `latent_steps` steps, low resolution normal and mask are concatenated and fed to the latent diffusion model. After this high resolution normal is used to perform RGB space optimziation. Details are described in the Fantasia3D paper. Default: 2500 |
-
-### image-condition-dreamfusion-system (TBD)
-
-| name | type | description |
-| ---- | ---- | ----------- |
 
 ## Geometry
 
