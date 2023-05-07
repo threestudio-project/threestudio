@@ -1,10 +1,19 @@
-# threestudio
+<p align="center">
+    <img alt="nerfstudio" src="https://user-images.githubusercontent.com/19284678/236706829-499fe708-2842-4251-94ff-a764c6b12118.png" width="50%">
+</p>
 
+<p align="center"><b>
 threestudio is a unified framework for 3D content creation from text prompts, single images, and few-shot images, by lifting 2D text-to-image generation models.
+</b></p>
 
-![mix](https://user-images.githubusercontent.com/19284678/236705385-7114e755-a05a-45a8-b5da-2a4525ecc231.gif)
+<p align="center">
+<img alt="nerfstudio" src="https://user-images.githubusercontent.com/19284678/236705385-7114e755-a05a-45a8-b5da-2a4525ecc231.gif" width="100%">
+</p>
 
-👆 Results obtained from methods implemented by threestudio: **| DreamFusion | Magic3D | SJC | Latent-NeRF | Fantasia3D |**
+<p align="center"><b>
+👆 Results obtained from methods implemented by threestudio 👆 <br/>
+| <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
+</b></p>
 
 ## Installation
 
