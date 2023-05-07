@@ -61,7 +61,7 @@
 
 Systems contain implementation of training/validation/testing logic for different methods.
 
-Common configurations:
+**Common configurations for systems**
 
 | name                          | type                | description                                                                                                                  |
 | ----------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -129,7 +129,7 @@ This system has all the configurations of `dreamfusion-system`, along with the f
 
 Geometry models properties for locations in space, including density, SDF, feature and normal.
 
-Common configurations for implicit geometry:
+**Common configurations for implicit geometry**
 
 | name                       | type             | description                                                                                                                                                                                      |
 | -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -186,7 +186,7 @@ An explicit geometry parameterized with a feature volume. The feature volume has
 | density_blob_std   | float                | The parameter for blob initialization. Default: 0.5                                                                                                                    |
 | normal_type        | Optional[str]        | The way to compute the normal from density. If set to "pred", the normal is produced with another volume in the shape of `3 x grid_size`. Default: "finite_difference" |
 
-Common configurations for explicit geometry:
+**Common configurations for explicit geometry**
 
 | name | type | description |
 | ---- | ---- | ----------- |
@@ -292,7 +292,7 @@ A background parameterized with a neural network (MLP).
 
 Renderers takes geometry, material, and background to produce images given camera and light specifications.
 
-Common configurations for renderer:
+**Common configurations for renderers**
 
 | name   | type  | description                                                                                                                 |
 | ------ | ----- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -352,7 +352,7 @@ No specific configuration.
 
 Prompt processors take a user prompt and compute text embeddings for training. The type of the prompt processor should match that of the guidance.
 
-**Common configurations for prompt processor**
+**Common configurations for prompt processors**
 
 | name                          | type  | description                                                                                                                                                                                                                                      |
 | ----------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
