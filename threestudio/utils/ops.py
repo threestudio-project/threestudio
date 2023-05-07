@@ -1,11 +1,10 @@
 from collections import defaultdict
-from igl import read_obj
-from igl import fast_winding_number_for_meshes, point_mesh_squared_distance
-import numpy as np
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from igl import fast_winding_number_for_meshes, point_mesh_squared_distance, read_obj
 from torch.autograd import Function
 from torch.cuda.amp import custom_bwd, custom_fwd
 
@@ -51,6 +50,22 @@ class _TruncExp(Function):  # pylint: disable=abstract-method
     def backward(ctx, g):  # pylint: disable=arguments-differ
         x = ctx.saved_tensors[0]
         return g * torch.exp(torch.clamp(x, max=15))
+
+
+class SpecifyGradient(Function):
+    @staticmethod
+    @custom_fwd
+    def forward(ctx, input_tensor, gt_grad):
+        ctx.save_for_backward(gt_grad)
+        # we return a dummy value 1, which will be scaled by amp's scaler so we get the scale in backward.
+        return torch.ones([1], device=input_tensor.device, dtype=input_tensor.dtype)
+
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, grad_scale):
+        (gt_grad,) = ctx.saved_tensors
+        gt_grad = gt_grad * grad_scale
+        return gt_grad, None
 
 
 trunc_exp = _TruncExp.apply

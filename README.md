@@ -63,7 +63,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 # train with sjc guidance in latent space
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="A high quality photo of a delicious burger"
 # train with sjc guidance in latent space, trump figure
-python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" seed=10 system.renderer.num_samples_per_ray=512 trainer.max_steps=30000 system.loss.lambda_emptiness=[15000,10000.0,200000.0,15001]
+python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" trainer.max_steps=30000 system.loss.lambda_emptiness=[15000,10000.0,200000.0,15001] seed=42
 ```
 
 ### Image-Condition DreamFusion
