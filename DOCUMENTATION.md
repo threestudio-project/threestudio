@@ -208,8 +208,8 @@ Given an image or its latent input, the guide should provide its gradient condit
 | enable_sequential_cpu_offload | bool | Whether to offload all models to CPU. This will use `accelerate`, significantly reducing memory usage but slower. Default: False |
 | enable_attention_slicing | bool | Whether to use sliced attention computation. This will save some memory in exchange for a small speed decrease. Default: False |
 | enable_channels_last_format | bool | Whether to use Channels Last format for the unet. Default: False (Stable Diffusion) / True (DeepFloyd) |
-| pretrained_model_name_or_path | str | The pretrained model path in huggingface. Default: runwayml/stable-diffusion-v1-5 (Stable Diffusion) / DeepFloyd/IF-I-XL-v1.0 (DeepFloyd) |
-| guidance_scale | float | Classifier free guidance. Default: 100.0 (Stable Diffusion) / 20.0 (DeepFloyd) |
+| pretrained_model_name_or_path | str | The pretrained model path in huggingface. Default: "runwayml/stable-diffusion-v1-5" (Stable Diffusion) / "DeepFloyd/IF-I-XL-v1.0" (DeepFloyd) |
+| guidance_scale | float | The classifier free guidance scale. Default: 100.0 (Stable Diffusion) / 20.0 (DeepFloyd) |
 | grad_clip | Optional[Any] | The gradient clip value. None or float or a list in the form of [start_step, start_value, end_value, end_step]. Default: None |
 | half_precision_weights | bool | Whether to use float16 for the diffusion model. Default: True |
 | min_step_percent | float | The precent range (min value) of the random timesteps to add noise and denoise. Default: 0.02 |
@@ -232,6 +232,23 @@ No specific configuration.
 
 ## Prompt Processor
 
+**Common configurations for prompt processor**
+
+| name | type | description |
+| ---- | ---- | ----------- |
+| prompt | str | The text prompt. Default: "a hamburger" |
+| negative_prompt | str | The uncondition text input in Classifier Free Guidance. Default: "" |
+| pretrained_model_name_or_path | str | The pretrained model path in huggingface. Default: "runwayml/stable-diffusion-v1-5" (Stable Diffusion) / "DeepFloyd/IF-I-XL-v1.0" (DeepFloyd) |
+| view_dependent_prompting | bool | Whether to use view dependent prompt, i.e. add front/side/back/overhead view to the original prompt. Default: True |
+| overhead_threshold | float | Consider the view as overhead when the elevation degree > overhead_threshold. Default: 60.0 |
+| front_threshold | float | Consider the view as front when the azimuth degree in [-front_threshold, front_threshold]. Default: 45.0 |
+| back_threshold | float | Consider the view as back when the azimuth degree > 180 - back_threshold or < -180 + back_threshold. Default: 45.0 |
+| view_dependent_prompt_front | bool | Whether to put the vide dependent prompt in front of the original prompt. If set to True, the final prompt will be `a front/back/side/overhead view of [prompt]`, otherwise it will be `[prompt], front/back/side/overhead view`. Default: False |
+
 ### dreamfusion-prompt-processor
 
+No specific configuration.
+
 ### deep-floyd-prompt-processor
+
+No specific configuration.
