@@ -213,6 +213,7 @@ class StableDiffusionGuidance(BaseObject):
         t: Int[Tensor, "B"],
     ):
         sigma = self.us[t]
+        sigma = sigma.view(-1, 1, 1, 1)
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
             # add noise
@@ -225,7 +226,9 @@ class StableDiffusionGuidance(BaseObject):
             # pred noise
             latent_model_input = torch.cat([scaled_zs] * 2, dim=0)
             noise_pred = self.forward_unet(
-                latent_model_input, t, encoder_hidden_states=text_embeddings
+                latent_model_input,
+                torch.cat([t] * 2),
+                encoder_hidden_states=text_embeddings,
             )
 
             # perform guidance (high scale from paper!)
