@@ -66,7 +66,7 @@ class VolumeGrid(BaseImplicitGeometry):
         df = grid.shape[1]
         di = points.shape[-1]
         out = F.grid_sample(
-            grid, points.view(1, 1, 1, -1, di), align_corners=True, mode="bilinear"
+            grid, points.view(1, 1, 1, -1, di), align_corners=False, mode="bilinear"
         )
         out = out.reshape(df, -1).T.reshape(*points_shape, df)
         return out
