@@ -40,7 +40,13 @@ class TexturedBackground(BaseBackground):
         uv = 2 * uv - 1  # rescale to [-1, 1] for grid_sample
         uv = uv.reshape(1, -1, 1, 2)
         color = (
-            F.grid_sample(self.texture, uv, mode="bilinear", padding_mode="reflection")
+            F.grid_sample(
+                self.texture,
+                uv,
+                mode="bilinear",
+                padding_mode="reflection",
+                align_corners=False,
+            )
             .reshape(self.cfg.n_output_dims, -1)
             .T.reshape(*dirs_shape, self.cfg.n_output_dims)
         )

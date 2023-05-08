@@ -177,6 +177,10 @@ python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_process
 python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_processor.prompt="Trump figure" trainer.max_steps=30000 system.loss.lambda_emptiness="[15000,10000.0,200000.0,15001]" system.optimizer.params.background.lr=0.05 seed=42
 ```
 
+**Tips**
+
+- SJC uses subpixel rendering which decodes a `128x128` latent feature map for better visualization quality. You can turn off this feature by `system.subpixel_rendering=false` to save VRAM in validation/testing.
+
 ### Latent-NeRF
 
 **Results obtained by threestudio (Stable Diffusion)**

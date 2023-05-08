@@ -92,7 +92,10 @@ This system has all the configurations of `dreamfusion-system`, along with the f
 
 ### sjc-system
 
-This system has all the configurations of `dreamfusion-system`.
+This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+| name | type | description |
+| ---------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| subpixel_rendering | bool | Whether to perform subpixel rendering in validation/testing, which decodes a `128x128` latent feature map instead of `64x64`. Default: True |
 
 ### latentnerf-system
 

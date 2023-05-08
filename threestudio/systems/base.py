@@ -117,6 +117,7 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         Gather metrics from all devices, compute mean.
         Purge repeated results using data index.
         """
+        pass
 
     def preprocess_data(self, batch, stage):
         pass
