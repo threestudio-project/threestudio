@@ -25,6 +25,8 @@ class ScoreJacobianChaining(BaseSystem):
         prompt_processor_type: str = "stable-diffusion-prompt-processor"
         prompt_processor: dict = field(default_factory=dict)
 
+        subpixel_rendering: bool = True
+
     cfg: Config
 
     def configure(self):
@@ -47,8 +49,14 @@ class ScoreJacobianChaining(BaseSystem):
             **render_out,
         }
         if decode:
+            if self.cfg.subpixel_rendering:
+                latent_height, latent_width = 128, 128
+            else:
+                latent_height, latent_width = 64, 64
             out["decoded_rgb"] = self.guidance.decode_latents(
-                out["comp_rgb"].permute(0, 3, 1, 2), latent_height=128, latent_width=128
+                out["comp_rgb"].permute(0, 3, 1, 2),
+                latent_height=latent_height,
+                latent_width=latent_width,
             ).permute(0, 2, 3, 1)
         return out
 
@@ -195,7 +203,7 @@ class ScoreJacobianChaining(BaseSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
-            align=1024,
+            align=512,
         )
 
     def on_test_epoch_end(self):
