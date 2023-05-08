@@ -3,11 +3,20 @@ import os
 from dataclasses import dataclass
 
 import torch
+import torch.multiprocessing as mp
 import torch.nn as nn
+from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
 import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.typing import *
+
+
+def hash_prompt(model: str, prompt: str) -> str:
+    import hashlib
+
+    identifier = f"{model}-{prompt}"
+    return hashlib.md5(identifier.encode()).hexdigest()
 
 
 class PromptProcessor(BaseObject):
@@ -21,45 +30,32 @@ class PromptProcessor(BaseObject):
         front_threshold: float = 45.0
         back_threshold: float = 45.0
         view_dependent_prompt_front: bool = False
+        use_cache: bool = True
 
     cfg: Config
 
+    @rank_zero_only
     def configure_text_encoder(self) -> None:
         raise NotImplementedError
 
+    @rank_zero_only
     def destroy_text_encoder(self) -> None:
         raise NotImplementedError
 
-    def configure(self) -> None:
-        threestudio.info(f"Loading text encoder ...")
-        self.configure_text_encoder()
-        threestudio.info(f"Loaded text encoder!")
+    def configure(self, trainer) -> None:
+        self.trainer = trainer
+
+        self._cache_dir = ".threestudio_cache/text_embeddings"  # FIXME: hard-coded path
 
         @dataclass
         class DirectionConfig:
             name: str
-            prompt: str
-            negative_prompt: str
+            prompt: Callable[[str], str]
+            negative_prompt: Callable[[str], str]
             condition: Callable[
                 [Float[Tensor, "B"], Float[Tensor, "B"], Float[Tensor, "B"]],
                 Float[Tensor, "B"],
             ]
-
-        # load prompt library
-        with open(os.path.join("load/prompt_library.json"), "r") as f:
-            self.prompt_library = json.load(f)
-
-        # use provided prompt or find prompt in library
-        self.prompt = self.preprocess_prompt(self.cfg.prompt)
-        # use provided negative prompt
-        self.negative_prompt = self.cfg.negative_prompt
-        threestudio.info(
-            f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
-        )
-
-        self.text_embeddings, self.uncond_text_embeddings = self.get_text_embeddings(
-            [self.prompt], [self.negative_prompt]
-        )
 
         # view-dependent text embeddings
         self.directions: List[DirectionConfig]
@@ -67,84 +63,145 @@ class PromptProcessor(BaseObject):
             self.directions = [
                 DirectionConfig(
                     "side",
-                    "side view of ",
-                    "",
+                    lambda s: f"side view of {s}",
+                    lambda s: s,
                     lambda ele, azi, dis: torch.ones_like(ele, dtype=torch.bool),
                 ),
                 DirectionConfig(
                     "front",
-                    "front view of ",
-                    "",
+                    lambda s: f"front view of {s}",
+                    lambda s: s,
                     lambda ele, azi, dis: (azi > -self.cfg.front_threshold)
                     & (azi < self.cfg.front_threshold),
                 ),
                 DirectionConfig(
                     "back",
-                    "backside view of ",
-                    "",
+                    lambda s: f"backside view of {s}",
+                    lambda s: s,
                     lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold)
                     | (azi < -180 + self.cfg.back_threshold),
                 ),
                 DirectionConfig(
                     "overhead",
-                    "overhead view of ",
-                    "",
+                    lambda s: f"overhead view of {s}",
+                    lambda s: s,
                     lambda ele, azi, dis: ele > self.cfg.overhead_threshold,
                 ),
             ]
-            self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
-            (
-                self.text_embeddings_vd,
-                self.uncond_text_embeddings_vd,
-            ) = self.get_text_embeddings(
-                [f"{d.prompt} {self.cfg.prompt} " for d in self.directions],
-                [
-                    f"{d.negative_prompt} {self.cfg.negative_prompt}"
-                    for d in self.directions
-                ],
-            )
         else:
             self.directions = [
                 DirectionConfig(
                     "side",
-                    ", side view",
-                    "",
+                    lambda s: f"{s}, side view",
+                    lambda s: s,
                     lambda ele, azi, dis: torch.ones_like(ele, dtype=torch.bool),
                 ),
                 DirectionConfig(
                     "front",
-                    ", front view",
-                    "",
+                    lambda s: f"{s}, front view",
+                    lambda s: s,
                     lambda ele, azi, dis: (azi > -self.cfg.front_threshold)
                     & (azi < self.cfg.front_threshold),
                 ),
                 DirectionConfig(
                     "back",
-                    ", back view",
-                    "",
+                    lambda s: f"{s}, back view",
+                    lambda s: s,
                     lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold)
                     | (azi < -180 + self.cfg.back_threshold),
                 ),
                 DirectionConfig(
                     "overhead",
-                    ", overhead view",
-                    "",
+                    lambda s: f"{s}, overhead view",
+                    lambda s: s,
                     lambda ele, azi, dis: ele > self.cfg.overhead_threshold,
                 ),
             ]
-            self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
-            (
-                self.text_embeddings_vd,
-                self.uncond_text_embeddings_vd,
-            ) = self.get_text_embeddings(
-                [f"{self.prompt} {d.prompt}" for d in self.directions],
-                [
-                    f"{self.negative_prompt} {d.negative_prompt}"
-                    for d in self.directions
-                ],
-            )
 
-        self.destroy_text_encoder()
+        self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
+
+        with open(os.path.join("load/prompt_library.json"), "r") as f:
+            self.prompt_library = json.load(f)
+        # use provided prompt or find prompt in library
+        self.prompt = self.preprocess_prompt(self.cfg.prompt)
+        # use provided negative prompt
+        self.negative_prompt = self.cfg.negative_prompt
+        self.prompts_vd = [d.prompt(self.prompt) for d in self.directions]
+        self.negative_prompts_vd = [
+            d.negative_prompt(self.negative_prompt) for d in self.directions
+        ]
+
+        self.prepare_text_embeddings()
+        self.load_text_embeddings()
+
+    @staticmethod
+    def spawn_func(pretrained_model_name_or_path, prompts, cache_dir):
+        raise NotImplementedError
+
+    @rank_zero_only
+    def prepare_text_embeddings(self):
+        os.makedirs(self._cache_dir, exist_ok=True)
+
+        all_prompts = (
+            [self.prompt]
+            + [self.negative_prompt]
+            + self.prompts_vd
+            + self.negative_prompts_vd
+        )
+        prompts_to_process = []
+        for prompt in all_prompts:
+            if self.cfg.use_cache:
+                # some text embeddings are already in cache
+                # do not process them
+                cache_path = os.path.join(
+                    self._cache_dir,
+                    f"{hash_prompt(self.cfg.pretrained_model_name_or_path, prompt)}.pt",
+                )
+                if os.path.exists(cache_path):
+                    threestudio.debug(
+                        f"Text embeddings for model {self.cfg.pretrained_model_name_or_path} and prompt [{prompt}] are already in cache, skip processing."
+                    )
+                    continue
+            prompts_to_process.append(prompt)
+
+        if len(prompts_to_process) > 0:
+            ctx = mp.get_context("spawn")
+            subprocess = ctx.Process(
+                target=self.spawn_func,
+                args=(
+                    self.cfg.pretrained_model_name_or_path,
+                    prompts_to_process,
+                    self._cache_dir,
+                ),
+            )
+            subprocess.start()
+            subprocess.join()
+
+    def load_text_embeddings(self):
+        # synchronize, to ensure the text embeddings have been computed and saved to cache
+        self.trainer.strategy.barrier()
+        self.text_embeddings = self.load_from_cache(self.prompt)[None, ...]
+        self.uncond_text_embeddings = self.load_from_cache(self.negative_prompt)[
+            None, ...
+        ]
+        self.text_embeddings_vd = torch.stack(
+            [self.load_from_cache(prompt) for prompt in self.prompts_vd], dim=0
+        )
+        self.uncond_text_embeddings_vd = torch.stack(
+            [self.load_from_cache(prompt) for prompt in self.negative_prompts_vd], dim=0
+        )
+        threestudio.debug(f"Loaded text embeddings.")
+
+    def load_from_cache(self, prompt):
+        cache_path = os.path.join(
+            self._cache_dir,
+            f"{hash_prompt(self.cfg.pretrained_model_name_or_path, prompt)}.pt",
+        )
+        if not os.path.exists(cache_path):
+            raise FileNotFoundError(
+                f"Text embedding file {cache_path} for model {self.cfg.pretrained_model_name_or_path} and prompt [{prompt}] not found."
+            )
+        return torch.load(cache_path, map_location=self.device)
 
     def preprocess_prompt(self, prompt: str) -> str:
         if prompt.startswith("lib:"):
@@ -189,11 +246,11 @@ class PromptProcessor(BaseObject):
                 ] = self.direction2idx[d.name]
 
             # Get text embeddings
-            text_embeddings = self.text_embeddings_vd[direction_idx]
-            uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]
+            text_embeddings = self.text_embeddings_vd[direction_idx]  # type: ignore
+            uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]  # type: ignore
         else:
-            text_embeddings = self.text_embeddings.expand(batch_size, -1, -1)
-            uncond_text_embeddings = self.uncond_text_embeddings.expand(
+            text_embeddings = self.text_embeddings.expand(batch_size, -1, -1)  # type: ignore
+            uncond_text_embeddings = self.uncond_text_embeddings.expand(  # type: ignore
                 batch_size, -1, -1
             )
 

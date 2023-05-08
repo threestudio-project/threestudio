@@ -353,6 +353,7 @@ Prompt processors take a user prompt and compute text embeddings for training. T
 | front_threshold               | float | Consider the view as front when the azimuth degree in [-front_threshold, front_threshold]. Default: 45.0                                                                                                                                         |
 | back_threshold                | float | Consider the view as back when the azimuth degree > 180 - back_threshold or < -180 + back_threshold. Default: 45.0                                                                                                                               |
 | view_dependent_prompt_front   | bool  | Whether to put the vide dependent prompt in front of the original prompt. If set to True, the final prompt will be `a front/back/side/overhead view of [prompt]`, otherwise it will be `[prompt], front/back/side/overhead view`. Default: False |
+| use_cache                     | bool  | Whether to cache computed text embeddings. If True, will use cached text embeddings if available. Default: True                                                                                                                                  |
 
 ### stable-diffusion-prompt-processor
 

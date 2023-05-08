@@ -51,16 +51,11 @@ class ImageConditionDreamFusion(BaseSystem):
         }
 
     def on_fit_start(self) -> None:
-        """
-        Initialize guidance and prompt processor in this hook:
-        (1) excluded from optimizer parameters (this hook executes after optimizer is initialized)
-        (2) only used in training
-        To avoid being saved to checkpoints, see on_save_checkpoint below.
-        """
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        # only used in training
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
+            self.cfg.prompt_processor, self.trainer
         )
+        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
         # visualize all training images
         all_images = self.trainer.datamodule.train_dataloader().dataset.get_all_images()
