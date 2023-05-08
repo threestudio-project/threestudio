@@ -1,8 +1,6 @@
 <p align="center">
     <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/19284678/236845453-450db19e-e0b1-4e27-9973-f8a3f6d77c5d.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/19284678/236706829-499fe708-2842-4251-94ff-a764c6b12118.png">
-    <img alt="threestudio" src="https://user-images.githubusercontent.com/19284678/236706829-499fe708-2842-4251-94ff-a764c6b12118.png" width="50%">
+    <img alt="threestudio" src="https://user-images.githubusercontent.com/19284678/236847132-219999d0-4ffa-4240-a262-c2c025d15d9e.png" width="50%">
     </picture>
 </p>
 
