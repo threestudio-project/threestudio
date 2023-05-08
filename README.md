@@ -1,5 +1,5 @@
 <p align="center">
-    <img alt="nerfstudio" src="https://user-images.githubusercontent.com/19284678/236706829-499fe708-2842-4251-94ff-a764c6b12118.png" width="50%">
+    <img alt="threestudio" src="https://user-images.githubusercontent.com/19284678/236706829-499fe708-2842-4251-94ff-a764c6b12118.png" width="50%">
 </p>
 
 <p align="center"><b>
@@ -7,7 +7,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="nerfstudio" src="https://user-images.githubusercontent.com/19284678/236705385-7114e755-a05a-45a8-b5da-2a4525ecc231.gif" width="100%">
+<img alt="threestudio" src="https://user-images.githubusercontent.com/3117031/236739017-365626d9-bb35-4c47-b71d-b9de767b0644.gif" width="100%">
 </p>
 
 <p align="center"><b>
@@ -224,6 +224,11 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 **Tips**
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
+
+### More to come, please stay tuned.
+
+- [ ] [Dream3D](https://bluestyle97.github.io/dream3d/)
+- [ ] [DreamAvatar](https://yukangcao.github.io/DreamAvatar/)
 
 **If you would like to contribute a new method to threestudio, see [here](https://github.com/bennyguo/threestudio#contributing-to-threestudio).**
 
