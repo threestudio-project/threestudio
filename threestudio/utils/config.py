@@ -4,6 +4,7 @@ from datetime import datetime
 
 from omegaconf import OmegaConf
 
+import threestudio
 from threestudio.utils.typing import *
 
 # ============ Register OmegaConf Recolvers ============= #
@@ -34,6 +35,7 @@ class ExperimentConfig:
     exp_dir: str = "outputs/default"
     trial_name: str = "exp"
     trial_dir: str = "outputs/default/exp"
+    n_gpus: int = 1
     ###
 
     resume: Optional[str] = None
@@ -57,17 +59,22 @@ class ExperimentConfig:
             raise ValueError("Either tag is specified or use_timestamp is True.")
         self.trial_name = self.tag
         if self.use_timestamp:
-            if self.timestamp is None:
-                self.timestamp = datetime.now().strftime("@%Y%m%d-%H%M%S")
-            self.trial_name += self.timestamp
+            if self.n_gpus > 1:
+                threestudio.warn(
+                    "Timestamp will be disabled when using multiple GPUs, please make sure you have a unique tag."
+                )
+            else:
+                if self.timestamp is None:
+                    self.timestamp = datetime.now().strftime("@%Y%m%d-%H%M%S")
+                self.trial_name += self.timestamp
         self.exp_dir = os.path.join(self.exp_root_dir, self.name)
         self.trial_dir = os.path.join(self.exp_dir, self.trial_name)
 
 
-def load_config(*yaml_files: str, cli_args: list = []) -> Any:
+def load_config(*yaml_files: str, cli_args: list = [], **kwargs) -> Any:
     yaml_confs = [OmegaConf.load(f) for f in yaml_files]
     cli_conf = OmegaConf.from_cli(cli_args)
-    cfg = OmegaConf.merge(*yaml_confs, cli_conf)
+    cfg = OmegaConf.merge(*yaml_confs, cli_conf, kwargs)
     OmegaConf.resolve(cfg)
     assert isinstance(cfg, DictConfig)
     scfg = parse_structured(ExperimentConfig, cfg)
