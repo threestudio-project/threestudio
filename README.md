@@ -85,6 +85,8 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 r
 
 See [here](https://github.com/bennyguo/threestudio#supported-models) for example running commands of all our supported models. Please refer to [here](https://github.com/bennyguo/threestudio#tips-on-improving-quality) for tips on getting higher-quality results, and [here](https://github.com/bennyguo/threestudio#vram-optimization) for reducing VRAM usage.
 
+For feature requests, bug reports, or discussions about technical problems, please [file an issue](https://github.com/threestudio-project/threestudio/issues/new). In case you want to discuss the generation quality or showcase your generation results, please feel free to participate in the [discussion panel](https://github.com/threestudio-project/threestudio/discussions).
+
 ## Supported Models
 
 ### DreamFusion
