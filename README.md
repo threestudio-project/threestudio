@@ -53,7 +53,7 @@ pip install -r requirements.txt
 
 - (Optional, Recommended) The best-performing models in threestudio uses the newly-released T2I model [DeepFloyd IF](https://github.com/deep-floyd/IF) which currently requires signing a license agreement. If you would like use these models, you need to [accept the license on the model card of DeepFloyd IF](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the huggingface hub in terminal by `huggingface-cli login`.
 
-- For contributors, see [here](https://github.com/bennyguo/threestudio#contributing-to-threestudio).
+- For contributors, see [here](https://github.com/threestudio-project/threestudio#contributing-to-threestudio).
 
 ## Quickstart
 
@@ -71,7 +71,7 @@ python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0 system.pro
 python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
 ```
 
-threestudio uses [OmegaConf](https://github.com/omry/omegaconf) for flexible configurations. You can easily change any configuration in the YAML file by specifying arguments without `--`, for example the specified prompt in the above cases. For all supported configurations, please see our [documentation](https://github.com/bennyguo/threestudio/blob/main/DOCUMENTATION.md).
+threestudio uses [OmegaConf](https://github.com/omry/omegaconf) for flexible configurations. You can easily change any configuration in the YAML file by specifying arguments without `--`, for example the specified prompt in the above cases. For all supported configurations, please see our [documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md).
 
 The training lasts for 10,000 iterations. You can find visualizations of the current status in the trial directory which defaults to `[exp_root_dir]/[name]/[tag]@[timestamp]`, where `exp_root_dir` (`outputs/` by default), `name` and `tag` can be set in the configuration file. A 360-degree video will be generated after the training is completed. In training, press `ctrl+c` one time will stop training and head directly to the test stage which generates the video. Press `ctrl+c` the second time to fully quit the program. If you want to resume from a checkpoint, do:
 
@@ -87,7 +87,7 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 r
 # if you want to save to a new trial directory, replace parsed.yaml with raw.yaml in the command
 ```
 
-See [here](https://github.com/bennyguo/threestudio#supported-models) for example running commands of all our supported models. Please refer to [here](https://github.com/bennyguo/threestudio#tips-on-improving-quality) for tips on getting higher-quality results, and [here](https://github.com/bennyguo/threestudio#vram-optimization) for reducing VRAM usage.
+See [here](https://github.com/threestudio-project/threestudio#supported-models) for example running commands of all our supported models. Please refer to [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) for tips on getting higher-quality results, and [here](https://github.com/threestudio-project/threestudio#vram-optimization) for reducing VRAM usage.
 
 For feature requests, bug reports, or discussions about technical problems, please [file an issue](https://github.com/threestudio-project/threestudio/issues/new). In case you want to discuss the generation quality or showcase your generation results, please feel free to participate in the [discussion panel](https://github.com/threestudio-project/threestudio/discussions).
 
@@ -238,11 +238,11 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 - [ ] [Dream3D](https://bluestyle97.github.io/dream3d/)
 - [ ] [DreamAvatar](https://yukangcao.github.io/DreamAvatar/)
 
-**If you would like to contribute a new method to threestudio, see [here](https://github.com/bennyguo/threestudio#contributing-to-threestudio).**
+**If you would like to contribute a new method to threestudio, see [here](https://github.com/threestudio-project/threestudio#contributing-to-threestudio).**
 
 ## Prompt Library
 
-For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html) in [this file](https://github.com/bennyguo/threestudio/blob/main/load/prompt_library.json). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's **exactly one match**. The used prompt will be printed to console. Also note that you can't use this syntax to point to every prompt in the library, as there are prompts that are subset of other prompts lmao. We will enhance the use of this feature.
+For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html) in [this file](https://github.com/threestudio-project/threestudio/blob/main/load/prompt_library.json). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's **exactly one match**. The used prompt will be printed to console. Also note that you can't use this syntax to point to every prompt in the library, as there are prompts that are subset of other prompts lmao. We will enhance the use of this feature.
 
 ## Tips on Improving Quality
 
@@ -251,14 +251,14 @@ It's important to note that existing techniques that lift 2D T2I models to 3D ca
 - **Increase batch size**. Large batch sizes help convergence and improve the 3D consistency of the geometry. State-of-the-art methods claims using large batch sizes: DreamFusion uses a batch size of 4; Magic3D uses a batch size of 32; Fantasia3D uses a batch size of 24; some results shown above uses a batch size of 8. You can easily change the batch size by setting `data.batch_size=N`. Increasing the batch size requires more VRAM. If you have limited VRAM but still want the benefit of large batch sizes, you may use [gradient accumulation provided by PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients) by setting `trainer.accumulate_grad_batches=N`. This will accumulate the gradient of several batches and achieve a large effective batch size. Note that if you use gradient accumulation, you may need to multiply all step values by N times in your config, such as values that have the name `X_steps` and `trainer.val_check_interval`, since now N batches equal to a large batch.
 - **Train longer.** This helps if you can already obtain reasonable results and would like to enhance the details. If the result is still a mess after several thousand steps, training for a longer time often won't help. You can set the total training iterations by `trainer.max_steps=N`.
 - **Try different seeds.** This is a simple solution if your results have correct overall geometry but suffer from the multi-face Janus problem. You can change the seed by setting `seed=N`. Good luck!
-- **Tuning regularization weights.** Some methods have regularizaion terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/bennyguo/threestudio#supported-models) for more detailed instructions.
+- **Tuning regularization weights.** Some methods have regularizaion terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/threestudio-project/threestudio#supported-models) for more detailed instructions.
 
 ## VRAM Optimization
 
 If you encounter CUDA OOM error, try the following in order (roughly sorted by recommendation) to meet your VRAM requirement.
 
 - If you only encounter OOM at validation/test time, you can set `system.cleanup_after_validation_step=true` and `system.cleanup_after_test_step=true` to free memory after each validation/test step. This will slow down validation/testing.
-- Use a smaller batch size or use gradient accumulation as demonstrated [here](https://github.com/bennyguo/threestudio#tips-on-improving-quality).
+- Use a smaller batch size or use gradient accumulation as demonstrated [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality).
 - If you are using PyTorch1.x, enable [memory efficient attention](https://huggingface.co/docs/diffusers/optimization/fp16#memory-efficient-attention) by setting `system.guidance.enable_memory_efficient_attention=true`. PyTorch2.0 has built-in support for this optimization and is enabled by default.
 - Enable [attention slicing](https://huggingface.co/docs/diffusers/optimization/fp16#sliced-attention-for-additional-memory-savings) by setting `system.guidance.enable_attention_slicing=true`. This will slow down training by ~20%.
 - If you are using StableDiffusionGuidance, you can use [Token Merging](https://github.com/dbolya/tomesd) to **drastically** speed up computation and save memory. You can easily enable Token Merging by setting `system.guidance.token_merging=true`. You can also customize the Token Merging behavior by setting the parameters [here](https://github.com/dbolya/tomesd/blob/main/tomesd/patch.py#L183-L213) to `system.guidance.token_merging_params`. Note that Token Merging may degrade generation quality.
@@ -266,7 +266,7 @@ If you encounter CUDA OOM error, try the following in order (roughly sorted by r
 
 ## Documentation
 
-threestudio use [OmegaConf](https://github.com/omry/omegaconf) to manage configurations. You can literally change anything inside the yaml configuration file or by adding command line arguments without `--`. We list all arguments that you can change in the configuration in our [documentation](https://github.com/bennyguo/threestudio/blob/main/DOCUMENTATION.md). Happy experimenting!
+threestudio use [OmegaConf](https://github.com/omry/omegaconf) to manage configurations. You can literally change anything inside the yaml configuration file or by adding command line arguments without `--`. We list all arguments that you can change in the configuration in our [documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md). Happy experimenting!
 
 ## Contributing to threestudio
 
