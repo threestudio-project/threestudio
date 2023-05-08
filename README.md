@@ -59,7 +59,7 @@ pip install -r requirements.txt
 
 Here we show some basic usage of threestudio. First let's train a DreamFusion model to create a classic pancake bunny.
 
-**IMPORTANT NOTE: Multi-GPU training is not fully tested and can be erroneous at the moment.**
+**IMPORTANT NOTE: Multi-GPU training is not fully tested and can be erroneous at the moment. Please see [here](https://github.com/threestudio-project/threestudio#known-problems) for known issues about multi-GPU training, and we are currently working on them on [this branch](https://github.com/threestudio-project/threestudio/tree/multigpu).**
 
 **If you are experiencing unstable connections with HuggingFace, we suggest you either (1) setting environment variable `TRANSFORMERS_OFFLINE=1 DIFFUSERS_OFFLINE=1` before your running command after all needed files have been fetched on the first run, to prevent from connecting to HuggingFace each time you run, or (2) downloading the guidance model you used to a local folder following [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-an-entire-repository) and [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-files-to-local-folder), and set `pretrained_model_name_or_path` of the guidance and the prompt processor to the local path.**
 
@@ -297,6 +297,7 @@ Here we just briefly introduce the code structure of this project. We will make 
 
 - Gradients of Vanilla MLP parameters are empty in AMP (temporarily fixed by disabling autocast).
 - FullyFused MLP may cause NaNs in 32 precision.
+- Multi-GPU training: (1) DeepFloyd IF text encoder causes deadlocks (resolved on [this branch](https://github.com/threestudio-project/threestudio/tree/multigpu)); (2) PyTorch Lightning callbacks randomly fail; (3) validation/testing logic requires adaptation; (4) Shape initialization now works on every rank, which may cause desynchronization across different ranks. We'd better initialize the shape on rank 0 and broadcast to other ranks.
 
 ## Citing threestudio
 
