@@ -53,6 +53,8 @@ class _TruncExp(Function):  # pylint: disable=abstract-method
 
 
 class SpecifyGradient(Function):
+    # Implementation from stable-dreamfusion
+    # https://github.com/ashawkey/stable-dreamfusion
     @staticmethod
     @custom_fwd
     def forward(ctx, input_tensor, gt_grad):
@@ -306,6 +308,7 @@ def tet_sdf_diff(
     return sdf_diff
 
 
+# Implementation from Latent-NeRF
 # https://github.com/eladrich/latent-nerf/blob/f49ecefcd48972e69a28e3116fe95edf0fac4dc8/src/latent_nerf/models/mesh_utils.py
 class MeshOBJ:
     dx = torch.zeros(3).float()

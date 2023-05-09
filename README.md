@@ -299,6 +299,23 @@ Here we just briefly introduce the code structure of this project. We will make 
 - FullyFused MLP may cause NaNs in 32 precision.
 - Multi-GPU training: (1) DeepFloyd IF text encoder causes deadlocks (resolved on [this branch](https://github.com/threestudio-project/threestudio/tree/multigpu)); (2) PyTorch Lightning callbacks randomly fail; (3) validation/testing logic requires adaptation; (4) Shape initialization now works on every rank, which may cause desynchronization across different ranks. We'd better initialize the shape on rank 0 and broadcast to other ranks.
 
+## Credits
+
+threestudio is built on the following amazing open-source projects:
+
+- **[Lightning](https://github.com/Lightning-AI/lightning)** Framework for creating highly organized PyTorch code.
+- **[OmegaConf](https://github.com/omry/omegaconf)** Flexible Python configuration system.
+- **[NerfAcc](https://github.com/KAIR-BAIR/nerfacc)** Plug-and-play NeRF acceleration.
+
+The following repositories greatly inspire threestudio:
+
+- **[Stable-DreamFusion](https://github.com/ashawkey/stable-dreamfusion)**
+- **[Latent-NeRF](https://github.com/eladrich/latent-nerf)**
+- **[Score Jacobian Chaining](https://github.com/pals-ttic/sjc)**
+- **[Fantasia3D.unofficial](https://github.com/ashawkey/fantasia3d.unofficial)**
+
+Thanks to the maintainers of these projects for their contribution to the community!
+
 ## Citing threestudio
 
 If you find threestudio helpful, please consider citing:
