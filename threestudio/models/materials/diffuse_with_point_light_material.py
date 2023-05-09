@@ -98,9 +98,11 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         if shading == "albedo":
             return albedo
         elif shading == "textureless":
-            return textureless_color
+            return (
+                albedo * 0 + textureless_color
+            )  # prevent checking for unused parameters in DDP
         elif shading == "diffuse":
-            return color
+            return albedo * 0 + color  # prevent checking for unused parameters in DDP
         else:
             raise ValueError(f"Unknown shading type {shading}")
 

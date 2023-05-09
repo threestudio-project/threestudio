@@ -9,6 +9,7 @@ import threestudio
 from threestudio.models.geometry.base import BaseImplicitGeometry, contract_to_unisphere
 from threestudio.models.mesh import Mesh
 from threestudio.models.networks import get_encoding, get_mlp
+from threestudio.utils.misc import get_rank
 from threestudio.utils.typing import *
 
 
@@ -55,11 +56,14 @@ class ImplicitSDF(BaseImplicitGeometry):
         self.sdf_network = get_mlp(
             self.encoding.n_output_dims, 1, self.cfg.mlp_network_config
         )
-        self.feature_network = get_mlp(
-            self.encoding.n_output_dims,
-            self.cfg.n_feature_dims,
-            self.cfg.mlp_network_config,
-        )
+
+        if self.cfg.n_feature_dims > 0:
+            self.feature_network = get_mlp(
+                self.encoding.n_output_dims,
+                self.cfg.n_feature_dims,
+                self.cfg.mlp_network_config,
+            )
+
         if self.cfg.normal_type == "pred":
             self.normal_network = get_mlp(
                 self.encoding.n_output_dims, 3, self.cfg.mlp_network_config
@@ -85,7 +89,9 @@ class ImplicitSDF(BaseImplicitGeometry):
         from tqdm import tqdm
 
         for _ in tqdm(
-            range(1000), desc=f"Initializing SDF to a(n) {self.cfg.shape_init}:"
+            range(1000),
+            desc=f"Initializing SDF to a(n) {self.cfg.shape_init}:",
+            disable=get_rank() != 0,
         ):
             points_rand = (
                 torch.rand((10000, 3), dtype=torch.float32).to(self.device) * 2.0 - 1.0
@@ -125,14 +131,14 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         enc = self.encoding(points.view(-1, self.cfg.n_input_dims))
         sdf = self.sdf_network(enc).view(*points.shape[:-1], 1)
-        features = self.feature_network(enc).view(
-            *points.shape[:-1], self.cfg.n_feature_dims
-        )
 
-        output = {
-            "sdf": sdf,
-            "features": features,
-        }
+        output = {"sdf": sdf}
+
+        if self.cfg.n_feature_dims > 0:
+            features = self.feature_network(enc).view(
+                *points.shape[:-1], self.cfg.n_feature_dims
+            )
+            output.update({"features": features})
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":

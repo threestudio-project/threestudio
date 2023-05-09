@@ -118,7 +118,7 @@ class LatentNeRF(BaseSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch, decode=True)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch_idx}.png",
+            f"it{self.true_global_step}-{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
@@ -152,7 +152,7 @@ class LatentNeRF(BaseSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch, decode=True)
         self.save_image_grid(
-            f"it{self.true_global_step}-test/{batch_idx}.png",
+            f"it{self.true_global_step}-test/{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",

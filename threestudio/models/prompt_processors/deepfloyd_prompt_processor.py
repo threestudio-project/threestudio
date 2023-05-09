@@ -61,6 +61,7 @@ class DeepFloydPromptProcessor(PromptProcessor):
         text_encoder = T5EncoderModel.from_pretrained(
             pretrained_model_name_or_path,
             subfolder="text_encoder",
+            torch_dtype=torch.float16,  # suppress warning
             load_in_8bit=True,
             variant="8bit",
             device_map="auto",

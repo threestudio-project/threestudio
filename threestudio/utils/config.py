@@ -61,7 +61,7 @@ class ExperimentConfig:
         if self.use_timestamp:
             if self.n_gpus > 1:
                 threestudio.warn(
-                    "Timestamp will be disabled when using multiple GPUs, please make sure you have a unique tag."
+                    "Timestamp is disabled when using multiple GPUs, please make sure you have a unique tag."
                 )
             else:
                 if self.timestamp is None:

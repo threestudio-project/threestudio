@@ -18,12 +18,17 @@ import logging
 
 logger = logging.getLogger("pytorch_lightning")
 
-from pytorch_lightning.utilities.rank_zero import rank_zero_debug, rank_zero_info
+from pytorch_lightning.utilities.rank_zero import (
+    rank_zero_debug,
+    rank_zero_info,
+    rank_zero_only,
+)
 
 debug = rank_zero_debug
 info = rank_zero_info
 
 
+@rank_zero_only
 def warn(*args, **kwargs):
     logger.warn(*args, **kwargs)
 

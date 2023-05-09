@@ -27,6 +27,8 @@ class RandomCameraDataModuleConfig:
     eval_width: int = 512
     batch_size: int = 1
     eval_batch_size: int = 1
+    n_val_views: int = 1
+    n_test_views: int = 120
     elevation_range: Tuple[float, float] = (-10, 90)
     azimuth_range: Tuple[float, float] = (-180, 180)
     camera_distance_range: Tuple[float, float] = (1, 1.5)
@@ -258,11 +260,16 @@ class RandomCameraDataset(Dataset):
         self.split = split
 
         if split == "val":
-            self.n_test_views = 5
+            self.n_views = self.cfg.n_val_views
         else:
-            self.n_test_views = 120
+            self.n_views = self.cfg.n_test_views
 
-        azimuth_deg: Float[Tensor, "B"] = torch.linspace(0, 360.0, self.n_test_views)
+        azimuth_deg: Float[Tensor, "B"]
+        if self.split == "val":
+            # make sure the first and last view are not the same
+            azimuth_deg = torch.linspace(0, 360.0, self.n_views + 1)[: self.n_views]
+        else:
+            azimuth_deg = torch.linspace(0, 360.0, self.n_views)
         elevation_deg: Float[Tensor, "B"] = torch.full_like(
             azimuth_deg, self.cfg.eval_elevation_deg
         )
@@ -315,7 +322,7 @@ class RandomCameraDataset(Dataset):
         )
         directions: Float[Tensor, "B H W 3"] = directions_unit_focal[
             None, :, :, :
-        ].repeat(self.n_test_views, 1, 1, 1)
+        ].repeat(self.n_views, 1, 1, 1)
         directions[:, :, :, :2] = (
             directions[:, :, :, :2] / focal_length[:, None, None, None]
         )
@@ -334,10 +341,11 @@ class RandomCameraDataset(Dataset):
         self.camera_distances = camera_distances
 
     def __len__(self):
-        return self.n_test_views
+        return self.n_views
 
     def __getitem__(self, index):
         return {
+            "index": index,
             "rays_o": self.rays_o[index],
             "rays_d": self.rays_d[index],
             "mvp_mtx": self.mvp_mtx[index],
