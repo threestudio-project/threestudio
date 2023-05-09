@@ -50,8 +50,6 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         **kwargs,
     ) -> Float[Tensor, "B ... 3"]:
         albedo = get_activation(self.cfg.albedo_activation)(features[..., :3])
-        if self.ambient_only:
-            return albedo
 
         if ambient_ratio is not None:
             # if ambient ratio is specified, use it
@@ -85,7 +83,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         if shading is None:
             if self.training:
                 # adopt the same type of augmentation for the whole batch
-                if random.random() > self.cfg.diffuse_prob:
+                if self.ambient_only or random.random() > self.cfg.diffuse_prob:
                     shading = "albedo"
                 elif random.random() < self.cfg.textureless_prob:
                     shading = "textureless"
@@ -95,14 +93,13 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
                 # return diffuse color by default in evaluation
                 shading = "diffuse"
 
+        # multiply by 0 to prevent checking for unused parameters in DDP
         if shading == "albedo":
-            return albedo
+            return albedo + textureless_color * 0
         elif shading == "textureless":
-            return (
-                albedo * 0 + textureless_color
-            )  # prevent checking for unused parameters in DDP
+            return albedo * 0 + textureless_color
         elif shading == "diffuse":
-            return albedo * 0 + color  # prevent checking for unused parameters in DDP
+            return color
         else:
             raise ValueError(f"Unknown shading type {shading}")
 
