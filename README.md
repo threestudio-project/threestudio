@@ -59,8 +59,6 @@ pip install -r requirements.txt
 
 Here we show some basic usage of threestudio. First let's train a DreamFusion model to create a classic pancake bunny.
 
-**IMPORTANT NOTE: Multi-GPU training is not fully tested and can be erroneous at the moment. Please see [here](https://github.com/threestudio-project/threestudio#known-problems) for known issues about multi-GPU training, and we are currently working on them on [this branch](https://github.com/threestudio-project/threestudio/tree/multigpu).**
-
 **If you are experiencing unstable connections with HuggingFace, we suggest you either (1) setting environment variable `TRANSFORMERS_OFFLINE=1 DIFFUSERS_OFFLINE=1` before your running command after all needed files have been fetched on the first run, to prevent from connecting to HuggingFace each time you run, or (2) downloading the guidance model you used to a local folder following [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-an-entire-repository) and [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-files-to-local-folder), and set `pretrained_model_name_or_path` of the guidance and the prompt processor to the local path.**
 
 ```sh
@@ -73,7 +71,23 @@ python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.pro
 
 threestudio uses [OmegaConf](https://github.com/omry/omegaconf) for flexible configurations. You can easily change any configuration in the YAML file by specifying arguments without `--`, for example the specified prompt in the above cases. For all supported configurations, please see our [documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md).
 
-The training lasts for 10,000 iterations. You can find visualizations of the current status in the trial directory which defaults to `[exp_root_dir]/[name]/[tag]@[timestamp]`, where `exp_root_dir` (`outputs/` by default), `name` and `tag` can be set in the configuration file. A 360-degree video will be generated after the training is completed. In training, press `ctrl+c` one time will stop training and head directly to the test stage which generates the video. Press `ctrl+c` the second time to fully quit the program. If you want to resume from a checkpoint, do:
+The training lasts for 10,000 iterations. You can find visualizations of the current status in the trial directory which defaults to `[exp_root_dir]/[name]/[tag]@[timestamp]`, where `exp_root_dir` (`outputs/` by default), `name` and `tag` can be set in the configuration file. A 360-degree video will be generated after the training is completed. In training, press `ctrl+c` one time will stop training and head directly to the test stage which generates the video. Press `ctrl+c` the second time to fully quit the program.
+
+### Multi-GPU training
+
+Multi-GPU training is supported. Note that `data.batch_size` is the batch size **per rank (device)**. Also remember to
+
+- Set `data.n_val_views` to be a multiple of the number of GPUs.
+- Set a unique `tag` as timestamp is disabled in multi-GPU training and will not be appended after the tag. If you the same tag as previous trials, saved config files, code and visualizations will be overriden.
+
+```sh
+# this results in an effective batch size of 4 (number of GPUs) * 2 (data.batch_size) = 8
+python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0,1,2,3 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes" data.batch_size=2 data.n_val_views=4
+```
+
+### Resume from checkpoints
+
+If you want to resume from a checkpoint, do:
 
 ```sh
 # resume training from the last checkpoint, you may replace last.ckpt with any other checkpoints
@@ -297,7 +311,6 @@ Here we just briefly introduce the code structure of this project. We will make 
 
 - Gradients of Vanilla MLP parameters are empty in AMP (temporarily fixed by disabling autocast).
 - FullyFused MLP may cause NaNs in 32 precision.
-- Multi-GPU training: (1) DeepFloyd IF text encoder causes deadlocks (resolved on [this branch](https://github.com/threestudio-project/threestudio/tree/multigpu)); (2) PyTorch Lightning callbacks randomly fail; (3) validation/testing logic requires adaptation; (4) Shape initialization now works on every rank, which may cause desynchronization across different ranks. We'd better initialize the shape on rank 0 and broadcast to other ranks.
 
 ## Credits
 

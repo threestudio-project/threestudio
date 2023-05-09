@@ -66,7 +66,7 @@ class CodeSnapshotCallback(VersionedCallback):
             b.decode()
             for b in set(
                 subprocess.check_output(
-                    'git ls-files -- ":!:load/*" ":!:data/*"', shell=True
+                    'git ls-files -- ":!:load/*"', shell=True
                 ).splitlines()
             )
             | set(  # hard code, TODO: use config to exclude folders or files

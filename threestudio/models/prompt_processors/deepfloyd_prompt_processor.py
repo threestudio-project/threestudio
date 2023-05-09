@@ -5,10 +5,10 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from diffusers import IFPipeline
-from transformers import T5EncoderModel
+from transformers import T5EncoderModel, T5Tokenizer
 
 import threestudio
-from threestudio.models.prompt_processors.base import PromptProcessor
+from threestudio.models.prompt_processors.base import PromptProcessor, hash_prompt
 from threestudio.utils.misc import cleanup
 from threestudio.utils.typing import *
 
@@ -21,6 +21,7 @@ class DeepFloydPromptProcessor(PromptProcessor):
 
     cfg: Config
 
+    ### these functions are unused, kept for debugging ###
     def configure_text_encoder(self) -> None:
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
         self.text_encoder = T5EncoderModel.from_pretrained(
@@ -48,3 +49,45 @@ class DeepFloydPromptProcessor(PromptProcessor):
             prompt=prompt, negative_prompt=negative_prompt, device=self.device
         )
         return text_embeddings, uncond_text_embeddings
+
+    ###
+
+    @staticmethod
+    def spawn_func(pretrained_model_name_or_path, prompts, cache_dir):
+        max_length = 77
+        tokenizer = T5Tokenizer.from_pretrained(
+            pretrained_model_name_or_path, subfolder="tokenizer"
+        )
+        text_encoder = T5EncoderModel.from_pretrained(
+            pretrained_model_name_or_path,
+            subfolder="text_encoder",
+            torch_dtype=torch.float16,  # suppress warning
+            load_in_8bit=True,
+            variant="8bit",
+            device_map="auto",
+        )
+        with torch.no_grad():
+            text_inputs = tokenizer(
+                prompts,
+                padding="max_length",
+                max_length=max_length,
+                truncation=True,
+                add_special_tokens=True,
+                return_tensors="pt",
+            )
+            text_input_ids = text_inputs.input_ids
+            attention_mask = text_inputs.attention_mask
+            text_embeddings = text_encoder(
+                text_input_ids,
+                attention_mask=attention_mask,
+            )
+            text_embeddings = text_embeddings[0]
+
+        for prompt, embedding in zip(prompts, text_embeddings):
+            torch.save(
+                embedding,
+                os.path.join(
+                    cache_dir,
+                    f"{hash_prompt(pretrained_model_name_or_path, prompt)}.pt",
+                ),
+            )

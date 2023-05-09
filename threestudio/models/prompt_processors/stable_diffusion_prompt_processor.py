@@ -7,7 +7,7 @@ import torch.nn as nn
 from transformers import AutoTokenizer, CLIPTextModel
 
 import threestudio
-from threestudio.models.prompt_processors.base import PromptProcessor
+from threestudio.models.prompt_processors.base import PromptProcessor, hash_prompt
 from threestudio.utils.misc import cleanup
 from threestudio.utils.typing import *
 
@@ -20,6 +20,7 @@ class StableDiffusionPromptProcessor(PromptProcessor):
 
     cfg: Config
 
+    ### these functions are unused, kept for debugging ###
     def configure_text_encoder(self) -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.cfg.pretrained_model_name_or_path, subfolder="tokenizer"
@@ -65,3 +66,35 @@ class StableDiffusionPromptProcessor(PromptProcessor):
             )[0]
 
         return text_embeddings, uncond_text_embeddings
+
+    ###
+
+    @staticmethod
+    def spawn_func(pretrained_model_name_or_path, prompts, cache_dir):
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        tokenizer = AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path, subfolder="tokenizer"
+        )
+        text_encoder = CLIPTextModel.from_pretrained(
+            pretrained_model_name_or_path,
+            subfolder="text_encoder",
+            device_map="auto",
+        )
+
+        with torch.no_grad():
+            tokens = tokenizer(
+                prompts,
+                padding="max_length",
+                max_length=tokenizer.model_max_length,
+                return_tensors="pt",
+            )
+            text_embeddings = text_encoder(tokens.input_ids)[0]
+
+        for prompt, embedding in zip(prompts, text_embeddings):
+            torch.save(
+                embedding,
+                os.path.join(
+                    cache_dir,
+                    f"{hash_prompt(pretrained_model_name_or_path, prompt)}.pt",
+                ),
+            )

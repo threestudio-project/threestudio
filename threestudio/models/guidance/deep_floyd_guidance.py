@@ -96,7 +96,7 @@ class DeepFloydGuidance(BaseObject):
 
         self.grad_clip_val: Optional[float] = None
 
-        threestudio.info(f"Loaded Deep Floyd ...")
+        threestudio.info(f"Loaded Deep Floyd!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def forward_unet(

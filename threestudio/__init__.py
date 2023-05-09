@@ -14,15 +14,23 @@ def find(name):
 
 
 ###  grammar sugar for logging utilities  ###
+import logging
+
+logger = logging.getLogger("pytorch_lightning")
+
 from pytorch_lightning.utilities.rank_zero import (
     rank_zero_debug,
     rank_zero_info,
-    rank_zero_warn,
+    rank_zero_only,
 )
 
 debug = rank_zero_debug
 info = rank_zero_info
-warn = rank_zero_warn
+
+
+@rank_zero_only
+def warn(*args, **kwargs):
+    logger.warn(*args, **kwargs)
 
 
 from . import data, models, systems

@@ -196,6 +196,7 @@ def get_ray_directions(
         cx, cy = W / 2, H / 2
     else:
         fx, fy = focal
+        assert principal is not None
         cx, cy = principal
 
     i, j = torch.meshgrid(

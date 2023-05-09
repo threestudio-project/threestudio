@@ -71,6 +71,7 @@ def main() -> None:
     from pytorch_lightning import Trainer
     from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
     from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
+    from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
     if args.typecheck:
         from jaxtyping import install_import_hook
@@ -85,10 +86,6 @@ def main() -> None:
     )
     from threestudio.utils.config import ExperimentConfig, load_config
 
-    # parse YAML config to OmegaConf
-    cfg: ExperimentConfig
-    cfg = load_config(args.config, cli_args=extras)
-
     logger = logging.getLogger("pytorch_lightning")
     if args.verbose:
         logger.setLevel(logging.DEBUG)
@@ -98,12 +95,15 @@ def main() -> None:
             handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
             handler.addFilter(ColoredFilter())
 
+    # parse YAML config to OmegaConf
+    cfg: ExperimentConfig
+    cfg = load_config(args.config, cli_args=extras, n_gpus=n_gpus)
+
     pl.seed_everything(cfg.seed)
 
     dm = threestudio.find(cfg.data_type)(cfg.data)
     system = threestudio.find(cfg.system_type)(cfg.system)
     system.set_save_dir(os.path.join(cfg.trial_dir, "save"))
-
     callbacks = []
     if args.train:
         callbacks += [
@@ -125,6 +125,10 @@ def main() -> None:
 
     loggers = []
     if args.train:
+        # make tensorboard logging dir to suppress warning
+        rank_zero_only(
+            lambda: os.makedirs(os.path.join(cfg.trial_dir, "tb_logs"), exist_ok=True)
+        )()
         loggers += [
             TensorBoardLogger(cfg.trial_dir, name="tb_logs"),
             CSVLogger(cfg.trial_dir, name="csv_logs"),
