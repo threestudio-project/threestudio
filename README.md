@@ -206,7 +206,7 @@ python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.
 # train Sketch-Shape in Stable Diffusion latent space
 python launch.py --config configs/sketchshape.yaml --train --gpu 0 system.guide_shape=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo"
 # refine Sketch-Shape in RGB space
-python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system.shape_guide=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
+python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system.guide_shape=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
 ```
 
 ### Fantasia3D [![arXiv](https://img.shields.io/badge/arXiv-2303.13873-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.13873)
