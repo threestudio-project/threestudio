@@ -93,7 +93,7 @@ For feature requests, bug reports, or discussions about technical problems, plea
 
 ## Supported Models
 
-### DreamFusion
+### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
 **Results obtained by threestudio (DeepFloyd IF, batch size 8)**
 
@@ -127,7 +127,7 @@ python launch.py --config configs/dreamfusion-sd.yaml --train --gpu 0 system.pro
 - Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
 - DeepFloyd IF uses T5-XXL as its text encoder, which consumes ~15GB VRAM even when using 8-bit quantization. This is currently the bottleneck for training with less VRAM. If anyone knows how to run the text encoder with less VRAM, please file an issue. We're also trying to push the text encoder to [Replicate](https://replicate.com/) to enable extracting text embeddings via API, but are having some network connection issues. Please [contact bennyguo](mailto:imbennyguo@gmail.com) if you would like to help out.
 
-### Magic3D
+### Magic3D [![arXiv](https://img.shields.io/badge/arXiv-2211.10440-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2211.10440)
 
 **Results obtained by threestudio (DeepFloyd IF, batch size 8; first row: coarse, second row: refine)**
 
@@ -164,7 +164,7 @@ python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.
 - Try increasing/decreasing `system.loss.lambda_sparsity` if your scene is stuffed with floaters/becoming empty.
 - Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
 
-### Score Jacobian Chaining
+### Score Jacobian Chaining [![arXiv](https://img.shields.io/badge/arXiv-2212.00774-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2212.00774)
 
 **Results obtained by threestudio (Stable Diffusion)**
 
@@ -185,7 +185,7 @@ python launch.py --config configs/sjc.yaml --train --gpu 0 system.prompt_process
 
 - SJC uses subpixel rendering which decodes a `128x128` latent feature map for better visualization quality. You can turn off this feature by `system.subpixel_rendering=false` to save VRAM in validation/testing.
 
-### Latent-NeRF
+### Latent-NeRF [![arXiv](https://img.shields.io/badge/arXiv-2211.07600-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2211.07600)
 
 **Results obtained by threestudio (Stable Diffusion)**
 
@@ -209,7 +209,7 @@ python launch.py --config configs/sketchshape.yaml --train --gpu 0 system.guide_
 python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system.shape_guide=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
 ```
 
-### Fantasia3D
+### Fantasia3D [![arXiv](https://img.shields.io/badge/arXiv-2303.13873-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.13873)
 
 **Results obtained by threestudio (Stable Diffusion)**
 
@@ -235,8 +235,8 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 ### More to come, please stay tuned.
 
-- [ ] [Dream3D](https://bluestyle97.github.io/dream3d/)
-- [ ] [DreamAvatar](https://yukangcao.github.io/DreamAvatar/)
+- [ ] [Dream3D](https://bluestyle97.github.io/dream3d/) [![arXiv](https://img.shields.io/badge/arXiv-2212.14704-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2212.14704)
+- [ ] [DreamAvatar](https://yukangcao.github.io/DreamAvatar/) [![arXiv](https://img.shields.io/badge/arXiv-2304.00916-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2304.00916)
 
 **If you would like to contribute a new method to threestudio, see [here](https://github.com/threestudio-project/threestudio#contributing-to-threestudio).**
 
