@@ -84,11 +84,12 @@ Systems contain implementation of training/validation/testing logic for differen
 
 This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
 
-| name                   | type | description                                                                                                                                                  |
-| ---------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| refinement             | bool | Whether to perform refinement (second stage in the Magic3D paper). Default: False                                                                            |
-| from_coarse            | bool | Whether to initialize geometry from the coarse stage (first stage in the Magic3D paper) for refinement. If True, `weights` must be specified. Default: False |
-| inherit_coarse_texture | bool | Whether to load the encoding and feature network from the coarse stage for refinement, used when `from_coarse=True`. Default: True                           |
+| name                     | type          | description                                                                                                                                                          |
+| ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| refinement               | bool          | Whether to perform refinement (second stage in the Magic3D paper). Default: False                                                                                    |
+| from_coarse              | Optional[str] | The path to the coarse stage model checkpoint. If not None and `refinement=True`, initialize the model for refinement from the specified coarse model. Default: None |
+| coarse_geometry_override | dict          | Configurations to override when initializing from coarse geometry. A typical use case is to specify an isosurface threshold value. Default: {}                       |
+| inherit_coarse_texture   | bool          | Whether to load the encoding and feature network from the coarse stage for refinement, used when `from_coarse=True`. Default: True                                   |
 
 ### sjc-system
 

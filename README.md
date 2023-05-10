@@ -168,7 +168,11 @@ Then convert the NeRF from the coarse stage to DMTet and train with differentiab
 
 ```sh
 # the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
+# NOTE: the meaning of system.from_coarse has changed from cfff05, it is now the path to the coarse stage weights instead of a boolean value
 python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt
+# if you're unsatisfied with the surface extraced using automatically determined threshold,
+# you can specify a threshold value using `system.coarse_geometry_override`
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.coarse_geometry_override.isosurface_threshold=10.
 ```
 
 **Tips**
