@@ -179,8 +179,8 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         return sdf
 
-    def forward_level(
-        self, points: Float[Tensor, "*N Di"], threshold: Union[float, Callable]
+    def forward_field(
+        self, points: Float[Tensor, "*N Di"]
     ) -> Tuple[Float[Tensor, "*N 1"], Optional[Float[Tensor, "*N 3"]]]:
         points_unscaled = points
         points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
@@ -189,4 +189,9 @@ class ImplicitSDF(BaseImplicitGeometry):
         deformation: Optional[Float[Tensor, "*N 3"]] = None
         if self.cfg.isosurface_deformable_grid:
             deformation = self.deformation_network(enc).reshape(*points.shape[:-1], 3)
-        return sdf - self.get_isosurface_threshold_value(sdf, threshold), deformation
+        return sdf, deformation
+
+    def forward_level(
+        self, field: Float[Tensor, "*N 1"], threshold: float
+    ) -> Float[Tensor, "*N 1"]:
+        return field - threshold

@@ -138,20 +138,23 @@ def main() -> None:
         callbacks=callbacks, logger=loggers, inference_mode=False, **cfg.trainer
     )
 
-    def set_system_status(system, ckpt_path):
+    def set_system_status(system, ckpt_path, eval):
+        if ckpt_path is None:
+            return
         ckpt = torch.load(ckpt_path, map_location="cpu")
-        system.set_resume_status(ckpt["epoch"], ckpt["global_step"])
+        system.set_resume_status(ckpt["epoch"], ckpt["global_step"], eval=eval)
 
     if args.train:
+        set_system_status(system, cfg.resume, eval=False)
         trainer.fit(system, datamodule=dm, ckpt_path=cfg.resume)
         trainer.test(system, datamodule=dm)
     elif args.validate:
         # manually set epoch and global_step as they cannot be automatically resumed
-        set_system_status(system, cfg.resume)
+        set_system_status(system, cfg.resume, eval=True)
         trainer.validate(system, datamodule=dm, ckpt_path=cfg.resume)
     elif args.test:
         # manually set epoch and global_step as they cannot be automatically resumed
-        set_system_status(system, cfg.resume)
+        set_system_status(system, cfg.resume, eval=True)
         trainer.test(system, datamodule=dm, ckpt_path=cfg.resume)
 
 

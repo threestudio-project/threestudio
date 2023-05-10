@@ -168,7 +168,7 @@ Then convert the NeRF from the coarse stage to DMTet and train with differentiab
 
 ```sh
 # the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.weights=path/to/coarse/stage/trial/ckpts/last.ckpt
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt
 ```
 
 **Tips**

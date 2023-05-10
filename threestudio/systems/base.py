@@ -27,25 +27,33 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         super().__init__()
         self.cfg = parse_structured(self.Config, cfg)
         self._save_dir: Optional[str] = None
+        self._resume: bool = False
         self._resume_eval: bool = False
         self._resume_eval_status: dict = {"global_step": 0, "current_epoch": 0}
         self.configure()
         if self.cfg.weights is not None:
-            state_dict, epoch, global_step = load_module_weights(
-                self.cfg.weights,
-                ignore_modules=self.cfg.weights_ignore_modules,
-                map_location="cpu",
-            )
-            self.load_state_dict(state_dict, strict=False)
-            self.do_update_step(
-                epoch, global_step, on_load_weights=True
-            )  # restore states
+            self.load_weights(self.cfg.weights, self.cfg.weights_ignore_modules)
         self.post_configure()
 
-    def set_resume_status(self, current_epoch: int, global_step: int):
-        self._resume_eval = True
+    def load_weights(self, weights: str, ignore_modules: Optional[List[str]] = None):
+        state_dict, epoch, global_step = load_module_weights(
+            weights, ignore_modules=ignore_modules, map_location="cpu"
+        )
+        self.load_state_dict(state_dict, strict=False)
+        # restore step-dependent states
+        self.do_update_step(epoch, global_step, on_load_weights=True)
+
+    def set_resume_status(self, current_epoch: int, global_step: int, eval: bool):
+        self._resume = True
+        if eval:
+            self._resume_eval = True
         self._resume_eval_status["current_epoch"] = current_epoch
         self._resume_eval_status["global_step"] = global_step
+
+    @property
+    def resume(self):
+        # whether from resumed checkpoint
+        return self._resume
 
     @property
     def true_global_step(self):
