@@ -3,15 +3,15 @@ from dataclasses import dataclass, field
 import torch
 
 import threestudio
-from threestudio.systems.base import BaseSystem
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
 @threestudio.register("dreamfusion-system")
-class DreamFusion(BaseSystem):
+class DreamFusion(BaseLift3DSystem):
     @dataclass
-    class Config(BaseSystem.Config):
+    class Config(BaseLift3DSystem.Config):
         geometry_type: str = "implicit-volume"
         geometry: dict = field(default_factory=dict)
         material_type: str = "diffuse-with-point-light-material"

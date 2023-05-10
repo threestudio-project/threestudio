@@ -5,15 +5,15 @@ import torch
 import torch.nn.functional as F
 
 import threestudio
-from threestudio.systems.base import BaseSystem
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
 @threestudio.register("image-condition-dreamfusion-system")
-class ImageConditionDreamFusion(BaseSystem):
+class ImageConditionDreamFusion(BaseLift3DSystem):
     @dataclass
-    class Config(BaseSystem.Config):
+    class Config(BaseLift3DSystem.Config):
         freq: dict = field(default_factory=dict)
         geometry_type: str = "implicit-volume"
         geometry: dict = field(default_factory=dict)

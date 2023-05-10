@@ -47,6 +47,9 @@ class BaseGeometry(BaseModule):
             f"Cannot create {BaseGeometry.__name__} from {other.__class__.__name__}"
         )
 
+    def export(self, *args, **kwargs) -> Dict[str, Any]:
+        return {}
+
 
 class BaseImplicitGeometry(BaseGeometry):
     @dataclass

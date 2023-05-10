@@ -12,7 +12,9 @@ import trimesh
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 
+from threestudio.models.mesh import Mesh
 from threestudio.utils.typing import *
+
 
 class SaverMixin:
     _save_dir: Optional[str] = None
@@ -26,7 +28,9 @@ class SaverMixin:
         return self._save_dir
 
     def convert_data(self, data):
-        if isinstance(data, np.ndarray):
+        if data is None:
+            return None
+        elif isinstance(data, np.ndarray):
             return data
         elif isinstance(data, torch.Tensor):
             return data.cpu().numpy()
@@ -45,9 +49,9 @@ class SaverMixin:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         return save_path
 
-    DEFAULT_RGB_KWARGS = {"data_format": "CHW", "data_range": (0, 1)}
+    DEFAULT_RGB_KWARGS = {"data_format": "HWC", "data_range": (0, 1)}
     DEFAULT_UV_KWARGS = {
-        "data_format": "CHW",
+        "data_format": "HWC",
         "data_range": (0, 1),
         "cmap": "checkerboard",
     }
@@ -88,6 +92,16 @@ class SaverMixin:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         return img
 
+    def _save_rgb_image(
+        self,
+        filename,
+        img,
+        data_format,
+        data_range,
+    ):
+        img = self.get_rgb_image_(img, data_format, data_range)
+        cv2.imwrite(filename, img)
+
     def save_rgb_image(
         self,
         filename,
@@ -95,8 +109,7 @@ class SaverMixin:
         data_format=DEFAULT_RGB_KWARGS["data_format"],
         data_range=DEFAULT_RGB_KWARGS["data_range"],
     ):
-        img = self.get_rgb_image_(img, data_format, data_range)
-        cv2.imwrite(self.get_save_path(filename), img)
+        self._save_rgb_image(self.get_save_path(filename), img, data_format, data_range)
 
     def get_uv_image_(self, img, data_format, data_range, cmap):
         img = self.convert_data(img)
@@ -319,6 +332,153 @@ class SaverMixin:
         t_pos_idx = self.convert_data(t_pos_idx)
         mesh = trimesh.Trimesh(vertices=v_pos, faces=t_pos_idx)
         mesh.export(self.get_save_path(filename))
+
+    def save_obj(
+        self,
+        filename: str,
+        mesh: Mesh,
+        save_mat: bool = False,
+        save_normal: bool = False,
+        save_uv: bool = False,
+        save_vertex_color: bool = False,
+        map_Kd: Optional[Float[Tensor, "H W 3"]] = None,
+        map_Ks: Optional[Float[Tensor, "H W 3"]] = None,
+        map_Bump: Optional[Float[Tensor, "H W 3"]] = None,
+        map_format: str = "jpg",
+    ) -> None:
+        if not filename.endswith(".obj"):
+            filename += ".obj"
+        v_pos, t_pos_idx = self.convert_data(mesh.v_pos), self.convert_data(
+            mesh.t_pos_idx
+        )
+        v_nrm, v_tex, t_tex_idx, v_rgb = None, None, None, None
+        if save_normal:
+            v_nrm = self.convert_data(mesh.v_nrm)
+        if save_uv:
+            v_tex, t_tex_idx = self.convert_data(mesh.v_tex), self.convert_data(
+                mesh.t_tex_idx
+            )
+        if save_vertex_color:
+            v_rgb = self.convert_data(mesh.v_rgb)
+        matname, mtllib = None, None
+        if save_mat:
+            matname = "default"
+            mtl_filename = filename.replace(".obj", ".mtl")
+            mtllib = os.path.basename(mtl_filename)
+            self._save_mtl(
+                mtl_filename,
+                matname,
+                map_Kd=self.convert_data(map_Kd),
+                map_Ks=self.convert_data(map_Ks),
+                map_Bump=self.convert_data(map_Bump),
+                map_format=map_format,
+            )
+        self._save_obj(
+            filename,
+            v_pos,
+            t_pos_idx,
+            v_nrm=v_nrm,
+            v_tex=v_tex,
+            t_tex_idx=t_tex_idx,
+            v_rgb=v_rgb,
+            matname=matname,
+            mtllib=mtllib,
+        )
+
+    def _save_obj(
+        self,
+        filename,
+        v_pos,
+        t_pos_idx,
+        v_nrm=None,
+        v_tex=None,
+        t_tex_idx=None,
+        v_rgb=None,
+        matname=None,
+        mtllib=None,
+    ):
+        obj_str = ""
+        if matname is not None:
+            obj_str += f"mtllib {mtllib}\n"
+            obj_str += f"g object\n"
+            obj_str += f"usemtl {matname}\n"
+        for i in range(len(v_pos)):
+            obj_str += f"v {v_pos[i][0]} {v_pos[i][1]} {v_pos[i][2]}"
+            if v_rgb is not None:
+                obj_str += f" {v_rgb[i][0]} {v_rgb[i][1]} {v_rgb[i][2]}"
+            obj_str += "\n"
+        if v_nrm is not None:
+            for v in v_nrm:
+                obj_str += f"vn {v[0]} {v[1]} {v[2]}\n"
+        if v_tex is not None:
+            for v in v_tex:
+                obj_str += f"vt {v[0]} {1.0 - v[1]}\n"
+
+        for i in range(len(t_pos_idx)):
+            obj_str += "f"
+            for j in range(3):
+                obj_str += f" {t_pos_idx[i][j] + 1}/"
+                if v_tex is not None:
+                    obj_str += f"{t_tex_idx[i][j] + 1}"
+                obj_str += "/"
+                if v_nrm is not None:
+                    obj_str += f"{t_pos_idx[i][j] + 1}"
+            obj_str += "\n"
+
+        with open(self.get_save_path(filename), "w") as f:
+            f.write(obj_str)
+
+    def _save_mtl(
+        self,
+        filename,
+        matname,
+        Ka=(0.0, 0.0, 0.0),
+        Kd=(1.0, 1.0, 1.0),
+        Ks=(0.0, 0.0, 0.0),
+        map_Kd=None,
+        map_Ks=None,
+        map_Bump=None,
+        map_format="jpg",
+    ):
+        mtl_str = f"newmtl {matname}\n"
+        mtl_str += f"Ka {Ka[0]} {Ka[1]} {Ka[2]}\n"
+        mtl_save_path = self.get_save_path(filename)
+        if map_Kd is not None:
+            mtl_str += f"map_Kd texture_kd.{map_format}\n"
+            self._save_rgb_image(
+                os.path.join(
+                    os.path.dirname(mtl_save_path), f"texture_kd.{map_format}"
+                ),
+                map_Kd,
+                data_format="HWC",
+                data_range=(0, 1),
+            )
+        else:
+            mtl_str += f"Kd {Kd[0]} {Kd[1]} {Kd[2]}\n"
+        if map_Ks is not None:
+            mtl_str += f"map_Ks texture_ks.{map_format}\n"
+            self._save_rgb_image(
+                os.path.join(
+                    os.path.dirname(mtl_save_path), f"texture_ks.{map_format}"
+                ),
+                map_Ks,
+                data_format="HWC",
+                data_range=(0, 1),
+            )
+        else:
+            mtl_str += f"Ks {Ks[0]} {Ks[1]} {Ks[2]}\n"
+        if map_Bump is not None:
+            mtl_str += f"map_Bump texture_nrm.{map_format}\n"
+            self._save_rgb_image(
+                os.path.join(
+                    os.path.dirname(mtl_save_path), f"texture_nrm.{map_format}"
+                ),
+                map_Bump,
+                data_format="HWC",
+                data_range=(0, 1),
+            )
+        with open(self.get_save_path(filename), "w") as f:
+            f.write(mtl_str)
 
     def save_file(self, filename, src_path):
         shutil.copyfile(src_path, self.get_save_path(filename))

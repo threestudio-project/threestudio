@@ -23,3 +23,6 @@ class BaseMaterial(BaseModule):
 
     def forward(self, *args, **kwargs) -> Float[Tensor, "*B 3"]:
         raise NotImplementedError
+
+    def export(self, *args, **kwargs) -> Dict[str, Any]:
+        return {}

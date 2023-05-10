@@ -196,3 +196,20 @@ class ImplicitVolume(BaseImplicitGeometry):
             -(density - self.get_isosurface_threshold_value(density, threshold)),
             None,
         )
+
+    def export(self, points: Float[Tensor, "*N Di"], **kwargs) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        if self.cfg.n_feature_dims == 0:
+            return out
+        points_unscaled = points
+        points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
+        enc = self.encoding(points.reshape(-1, self.cfg.n_input_dims))
+        features = self.feature_network(enc).view(
+            *points.shape[:-1], self.cfg.n_feature_dims
+        )
+        out.update(
+            {
+                "features": features,
+            }
+        )
+        return out

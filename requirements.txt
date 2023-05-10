@@ -21,3 +21,4 @@ sentencepiece
 safetensors
 huggingface_hub
 libigl
+xatlas

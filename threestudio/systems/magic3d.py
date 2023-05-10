@@ -4,16 +4,16 @@ from dataclasses import dataclass, field
 import torch
 
 import threestudio
-from threestudio.systems.base import BaseSystem
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
 @threestudio.register("magic3d-system")
-class Magic3D(BaseSystem):
+class Magic3D(BaseLift3DSystem):
     @dataclass
-    class Config(BaseSystem.Config):
+    class Config(BaseLift3DSystem.Config):
         geometry_type: str = "implicit-volume"
         geometry: dict = field(default_factory=dict)
 

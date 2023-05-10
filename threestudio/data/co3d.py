@@ -30,7 +30,6 @@ from threestudio.utils.ops import (
 from threestudio.utils.typing import *
 
 
-
 def _load_16big_png_depth(depth_png) -> np.ndarray:
     with Image.open(depth_png) as depth_pil:
         # the image is stored with 16-bit depth but PIL reads it as I (32 bit).
@@ -683,10 +682,8 @@ class Co3dDataModule(pl.LightningDataModule):
             self.train_dataset = Co3dIterableDataset(self.cfg, self.cfg.train_split)
         if stage in [None, "fit", "validate"]:
             self.val_dataset = Co3dDataset(self.cfg, self.cfg.val_split)
-        if stage in [None, "test"]:
+        if stage in [None, "test", "predict"]:
             self.test_dataset = Co3dDataset(self.cfg, self.cfg.test_split)
-        if stage in [None, "predict"]:
-            self.predict_dataset = Co3dDataset(self.cfg, self.cfg.train_split)
 
     def prepare_data(self):
         pass
@@ -713,4 +710,4 @@ class Co3dDataModule(pl.LightningDataModule):
         return self.general_loader(self.test_dataset, batch_size=1)
 
     def predict_dataloader(self):
-        return self.general_loader(self.predict_dataset, batch_size=1)
+        return self.general_loader(self.test_dataset, batch_size=1)

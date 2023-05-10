@@ -47,7 +47,7 @@ def main() -> None:
     group.add_argument("--train", action="store_true")
     group.add_argument("--validate", action="store_true")
     group.add_argument("--test", action="store_true")
-    # group.add_argument("--export", action="store_true") # TODO: a separate export function
+    group.add_argument("--export", action="store_true")
 
     parser.add_argument(
         "--verbose", action="store_true", help="if true, set logging level to DEBUG"
@@ -153,6 +153,9 @@ def main() -> None:
         # manually set epoch and global_step as they cannot be automatically resumed
         set_system_status(system, cfg.resume)
         trainer.test(system, datamodule=dm, ckpt_path=cfg.resume)
+    elif args.export:
+        set_system_status(system, cfg.resume)
+        trainer.predict(system, datamodule=dm, ckpt_path=cfg.resume)
 
 
 if __name__ == "__main__":

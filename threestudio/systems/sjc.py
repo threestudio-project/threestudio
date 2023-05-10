@@ -4,14 +4,14 @@ import numpy as np
 import torch
 
 import threestudio
-from threestudio.systems.base import BaseSystem
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.typing import *
 
 
 @threestudio.register("sjc-system")
-class ScoreJacobianChaining(BaseSystem):
+class ScoreJacobianChaining(BaseLift3DSystem):
     @dataclass
-    class Config(BaseSystem.Config):
+    class Config(BaseLift3DSystem.Config):
         geometry_type: str = "volume-grid"
         geometry: dict = field(default_factory=dict)
         material_type: str = "no-material"

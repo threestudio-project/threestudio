@@ -1,6 +1,8 @@
+import numpy as np
 import torch
 import torch.nn.functional as F
 
+import threestudio
 from threestudio.utils.ops import dot
 from threestudio.utils.typing import *
 
@@ -13,6 +15,9 @@ class Mesh:
         self.t_pos_idx = t_pos_idx
         self._v_nrm = None
         self._v_tng = None
+        self._v_tex = None
+        self._t_tex_idx = None
+        self._v_rgb = None
         self._edges = None
         self.extras: Dict[str, Any] = {}
         for k, v in kwargs.items():
@@ -24,22 +29,38 @@ class Mesh:
     @property
     def v_nrm(self):
         if self._v_nrm is None:
-            self._v_nrm = self.compute_vertex_normal()
+            self._v_nrm = self._compute_vertex_normal()
         return self._v_nrm
 
     @property
     def v_tng(self):
         if self._v_tng is None:
-            self._v_tng = self.compute_vertex_tangent()
+            self._v_tng = self._compute_vertex_tangent()
         return self._v_tng
+
+    @property
+    def v_tex(self):
+        if self._v_tex is None:
+            self._v_tex, self._t_tex_idx = self._unwrap_uv()
+        return self._v_tex
+
+    @property
+    def t_tex_idx(self):
+        if self._t_tex_idx is None:
+            self._v_tex, self._t_tex_idx = self._unwrap_uv()
+        return self._t_tex_idx
+
+    @property
+    def v_rgb(self):
+        return self._v_rgb
 
     @property
     def edges(self):
         if self._edges is None:
-            self._edges = self.compute_edges()
+            self._edges = self._compute_edges()
         return self._edges
 
-    def compute_vertex_normal(self):
+    def _compute_vertex_normal(self):
         i0 = self.t_pos_idx[:, 0]
         i1 = self.t_pos_idx[:, 1]
         i2 = self.t_pos_idx[:, 2]
@@ -67,7 +88,7 @@ class Mesh:
 
         return v_nrm
 
-    def compute_vertex_tangent(self):
+    def _compute_vertex_tangent(self):
         vn_idx = [None] * 3
         pos = [None] * 3
         tex = [None] * 3
@@ -111,7 +132,55 @@ class Mesh:
 
         return tangents
 
-    def compute_edges(self):
+    def _unwrap_uv(
+        self, xatlas_chart_options: dict = {}, xatlas_pack_options: dict = {}
+    ):
+        threestudio.info("Using xatlas to perform UV unwrapping, may take a while ...")
+
+        import xatlas
+
+        atlas = xatlas.Atlas()
+        atlas.add_mesh(
+            self.v_pos.cpu().numpy(),
+            self.t_pos_idx.cpu().numpy(),
+        )
+        co = xatlas.ChartOptions()
+        po = xatlas.PackOptions()
+        for k, v in xatlas_chart_options.items():
+            setattr(co, k, v)
+        for k, v in xatlas_pack_options.items():
+            setattr(po, k, v)
+        atlas.generate(co, po)
+        vmapping, indices, uvs = atlas.get_mesh(0)
+        vmapping = (
+            torch.from_numpy(
+                vmapping.astype(np.uint64, casting="same_kind").view(np.int64)
+            )
+            .to(self.v_pos.device)
+            .long()
+        )
+        uvs = torch.from_numpy(uvs).to(self.v_pos.device).float()
+        indices = (
+            torch.from_numpy(
+                indices.astype(np.uint64, casting="same_kind").view(np.int64)
+            )
+            .to(self.v_pos.device)
+            .long()
+        )
+        return uvs, indices
+
+    def unwrap_uv(
+        self, xatlas_chart_options: dict = {}, xatlas_pack_options: dict = {}
+    ):
+        self._v_tex, self._t_tex_idx = self._unwrap_uv(
+            xatlas_chart_options, xatlas_pack_options
+        )
+
+    def set_vertex_color(self, v_rgb):
+        assert v_rgb.shape[0] == self.v_pos.shape[0]
+        self._v_rgb = v_rgb
+
+    def _compute_edges(self):
         # Compute edges
         edges = torch.cat(
             [

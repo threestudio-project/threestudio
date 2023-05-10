@@ -3,15 +3,15 @@ from dataclasses import dataclass, field
 import torch
 
 import threestudio
-from threestudio.systems.base import BaseSystem
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import ShapeLoss, binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
 @threestudio.register("latentnerf-system")
-class LatentNeRF(BaseSystem):
+class LatentNeRF(BaseLift3DSystem):
     @dataclass
-    class Config(BaseSystem.Config):
+    class Config(BaseLift3DSystem.Config):
         geometry_type: str = "implicit-volume"
         geometry: dict = field(default_factory=dict)
         material_type: str = "nomaterial"

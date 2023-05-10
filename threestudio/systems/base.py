@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
 
+import threestudio
+from threestudio.models.exporters.base import Exporter, ExporterOutput
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
@@ -98,10 +100,6 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
             cleanup()
 
     def on_validation_epoch_end(self):
-        """
-        Gather metrics from all devices, compute mean.
-        Purge repeated results using data index.
-        """
         raise NotImplementedError
 
     def test_step(self, batch, batch_idx):
@@ -113,10 +111,17 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
             cleanup()
 
     def on_test_epoch_end(self):
-        """
-        Gather metrics from all devices, compute mean.
-        Purge repeated results using data index.
-        """
+        pass
+
+    def predict_step(self, batch, batch_idx):
+        raise NotImplementedError
+
+    def on_predict_batch_end(self, outputs, batch, batch_idx):
+        if self.cfg.cleanup_after_test_step:
+            # cleanup to save vram
+            cleanup()
+
+    def on_predict_epoch_end(self):
         pass
 
     def preprocess_data(self, batch, stage):
@@ -139,6 +144,10 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         self.preprocess_data(batch, "test")
         self.do_update_step(self.true_current_epoch, self.true_global_step)
 
+    def on_predict_batch_start(self, batch, batch_idx, dataloader_idx=0):
+        self.preprocess_data(batch, "predict")
+        self.do_update_step(self.true_current_epoch, self.true_global_step)
+
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         pass
 
@@ -150,3 +159,62 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         print(norms)
         """
         pass
+
+
+class BaseLift3DSystem(BaseSystem):
+    @dataclass
+    class Config(BaseSystem.Config):
+        geometry_type: str = ""
+        geometry: dict = field(default_factory=dict)
+        material_type: str = ""
+        material: dict = field(default_factory=dict)
+        background_type: str = ""
+        background: dict = field(default_factory=dict)
+        renderer_type: str = ""
+        renderer: dict = field(default_factory=dict)
+        guidance_type: str = ""
+        guidance: dict = field(default_factory=dict)
+        prompt_processor_type: str = ""
+        prompt_processor: dict = field(default_factory=dict)
+
+        # geometry export configurations, no need to specify in training
+        exporter_type: str = ""
+        exporter: dict = field(default_factory=dict)
+
+    cfg: Config
+
+    def configure(self) -> None:
+        self.geometry = threestudio.find(self.cfg.geometry_type)(self.cfg.geometry)
+        self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
+        self.background = threestudio.find(self.cfg.background_type)(
+            self.cfg.background
+        )
+        self.renderer = threestudio.find(self.cfg.renderer_type)(
+            self.cfg.renderer,
+            geometry=self.geometry,
+            material=self.material,
+            background=self.background,
+        )
+
+    def on_predict_start(self) -> None:
+        self.exporter: Exporter = threestudio.find(self.cfg.exporter_type)(
+            self.cfg.exporter,
+            geometry=self.geometry,
+            material=self.material,
+            background=self.background,
+        )
+
+    def predict_step(self, batch, batch_idx):
+        if self.exporter.cfg.save_video:
+            self.test_step(batch, batch_idx)
+
+    def on_predict_epoch_end(self) -> None:
+        if self.exporter.cfg.save_video:
+            self.on_test_epoch_end()
+        exporter_output: List[ExporterOutput] = self.exporter()
+        for out in exporter_output:
+            save_func_name = f"save_{out.save_type}"
+            if not hasattr(self, save_func_name):
+                raise ValueError(f"{save_func_name} not supported by the SaverMixin")
+            save_func = getattr(self, save_func_name)
+            save_func(f"it{self.true_global_step}-export/{out.save_name}", **out.params)

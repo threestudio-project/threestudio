@@ -4,15 +4,15 @@ import torch
 import torch.nn.functional as F
 
 import threestudio
-from threestudio.systems.base import BaseSystem
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
 @threestudio.register("fantasia3d-system")
-class Fantasia3D(BaseSystem):
+class Fantasia3D(BaseLift3DSystem):
     @dataclass
-    class Config(BaseSystem.Config):
+    class Config(BaseLift3DSystem.Config):
         geometry_type: str = "implicit-sdf"
         geometry: dict = field(default_factory=lambda: {"n_feature_dims": 0})
         material_type: str = "no-material"  # unused
