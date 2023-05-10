@@ -23,13 +23,13 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
 
     cfg: Config
 
-    def __init__(self, cfg) -> None:
+    def __init__(self, cfg, resumed=False) -> None:
         super().__init__()
         self.cfg = parse_structured(self.Config, cfg)
         self._save_dir: Optional[str] = None
-        self._resume: bool = False
-        self._resume_eval: bool = False
-        self._resume_eval_status: dict = {"global_step": 0, "current_epoch": 0}
+        self._resumed: bool = resumed
+        self._resumed_eval: bool = False
+        self._resumed_eval_status: dict = {"global_step": 0, "current_epoch": 0}
         self.configure()
         if self.cfg.weights is not None:
             self.load_weights(self.cfg.weights, self.cfg.weights_ignore_modules)
@@ -43,29 +43,28 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         # restore step-dependent states
         self.do_update_step(epoch, global_step, on_load_weights=True)
 
-    def set_resume_status(self, current_epoch: int, global_step: int, eval: bool):
-        self._resume = True
-        if eval:
-            self._resume_eval = True
-        self._resume_eval_status["current_epoch"] = current_epoch
-        self._resume_eval_status["global_step"] = global_step
+    def set_resume_status(self, current_epoch: int, global_step: int):
+        # restore correct epoch and global step in eval
+        self._resumed_eval = True
+        self._resumed_eval_status["current_epoch"] = current_epoch
+        self._resumed_eval_status["global_step"] = global_step
 
     @property
-    def resume(self):
+    def resumed(self):
         # whether from resumed checkpoint
-        return self._resume
+        return self._resumed
 
     @property
     def true_global_step(self):
-        if self._resume_eval:
-            return self._resume_eval_status["global_step"]
+        if self._resumed_eval:
+            return self._resumed_eval_status["global_step"]
         else:
             return self.global_step
 
     @property
     def true_current_epoch(self):
-        if self._resume_eval:
-            return self._resume_eval_status["current_epoch"]
+        if self._resumed_eval:
+            return self._resumed_eval_status["current_epoch"]
         else:
             return self.current_epoch
 

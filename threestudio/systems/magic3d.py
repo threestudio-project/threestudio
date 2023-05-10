@@ -58,7 +58,7 @@ class Magic3D(BaseSystem):
             self.cfg.refinement
             and self.cfg.from_coarse  # from_coarse must be specified
             and not self.cfg.weights  # not initialized from coarse when weights are specified
-            and not self.resume  # not initialized from coarse when resumed from checkpoints
+            and not self.resumed  # not initialized from coarse when resumed from checkpoints
         ):
             threestudio.info("Initializing from coarse stage ...")
             from threestudio.utils.config import load_config, parse_structured

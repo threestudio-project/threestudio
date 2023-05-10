@@ -79,12 +79,14 @@ def main() -> None:
         install_import_hook("threestudio", "typeguard.typechecked")
 
     import threestudio
+    from threestudio.systems.base import BaseSystem
     from threestudio.utils.callbacks import (
         CodeSnapshotCallback,
         ConfigSnapshotCallback,
         CustomProgressBar,
     )
     from threestudio.utils.config import ExperimentConfig, load_config
+    from threestudio.utils.typing import Optional
 
     logger = logging.getLogger("pytorch_lightning")
     if args.verbose:
@@ -102,7 +104,9 @@ def main() -> None:
     pl.seed_everything(cfg.seed)
 
     dm = threestudio.find(cfg.data_type)(cfg.data)
-    system = threestudio.find(cfg.system_type)(cfg.system)
+    system: BaseSystem = threestudio.find(cfg.system_type)(
+        cfg.system, resumed=cfg.resume is not None
+    )
     system.set_save_dir(os.path.join(cfg.trial_dir, "save"))
     callbacks = []
     if args.train:
@@ -138,23 +142,22 @@ def main() -> None:
         callbacks=callbacks, logger=loggers, inference_mode=False, **cfg.trainer
     )
 
-    def set_system_status(system, ckpt_path, eval):
+    def set_system_status(system: BaseSystem, ckpt_path: Optional[str]):
         if ckpt_path is None:
             return
         ckpt = torch.load(ckpt_path, map_location="cpu")
-        system.set_resume_status(ckpt["epoch"], ckpt["global_step"], eval=eval)
+        system.set_resume_status(ckpt["epoch"], ckpt["global_step"])
 
     if args.train:
-        set_system_status(system, cfg.resume, eval=False)
         trainer.fit(system, datamodule=dm, ckpt_path=cfg.resume)
         trainer.test(system, datamodule=dm)
     elif args.validate:
         # manually set epoch and global_step as they cannot be automatically resumed
-        set_system_status(system, cfg.resume, eval=True)
+        set_system_status(system, cfg.resume)
         trainer.validate(system, datamodule=dm, ckpt_path=cfg.resume)
     elif args.test:
         # manually set epoch and global_step as they cannot be automatically resumed
-        set_system_status(system, cfg.resume, eval=True)
+        set_system_status(system, cfg.resume)
         trainer.test(system, datamodule=dm, ckpt_path=cfg.resume)
 
 
