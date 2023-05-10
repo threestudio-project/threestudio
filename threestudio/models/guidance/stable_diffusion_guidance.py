@@ -287,7 +287,10 @@ class StableDiffusionGuidance(BaseObject):
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)
+        # loss = SpecifyGradient.apply(latents, grad)
+        # not straghtforward, use a reparameterization trick instead 
+        target = (latents-grad).detach() # the target is the denoised latents
+        loss = 0.5 * F.mse_loss(latents, target, reduction='sum')  / batch_size
         # latents.backward(grad, retain_graph=True)
 
         return {
