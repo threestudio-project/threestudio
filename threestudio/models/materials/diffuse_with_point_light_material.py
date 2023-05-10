@@ -90,8 +90,11 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
                 else:
                     shading = "diffuse"
             else:
-                # return diffuse color by default in evaluation
-                shading = "diffuse"
+                if self.ambient_only:
+                    shading = "albedo"
+                else:
+                    # return shaded color by default in evaluation
+                    shading = "diffuse"
 
         # multiply by 0 to prevent checking for unused parameters in DDP
         if shading == "albedo":
