@@ -17,6 +17,10 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
 </b></p>
 
+<p align="center">
+    Did not find what you want? Submit a feature request or upvote others' requests <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
+</p>
+
 ## Installation
 
 The following steps have been tested on Ubuntu20.04.
