@@ -21,6 +21,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
     Did not find what you want? Submit a feature request or upvote others' requests <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
 </p>
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio_google_colab.ipynb)
+
 ## News
 
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
