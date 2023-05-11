@@ -19,6 +19,7 @@ class MeshExporter(Exporter):
     @dataclass
     class Config(Exporter.Config):
         fmt: str = "obj-mtl"  # in ['obj-mtl', 'obj'], TODO: fbx
+        save_name: str = "model"
         save_normal: bool = False
         save_uv: bool = True
         save_texture: bool = True
@@ -122,7 +123,11 @@ class MeshExporter(Exporter):
                     "save_texture is True but no albedo texture found, using default white texture"
                 )
             # TODO: map_Ks
-        return [ExporterOutput(save_name="model.obj", save_type="obj", params=params)]
+        return [
+            ExporterOutput(
+                save_name=f"{self.cfg.save_name}.obj", save_type="obj", params=params
+            )
+        ]
 
     def export_obj(self, mesh: Mesh) -> List[ExporterOutput]:
         params = {
@@ -153,4 +158,8 @@ class MeshExporter(Exporter):
                     "save_texture is True but no albedo texture found, not saving vertex color"
                 )
 
-        return [ExporterOutput(save_name="model.obj", save_type="obj", params=params)]
+        return [
+            ExporterOutput(
+                save_name=f"{self.cfg.save_name}.obj", save_type="obj", params=params
+            )
+        ]
