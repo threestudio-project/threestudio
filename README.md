@@ -21,6 +21,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
 
+![export-blender](https://github.com/threestudio-project/threestudio/assets/19284678/ccae2820-e702-484c-a43f-81678a365427)
+
 ## Installation
 
 The following steps have been tested on Ubuntu20.04.
