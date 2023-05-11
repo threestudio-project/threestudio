@@ -13,6 +13,15 @@ from threestudio.utils.typing import *
 class Fantasia3D(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
+        # not necessary, just for backward compatibility
+        material_type: str = "no-material"  # unused
+        material: dict = field(default_factory=lambda: {"n_output_dims": 0})
+        background_type: str = "solid-color-background"  # unused
+        background: dict = field(default_factory=dict)
+        renderer_type: str = "nvdiff-rasterizer"
+        renderer: dict = field(default_factory=dict)
+        ##################################################
+
         latent_steps: int = 2500
 
     cfg: Config
