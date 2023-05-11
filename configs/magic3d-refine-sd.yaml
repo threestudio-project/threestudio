@@ -15,9 +15,8 @@ data:
 
 system_type: "magic3d-system"
 system:
-  weights: ???
   refinement: true
-  from_coarse: true
+  from_coarse: ???
   geometry_type: "tetrahedra-sdf-grid"
   geometry:
     radius: 2.0 # consistent with coarse

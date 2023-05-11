@@ -109,6 +109,8 @@ def get_activation(name) -> Callable:
 
 
 def chunk_batch(func: Callable, chunk_size: int, *args, **kwargs) -> Any:
+    if chunk_size <= 0:
+        return func(*args, **kwargs)
     B = None
     for arg in list(args) + list(kwargs.values()):
         if isinstance(arg, torch.Tensor):

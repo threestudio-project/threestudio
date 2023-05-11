@@ -141,18 +141,20 @@ class VolumeGrid(BaseImplicitGeometry):
         )
         return density
 
-    def forward_level(
-        self, points: Float[Tensor, "*N Di"], threshold: Union[float, Callable]
+    def forward_field(
+        self, points: Float[Tensor, "*N Di"]
     ) -> Tuple[Float[Tensor, "*N 1"], Optional[Float[Tensor, "*N 3"]]]:
         if self.cfg.isosurface_deformable_grid:
             threestudio.warn(
                 f"{self.__class__.__name__} does not support isosurface_deformable_grid. Ignoring."
             )
         density = self.forward_density(points)
-        return (
-            -(density - self.get_isosurface_threshold_value(density, threshold)),
-            None,
-        )
+        return density, None
+
+    def forward_level(
+        self, field: Float[Tensor, "*N 1"], threshold: float
+    ) -> Float[Tensor, "*N 1"]:
+        return -(field - threshold)
 
     def export(self, points: Float[Tensor, "*N Di"], **kwargs) -> Dict[str, Any]:
         out: Dict[str, Any] = {}

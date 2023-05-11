@@ -99,68 +99,64 @@ class BaseImplicitGeometry(BaseGeometry):
     ) -> Dict[str, Float[Tensor, "..."]]:
         raise NotImplementedError
 
-    def forward_level(
-        self, points: Float[Tensor, "*N Di"], threshold: Union[float, Callable]
+    def forward_field(
+        self, points: Float[Tensor, "*N Di"]
     ) -> Tuple[Float[Tensor, "*N 1"], Optional[Float[Tensor, "*N 3"]]]:
+        # return the value of the implicit field, could be density / signed distance
+        # also return a deformation field if the grid vertices can be optimized
         raise NotImplementedError
 
-    def get_isosurface_threshold_value(
-        self, level: Float[Tensor, "*N 1"], threshold: Union[float, Callable]
-    ):
-        if isinstance(threshold, float):
-            threshold_val = threshold
-        elif isinstance(threshold, Callable):  # type: ignore
-            threshold_val = threshold(level)
-        else:
-            raise TypeError(f"Unsupported threshold type {type(threshold)}")
-        return threshold_val
+    def forward_level(
+        self, field: Float[Tensor, "*N 1"], threshold: float
+    ) -> Float[Tensor, "*N 1"]:
+        # return the value of the implicit field, where the zero level set represents the surface
+        raise NotImplementedError
 
     def _isosurface(self, bbox: Float[Tensor, "2 3"], fine_stage: bool = False) -> Mesh:
-        def batch_func(x, threshold):
+        def batch_func(x):
             # scale to bbox as the input vertices are in [0, 1]
-            level, deformation = self.forward_level(
+            field, deformation = self.forward_field(
                 scale_tensor(
                     x.to(bbox.device), self.isosurface_helper.points_range, bbox
                 ),
-                threshold,
             )
-            level = level.to(
+            field = field.to(
                 x.device
             )  # move to the same device as the input (could be CPU)
             if deformation is not None:
                 deformation = deformation.to(x.device)
-            return level, deformation
+            return field, deformation
 
         assert self.isosurface_helper is not None
-        if self.cfg.isosurface_chunk > 0:
-            assert isinstance(
-                self.cfg.isosurface_threshold, float
-            ), "isosurface_threshold must be float when isosurface_chunk > 0"
-            level, deformation = chunk_batch(
-                batch_func,
-                self.cfg.isosurface_chunk,
-                self.isosurface_helper.grid_vertices,
-                self.cfg.isosurface_threshold,
-            )
-        else:
-            threshold: Union[float, Callable]
-            if isinstance(self.cfg.isosurface_threshold, float):
-                threshold = self.cfg.isosurface_threshold
-            elif self.cfg.isosurface_threshold == "auto":
-                # automatic determining threshold for density field
-                # FIXME: highly empirical
-                if not fine_stage:
-                    # large threshold for the coarse stage to remove outliars
-                    threshold = lambda level: level.mean() + 5 * level.std()
-                else:
-                    threshold = lambda level: level.mean()
-            else:
-                raise TypeError(
-                    f"Unknown isosurface_threshold {self.cfg.isosurface_threshold}"
+
+        field, deformation = chunk_batch(
+            batch_func,
+            self.cfg.isosurface_chunk,
+            self.isosurface_helper.grid_vertices,
+        )
+
+        threshold: float
+        if isinstance(self.cfg.isosurface_threshold, float):
+            threshold = self.cfg.isosurface_threshold
+        elif self.cfg.isosurface_threshold == "auto":
+            # automatic determining threshold for density field
+            # FIXME: highly empirical
+            if not fine_stage:
+                # large threshold for the coarse stage to remove outliars
+                threshold = (field.mean() + 5 * field.std()).item()
+                threestudio.info(
+                    f"Automatically determined isosurface threshold: {threshold}"
                 )
-            level, deformation = batch_func(
-                self.isosurface_helper.grid_vertices, threshold
+            else:
+                threshold = field.mean().item()
+                threestudio.info(
+                    f"Automatically determined isosurface threshold: {threshold} (fine stage)"
+                )
+        else:
+            raise TypeError(
+                f"Unknown isosurface_threshold {self.cfg.isosurface_threshold}"
             )
+        level = self.forward_level(field, threshold)
         mesh: Mesh = self.isosurface_helper(level, deformation=deformation)
         mesh.v_pos = scale_tensor(
             mesh.v_pos, self.isosurface_helper.points_range, bbox
@@ -171,7 +167,7 @@ class BaseImplicitGeometry(BaseGeometry):
     def isosurface(self) -> Mesh:
         if not self.cfg.isosurface:
             raise NotImplementedError(
-                "Isosurface is disabled in the current configuration"
+                "Isosurface is not enabled in the current configuration"
             )
         if self.cfg.isosurface_coarse_to_fine:
             with torch.no_grad():

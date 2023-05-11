@@ -59,7 +59,9 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
     def configure(self) -> None:
         super().configure()
 
-        self.isosurface_bbox = self.bbox
+        # this should be saved to state_dict, register as buffer
+        self.isosurface_bbox: Float[Tensor, "2 3"]
+        self.register_buffer("isosurface_bbox", self.bbox.clone())
 
         self.isosurface_helper = MarchingTetrahedraHelper(
             self.cfg.isosurface_resolution,
