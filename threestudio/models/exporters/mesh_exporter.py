@@ -1,5 +1,7 @@
 from dataclasses import dataclass, field
 
+import cv2
+import numpy as np
 import torch
 
 import threestudio
@@ -81,9 +83,23 @@ class MeshExporter(Exporter):
             rast, _ = self.ctx.rasterize_one(
                 uv_clip4, mesh.t_tex_idx, (self.cfg.texture_size, self.cfg.texture_size)
             )
-            valid = rast[:, :, 3] > 0
-            # Interpolate world space position
 
+            hole_mask = ~(rast[:, :, 3] > 0)
+
+            def uv_padding(image):
+                uv_padding_size = self.cfg.xatlas_pack_options.get("padding", 2)
+                inpaint_image = (
+                    cv2.inpaint(
+                        (image.detach().cpu().numpy() * 255).astype(np.uint8),
+                        (hole_mask.detach().cpu().numpy() * 255).astype(np.uint8),
+                        uv_padding_size,
+                        cv2.INPAINT_TELEA,
+                    )
+                    / 255.0
+                )
+                return torch.from_numpy(inpaint_image).to(image)
+
+            # Interpolate world space position
             gb_pos, _ = self.ctx.interpolate_one(
                 mesh.v_pos, rast[None, ...], mesh.t_pos_idx
             )
@@ -93,11 +109,14 @@ class MeshExporter(Exporter):
             geo_out = self.geometry.export(points=gb_pos)
             mat_out = self.material.export(points=gb_pos, **geo_out)
 
+            threestudio.info(
+                "Perform UV padding on texture maps to avoid seams, may take a while ..."
+            )
             if "normal" in geo_out:
-                params["map_Bump"] = geo_out["normal"]
+                params["map_Bump"] = uv_padding(geo_out["normal"])
 
             if "albedo" in mat_out:
-                params["map_Kd"] = mat_out["albedo"]
+                params["map_Kd"] = uv_padding(mat_out["albedo"])
             else:
                 threestudio.warn(
                     "save_texture is True but no albedo texture found, using default white texture"
