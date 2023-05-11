@@ -4,43 +4,21 @@ import numpy as np
 import torch
 
 import threestudio
-from threestudio.systems.base import BaseSystem
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.typing import *
 
 
 @threestudio.register("sjc-system")
-class ScoreJacobianChaining(BaseSystem):
+class ScoreJacobianChaining(BaseLift3DSystem):
     @dataclass
-    class Config(BaseSystem.Config):
-        geometry_type: str = "volume-grid"
-        geometry: dict = field(default_factory=dict)
-        material_type: str = "no-material"
-        material: dict = field(default_factory=dict)
-        background_type: str = "textured-background"
-        background: dict = field(default_factory=dict)
-        renderer_type: str = "nerf-volume-renderer"
-        renderer: dict = field(default_factory=dict)
-        guidance_type: str = "stable-diffusion-guidance"
-        guidance: dict = field(default_factory=dict)
-        prompt_processor_type: str = "stable-diffusion-prompt-processor"
-        prompt_processor: dict = field(default_factory=dict)
-
+    class Config(BaseLift3DSystem.Config):
         subpixel_rendering: bool = True
 
     cfg: Config
 
     def configure(self):
-        self.geometry = threestudio.find(self.cfg.geometry_type)(self.cfg.geometry)
-        self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
-        self.background = threestudio.find(self.cfg.background_type)(
-            self.cfg.background
-        )
-        self.renderer = threestudio.find(self.cfg.renderer_type)(
-            self.cfg.renderer,
-            geometry=self.geometry,
-            material=self.material,
-            background=self.background,
-        )
+        # create geometry, material, background, renderer
+        super().configure()
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def forward(self, batch: Dict[str, Any], decode: bool = False) -> Dict[str, Any]:

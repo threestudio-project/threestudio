@@ -224,7 +224,7 @@ class SingleImageDataModule(pl.LightningDataModule):
             self.train_dataset = SingleImageIterableDataset(self.cfg, "train")
         if stage in [None, "fit", "validate"]:
             self.val_dataset = SingleImageDataset(self.cfg, "val")
-        if stage in [None, "test"]:
+        if stage in [None, "test", "predict"]:
             self.test_dataset = SingleImageDataset(self.cfg, "test")
 
     def prepare_data(self):
@@ -246,4 +246,7 @@ class SingleImageDataModule(pl.LightningDataModule):
         return self.general_loader(self.val_dataset, batch_size=1)
 
     def test_dataloader(self) -> DataLoader:
+        return self.general_loader(self.test_dataset, batch_size=1)
+
+    def predict_dataloader(self) -> DataLoader:
         return self.general_loader(self.test_dataset, batch_size=1)

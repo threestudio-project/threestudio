@@ -375,7 +375,7 @@ class RandomCameraDataModule(pl.LightningDataModule):
             self.train_dataset = RandomCameraIterableDataset(self.cfg)
         if stage in [None, "fit", "validate"]:
             self.val_dataset = RandomCameraDataset(self.cfg, "val")
-        if stage in [None, "test"]:
+        if stage in [None, "test", "predict"]:
             self.test_dataset = RandomCameraDataset(self.cfg, "test")
 
     def prepare_data(self):
@@ -401,6 +401,11 @@ class RandomCameraDataModule(pl.LightningDataModule):
         # return self.general_loader(self.train_dataset, batch_size=None, collate_fn=self.train_dataset.collate)
 
     def test_dataloader(self) -> DataLoader:
+        return self.general_loader(
+            self.test_dataset, batch_size=1, collate_fn=self.test_dataset.collate
+        )
+
+    def predict_dataloader(self) -> DataLoader:
         return self.general_loader(
             self.test_dataset, batch_size=1, collate_fn=self.test_dataset.collate
         )

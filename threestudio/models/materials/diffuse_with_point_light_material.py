@@ -111,3 +111,9 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
             self.ambient_only = True
         else:
             self.ambient_only = False
+
+    def export(self, features: Float[Tensor, "*N Nf"], **kwargs) -> Dict[str, Any]:
+        albedo = get_activation(self.cfg.albedo_activation)(features[..., :3]).clamp(
+            0.0, 1.0
+        )
+        return {"albedo": albedo}

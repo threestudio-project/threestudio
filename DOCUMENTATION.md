@@ -63,26 +63,32 @@ Systems contain implementation of training/validation/testing logic for differen
 | cleanup_after_validation_step | bool                | Whether to empty cache after each validation step. This will slow down validation. Default: False                            |
 | cleanup_after_test_step       | bool                | Whether to empty cache after each test step. This will slow down testing. Default: False                                     |
 
+Currently all implemented systems inherit to `BaseLift3DSystem`, which has the following common configurations:
+
+| name                  | type | description                                                                                                                                                                                                                       |
+| --------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| geometry_type         | str  | Type of the geometry used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#geometry) for supported geometry.                                                               |
+| geometry              | dict | Configurations of the geometry.                                                                                                                                                                                                   |
+| material_type         | str  | Type of the material used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#material) for supported materials.                                                              |
+| matrial               | dict | Configurations of the material.                                                                                                                                                                                                   |
+| background_type       | str  | Type of the background used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#background) for supported background.                                                         |
+| background            | dict | Configurations of the background.                                                                                                                                                                                                 |
+| renderer_type         | str  | Type of the renderer used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#renderers) for supported renderers.                                                             |
+| renderer              | dict | Configurations of the renderer.                                                                                                                                                                                                   |
+| guidance_type         | str  | Type of the guidance used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#guidance) for supported guidance.                                                               |
+| guidance              | dict | Configurations of the guidance.                                                                                                                                                                                                   |
+| prompt_processor_type | str  | Type of the prompt processor used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported prompt processors.                                     |
+| prompt_processor      | dict | Configurations of the prompt processor.                                                                                                                                                                                           |
+| exporter_type         | str  | Type of the exporter used in the system. Only used in export stage. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported exporters. Default: "mesh-exporter" |
+| exporter              | dict | Configurations of the exporter.                                                                                                                                                                                                   |
+
 ### dreamfusion-system
 
-| name                  | type | description                                                                                                                                                                                  |
-| --------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| geometry_type         | str  | Type of the geometry used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#geometry) for supported geometry.                          |
-| geometry              | dict | Configurations of the geometry.                                                                                                                                                              |
-| material_type         | str  | Type of the material used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#material) for supported material.                          |
-| matrial               | dict | Configurations of the material.                                                                                                                                                              |
-| background_type       | str  | Type of the background used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#background) for supported background.                    |
-| background            | dict | Configurations of the background.                                                                                                                                                            |
-| renderer_type         | str  | Type of the renderer used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#renderers) for supported renderer.                         |
-| renderer              | dict | Configurations of the renderer.                                                                                                                                                              |
-| guidance_type         | str  | Type of the guidance used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#guidance) for supported guidance.                          |
-| guidance              | dict | Configurations of the guidance.                                                                                                                                                              |
-| prompt_processor_type | str  | Type of the prompt processor used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported prompt processor. |
-| prompt_processor      | dict | Configurations of the prompt processor.                                                                                                                                                      |
+This system has all the common configurations.
 
 ### magic3d-system
 
-This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+This system has all the common configurations, along with the following unique configurations:
 
 | name                     | type          | description                                                                                                                                                          |
 | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -93,14 +99,14 @@ This system has all the configurations of `dreamfusion-system`, along with the f
 
 ### sjc-system
 
-This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+This system has all the common configurations, along with the following unique configurations:
 | name | type | description |
-| ---------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | subpixel_rendering | bool | Whether to perform subpixel rendering in validation/testing, which decodes a `128x128` latent feature map instead of `64x64`. Default: True |
 
 ### latentnerf-system
 
-This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+This system has all the common configurations, along with the following unique configurations:
 
 | name        | type          | description                                                                      |
 | ----------- | ------------- | -------------------------------------------------------------------------------- |
@@ -109,7 +115,7 @@ This system has all the configurations of `dreamfusion-system`, along with the f
 
 ### fantasia3d-system
 
-This system has all the configurations of `dreamfusion-system`, along with the following unique configurations:
+This system has all the common configurations, along with the following unique configurations:
 
 | name         | type | description                                                                                                                                                                                                                                                                                                                    |
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -166,15 +172,16 @@ Geometry models properties for locations in space, including density, SDF, featu
 
 An explicit geometry parameterized with a feature volume. The feature volume has a shape of `(n_feature_dims + 1) x grid_size`, one channel for density and the rest for material. The density is first scaled, then biased and finally activated.
 
-| name               | type                 | description                                                                                                                                                            |
-| ------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| grid_size          | tuple[int, int, int] | The resolution of the feature volume. Default: (100, 100, 100)                                                                                                         |
-| n_feature_dims     | int                  | The feature dimensions for its material. Default: 3                                                                                                                    |
-| density_activation | Optional[str]        | The activation to get the density value. Default: "softplus"                                                                                                           |
-| density_bias       | Union[float, str]    | The initialization of the density. A float value indicates uniform initialization and `blob` indicates a ball centered at the center. Default: "blob"                  |
-| density_blob_scale | float                | The parameter for blob initialization. Default: 5.0                                                                                                                    |
-| density_blob_std   | float                | The parameter for blob initialization. Default: 0.5                                                                                                                    |
-| normal_type        | Optional[str]        | The way to compute the normal from density. If set to "pred", the normal is produced with another volume in the shape of `3 x grid_size`. Default: "finite_difference" |
+| name                 | type                 | description                                                                                                                                                            |
+| -------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| grid_size            | tuple[int, int, int] | The resolution of the feature volume. Default: (100, 100, 100)                                                                                                         |
+| n_feature_dims       | int                  | The feature dimensions for its material. Default: 3                                                                                                                    |
+| density_activation   | Optional[str]        | The activation to get the density value. Default: "softplus"                                                                                                           |
+| density_bias         | Union[float, str]    | The initialization of the density. A float value indicates uniform initialization and `blob` indicates a ball centered at the center. Default: "blob"                  |
+| density_blob_scale   | float                | The parameter for blob initialization. Default: 5.0                                                                                                                    |
+| density_blob_std     | float                | The parameter for blob initialization. Default: 0.5                                                                                                                    |
+| normal_type          | Optional[str]        | The way to compute the normal from density. If set to "pred", the normal is produced with another volume in the shape of `3 x grid_size`. Default: "finite_difference" |
+| isosurface_threshold | Union[float,str]     | Inherit from common configurations, but default to "auto". Default: "auto"                                                                                             |
 
 **Common configurations for explicit geometry**
 
@@ -363,3 +370,28 @@ No specific configuration.
 ### deep-floyd-prompt-processor
 
 No specific configuration.
+
+## Exporters
+
+Exporters output assets like textured meshes, which can be used for further processing.
+
+**Common configurations for exporters**
+
+| name       | type | description                                 |
+| ---------- | ---- | ------------------------------------------- |
+| save_video | int  | Whether to save a 360 video. default: False |
+
+### mesh-exporter
+
+| name                 | type | description                                                                                                                                                                                                                                                       |
+| -------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| fmt                  | str  | The format to save, in ["obj-mtl", "obj"]. If "obj-mtl", save to an obj file with mtl material specification; if "obj", save to an obj file with vertex colors. Default: "obj-mtl"                                                                                |
+| save_name            | str  | Filename of the saved mesh model, without extension. Default: "model"                                                                                                                                                                                             |
+| save_normal          | bool | Whether to save vertex normal. Default: False                                                                                                                                                                                                                     |
+| save_uv              | bool | Whether to save texture coordinates. If True, will use xatlas to perform UV unwrapping. Default: True                                                                                                                                                             |
+| save_texture         | bool | Whether to save texture information. If True, will save texture maps if `fmt="obj-mtl"`, and will save vertex colors if `fmt="obj"`. Note that `save_uv` must be True for `save_texture=True` and `fmt="obj-mtl"`. Default: True                                  |
+| texture_size         | int  | Texture map size, used when `save_texture=True` and `fmt="obj-mtl"`. Default: 1024                                                                                                                                                                                |
+| texture_format       | str  | Texture map file format, used when `save_texture=True` and `fmt="obj-mtl"`. Default: "jpg"                                                                                                                                                                        |
+| xatlas_chart_options | dict | Chart options for xatlas UV unwrapping, used when `save_uv=True`. See [here](https://github.com/MozillaReality/xatlas-web/blob/master/xatlas.h#L169) for supported options. Default: {}                                                                           |
+| xatlas_pack_options  | dict | Pack options for xatlas UV unwrapping, used when `save_uv=True`. See [here](https://github.com/MozillaReality/xatlas-web/blob/master/xatlas.h#L201) for supported options. Default: {}                                                                            |
+| context_type         | str  | Rasterization context type used by nvdiffrast, in ["gl", "cuda"], used when `save_texture=True` and `fmt="obj-mtl"`. See the [nvdiffrast documentation](https://nvlabs.github.io/nvdiffrast/#rasterizing-with-cuda-vs-opengl-new) for more details. Default: "gl" |

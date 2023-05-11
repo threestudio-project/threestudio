@@ -29,6 +29,14 @@ system:
     shape_init: sphere
     shape_init_params: 0.5
 
+  material_type: "no-material" # unused
+  material:
+    n_output_dims: 0
+
+  background_type: "solid-color-background" # unused
+
+  renderer_type: "nvdiff-rasterizer"
+
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"

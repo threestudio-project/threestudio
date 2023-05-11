@@ -25,6 +25,10 @@ class VolumeGrid(BaseImplicitGeometry):
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
 
+        isosurface_threshold: Union[
+            float, str
+        ] = "auto"  # automatically determine the threshold
+
     cfg: Config
 
     def configure(self) -> None:
@@ -155,3 +159,18 @@ class VolumeGrid(BaseImplicitGeometry):
         self, field: Float[Tensor, "*N 1"], threshold: float
     ) -> Float[Tensor, "*N 1"]:
         return -(field - threshold)
+
+    def export(self, points: Float[Tensor, "*N Di"], **kwargs) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        if self.cfg.n_feature_dims == 0:
+            return out
+        points_unscaled = points
+        points = contract_to_unisphere(points, self.bbox, self.unbounded)
+        points = points * 2 - 1  # convert to [-1, 1] for grid sample
+        features = self.get_trilinear_feature(points, self.grid)[..., 1:]
+        out.update(
+            {
+                "features": features,
+            }
+        )
+        return out
