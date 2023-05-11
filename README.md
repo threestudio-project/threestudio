@@ -194,7 +194,7 @@ python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.
 
 **Tips**
 
-- For the caorse stage, DeepFloyd IF performs **way better than** StableDiffusion.
+- For the coarse stage, DeepFloyd IF performs **way better than** StableDiffusion.
 - Magic3D uses a neural network to predict the surface normal, which may not resemble the true geometric normal, so it's common to see that your object becomes extremely dark after `system.material.ambient_only_steps`.
 - Try increasing/decreasing `system.loss.lambda_sparsity` if your scene is stuffed with floaters/becoming empty.
 - Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
