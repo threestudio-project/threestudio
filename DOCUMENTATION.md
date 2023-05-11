@@ -65,22 +65,22 @@ Systems contain implementation of training/validation/testing logic for differen
 
 Currently all implemented systems inherit to `BaseLift3DSystem`, which has the following common configurations:
 
-| name                  | type | description                                                                                                                                                                                              |
-| --------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| geometry_type         | str  | Type of the geometry used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#geometry) for supported geometry.                                      |
-| geometry              | dict | Configurations of the geometry.                                                                                                                                                                          |
-| material_type         | str  | Type of the material used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#material) for supported materials.                                     |
-| matrial               | dict | Configurations of the material.                                                                                                                                                                          |
-| background_type       | str  | Type of the background used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#background) for supported background.                                |
-| background            | dict | Configurations of the background.                                                                                                                                                                        |
-| renderer_type         | str  | Type of the renderer used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#renderers) for supported renderers.                                    |
-| renderer              | dict | Configurations of the renderer.                                                                                                                                                                          |
-| guidance_type         | str  | Type of the guidance used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#guidance) for supported guidance.                                      |
-| guidance              | dict | Configurations of the guidance.                                                                                                                                                                          |
-| prompt_processor_type | str  | Type of the prompt processor used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported prompt processors.            |
-| prompt_processor      | dict | Configurations of the prompt processor.                                                                                                                                                                  |
-| exporter_type         | str  | Type of the exporter used in the system. Only used in export stage. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported exporters. |
-| exporter              | dict | Configurations of the exporter.                                                                                                                                                                          |
+| name                  | type | description                                                                                                                                                                                                                       |
+| --------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| geometry_type         | str  | Type of the geometry used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#geometry) for supported geometry.                                                               |
+| geometry              | dict | Configurations of the geometry.                                                                                                                                                                                                   |
+| material_type         | str  | Type of the material used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#material) for supported materials.                                                              |
+| matrial               | dict | Configurations of the material.                                                                                                                                                                                                   |
+| background_type       | str  | Type of the background used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#background) for supported background.                                                         |
+| background            | dict | Configurations of the background.                                                                                                                                                                                                 |
+| renderer_type         | str  | Type of the renderer used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#renderers) for supported renderers.                                                             |
+| renderer              | dict | Configurations of the renderer.                                                                                                                                                                                                   |
+| guidance_type         | str  | Type of the guidance used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#guidance) for supported guidance.                                                               |
+| guidance              | dict | Configurations of the guidance.                                                                                                                                                                                                   |
+| prompt_processor_type | str  | Type of the prompt processor used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported prompt processors.                                     |
+| prompt_processor      | dict | Configurations of the prompt processor.                                                                                                                                                                                           |
+| exporter_type         | str  | Type of the exporter used in the system. Only used in export stage. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported exporters. Default: "mesh-exporter" |
+| exporter              | dict | Configurations of the exporter.                                                                                                                                                                                                   |
 
 ### dreamfusion-system
 
@@ -100,7 +100,7 @@ This system has all the common configurations, along with the following unique c
 ### sjc-system
 
 This system has all the common configurations, along with the following unique configurations:
-| name               | type | description                                                                                                                                 |
+| name | type | description |
 | ------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | subpixel_rendering | bool | Whether to perform subpixel rendering in validation/testing, which decodes a `128x128` latent feature map instead of `64x64`. Default: True |
 
@@ -172,15 +172,16 @@ Geometry models properties for locations in space, including density, SDF, featu
 
 An explicit geometry parameterized with a feature volume. The feature volume has a shape of `(n_feature_dims + 1) x grid_size`, one channel for density and the rest for material. The density is first scaled, then biased and finally activated.
 
-| name               | type                 | description                                                                                                                                                            |
-| ------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| grid_size          | tuple[int, int, int] | The resolution of the feature volume. Default: (100, 100, 100)                                                                                                         |
-| n_feature_dims     | int                  | The feature dimensions for its material. Default: 3                                                                                                                    |
-| density_activation | Optional[str]        | The activation to get the density value. Default: "softplus"                                                                                                           |
-| density_bias       | Union[float, str]    | The initialization of the density. A float value indicates uniform initialization and `blob` indicates a ball centered at the center. Default: "blob"                  |
-| density_blob_scale | float                | The parameter for blob initialization. Default: 5.0                                                                                                                    |
-| density_blob_std   | float                | The parameter for blob initialization. Default: 0.5                                                                                                                    |
-| normal_type        | Optional[str]        | The way to compute the normal from density. If set to "pred", the normal is produced with another volume in the shape of `3 x grid_size`. Default: "finite_difference" |
+| name                 | type                 | description                                                                                                                                                            |
+| -------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| grid_size            | tuple[int, int, int] | The resolution of the feature volume. Default: (100, 100, 100)                                                                                                         |
+| n_feature_dims       | int                  | The feature dimensions for its material. Default: 3                                                                                                                    |
+| density_activation   | Optional[str]        | The activation to get the density value. Default: "softplus"                                                                                                           |
+| density_bias         | Union[float, str]    | The initialization of the density. A float value indicates uniform initialization and `blob` indicates a ball centered at the center. Default: "blob"                  |
+| density_blob_scale   | float                | The parameter for blob initialization. Default: 5.0                                                                                                                    |
+| density_blob_std     | float                | The parameter for blob initialization. Default: 0.5                                                                                                                    |
+| normal_type          | Optional[str]        | The way to compute the normal from density. If set to "pred", the normal is produced with another volume in the shape of `3 x grid_size`. Default: "finite_difference" |
+| isosurface_threshold | Union[float,str]     | Inherit from common configurations, but default to "auto". Default: "auto"                                                                                             |
 
 **Common configurations for explicit geometry**
 
@@ -376,9 +377,9 @@ Exporters output assets like textured meshes, which can be used for further proc
 
 **Common configurations for exporters**
 
-| name       | type | description                                |
-| ---------- | ---- | ------------------------------------------ |
-| save_video | bool | Whether to save a 360 video. default: True |
+| name       | type | description                                 |
+| ---------- | ---- | ------------------------------------------- |
+| save_video | int  | Whether to save a 360 video. default: False |
 
 ### mesh-exporter
 

@@ -18,7 +18,7 @@ class ExporterOutput:
 class Exporter(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
-        save_video: bool = True
+        save_video: bool = False
 
     cfg: Config
 
