@@ -12,36 +12,14 @@ from threestudio.utils.typing import *
 class LatentNeRF(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        geometry_type: str = "implicit-volume"
-        geometry: dict = field(default_factory=dict)
-        material_type: str = "nomaterial"
-        material: dict = field(default_factory=dict)
-        background_type: str = "solid-color-background"
-        background: dict = field(default_factory=dict)
-        renderer_type: str = "nerf-volume-renderer"
-        renderer: dict = field(default_factory=dict)
-        guidance_type: str = "stable-diffusion-guidance"
-        guidance: dict = field(default_factory=dict)
-        prompt_processor_type: str = "stable-diffusion-prompt-processor"
-        prompt_processor: dict = field(default_factory=dict)
-
         guide_shape: Optional[str] = None
         refinement: bool = False
 
     cfg: Config
 
     def configure(self):
-        self.geometry = threestudio.find(self.cfg.geometry_type)(self.cfg.geometry)
-        self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
-        self.background = threestudio.find(self.cfg.background_type)(
-            self.cfg.background
-        )
-        self.renderer = threestudio.find(self.cfg.renderer_type)(
-            self.cfg.renderer,
-            geometry=self.geometry,
-            material=self.material,
-            background=self.background,
-        )
+        # create geometry, material, background, renderer
+        super().configure()
 
         if self.training or not self.cfg.refinement:
             self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
