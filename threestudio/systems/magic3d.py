@@ -14,27 +14,9 @@ from threestudio.utils.typing import *
 class Magic3D(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        geometry_type: str = "implicit-volume"
-        geometry: dict = field(default_factory=dict)
-
         # only used when refinement=True and from_coarse=True
         geometry_coarse_type: str = "implicit-volume"
         geometry_coarse: dict = field(default_factory=dict)
-
-        material_type: str = "diffuse-with-point-light-material"
-        material: dict = field(default_factory=dict)
-
-        background_type: str = "neural-environment-map-background"
-        background: dict = field(default_factory=dict)
-
-        renderer_type: str = "nerf-volume-renderer"
-        renderer: dict = field(default_factory=dict)
-
-        guidance_type: str = "stable-diffusion-guidance"
-        guidance: dict = field(default_factory=dict)
-
-        prompt_processor_type: str = "stable-diffusion-prompt-processor"
-        prompt_processor: dict = field(default_factory=dict)
 
         refinement: bool = False
         # path to the coarse stage weights
@@ -47,6 +29,7 @@ class Magic3D(BaseLift3DSystem):
     cfg: Config
 
     def configure(self) -> None:
+        # override the default configure function
         self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
         self.background = threestudio.find(self.cfg.background_type)(
             self.cfg.background

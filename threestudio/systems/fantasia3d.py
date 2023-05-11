@@ -13,35 +13,13 @@ from threestudio.utils.typing import *
 class Fantasia3D(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        geometry_type: str = "implicit-sdf"
-        geometry: dict = field(default_factory=lambda: {"n_feature_dims": 0})
-        material_type: str = "no-material"  # unused
-        material: dict = field(default_factory=lambda: {"n_output_dims": 0})
-        background_type: str = "solid-color-background"  # unused
-        background: dict = field(default_factory=dict)
-        renderer_type: str = "nvdiff-rasterizer"
-        renderer: dict = field(default_factory=dict)
-        guidance_type: str = "stable-diffusion-guidance"
-        guidance: dict = field(default_factory=dict)
-        prompt_processor_type: str = "stable-diffusion-prompt-processor"
-        prompt_processor: dict = field(default_factory=dict)
-
         latent_steps: int = 2500
 
     cfg: Config
 
     def configure(self):
-        self.geometry = threestudio.find(self.cfg.geometry_type)(self.cfg.geometry)
-        self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
-        self.background = threestudio.find(self.cfg.background_type)(
-            self.cfg.background
-        )
-        self.renderer = threestudio.find(self.cfg.renderer_type)(
-            self.cfg.renderer,
-            geometry=self.geometry,
-            material=self.material,
-            background=self.background,
-        )
+        # create geometry, material, background, renderer
+        super().configure()
         self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
