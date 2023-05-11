@@ -379,7 +379,7 @@ Exporters output assets like textured meshes, which can be used for further proc
 
 | name       | type | description                                 |
 | ---------- | ---- | ------------------------------------------- |
-| save_video | int  | Whether to save a 360 video. default: False |
+| save_video | bool | Whether to save a 360 video. default: False |
 
 ### mesh-exporter
 
