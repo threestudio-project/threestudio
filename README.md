@@ -17,6 +17,10 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
 </b></p>
 
+## News
+
+- 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
+
 ## Installation
 
 The following steps have been tested on Ubuntu20.04.
@@ -100,6 +104,19 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 r
 # which will continue using the same trial directory
 # if you want to save to a new trial directory, replace parsed.yaml with raw.yaml in the command
 ```
+
+### Export Meshes
+
+To export the scene to texture meshes, use the `--export` option. We currently support exporting to obj+mtl, or obj with vertex colors.
+
+```sh
+# this uses default mesh-exporter configurations which exports obj+mtl
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter
+# specify system.exporter.fmt=obj to get obj with vertex colors
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.exporter.fmt=obj
+```
+
+For all the options you can specify when exporting, see [the documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#exporters).
 
 See [here](https://github.com/threestudio-project/threestudio#supported-models) for example running commands of all our supported models. Please refer to [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) for tips on getting higher-quality results, and [here](https://github.com/threestudio-project/threestudio#vram-optimization) for reducing VRAM usage.
 

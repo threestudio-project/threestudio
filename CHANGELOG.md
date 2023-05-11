@@ -21,3 +21,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implementation of DreamFusion, Magic3D, SJC, Latent-NeRF and Sketch-Shape.
 - Implementation of the geometry stage of Fantasia3D.
 - Multi-GPU training support (#33).
+- Mesh export, supporting obj with mtl and obj with vertex colors.
