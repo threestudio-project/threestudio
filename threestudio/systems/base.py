@@ -185,7 +185,7 @@ class BaseLift3DSystem(BaseSystem):
         prompt_processor: dict = field(default_factory=dict)
 
         # geometry export configurations, no need to specify in training
-        exporter_type: str = ""
+        exporter_type: str = "mesh-exporter"
         exporter: dict = field(default_factory=dict)
 
     cfg: Config

@@ -25,6 +25,10 @@ class VolumeGrid(BaseImplicitGeometry):
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
 
+        isosurface_threshold: Union[
+            float, str
+        ] = "auto"  # automatically determine the threshold
+
     cfg: Config
 
     def configure(self) -> None:
