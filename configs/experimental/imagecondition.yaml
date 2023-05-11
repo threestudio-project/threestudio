@@ -86,7 +86,11 @@ system:
     params:
       geometry.encoding:
         lr: 0.05
-      geometry.network:
+      # geometry.network:
+      #   lr: 0.005
+      geometry.density_network:
+        lr: 0.005
+      geometry.feature_network:
         lr: 0.005
       background.network:
         lr: 0.005
