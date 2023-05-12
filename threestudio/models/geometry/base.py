@@ -59,6 +59,7 @@ class BaseImplicitGeometry(BaseGeometry):
         isosurface_method: str = "mt"
         isosurface_resolution: int = 128
         isosurface_threshold: Union[float, str] = 0.0
+        isosurface_threshold_fine: Union[float, str] = 0.0
         isosurface_chunk: int = 0
         isosurface_coarse_to_fine: bool = True
         isosurface_deformable_grid: bool = False
@@ -136,26 +137,35 @@ class BaseImplicitGeometry(BaseGeometry):
         )
 
         threshold: float
-        if isinstance(self.cfg.isosurface_threshold, float):
-            threshold = self.cfg.isosurface_threshold
-        elif self.cfg.isosurface_threshold == "auto":
-            # automatic determining threshold for density field
-            # FIXME: highly empirical
-            if not fine_stage:
-                # large threshold for the coarse stage to remove outliars
+        if fine_stage:
+            if isinstance(self.cfg.isosurface_threshold_fine, float):
+                threshold = self.cfg.isosurface_threshold_fine
+                threestudio.info(
+                    f"User specified isosurface threshold: {threshold} (fine stage)"
+                )
+            elif self.cfg.isosurface_threshold_fine == "auto":
+                threshold = field.mean().item()
+                threestudio.info(
+                    f"Automatically determined isosurface threshold: {threshold} (fine stage)"
+                )
+            else:
+                raise TypeError(
+                    f"Unknown isosurface_threshold {self.cfg.isosurface_threshold_fine}"
+                )
+        else:
+            if isinstance(self.cfg.isosurface_threshold, float):
+                threshold = self.cfg.isosurface_threshold
+                threestudio.info(f"User specified isosurface threshold: {threshold}")
+            elif self.cfg.isosurface_threshold == "auto":
                 threshold = (field.mean() + 5 * field.std()).item()
                 threestudio.info(
                     f"Automatically determined isosurface threshold: {threshold}"
                 )
             else:
-                threshold = field.mean().item()
-                threestudio.info(
-                    f"Automatically determined isosurface threshold: {threshold} (fine stage)"
+                raise TypeError(
+                    f"Unknown isosurface_threshold {self.cfg.isosurface_threshold}"
                 )
-        else:
-            raise TypeError(
-                f"Unknown isosurface_threshold {self.cfg.isosurface_threshold}"
-            )
+
         level = self.forward_level(field, threshold)
         mesh: Mesh = self.isosurface_helper(level, deformation=deformation)
         mesh.v_pos = scale_tensor(
