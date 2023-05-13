@@ -31,6 +31,7 @@ class PromptProcessor(BaseObject):
         back_threshold: float = 45.0
         view_dependent_prompt_front: bool = False
         use_cache: bool = True
+        spawn: bool = True
 
     cfg: Config
 
@@ -165,17 +166,24 @@ class PromptProcessor(BaseObject):
             prompts_to_process.append(prompt)
 
         if len(prompts_to_process) > 0:
-            ctx = mp.get_context("spawn")
-            subprocess = ctx.Process(
-                target=self.spawn_func,
-                args=(
+            if self.cfg.spawn:
+                ctx = mp.get_context("spawn")
+                subprocess = ctx.Process(
+                    target=self.spawn_func,
+                    args=(
+                        self.cfg.pretrained_model_name_or_path,
+                        prompts_to_process,
+                        self._cache_dir,
+                    ),
+                )
+                subprocess.start()
+                subprocess.join()
+            else:
+                self.spawn_func(
                     self.cfg.pretrained_model_name_or_path,
                     prompts_to_process,
                     self._cache_dir,
-                ),
-            )
-            subprocess.start()
-            subprocess.join()
+                )
 
     def load_text_embeddings(self):
         # synchronize, to ensure the text embeddings have been computed and saved to cache
