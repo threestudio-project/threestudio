@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A simple jupyter notebook.
+
+## [v0.1.0]
+
+### Added
+
 - Implementation of DreamFusion, Magic3D, SJC, Latent-NeRF and Sketch-Shape.
 - Implementation of the geometry stage of Fantasia3D.
 - Multi-GPU training support (#33).
