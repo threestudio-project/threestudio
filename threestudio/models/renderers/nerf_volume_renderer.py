@@ -9,10 +9,7 @@ from threestudio.models.background.base import BaseBackground
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import get_device
 from threestudio.utils.ops import chunk_batch
-from threestudio.utils.rasterize import NVDiffRasterizerContext
 from threestudio.utils.typing import *
 
 

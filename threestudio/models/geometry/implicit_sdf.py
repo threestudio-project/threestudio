@@ -95,19 +95,22 @@ class ImplicitSDF(BaseImplicitGeometry):
         ):
             points_rand = (
                 torch.rand((10000, 3), dtype=torch.float32).to(self.device) * 2.0 - 1.0
-            )
+            ) * self.cfg.radius
             if self.cfg.shape_init == "ellipsoid":
                 assert (
                     isinstance(self.cfg.shape_init_params, Sized)
                     and len(self.cfg.shape_init_params) == 3
                 )
-                size = torch.as_tensor(self.cfg.shape_init_params).to(points_rand)
+                size = (
+                    torch.as_tensor(self.cfg.shape_init_params).to(points_rand)
+                    * self.cfg.radius
+                )  # relative size
                 sdf_gt = ((points_rand / size) ** 2).sum(
                     dim=-1, keepdim=True
                 ).sqrt() - 1.0  # pseudo signed distance of an ellipsoid
             elif self.cfg.shape_init == "sphere":
                 assert isinstance(self.cfg.shape_init_params, float)
-                radius = self.cfg.shape_init_params
+                radius = self.cfg.shape_init_params * self.cfg.radius  # relative size
                 sdf_gt = (points_rand**2).sum(dim=-1, keepdim=True).sqrt() - radius
             elif self.cfg.shape_init == "mesh":
                 raise NotImplementedError
@@ -124,6 +127,12 @@ class ImplicitSDF(BaseImplicitGeometry):
     def forward(
         self, points: Float[Tensor, "*N Di"], output_normal: bool = False
     ) -> Dict[str, Float[Tensor, "..."]]:
+        grad_enabled = torch.is_grad_enabled()
+
+        if output_normal and self.cfg.normal_type == "analytic":
+            torch.set_grad_enabled(True)
+            points.requires_grad_(True)
+
         points_unscaled = points  # points in the original scale
         points = contract_to_unisphere(
             points, self.bbox, self.unbounded
@@ -157,16 +166,30 @@ class ImplicitSDF(BaseImplicitGeometry):
                     points_unscaled[..., None, :] + offsets
                 ).clamp(-self.cfg.radius, self.cfg.radius)
                 sdf_offset: Float[Tensor, "... 6 1"] = self.forward_sdf(points_offset)
-                normal = (
+                sdf_grad = (
                     0.5 * (sdf_offset[..., 0::2, 0] - sdf_offset[..., 1::2, 0]) / eps
                 )
-                normal = F.normalize(normal, dim=-1)
+                normal = F.normalize(sdf_grad, dim=-1)
             elif self.cfg.normal_type == "pred":
                 normal = self.normal_network(enc).view(*points.shape[:-1], 3)
                 normal = F.normalize(normal, dim=-1)
+                sdf_grad = normal
+            elif self.cfg.normal_type == "analytic":
+                sdf_grad = -torch.autograd.grad(
+                    sdf,
+                    points_unscaled,
+                    grad_outputs=torch.ones_like(sdf),
+                    create_graph=True,
+                )[0]
+                normal = F.normalize(sdf_grad, dim=-1)
+                if not grad_enabled:
+                    sdf_grad = sdf_grad.detach()
+                    normal = normal.detach()
             else:
                 raise AttributeError(f"Unknown normal type {self.cfg.normal_type}")
-            output.update({"normal": normal, "shading_normal": normal})
+            output.update(
+                {"normal": normal, "shading_normal": normal, "sdf_grad": sdf_grad}
+            )
         return output
 
     def forward_sdf(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:

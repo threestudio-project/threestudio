@@ -33,7 +33,7 @@ class SaverMixin:
         elif isinstance(data, np.ndarray):
             return data
         elif isinstance(data, torch.Tensor):
-            return data.cpu().numpy()
+            return data.detach().cpu().numpy()
         elif isinstance(data, list):
             return [self.convert_data(d) for d in data]
         elif isinstance(data, dict):
