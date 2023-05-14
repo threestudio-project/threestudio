@@ -42,7 +42,7 @@ class ScoreJacobianChaining(BaseLift3DSystem):
         super().on_fit_start()
         # only used in training
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor, self.trainer
+            self.cfg.prompt_processor
         )
 
     def on_test_start(self) -> None:
