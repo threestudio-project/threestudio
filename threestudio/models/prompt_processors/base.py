@@ -9,7 +9,7 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
 import threestudio
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import cleanup
+from threestudio.utils.misc import barrier, cleanup, get_rank
 from threestudio.utils.typing import *
 
 
@@ -44,9 +44,7 @@ class PromptProcessor(BaseObject):
     def destroy_text_encoder(self) -> None:
         raise NotImplementedError
 
-    def configure(self, trainer) -> None:
-        self.trainer = trainer
-
+    def configure(self) -> None:
         self._cache_dir = ".threestudio_cache/text_embeddings"  # FIXME: hard-coded path
 
         @dataclass
@@ -189,7 +187,7 @@ class PromptProcessor(BaseObject):
 
     def load_text_embeddings(self):
         # synchronize, to ensure the text embeddings have been computed and saved to cache
-        self.trainer.strategy.barrier()
+        barrier()
         self.text_embeddings = self.load_from_cache(self.prompt)[None, ...]
         self.uncond_text_embeddings = self.load_from_cache(self.negative_prompt)[
             None, ...

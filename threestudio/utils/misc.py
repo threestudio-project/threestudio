@@ -99,3 +99,14 @@ def finish_with_cleanup(func: Callable):
         return out
 
     return wrapper
+
+
+def _distributed_available():
+    return torch.distributed.is_available() and torch.distributed.is_initialized()
+
+
+def barrier():
+    if not _distributed_available():
+        return
+    else:
+        torch.distributed.barrier()
