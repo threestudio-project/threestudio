@@ -110,7 +110,3 @@ def barrier():
         return
     else:
         torch.distributed.barrier()
-    # if torch.distributed.get_backend() == "nccl":
-    #     torch.distributed.barrier(device_ids=self.determine_ddp_device_ids())
-    # else:
-    #     torch.distributed.barrier()
