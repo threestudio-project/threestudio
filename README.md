@@ -29,6 +29,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
+- 05/14/2023: You can try to directly optimize a 2D image with the SDS loss in the [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
 
