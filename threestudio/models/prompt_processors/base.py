@@ -219,6 +219,7 @@ class PromptProcessor(BaseObject):
                 raise ValueError(
                     f"Cannot find prompt with keywords {keywords} in library"
                 )
+            threestudio.info("Use prompt in library: " + candidate)
             return candidate
         else:
             return prompt

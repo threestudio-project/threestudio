@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -11,20 +13,68 @@ class Mesh:
     def __init__(
         self, v_pos: Float[Tensor, "Nv 3"], t_pos_idx: Integer[Tensor, "Nf 3"], **kwargs
     ) -> None:
-        self.v_pos = v_pos
-        self.t_pos_idx = t_pos_idx
-        self._v_nrm = None
-        self._v_tng = None
-        self._v_tex = None
-        self._t_tex_idx = None
-        self._v_rgb = None
-        self._edges = None
+        self.v_pos: Float[Tensor, "Nv 3"] = v_pos
+        self.t_pos_idx: Integer[Tensor, "Nf 3"] = t_pos_idx
+        self._v_nrm: Optional[Float[Tensor, "Nv 3"]] = None
+        self._v_tng: Optional[Float[Tensor, "Nv 3"]] = None
+        self._v_tex: Optional[Float[Tensor, "Nt 3"]] = None
+        self._t_tex_idx: Optional[Float[Tensor, "Nf 3"]] = None
+        self._v_rgb: Optional[Float[Tensor, "Nv 3"]] = None
+        self._edges: Optional[Integer[Tensor, "Ne 2"]] = None
         self.extras: Dict[str, Any] = {}
         for k, v in kwargs.items():
             self.add_extra(k, v)
 
     def add_extra(self, k, v) -> None:
         self.extras[k] = v
+
+    def remove_outlier(self, n_face_ratio_threshold: float) -> Mesh:
+        # use trimesh to first split the mesh into connected components
+        # then remove the components with less than n_face_threshold faces
+        import trimesh
+
+        # construct a trimesh object
+        mesh = trimesh.Trimesh(
+            vertices=self.v_pos.detach().cpu().numpy(),
+            faces=self.t_pos_idx.detach().cpu().numpy(),
+        )
+
+        # split the mesh into connected components
+        components = mesh.split(only_watertight=False)
+        # log the number of faces in each component
+        threestudio.info(
+            "Mesh has {} components, with faces: {}".format(
+                len(components), [c.faces.shape[0] for c in components]
+            )
+        )
+        # set the threshold to the number of faces in the largest component multiplied by n_face_ratio_threshold
+        n_face_threshold = int(
+            max([c.faces.shape[0] for c in components]) * n_face_ratio_threshold
+        )
+
+        # log the threshold
+        threestudio.info(
+            "Removing components with less than {} faces".format(n_face_threshold)
+        )
+
+        # remove the components with less than n_face_threshold faces
+        components = [c for c in components if c.faces.shape[0] >= n_face_threshold]
+
+        # log the number of faces in each component after removing outliers
+        threestudio.info(
+            "Mesh has {} components after removing outliers, with faces: {}".format(
+                len(components), [c.faces.shape[0] for c in components]
+            )
+        )
+
+        # merge the components
+        mesh = trimesh.util.concatenate(components)
+
+        # convert back to our mesh format
+        v_pos = torch.from_numpy(mesh.vertices).to(self.v_pos.device)
+        t_pos_idx = torch.from_numpy(mesh.faces).to(self.t_pos_idx.device)
+
+        return Mesh(v_pos, t_pos_idx)
 
     @property
     def v_nrm(self):

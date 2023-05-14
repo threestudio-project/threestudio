@@ -22,3 +22,5 @@ safetensors
 huggingface_hub
 libigl
 xatlas
+trimesh
+networkx
