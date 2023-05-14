@@ -26,8 +26,14 @@ system:
     n_feature_dims: 0
     isosurface_resolution: 128
     isosurface_deformable_grid: true
+    # initialize SDF by optimization
     shape_init: sphere
     shape_init_params: 0.5
+    # or you can initialize SDF by add a bias value
+    # which leads to more smooth initialized shape
+    # sdf_bias: sphere
+    # sdf_bias_params: 0.5
+    # DO NOT use the two initialization methods together
 
   material_type: "no-material" # unused
   material:
