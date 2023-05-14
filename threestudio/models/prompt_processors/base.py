@@ -9,6 +9,7 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
 import threestudio
 from threestudio.utils.base import BaseObject
+from threestudio.utils.misc import cleanup
 from threestudio.utils.typing import *
 
 
@@ -184,6 +185,7 @@ class PromptProcessor(BaseObject):
                     prompts_to_process,
                     self._cache_dir,
                 )
+            cleanup()
 
     def load_text_embeddings(self):
         # synchronize, to ensure the text embeddings have been computed and saved to cache
