@@ -286,9 +286,11 @@ class StableDiffusionGuidance(BaseObject):
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
-        # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)
-        # latents.backward(grad, retain_graph=True)
+        # loss = SpecifyGradient.apply(latents, grad)
+        # SpecifyGradient is not straghtforward, use a reparameterization trick instead
+        target = (latents - grad).detach()
+        # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
+        loss = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
         return {
             "sds": loss,
