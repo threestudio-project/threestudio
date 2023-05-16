@@ -28,7 +28,11 @@ class Mesh:
     def add_extra(self, k, v) -> None:
         self.extras[k] = v
 
-    def remove_outlier(self, n_face_ratio_threshold: float) -> Mesh:
+    def remove_outlier(self, outlier_n_faces_threshold: Union[int, float]) -> Mesh:
+        if self.requires_grad:
+            threestudio.debug("Mesh is differentiable, not removing outliers")
+            return self
+
         # use trimesh to first split the mesh into connected components
         # then remove the components with less than n_face_threshold faces
         import trimesh
@@ -42,39 +46,56 @@ class Mesh:
         # split the mesh into connected components
         components = mesh.split(only_watertight=False)
         # log the number of faces in each component
-        threestudio.info(
+        threestudio.debug(
             "Mesh has {} components, with faces: {}".format(
                 len(components), [c.faces.shape[0] for c in components]
             )
         )
-        # set the threshold to the number of faces in the largest component multiplied by n_face_ratio_threshold
-        n_face_threshold = int(
-            max([c.faces.shape[0] for c in components]) * n_face_ratio_threshold
-        )
+
+        n_faces_threshold: int
+        if isinstance(outlier_n_faces_threshold, float):
+            # set the threshold to the number of faces in the largest component multiplied by outlier_n_faces_threshold
+            n_faces_threshold = int(
+                max([c.faces.shape[0] for c in components]) * outlier_n_faces_threshold
+            )
+        else:
+            # set the threshold directly to outlier_n_faces_threshold
+            n_faces_threshold = outlier_n_faces_threshold
 
         # log the threshold
-        threestudio.info(
-            "Removing components with less than {} faces".format(n_face_threshold)
+        threestudio.debug(
+            "Removing components with less than {} faces".format(n_faces_threshold)
         )
 
         # remove the components with less than n_face_threshold faces
-        components = [c for c in components if c.faces.shape[0] >= n_face_threshold]
+        components = [c for c in components if c.faces.shape[0] >= n_faces_threshold]
 
         # log the number of faces in each component after removing outliers
-        threestudio.info(
+        threestudio.debug(
             "Mesh has {} components after removing outliers, with faces: {}".format(
                 len(components), [c.faces.shape[0] for c in components]
             )
         )
-
         # merge the components
         mesh = trimesh.util.concatenate(components)
 
         # convert back to our mesh format
-        v_pos = torch.from_numpy(mesh.vertices).to(self.v_pos.device)
-        t_pos_idx = torch.from_numpy(mesh.faces).to(self.t_pos_idx.device)
+        v_pos = torch.from_numpy(mesh.vertices).to(self.v_pos)
+        t_pos_idx = torch.from_numpy(mesh.faces).to(self.t_pos_idx)
 
-        return Mesh(v_pos, t_pos_idx)
+        clean_mesh = Mesh(v_pos, t_pos_idx)
+        # keep the extras unchanged
+
+        if len(self.extras) > 0:
+            clean_mesh.extras = self.extras
+            threestudio.debug(
+                f"The following extra attributes are inherited from the original mesh unchanged: {list(self.extras.keys())}"
+            )
+        return clean_mesh
+
+    @property
+    def requires_grad(self):
+        return self.v_pos.requires_grad
 
     @property
     def v_nrm(self):

@@ -126,6 +126,9 @@ class PromptProcessor(BaseObject):
         self.prompt = self.preprocess_prompt(self.cfg.prompt)
         # use provided negative prompt
         self.negative_prompt = self.cfg.negative_prompt
+        threestudio.info(
+            f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
+        )
         self.prompts_vd = [d.prompt(self.prompt) for d in self.directions]
         self.negative_prompts_vd = [
             d.negative_prompt(self.negative_prompt) for d in self.directions
@@ -219,7 +222,7 @@ class PromptProcessor(BaseObject):
                 raise ValueError(
                     f"Cannot find prompt with keywords {keywords} in library"
                 )
-            threestudio.info("Use prompt in library: " + candidate)
+            threestudio.info("Find matched prompt in library: " + candidate)
             return candidate
         else:
             return prompt

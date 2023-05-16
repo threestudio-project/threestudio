@@ -149,6 +149,7 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         return {"features": features}
 
     @staticmethod
+    @torch.no_grad()
     def create_from(
         other: BaseGeometry,
         cfg: Optional[Union[dict, DictConfig]] = None,

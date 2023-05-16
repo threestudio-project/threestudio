@@ -46,6 +46,9 @@ class ImplicitSDF(BaseImplicitGeometry):
         shape_init_params: Optional[Any] = None
         force_shape_init: bool = False
 
+        # no need to removal outlier for SDF
+        isosurface_remove_outliers: bool = False
+
     cfg: Config
 
     def configure(self) -> None:

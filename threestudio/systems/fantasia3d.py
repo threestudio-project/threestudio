@@ -29,7 +29,6 @@ class Fantasia3D(BaseLift3DSystem):
     def configure(self):
         # create geometry, material, background, renderer
         super().configure()
-        self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch, render_normal=True, render_rgb=False)
@@ -49,8 +48,6 @@ class Fantasia3D(BaseLift3DSystem):
         self.geometry.initialize_shape()
 
     def training_step(self, batch, batch_idx):
-        opt = self.optimizers()
-
         loss = 0.0
 
         out = self(batch)
@@ -74,9 +71,7 @@ class Fantasia3D(BaseLift3DSystem):
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
-        opt.zero_grad()
-        self.manual_backward(loss)
-        opt.step()
+        return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)

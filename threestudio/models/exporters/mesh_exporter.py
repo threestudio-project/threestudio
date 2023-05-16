@@ -27,7 +27,6 @@ class MeshExporter(Exporter):
         texture_format: str = "jpg"
         xatlas_chart_options: dict = field(default_factory=dict)
         xatlas_pack_options: dict = field(default_factory=dict)
-        outlier_n_face_ratio_threshold: float = 0.01
         context_type: str = "gl"
 
     cfg: Config
@@ -43,7 +42,6 @@ class MeshExporter(Exporter):
 
     def __call__(self) -> List[ExporterOutput]:
         mesh: Mesh = self.geometry.isosurface()
-        mesh = mesh.remove_outlier(self.cfg.outlier_n_face_ratio_threshold)
 
         if self.cfg.fmt == "obj-mtl":
             return self.export_obj_with_mtl(mesh)
