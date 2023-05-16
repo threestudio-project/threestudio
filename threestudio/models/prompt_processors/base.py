@@ -386,7 +386,8 @@ class PromptProcessor(BaseObject):
                     ]
                 else:
                     # side-back interpolation
-                    r_inter = torch.abs(azi) / 90 - 1.0
+                    # 0 - complete back, 1 - complete side
+                    r_inter = 2.0 - torch.abs(azi) / 90
                     pos_text_embeddings.append(
                         r_inter * side_emb + (1 - r_inter) * back_emb
                     )
@@ -403,6 +404,7 @@ class PromptProcessor(BaseObject):
         neg_guidance_weights = torch.as_tensor(
             neg_guidance_weights, device=elevation.device
         ).reshape(batch_size, 2)
+        # breakpoint()
         return (
             uncond_text_embeddings,
             pos_text_embeddings,

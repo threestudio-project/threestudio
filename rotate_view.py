@@ -68,7 +68,7 @@ def seed_everything(seed):
 
 config = {
     "max_iters": 1000,
-    "seed": 42,
+    "seed": 3407,
     "scheduler": "cosine",
     "mode": "rgb",  # deepfloyd does not support latent optimization
     "prompt_processor_type": "deep-floyd-prompt-processor",
@@ -100,7 +100,7 @@ prompt_processor = threestudio.find(config["prompt_processor_type"])(
 )
 
 n_images = 6
-azimuth = torch.linspace(0, 90, n_images).to(guidance.device)
+azimuth = torch.linspace(0, 180, n_images).to(guidance.device)
 elevation = torch.zeros_like(azimuth)
 camera_distance = torch.zeros_like(azimuth)
 
