@@ -416,3 +416,18 @@ class ShapeLoss(nn.Module):
             nerf_occ, indicator, weight=weight
         )  # order is important for CE loss + second argument may not be optimized
         return loss
+
+
+def shifted_expotional_decay(a, b, c, r):
+    return a * torch.exp(-b * r) + c
+
+
+def perpendicular_component(x: Float[Tensor, "B C H W"], y: Float[Tensor, "B C H W"]):
+    # get the component of x that is perpendicular to y
+    return (
+        x
+        - (
+            torch.mul(x, y).sum(dim=[1, 2, 3]) / torch.mul(y, y).sum(dim=[1, 2, 3])
+        ).view(-1, 1, 1, 1)
+        * y
+    )

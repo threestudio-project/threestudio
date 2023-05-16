@@ -249,10 +249,11 @@ class StableDiffusionGuidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        text_embeddings: Float[Tensor, "BB 77 768"],
+        processor_output: Dict[str, Any],
         rgb_as_latents=False,
     ):
         batch_size = rgb.shape[0]
+        text_embeddings = processor_output["text_embeddings"]
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]

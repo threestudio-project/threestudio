@@ -10,6 +10,7 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_only
 import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import barrier, cleanup, get_rank
+from threestudio.utils.ops import shifted_expotional_decay
 from threestudio.utils.typing import *
 
 
@@ -33,6 +34,16 @@ class PromptProcessor(BaseObject):
         view_dependent_prompt_front: bool = False
         use_cache: bool = True
         spawn: bool = True
+
+        # for perp-neg
+        use_perp_neg: bool = False
+        # a*e(-b*r) + c
+        # a * e(-b) + c = 0
+        #
+        f_sb: Tuple[float, float, float] = (4, 0.5, -2.426)
+        f_fsb: Tuple[float, float, float] = (4, 0.5, -2.426)
+        f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
+        f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
 
     cfg: Config
 
@@ -242,25 +253,159 @@ class PromptProcessor(BaseObject):
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
         **kwargs,
-    ) -> Float[Tensor, "BB ..."]:
-        batch_size = elevation.shape[0]
+    ) -> Dict[str, Any]:
+        res = {}
 
         if self.cfg.view_dependent_prompting:
-            # Get direction
-            direction_idx = torch.zeros_like(elevation, dtype=torch.long)
-            for d in self.directions:
-                direction_idx[
-                    d.condition(elevation, azimuth, camera_distances)
-                ] = self.direction2idx[d.name]
-
-            # Get text embeddings
-            text_embeddings = self.text_embeddings_vd[direction_idx]  # type: ignore
-            uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]  # type: ignore
+            if self.cfg.use_perp_neg:
+                (
+                    uncond_text_embeddings,
+                    pos_text_embeddings,
+                    neg_text_embeddings,
+                    neg_guidance_weights,
+                ) = self.get_perp_neg_view_dependent_text_embeddings(
+                    elevation, azimuth, camera_distances
+                )
+                res.update(
+                    {
+                        "uncond_text_embeddings": uncond_text_embeddings,
+                        "pos_text_embeddings": pos_text_embeddings,
+                        "neg_text_embeddings": neg_text_embeddings,
+                        "neg_guidance_weights": neg_guidance_weights,
+                    }
+                )
+            else:
+                (
+                    text_embeddings,
+                    uncond_text_embeddings,
+                ) = self.get_vanilla_view_dependent_text_embeddings(
+                    elevation, azimuth, camera_distances
+                )
+                res.update(
+                    {
+                        "text_embeddings": torch.cat(
+                            [text_embeddings, uncond_text_embeddings], dim=0
+                        )
+                    }
+                )
         else:
+            batch_size = elevation.shape[0]
             text_embeddings = self.text_embeddings.expand(batch_size, -1, -1)  # type: ignore
             uncond_text_embeddings = self.uncond_text_embeddings.expand(  # type: ignore
                 batch_size, -1, -1
             )
 
-        # IMPORTANT: we return (cond, uncond), which is in different order than other implementations!
-        return torch.cat([text_embeddings, uncond_text_embeddings], dim=0)
+            # IMPORTANT: we return (cond, uncond), which is in different order than other implementations!
+            res.update(
+                {
+                    "text_embeddings": torch.cat(
+                        [text_embeddings, uncond_text_embeddings], dim=0
+                    )
+                }
+            )
+        return res
+
+    def get_vanilla_view_dependent_text_embeddings(
+        self,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+    ) -> Tuple[Float[Tensor, "B ..."], Float[Tensor, "B ..."]]:
+        # Get direction
+        direction_idx = torch.zeros_like(elevation, dtype=torch.long)
+        for d in self.directions:
+            direction_idx[
+                d.condition(elevation, azimuth, camera_distances)
+            ] = self.direction2idx[d.name]
+
+        # Get text embeddings
+        text_embeddings = self.text_embeddings_vd[direction_idx]  # type: ignore
+        uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]  # type: ignore
+        return text_embeddings, uncond_text_embeddings
+
+    def get_perp_neg_view_dependent_text_embeddings(
+        self,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+    ) -> Tuple[
+        Float[Tensor, "B ..."],
+        Float[Tensor, "B ..."],
+        Float[Tensor, "B 2 ..."],
+        Float[Tensor, "B 2"],
+    ]:
+        batch_size = elevation.shape[0]
+
+        direction_idx = torch.zeros_like(elevation, dtype=torch.long)
+        for d in self.directions:
+            direction_idx[
+                d.condition(elevation, azimuth, camera_distances)
+            ] = self.direction2idx[d.name]
+        # 0 - side view
+        # 1 - front view
+        # 2 - back view
+        # 3 - overhead view
+
+        pos_text_embeddings = []
+        neg_text_embeddings = []
+        neg_guidance_weights = []
+        uncond_text_embeddings = []
+
+        side_emb = self.text_embeddings_vd[0]
+        front_emb = self.text_embeddings_vd[1]
+        back_emb = self.text_embeddings_vd[2]
+        overhead_emb = self.text_embeddings_vd[3]
+
+        for idx, ele, azi, dis in zip(
+            direction_idx, elevation, azimuth, camera_distances
+        ):
+            uncond_text_embeddings.append(
+                self.uncond_text_embeddings_vd[idx]
+            )  # should be ""
+            if idx.item() == 3:  # overhead view
+                pos_text_embeddings.append(overhead_emb)  # side view
+                # dummy
+                neg_text_embeddings += [
+                    self.uncond_text_embeddings_vd[idx],
+                    self.uncond_text_embeddings_vd[idx],
+                ]
+
+                neg_guidance_weights += [0.0, 0.0]
+            else:  # interpolating views
+                if torch.abs(azi) < 90:
+                    # front-side interpolation
+                    # 0 - complete front, 1 - complete side
+                    r_inter = 1 - torch.abs(azi) / 90
+                    pos_text_embeddings.append(
+                        r_inter * front_emb + (1 - r_inter) * side_emb
+                    )
+                    neg_text_embeddings += [front_emb, side_emb]
+                    neg_guidance_weights += [
+                        -shifted_expotional_decay(*self.cfg.f_fs, r_inter),
+                        -shifted_expotional_decay(*self.cfg.f_sf, 1 - r_inter),
+                    ]
+                else:
+                    # side-back interpolation
+                    r_inter = torch.abs(azi) / 90 - 1.0
+                    pos_text_embeddings.append(
+                        r_inter * side_emb + (1 - r_inter) * back_emb
+                    )
+                    neg_text_embeddings += [side_emb, front_emb]
+                    neg_guidance_weights += [
+                        -shifted_expotional_decay(*self.cfg.f_sb, r_inter),
+                        -shifted_expotional_decay(*self.cfg.f_fsb, r_inter),
+                    ]
+        uncond_text_embeddings = torch.stack(uncond_text_embeddings, dim=0)
+        pos_text_embeddings = torch.stack(pos_text_embeddings, dim=0)
+        neg_text_embeddings = torch.stack(neg_text_embeddings, dim=0).reshape(
+            batch_size, 2, *uncond_text_embeddings.shape[1:]
+        )
+        neg_guidance_weights = torch.as_tensor(
+            neg_guidance_weights, device=ele.device
+        ).reshape(batch_size, 2)
+        return (
+            uncond_text_embeddings,
+            pos_text_embeddings,
+            neg_text_embeddings,
+            neg_guidance_weights,
+        )
