@@ -401,7 +401,7 @@ class PromptProcessor(BaseObject):
             batch_size, 2, *uncond_text_embeddings.shape[1:]
         )
         neg_guidance_weights = torch.as_tensor(
-            neg_guidance_weights, device=ele.device
+            neg_guidance_weights, device=elevation.device
         ).reshape(batch_size, 2)
         return (
             uncond_text_embeddings,
