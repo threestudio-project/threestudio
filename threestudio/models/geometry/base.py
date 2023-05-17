@@ -142,16 +142,7 @@ class BaseImplicitGeometry(BaseGeometry):
         if isinstance(self.cfg.isosurface_threshold, float):
             threshold = self.cfg.isosurface_threshold
         elif self.cfg.isosurface_threshold == "auto":
-            eps = 1e-5
-            threshold = field[field > eps].mean().item()
-            threestudio.info(
-                f"Automatically determined isosurface threshold: {threshold}"
-            )
-            threestudio.info(
-                "isosurface_threshold=auto now behaves the same as isosurface_threshold=mean, but this may change in the future"
-            )
-        elif self.cfg.isosurface_threshold == "mean":
-            eps = 1e-5
+            eps = 1.0e-5
             threshold = field[field > eps].mean().item()
             threestudio.info(
                 f"Automatically determined isosurface threshold: {threshold}"

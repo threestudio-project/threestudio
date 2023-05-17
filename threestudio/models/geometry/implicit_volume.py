@@ -47,7 +47,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         finite_difference_normal_eps: float = 0.01
 
         # automatically determine the threshold
-        isosurface_threshold: Union[float, str] = "auto"
+        isosurface_threshold: Union[float, str] = 25.0
 
     cfg: Config
 
