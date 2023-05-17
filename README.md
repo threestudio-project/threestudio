@@ -127,9 +127,14 @@ To export the scene to texture meshes, use the `--export` option. We currently s
 # this uses default mesh-exporter configurations which exports obj+mtl
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter
 # specify system.exporter.fmt=obj to get obj with vertex colors
+# you may also add system.exporter.save_uv=false to accelerate the process, suitable for a quick peek of the result
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.exporter.fmt=obj
+# for NeRF-based methods (DreamFusion, Magic3D coarse, Latent-NeRF, SJC)
+# you may need to adjust the isosurface threshold (25 by default) to get satisfying outputs
+# decrease the threshold if the extracted model is incomplete, increase if it is extruded
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_threshold=10.
 # use marching cubes of higher resolutions to get more detailed models
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.geometry.isosurface_method=mc system.geometry.isosurface_resolution=256
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.geometry.isosurface_method=mc-cpu system.geometry.isosurface_resolution=256
 ```
 
 For all the options you can specify when exporting, see [the documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#exporters).
@@ -184,6 +189,8 @@ https://user-images.githubusercontent.com/19284678/236694858-0ed6939e-cd7a-408f-
 
 - We use open-source T2I models (StableDiffusion, DeepFloyd IF) for the coarse stage, while the paper uses eDiff-I.
 - In the coarse stage, we use a guiandance scale of 20 for DeepFloyd IF, while the paper uses 100 for eDiff-I.
+- In the coarse stage, we use analytic normal, while the paper uses predicted normal.
+- In the coarse stage, we use orientation loss as in DreamFusion, while the paper does not.
 - There are many things that are ommited from the paper such as the weighting of loss terms and the DMTet grid resolution, which could be different.
 
 **Example running commands**
@@ -203,16 +210,18 @@ Then convert the NeRF from the coarse stage to DMTet and train with differentiab
 # the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
 # NOTE: the meaning of system.from_coarse has changed from cfff05, it is now the path to the coarse stage weights instead of a boolean value
 python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt
-# if you're unsatisfied with the surface extraced using automatically determined threshold,
+# if you're unsatisfied with the surface extraced using the default threshold (25)
 # you can specify a threshold value using `system.coarse_geometry_override`
+# decrease the value if the extracted surface is incomplete, increate if it is extruded
 python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.coarse_geometry_override.isosurface_threshold=10.
 ```
 
 **Tips**
 
 - For the coarse stage, DeepFloyd IF performs **way better than** StableDiffusion.
-- Magic3D uses a neural network to predict the surface normal, which may not resemble the true geometric normal, so it's common to see that your object becomes extremely dark after `system.material.ambient_only_steps`.
+- Magic3D uses a neural network to predict the surface normal, which may not resemble the true geometric normal and degrade geometry quality, so we use analytic normal instead.
 - Try increasing/decreasing `system.loss.lambda_sparsity` if your scene is stuffed with floaters/becoming empty.
+- Try increasing/decreasing `system.loss.lambda_orient` if you object is foggy/over-smoothed.
 - Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
 
 ### Score Jacobian Chaining [![arXiv](https://img.shields.io/badge/arXiv-2212.00774-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2212.00774)

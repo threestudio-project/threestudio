@@ -62,6 +62,8 @@ class BaseImplicitGeometry(BaseGeometry):
         isosurface_chunk: int = 0
         isosurface_coarse_to_fine: bool = True
         isosurface_deformable_grid: bool = False
+        isosurface_remove_outliers: bool = True
+        isosurface_outlier_n_faces_threshold: Union[int, float] = 0.01
 
     cfg: Config
 
@@ -136,32 +138,32 @@ class BaseImplicitGeometry(BaseGeometry):
         )
 
         threshold: float
+
         if isinstance(self.cfg.isosurface_threshold, float):
             threshold = self.cfg.isosurface_threshold
         elif self.cfg.isosurface_threshold == "auto":
-            # automatic determining threshold for density field
-            # FIXME: highly empirical
-            if not fine_stage:
-                # large threshold for the coarse stage to remove outliars
-                threshold = (field.mean() + 5 * field.std()).item()
-                threestudio.info(
-                    f"Automatically determined isosurface threshold: {threshold}"
-                )
-            else:
-                threshold = field.mean().item()
-                threestudio.info(
-                    f"Automatically determined isosurface threshold: {threshold} (fine stage)"
-                )
+            eps = 1.0e-5
+            threshold = field[field > eps].mean().item()
+            threestudio.info(
+                f"Automatically determined isosurface threshold: {threshold}"
+            )
         else:
             raise TypeError(
                 f"Unknown isosurface_threshold {self.cfg.isosurface_threshold}"
             )
+
         level = self.forward_level(field, threshold)
         mesh: Mesh = self.isosurface_helper(level, deformation=deformation)
         mesh.v_pos = scale_tensor(
             mesh.v_pos, self.isosurface_helper.points_range, bbox
         )  # scale to bbox as the grid vertices are in [0, 1]
         mesh.add_extra("bbox", bbox)
+
+        if self.cfg.isosurface_remove_outliers:
+            # remove outliers components with small number of faces
+            # only enabled when the mesh is not differentiable
+            mesh = mesh.remove_outlier(self.cfg.isosurface_outlier_n_faces_threshold)
+
         return mesh
 
     def isosurface(self) -> Mesh:
@@ -170,11 +172,13 @@ class BaseImplicitGeometry(BaseGeometry):
                 "Isosurface is not enabled in the current configuration"
             )
         if self.cfg.isosurface_coarse_to_fine:
+            threestudio.debug("First run isosurface to get a tight bounding box ...")
             with torch.no_grad():
                 mesh_coarse = self._isosurface(self.bbox)
             vmin, vmax = mesh_coarse.v_pos.amin(dim=0), mesh_coarse.v_pos.amax(dim=0)
             vmin_ = (vmin - (vmax - vmin) * 0.1).max(self.bbox[0])
             vmax_ = (vmax + (vmax - vmin) * 0.1).min(self.bbox[1])
+            threestudio.debug("Run isosurface again with the tight bounding box ...")
             mesh = self._isosurface(torch.stack([vmin_, vmax_], dim=0), fine_stage=True)
         else:
             mesh = self._isosurface(self.bbox)

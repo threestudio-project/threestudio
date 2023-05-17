@@ -48,6 +48,9 @@ class ImplicitSDF(BaseImplicitGeometry):
         sdf_bias: Union[float, str] = 0.0
         sdf_bias_params: Optional[Any] = None
 
+        # no need to removal outlier for SDF
+        isosurface_remove_outliers: bool = False
+
     cfg: Config
 
     def configure(self) -> None:
