@@ -20,11 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A simple jupyter notebook (#55).
 - `sdf_bias` as an alternative way for SDF initialization in `implicit-volume` (#57).
+- Automatically remove outliers with a small number of faces when extracting surfaces.
 
 ### Changed
 
 - Remove `trainer` from the constructor arguments of prompt processors (#56).
 - Use a reparametrization trick for the SDS loss (#57).
+- Make Magic3D coarse stage use analytic normal and orientation loss.
 
 ## [v0.1.0]
 
