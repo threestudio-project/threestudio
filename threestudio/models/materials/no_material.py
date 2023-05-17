@@ -36,7 +36,6 @@ class NoMaterial(BaseMaterial):
             )
             self.use_network = True
 
-    @typechecker
     def forward(
         self, features: Float[Tensor, "B ... Nf"], **kwargs
     ) -> Float[Tensor, "B ... Nc"]:

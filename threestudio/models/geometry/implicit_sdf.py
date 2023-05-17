@@ -45,6 +45,8 @@ class ImplicitSDF(BaseImplicitGeometry):
         shape_init: Optional[str] = None
         shape_init_params: Optional[Any] = None
         force_shape_init: bool = False
+        sdf_bias: Union[float, str] = 0.0
+        sdf_bias_params: Optional[Any] = None
 
         # no need to removal outlier for SDF
         isosurface_remove_outliers: bool = False
@@ -87,6 +89,11 @@ class ImplicitSDF(BaseImplicitGeometry):
         if self.cfg.weights is not None and not self.cfg.force_shape_init:
             return
 
+        if self.cfg.sdf_bias != 0.0:
+            threestudio.warn(
+                "shape_init and sdf_bias are both specified, which may lead to unexpected results."
+            )
+
         # Initialize SDF to a given shape when no weights are provided or force_shape_init is True
         optim = torch.optim.Adam(self.parameters(), lr=1e-3)
         from tqdm import tqdm
@@ -124,6 +131,29 @@ class ImplicitSDF(BaseImplicitGeometry):
             loss.backward()
             optim.step()
 
+    def get_shifted_sdf(
+        self, points: Float[Tensor, "*N Di"], sdf: Float[Tensor, "*N 1"]
+    ) -> Float[Tensor, "*N 1"]:
+        sdf_bias: Union[float, Float[Tensor, "*N 1"]]
+        if self.cfg.sdf_bias == "ellipsoid":
+            assert (
+                isinstance(self.cfg.sdf_bias_params, Sized)
+                and len(self.cfg.sdf_bias_params) == 3
+            )
+            size = torch.as_tensor(self.cfg.sdf_bias_params).to(points)
+            sdf_bias = ((points / size) ** 2).sum(
+                dim=-1, keepdim=True
+            ).sqrt() - 1.0  # pseudo signed distance of an ellipsoid
+        elif self.cfg.sdf_bias == "sphere":
+            assert isinstance(self.cfg.sdf_bias_params, float)
+            radius = self.cfg.sdf_bias_params
+            sdf_bias = (points**2).sum(dim=-1, keepdim=True).sqrt() - radius
+        elif isinstance(self.cfg.sdf_bias, float):
+            sdf_bias = self.cfg.sdf_bias
+        else:
+            raise ValueError(f"Unknown sdf bias {self.cfg.sdf_bias}")
+        return sdf + sdf_bias
+
     def forward(
         self, points: Float[Tensor, "*N Di"], output_normal: bool = False
     ) -> Dict[str, Float[Tensor, "..."]]:
@@ -134,7 +164,7 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         enc = self.encoding(points.view(-1, self.cfg.n_input_dims))
         sdf = self.sdf_network(enc).view(*points.shape[:-1], 1)
-
+        sdf = self.get_shifted_sdf(points_unscaled, sdf)
         output = {"sdf": sdf}
 
         if self.cfg.n_feature_dims > 0:
@@ -179,7 +209,7 @@ class ImplicitSDF(BaseImplicitGeometry):
         sdf = self.sdf_network(
             self.encoding(points.reshape(-1, self.cfg.n_input_dims))
         ).reshape(*points.shape[:-1], 1)
-
+        sdf = self.get_shifted_sdf(points_unscaled, sdf)
         return sdf
 
     def forward_field(
@@ -189,6 +219,7 @@ class ImplicitSDF(BaseImplicitGeometry):
         points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
         enc = self.encoding(points.reshape(-1, self.cfg.n_input_dims))
         sdf = self.sdf_network(enc).reshape(*points.shape[:-1], 1)
+        sdf = self.get_shifted_sdf(points_unscaled, sdf)
         deformation: Optional[Float[Tensor, "*N 3"]] = None
         if self.cfg.isosurface_deformable_grid:
             deformation = self.deformation_network(enc).reshape(*points.shape[:-1], 3)

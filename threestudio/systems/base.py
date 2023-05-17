@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
@@ -203,6 +204,18 @@ class BaseLift3DSystem(BaseSystem):
             background=self.background,
         )
 
+    def on_fit_start(self) -> None:
+        if self._save_dir is not None:
+            threestudio.info(f"Validation results will be saved to {self._save_dir}")
+        else:
+            threestudio.warn(
+                f"Saving directory not set for the system, visualization results will not be saved"
+            )
+
+    def on_test_end(self) -> None:
+        if self._save_dir is not None:
+            threestudio.info(f"Test results saved to {self._save_dir}")
+
     def on_predict_start(self) -> None:
         self.exporter: Exporter = threestudio.find(self.cfg.exporter_type)(
             self.cfg.exporter,
@@ -225,3 +238,7 @@ class BaseLift3DSystem(BaseSystem):
                 raise ValueError(f"{save_func_name} not supported by the SaverMixin")
             save_func = getattr(self, save_func_name)
             save_func(f"it{self.true_global_step}-export/{out.save_name}", **out.params)
+
+    def on_predict_end(self) -> None:
+        if self._save_dir is not None:
+            threestudio.info(f"Export assets saved to {self._save_dir}")

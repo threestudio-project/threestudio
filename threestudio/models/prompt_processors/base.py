@@ -9,6 +9,7 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_only
 
 import threestudio
 from threestudio.utils.base import BaseObject
+from threestudio.utils.misc import barrier, cleanup, get_rank
 from threestudio.utils.typing import *
 
 
@@ -31,6 +32,7 @@ class PromptProcessor(BaseObject):
         back_threshold: float = 45.0
         view_dependent_prompt_front: bool = False
         use_cache: bool = True
+        spawn: bool = True
 
     cfg: Config
 
@@ -42,9 +44,7 @@ class PromptProcessor(BaseObject):
     def destroy_text_encoder(self) -> None:
         raise NotImplementedError
 
-    def configure(self, trainer) -> None:
-        self.trainer = trainer
-
+    def configure(self) -> None:
         self._cache_dir = ".threestudio_cache/text_embeddings"  # FIXME: hard-coded path
 
         @dataclass
@@ -168,21 +168,29 @@ class PromptProcessor(BaseObject):
             prompts_to_process.append(prompt)
 
         if len(prompts_to_process) > 0:
-            ctx = mp.get_context("spawn")
-            subprocess = ctx.Process(
-                target=self.spawn_func,
-                args=(
+            if self.cfg.spawn:
+                ctx = mp.get_context("spawn")
+                subprocess = ctx.Process(
+                    target=self.spawn_func,
+                    args=(
+                        self.cfg.pretrained_model_name_or_path,
+                        prompts_to_process,
+                        self._cache_dir,
+                    ),
+                )
+                subprocess.start()
+                subprocess.join()
+            else:
+                self.spawn_func(
                     self.cfg.pretrained_model_name_or_path,
                     prompts_to_process,
                     self._cache_dir,
-                ),
-            )
-            subprocess.start()
-            subprocess.join()
+                )
+            cleanup()
 
     def load_text_embeddings(self):
         # synchronize, to ensure the text embeddings have been computed and saved to cache
-        self.trainer.strategy.barrier()
+        barrier()
         self.text_embeddings = self.load_from_cache(self.prompt)[None, ...]
         self.uncond_text_embeddings = self.load_from_cache(self.negative_prompt)[
             None, ...

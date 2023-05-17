@@ -18,7 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A simple jupyter notebook (#55).
+- `sdf_bias` as an alternative way for SDF initialization in `implicit-volume` (#57).
+
+### Changed
+
+- Remove `trainer` from the constructor arguments of prompt processors (#56).
+- Use a reparametrization trick for the SDS loss (#57).
+
+## [v0.1.0]
+
+### Added
+
 - Implementation of DreamFusion, Magic3D, SJC, Latent-NeRF and Sketch-Shape.
 - Implementation of the geometry stage of Fantasia3D.
 - Multi-GPU training support (#33).
-- Mesh export, supporting obj with mtl and obj with vertex colors.
+- Mesh export, supporting obj with mtl and obj with vertex colors (#44).

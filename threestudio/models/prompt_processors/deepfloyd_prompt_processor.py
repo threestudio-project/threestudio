@@ -91,3 +91,5 @@ class DeepFloydPromptProcessor(PromptProcessor):
                     f"{hash_prompt(pretrained_model_name_or_path, prompt)}.pt",
                 ),
             )
+
+        del text_encoder

@@ -18,11 +18,19 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
+  <a href="https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg">
+  </a>
+</p>
+
+<p align="center">
     Did not find what you want? Submit a feature request or upvote others' requests <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
 </p>
 
 ## News
 
+- 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
+- 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
 
 ![export-blender](https://github.com/threestudio-project/threestudio/assets/19284678/ccae2820-e702-484c-a43f-81678a365427)

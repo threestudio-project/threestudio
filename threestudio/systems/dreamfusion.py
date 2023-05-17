@@ -27,9 +27,10 @@ class DreamFusion(BaseLift3DSystem):
         }
 
     def on_fit_start(self) -> None:
+        super().on_fit_start()
         # only used in training
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor, self.trainer
+            self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
