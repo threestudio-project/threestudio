@@ -48,6 +48,10 @@ def parse_optimizer(config, model):
         from threestudio.systems import optimizers
 
         optim = getattr(optimizers, config.name)(params, **config.args)
+    elif config.name in ["Adahessian"]:
+        import torch_optimizer as toptim
+
+        optim = toptim.Adahessian(params, **config.args)
     else:
         optim = getattr(torch.optim, config.name)(params, **config.args)
     return optim

@@ -19,6 +19,7 @@ class DreamFusion(BaseLift3DSystem):
     def configure(self):
         # create geometry, material, background, renderer
         super().configure()
+        self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -69,7 +70,11 @@ class DreamFusion(BaseLift3DSystem):
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
-        return {"loss": loss}
+        opt = self.optimizers()
+        opt.zero_grad()
+        loss.backward(create_graph=True)
+        opt.step()
+        loss = None
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
