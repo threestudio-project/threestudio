@@ -8,8 +8,8 @@ data:
   batch_size: 1
   width: 64
   height: 64
-  camera_distance_range: [1.5, 2.0]
-  # camera_distance_range: [1.0, 1.5]
+  # camera_distance_range: [1.5, 2.0]
+  camera_distance_range: [1.0, 1.5]
   fovy_range: [40, 70]
   elevation_range: [-10, 90]
   light_sample_strategy: "dreamfusion"
@@ -20,30 +20,31 @@ system_type: "dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
-    radius: 2.0
-    # radius: 1.4
+    # radius: 2.0
+    radius: 1.4
 
     # normal_type: "analytic"
     normal_type: "pred"
 
     # the density initialization proposed in the DreamFusion paper
     # does not work very well
-    # density_bias: "blob_dreamfusion"
-    # density_activation: exp
-    # density_blob_scale: 5.
-    # density_blob_std: 0.2
+    density_bias: "blob_dreamfusion"
+    density_activation: exp
+    density_blob_scale: 5.
+    density_blob_std: 0.2
 
     # use Magic3D density initialization instead
-    density_bias: "blob_magic3d"
-    density_activation: softplus
-    density_blob_scale: 10.
-    density_blob_std: 0.5
+    # density_bias: "blob_magic3d"
+    # density_activation: softplus
+    # density_blob_scale: 10.
+    # density_blob_std: 0.5
 
     # coarse to fine hash grid encoding
     # to ensure smooth analytic normals
     pos_encoding_config:
       otype: ProgressiveBandFrequency
       n_frequencies: 10
+      n_masking_step: 1000
     # pos_encoding_config:
     #   otype: ProgressiveBandHashGrid
     #   n_levels: 16
@@ -94,23 +95,23 @@ system:
     lambda_sparsity: 0.
     lambda_opaque: 0.0
   optimizer:
-    # name: Adam
+    name: Adam
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+    params:
+      geometry:
+        lr: 0.01
+      background:
+        lr: 0.001
+    # name: Adahessian
     # args:
     #   lr: 0.01
-    #   betas: [0.9, 0.99]
-    #   eps: 1.e-15
-    # params:
-    #   geometry:
-    #     lr: 0.01
-    #   background:
-    #     lr: 0.001
-    name: Adahessian
-    args:
-      lr: 0.1
-      betas: [0.9, 0.999]
-      eps: 1.e-4
-      weight_decay: 0.0
-      hessian_power: 1.0
+    #   betas: [0.9, 0.999]
+    #   eps: 1.e-8
+    #   weight_decay: 0.0
+    #   hessian_power: 1.0
 
 trainer:
   max_steps: 10000
