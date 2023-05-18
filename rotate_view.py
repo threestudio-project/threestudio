@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import random
@@ -67,16 +68,33 @@ def seed_everything(seed):
 # deepfloyd
 
 config = {
-    "max_iters": 1000,
+    "max_iters": 200,
     "seed": 3407,
     "scheduler": "cosine",
     "mode": "rgb",  # deepfloyd does not support latent optimization
     "prompt_processor_type": "deep-floyd-prompt-processor",
     "prompt_processor": {
-        "prompt": "a photo of lion",
+        "prompt": "lib:chimpanzee_banana",
         "view_dependent_prompting": True,
         "use_perp_neg": True,
         "spawn": False,
+        # side back interpolation
+        # back -> side
+        # -f_sb(r_inter)
+        "f_sb": (4, 0.5, -2.426),
+        # -f_sb(r_inter)
+        # front negative
+        "f_fsb": (4, 0.5, -0.852),
+        # front side interpolation
+        # side -> front
+        # -f_fs(r_inter)
+        # front negative
+        # "f_fs": (4, 0.5, -2.426),
+        "f_fs": (-4, -0.5, 6.59),
+        # side negative
+        # -f_sf(1-r_inter)
+        "f_sf": (4, 0.5, -2.426),
+        # f_fs(0) == f_fsb(1)
     },
     "guidance_type": "deep-floyd-guidance",
     "guidance": {
@@ -130,6 +148,8 @@ out_dir = os.path.join(
     "outputs", "perpneg", f"{config['prompt_processor']['prompt']}{timestamp}"
 )
 os.makedirs(out_dir, exist_ok=True)
+with open(os.path.join(out_dir, "config.json"), "w") as f:
+    json.dump(config, f, indent=4)
 
 plt.axis("off")
 
