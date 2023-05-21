@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import threestudio
+from threestudio.models.encoding import MultiResHashGrid
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import config_to_primitive
 from threestudio.utils.misc import get_rank
@@ -128,6 +129,61 @@ class CompositeEncoding(nn.Module, Updateable):
             )
         )
 
+    # "otype": "ProgressiveBandHashGrid",
+    # "n_levels": 16,
+    # "n_features_per_level": 2,
+    # "log2_hashmap_size": 19,
+    # "base_resolution": 16,
+    # "per_level_scale": 1.447269237440378,
+    # "start_level": 8,
+    # "start_step": 2000,
+    # "update_steps": 500,
+
+
+class ProgressiveBandHashGridTorch(nn.Module, Updateable):
+    def __init__(self, in_channels, config, dtype=torch.float32):
+        super().__init__()
+        self.n_input_dims = in_channels
+
+        self.encoding = MultiResHashGrid(
+            dim=self.n_input_dims,
+            n_levels=config["n_levels"],
+            n_features_per_level=config["n_features_per_level"],
+            log2_hashmap_size=config["log2_hashmap_size"],
+            base_resolution=config["base_resolution"],
+            finest_resolution=4096,
+        )
+        self.n_features_per_level = config["n_features_per_level"]
+        self.n_level = config["n_levels"]
+        self.n_output_dims = self.encoding.output_dim
+        self.start_level, self.start_step, self.update_steps = (
+            config["start_level"],
+            config["start_step"],
+            config["update_steps"],
+        )
+        self.current_level = self.start_level
+        self.mask = torch.zeros(
+            self.n_level * self.n_features_per_level,
+            dtype=torch.float32,
+            device=get_rank(),
+        )
+
+    def forward(self, x):
+        enc = self.encoding(x)
+        enc = enc * self.mask
+        return enc
+
+    def update_step(self, epoch, global_step, on_load_weights=False):
+        current_level = min(
+            self.start_level
+            + max(global_step - self.start_step, 0) // self.update_steps,
+            self.n_level,
+        )
+        if current_level > self.current_level:
+            threestudio.debug(f"Update current level to {current_level}")
+        self.current_level = current_level
+        self.mask[: self.current_level * self.n_features_per_level] = 1.0
+
 
 def get_encoding(n_input_dims: int, config) -> nn.Module:
     # input suppose to be range [0, 1]
@@ -136,6 +192,10 @@ def get_encoding(n_input_dims: int, config) -> nn.Module:
         encoding = ProgressiveBandFrequency(n_input_dims, config_to_primitive(config))
     elif config.otype == "ProgressiveBandHashGrid":
         encoding = ProgressiveBandHashGrid(n_input_dims, config_to_primitive(config))
+    elif config.otype == "ProgressiveBandHashGridTorch":
+        encoding = ProgressiveBandHashGridTorch(
+            n_input_dims, config_to_primitive(config)
+        )
     else:
         encoding = TCNNEncoding(n_input_dims, config_to_primitive(config))
     encoding = CompositeEncoding(

@@ -36,6 +36,8 @@ class DreamFusion(BaseLift3DSystem):
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def training_step(self, batch, batch_idx):
+        opt = self.optimizers()
+        opt.zero_grad(set_to_none=True)
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
         guidance_out = self.guidance(
@@ -43,7 +45,6 @@ class DreamFusion(BaseLift3DSystem):
         )
 
         loss = 0.0
-
         loss += guidance_out["sds"] * self.C(self.cfg.loss.lambda_sds)
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
@@ -70,11 +71,22 @@ class DreamFusion(BaseLift3DSystem):
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
-        opt = self.optimizers()
-        opt.zero_grad()
-        loss.backward(create_graph=True)
+        self.manual_backward(loss, create_graph=True)
         opt.step()
+        # clear grad in out
+        for k in out:
+            if isinstance(out[k], torch.Tensor) and out[k].requires_grad:
+                out[k].grad = None
+                out[k] = out[k].detach()
+                out[k] = None
+        for k in batch:
+            if isinstance(batch[k], torch.Tensor) and batch[k].requires_grad:
+                batch[k].grad = None
+                batch[k] = batch[k].detach()
+                batch[k] = None
         loss = None
+        for p in self.parameters():
+            p.grad = None
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
