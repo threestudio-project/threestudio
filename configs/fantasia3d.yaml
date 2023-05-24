@@ -29,7 +29,15 @@ system:
     # initialize SDF by optimization
     shape_init: sphere
     shape_init_params: 0.5
-    # or you can initialize SDF by add a bias value
+
+    # or you can initialize SDF using a guide mesh
+    # shape_init: mesh:load/shapes/animal.obj
+    # shape_init_params: 0.5
+    # shape_init_mesh_up: +y
+    # shape_init_mesh_front: +z
+
+    # an alternative initialization implementation:
+    # you can initialize SDF to sphere/ellipsoid by adding a bias value
     # which leads to more smooth initialized shape
     # sdf_bias: sphere
     # sdf_bias_params: 0.5
