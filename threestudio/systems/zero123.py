@@ -1,4 +1,6 @@
+import os
 import random
+import shutil
 from dataclasses import dataclass, field
 
 import torch
@@ -179,7 +181,7 @@ class Zero123(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}.png",
+            f"it{self.true_global_step}-val/{batch['index'][0]}.png",
             (
                 [
                     {
@@ -220,7 +222,16 @@ class Zero123(BaseLift3DSystem):
         )
 
     def on_validation_epoch_end(self):
-        pass
+        self.save_img_sequence(
+            f"it{self.true_global_step}-val",
+            f"it{self.true_global_step}-val",
+            "(\d+)\.png",
+            save_format="mp4",
+            fps=30,
+        )
+        shutil.rmtree(
+            os.path.join(self.get_save_dir(), f"it{self.true_global_step}-val")
+        )
 
     def test_step(self, batch, batch_idx):
         out = self(batch)
