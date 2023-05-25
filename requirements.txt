@@ -15,7 +15,7 @@ imageio[ffmpeg]
 trimesh
 git+https://github.com/NVlabs/nvdiffrast.git
 # deepfloyd
-git+https://github.com/facebookresearch/xformers.git@main#egg=xformers
+xformers
 bitsandbytes
 sentencepiece
 safetensors
@@ -24,3 +24,10 @@ libigl
 xatlas
 trimesh
 networkx
+PyMCubes
+
+# for zero123
+einops
+kornia
+taming-transformers-rom1504
+git+https://github.com/openai/CLIP.git
