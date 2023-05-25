@@ -110,7 +110,7 @@ class Zero123(BaseLift3DSystem):
         else:
             cond = self.guidance.get_cond(**batch)
             guidance_out = self.guidance(out["comp_rgb"], cond, rgb_as_latents=False)
-
+            self.log("train/loss_guidance", guidance_out["sds"])
             loss += guidance_out["sds"]
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
@@ -126,11 +126,11 @@ class Zero123(BaseLift3DSystem):
             loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
-            if "normal" not in out:
+            if "comp_normal" not in out:
                 raise ValueError(
-                    "Normal is required for normal smooth loss, no normal is found in the output."
+                    "comp_normal is required for 2D normal smooth loss, no comp_normal is found in the output."
                 )
-            normal = out["normal"]
+            normal = out["comp_normal"]
             loss_normal_smooth = (
                 normal[:, 1:, :, :] - normal[:, :-1, :, :]
             ).square().mean() + (
@@ -138,6 +138,23 @@ class Zero123(BaseLift3DSystem):
             ).square().mean()
             self.log("train/loss_normal_smooth", loss_normal_smooth)
             loss += self.C(self.cfg.loss.lambda_normal_smooth) * loss_normal_smooth
+
+        if self.C(self.cfg.loss.lambda_3d_normal_smooth) > 0:
+            if "normal" not in out:
+                raise ValueError(
+                    "Normal is required for normal smooth loss, no normal is found in the output."
+                )
+            if "normal_perturb" not in out:
+                raise ValueError(
+                    "normal_perturb is required for normal smooth loss, no normal_perturb is found in the output."
+                )
+            normals = out["normal"]
+            normals_perturb = out["normal_perturb"]
+            loss_3d_normal_smooth = (normals - normals_perturb).abs().mean()
+            self.log("train/loss_3d_normal_smooth", loss_3d_normal_smooth)
+            loss += (
+                self.C(self.cfg.loss.lambda_3d_normal_smooth) * loss_3d_normal_smooth
+            )
 
         loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
         self.log("train/loss_sparsity", loss_sparsity)

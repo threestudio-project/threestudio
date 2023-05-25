@@ -23,7 +23,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     elevation_range: [-10, 90]
     azimuth_range: [-180, 180]
     camera_distance_range: [1, 1.5]
-    fovy_range: [60., 60.]
+    fovy_range: [60., 60.]  # Zero123 has fixed fovy
     camera_perturb: 0.1
     center_perturb: 0.2
     up_perturb: 0.02
@@ -92,37 +92,39 @@ system:
     pretrained_model_name_or_path: "./load/zero123/105000.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     cond_image_path: "./load/images/hamburger_rgba.png"
-    cond_elevation_deg: 0.0     # ENSURE SAME AS data.default_elevation_deg
-    cond_azimuth_deg: 0.0       # ENSURE SAME AS data.default_azimuth_deg
-    cond_camera_distance: 1.2   # ENSURE SAME AS data.default_camera_distance
+    cond_elevation_deg: ${data.default_elevation_deg}
+    cond_azimuth_deg: ${data.default_azimuth_deg}
+    cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 5.
     min_step_percent: 0.02
     max_step_percent: 0.98
 
   freq:
     n_ref: 2
-    ref_only_steps: 100
+    ref_only_steps: 0
 
   loss:
-    lambda_sds: 0.1
-    lambda_rgb: 10.
-    lambda_mask: 1.
+    lambda_sds: 1.
+    lambda_rgb: 1000.
+    lambda_mask: 500.
     lambda_depth: 10.
     lambda_normal_smooth: 0.0
-    lambda_orient: 0.0
+    lambda_3d_normal_smooth: 10.0
+    lambda_orient: 1.0
     lambda_sparsity: 0.0
     lambda_opaque: 0.0
   optimizer:
-    name: Adam
+    name: Adan
     args:
-      lr: 0.01
-      betas: [0.9, 0.99]
-      eps: 1.e-15
+      lr: 0.005
+      max_grad_norm: 5.0
+      eps: 1.e-8
+      weight_decay: 2e-5
     params:
       geometry:
-        lr: 0.01
+        lr: ${system.optimizer.args.lr}
       background:
-        lr: 0.001
+        lr: ${system.optimizer.args.lr}
 
 trainer:
   max_steps: 10000
