@@ -84,8 +84,8 @@ class ProlificDreamer(BaseLift3DSystem):
             material=self.material,
             background=self.background,
         )
-        if self.training:
-            self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        # FIXME: not necessary in validation/testing
+        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
