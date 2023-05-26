@@ -17,7 +17,7 @@ from diffusers.utils.import_utils import is_xformers_available
 
 import threestudio
 from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import C, parse_version
+from threestudio.utils.misc import C, cleanup, parse_version
 from threestudio.utils.typing import *
 
 
@@ -35,7 +35,8 @@ class ToWeightsDType(nn.Module):
 class StableDiffusionVSDGuidance(BaseModule):
     @dataclass
     class Config(BaseModule.Config):
-        pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
+        pretrained_model_name_or_path: str = "stabilityai/stable-diffusion-2-1-base"
+        pretrained_model_name_or_path_lora: str = "stabilityai/stable-diffusion-2-1"
         enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
         enable_attention_slicing: bool = False
@@ -66,16 +67,36 @@ class StableDiffusionVSDGuidance(BaseModule):
             "torch_dtype": self.weights_dtype,
         }
 
+        pipe_lora_kwargs = {
+            "tokenizer": None,
+            "safety_checker": None,
+            "feature_extractor": None,
+            "requires_safety_checker": False,
+            "torch_dtype": self.weights_dtype,
+        }
+
         @dataclass
         class SubModules:
             pipe: StableDiffusionPipeline
+            pipe_lora: StableDiffusionPipeline
 
-        self.submodules = SubModules(
-            StableDiffusionPipeline.from_pretrained(
-                self.cfg.pretrained_model_name_or_path,
-                **pipe_kwargs,
+        pipe = StableDiffusionPipeline.from_pretrained(
+            self.cfg.pretrained_model_name_or_path,
+            **pipe_kwargs,
+        ).to(self.device)
+        if (
+            self.cfg.pretrained_model_name_or_path
+            == self.cfg.pretrained_model_name_or_path_lora
+        ):
+            self.single_model = True
+            pipe_lora = pipe
+        else:
+            self.single_model = False
+            pipe_lora = StableDiffusionPipeline.from_pretrained(
+                self.cfg.pretrained_model_name_or_path_lora,
+                **pipe_lora_kwargs,
             ).to(self.device)
-        )
+        self.submodules = SubModules(pipe=pipe, pipe_lora=pipe_lora)
 
         if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
@@ -88,58 +109,72 @@ class StableDiffusionVSDGuidance(BaseModule):
                 )
             else:
                 self.pipe.enable_xformers_memory_efficient_attention()
+                self.pipe_lora.enable_xformers_memory_efficient_attention()
 
         if self.cfg.enable_sequential_cpu_offload:
             self.pipe.enable_sequential_cpu_offload()
+            self.pipe_lora.enable_sequential_cpu_offload()
 
         if self.cfg.enable_attention_slicing:
             self.pipe.enable_attention_slicing(1)
+            self.pipe_lora.enable_attention_slicing(1)
 
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
+            self.pipe_lora.unet.to(memory_format=torch.channels_last)
 
         for p in self.vae.parameters():
             p.requires_grad_(False)
         for p in self.unet.parameters():
+            p.requires_grad_(False)
+        for p in self.vae_lora.parameters():
+            p.requires_grad_(False)
+        for p in self.unet_lora.parameters():
             p.requires_grad_(False)
 
         # FIXME: hard-coded dims
         self.camera_embedding = ToWeightsDType(
             TimestepEmbedding(16, 1280), self.weights_dtype
         )
-        self.unet.class_embedding = self.camera_embedding
+        self.unet_lora.class_embedding = self.camera_embedding
 
         # set up LoRA layers
         lora_attn_procs = {}
-        for name in self.unet.attn_processors.keys():
+        for name in self.unet_lora.attn_processors.keys():
             cross_attention_dim = (
                 None
                 if name.endswith("attn1.processor")
-                else self.unet.config.cross_attention_dim
+                else self.unet_lora.config.cross_attention_dim
             )
             if name.startswith("mid_block"):
-                hidden_size = self.unet.config.block_out_channels[-1]
+                hidden_size = self.unet_lora.config.block_out_channels[-1]
             elif name.startswith("up_blocks"):
                 block_id = int(name[len("up_blocks.")])
-                hidden_size = list(reversed(self.unet.config.block_out_channels))[
+                hidden_size = list(reversed(self.unet_lora.config.block_out_channels))[
                     block_id
                 ]
             elif name.startswith("down_blocks"):
                 block_id = int(name[len("down_blocks.")])
-                hidden_size = self.unet.config.block_out_channels[block_id]
+                hidden_size = self.unet_lora.config.block_out_channels[block_id]
 
             lora_attn_procs[name] = LoRAAttnProcessor(
                 hidden_size=hidden_size, cross_attention_dim=cross_attention_dim
             )
 
-        self.unet.set_attn_processor(lora_attn_procs)
+        self.unet_lora.set_attn_processor(lora_attn_procs)
 
-        self.lora_layers = AttnProcsLayers(self.unet.attn_processors)
+        self.lora_layers = AttnProcsLayers(self.unet_lora.attn_processors)
         self.lora_layers._load_state_dict_pre_hooks.clear()
         self.lora_layers._state_dict_hooks.clear()
 
         self.scheduler = DDPMScheduler.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
+            subfolder="scheduler",
+            torch_dtype=self.weights_dtype,
+        )
+        # used to get prediction type later in training
+        self.scheduler_lora = DDPMScheduler.from_pretrained(
+            self.cfg.pretrained_model_name_or_path_lora,
             subfolder="scheduler",
             torch_dtype=self.weights_dtype,
         )
@@ -159,16 +194,29 @@ class StableDiffusionVSDGuidance(BaseModule):
         return self.submodules.pipe
 
     @property
+    def pipe_lora(self):
+        return self.submodules.pipe_lora
+
+    @property
     def unet(self):
         return self.submodules.pipe.unet
+
+    @property
+    def unet_lora(self):
+        return self.submodules.pipe_lora.unet
 
     @property
     def vae(self):
         return self.submodules.pipe.vae
 
+    @property
+    def vae_lora(self):
+        return self.submodules.pipe_lora.vae
+
     @torch.cuda.amp.autocast(enabled=False)
     def forward_unet(
         self,
+        unet: UNet2DConditionModel,
         latents: Float[Tensor, "..."],
         t: Float[Tensor, "..."],
         encoder_hidden_states: Float[Tensor, "..."],
@@ -176,7 +224,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Float[Tensor, "..."]:
         input_dtype = latents.dtype
-        return self.unet(
+        return unet(
             latents.to(self.weights_dtype),
             t.to(self.weights_dtype),
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
@@ -235,13 +283,16 @@ class StableDiffusionVSDGuidance(BaseModule):
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
             with self.disable_unet_class_embedding():
+                cross_attention_kwargs = {"scale": 0.0} if self.single_model else None
                 noise_pred_pretrain = self.forward_unet(
+                    self.unet,
                     latent_model_input,
                     torch.cat([t] * 2),
                     encoder_hidden_states=text_embeddings,
-                    cross_attention_kwargs={"scale": 0.0},
+                    cross_attention_kwargs=cross_attention_kwargs,
                 )
             noise_pred_est = self.forward_unet(
+                self.unet_lora,
                 latent_model_input,
                 torch.cat([t] * 2),
                 encoder_hidden_states=text_embeddings,
@@ -272,6 +323,11 @@ class StableDiffusionVSDGuidance(BaseModule):
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
 
         grad = w * (noise_pred_pretrain - noise_pred_est)
+        # print(
+        #     noise_pred_pretrain.norm(),
+        #     noise_pred_est.norm(),
+        #     (noise_pred_pretrain - noise_pred_est).norm(),
+        # )
         return grad
 
     def train_lora(
@@ -284,17 +340,18 @@ class StableDiffusionVSDGuidance(BaseModule):
         B = latents.shape[0]
         latents = latents.detach()
         noise = torch.randn_like(latents)
-        noisy_latents = self.scheduler.add_noise(latents, noise, t)
-        if self.scheduler.config.prediction_type == "epsilon":
+        noisy_latents = self.scheduler_lora.add_noise(latents, noise, t)
+        if self.scheduler_lora.config.prediction_type == "epsilon":
             target = noise
-        elif self.scheduler.config.prediction_type == "v_prediction":
-            target = self.scheduler.get_velocity(latents, noise, t)
+        elif self.scheduler_lora.config.prediction_type == "v_prediction":
+            target = self.scheduler_lora.get_velocity(latents, noise, t)
         else:
             raise ValueError(
-                f"Unknown prediction type {self.scheduler.config.prediction_type}"
+                f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
             )
         text_embeddings, _ = text_embeddings.chunk(2)  # conditional text embeddings
         model_pred = self.forward_unet(
+            self.unet_lora,
             noisy_latents,
             t,
             encoder_hidden_states=text_embeddings,
@@ -302,6 +359,21 @@ class StableDiffusionVSDGuidance(BaseModule):
             cross_attention_kwargs={"scale": 1.0},
         )
         return F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+
+    def get_latents(
+        self, rgb_BCHW: Float[Tensor, "B C H W"], rgb_as_latents=False
+    ) -> Float[Tensor, "B 4 64 64"]:
+        if rgb_as_latents:
+            latents = F.interpolate(
+                rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
+            )
+        else:
+            rgb_BCHW_512 = F.interpolate(
+                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+            )
+            # encode image into latents with vae
+            latents = self.encode_images(rgb_BCHW_512)
+        return latents
 
     def forward(
         self,
@@ -313,17 +385,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         batch_size = rgb.shape[0]
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 64 64"]
-        if rgb_as_latents:
-            latents = F.interpolate(
-                rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
-            )
-        else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-            )
-            # encode image into latents with vae
-            latents = self.encode_images(rgb_BCHW_512)
+        latents = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
