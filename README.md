@@ -293,6 +293,27 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
 
+### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
+
+**Results obtained by threestudio (Stable Diffusion, 64x64, 15000 iterations)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/29ded457-60a9-4d7e-8a5e-ab71a7ef361a
+
+**IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
+
+We currently only experiment on the first stage (NeRF training), although the third stage is already implemented (mesh texture refinement), and the second stage is easy to implement too (mesh normal optimization). Some other important design factors that are not implemented:
+
+- multiple particles
+
+```sh
+# object geneartion with 64x64 NeRF rendering, ~14GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=64 data.height=64
+# object generation with 512x512 NeRF rendering (original paper), >24GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=512 data.height=512
+# scene generation
+python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k" data.width=64 data.height=64
+```
+
 ### More to come, please stay tuned.
 
 - [ ] [Dream3D](https://bluestyle97.github.io/dream3d/) [![arXiv](https://img.shields.io/badge/arXiv-2212.14704-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2212.14704)

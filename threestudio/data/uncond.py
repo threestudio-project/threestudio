@@ -244,6 +244,7 @@ class RandomCameraIterableDataset(IterableDataset):
             "rays_d": rays_d,
             "mvp_mtx": mvp_mtx,
             "camera_positions": camera_positions,
+            "c2w": c2w,
             "light_positions": light_positions,
             "elevation": elevation_deg,
             "azimuth": azimuth_deg,
