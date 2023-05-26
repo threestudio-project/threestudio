@@ -273,12 +273,14 @@ class StableDiffusionVSDGuidance(BaseModule):
         text_embeddings: Float[Tensor, "BB 77 768"],
         t: Int[Tensor, "B"],
         mvp_mtx: Float[Tensor, "B 4 4"],
+        noise: Float[Tensor, "B 4 64 64"],
     ):
         B = latents.shape[0]
         # predict the noise residual with unet, NO grad!
+
         with torch.no_grad():
             # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
+            # noise = torch.randn_like(latents)  # TODO: use torch generator
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
@@ -311,11 +313,21 @@ class StableDiffusionVSDGuidance(BaseModule):
             noise_pred_pretrain_text - noise_pred_pretrain_uncond
         )
 
+        if self.scheduler_lora.config.prediction_type == "v_prediction":
+            alphas_cumprod = self.scheduler_lora.alphas_cumprod.to(
+                device=latents_noisy.device, dtype=latents_noisy.dtype
+            )
+            alpha_t = alphas_cumprod[t] ** 0.5
+            sigma_t = (1 - alphas_cumprod[t]) ** 0.5
+
+            noise_pred_est = latents_noisy * sigma_t + noise_pred_est * alpha_t
+
         (
             noise_pred_est_text,
             noise_pred_est_uncond,
         ) = noise_pred_est.chunk(2)
         # NOTE: guidance scale definition here is aligned with diffusers, but different from other guidance
+
         noise_pred_est = noise_pred_est_uncond + self.cfg.guidance_scale_lora * (
             noise_pred_est_text - noise_pred_est_uncond
         )
@@ -336,10 +348,11 @@ class StableDiffusionVSDGuidance(BaseModule):
         text_embeddings: Float[Tensor, "BB 77 768"],
         t: Float[Tensor, "..."],
         mvp_mtx: Float[Tensor, "B 4 4"],
+        noise: Float[Tensor, "B 4 64 64"],
     ):
         B = latents.shape[0]
         latents = latents.detach()
-        noise = torch.randn_like(latents)
+        # noise = torch.randn_like(latents)
         noisy_latents = self.scheduler_lora.add_noise(latents, noise, t)
         if self.scheduler_lora.config.prediction_type == "epsilon":
             target = noise
@@ -396,7 +409,9 @@ class StableDiffusionVSDGuidance(BaseModule):
             device=self.device,
         )
 
-        grad = self.compute_grad_vsd(latents, text_embeddings, t, mvp_mtx)
+        # use same noise
+        noise = torch.randn_like(latents)
+        grad = self.compute_grad_vsd(latents, text_embeddings, t, mvp_mtx, noise)
 
         grad = torch.nan_to_num(grad)
 
@@ -405,7 +420,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         target = (latents - grad).detach()
         vsd_loss = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        lora_loss = self.train_lora(latents, text_embeddings, t, mvp_mtx)
+        lora_loss = self.train_lora(latents, text_embeddings, t, mvp_mtx, noise)
 
         return {
             "vsd": vsd_loss,
