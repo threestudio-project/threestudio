@@ -6,8 +6,8 @@ seed: 0
 data_type: "random-camera-datamodule"
 data:
   batch_size: 1
-  width: 64
-  height: 64
+  width: 256
+  height: 256
   camera_distance_range: [1.0, 1.5]
   fovy_range: [40, 70]
   elevation_range: [-10, 90]
@@ -89,7 +89,7 @@ trainer:
   num_sanity_val_steps: 0
   val_check_interval: 200
   enable_progress_bar: true
-  precision: 16-mixed
+  precision: 32
 
 checkpoint:
   save_last: true

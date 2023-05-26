@@ -14,6 +14,7 @@ from threestudio.utils.typing import *
 class ProlificDreamer(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
+        camera_condition_type: str = "extrinsics"
         # only used when refinement=True and from_coarse=True
         geometry_coarse_type: str = "implicit-volume"
         geometry_coarse: dict = field(default_factory=dict)
@@ -103,12 +104,20 @@ class ProlificDreamer(BaseLift3DSystem):
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
 
-        R_t = batch["c2w"]  # B x 3 x 4
-        R_t = torch.cat([R_t, torch.zeros_like(R_t[:, :1])], dim=1)
-        R_t[:, 3, 3] = 0.0
+        if self.cfg.camera_condition_type == "extrinsics":
+            Rt = batch["c2w"]  # B x 3 x 4
+            Rt = torch.cat([Rt, torch.zeros_like(Rt[:, :1])], dim=1)
+            Rt[:, 3, 3] = 0.0
+            camera_condition = Rt
+        elif self.cfg.camera_condition_type == "mvp":
+            camera_condition = batch["mvp_mtx"]
+        else:
+            raise ValueError(
+                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
+            )
 
         guidance_out = self.guidance(
-            out["comp_rgb"], text_embeddings, R_t, rgb_as_latents=False
+            out["comp_rgb"], text_embeddings, camera_condition, rgb_as_latents=False
         )
 
         loss = 0.0
