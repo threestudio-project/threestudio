@@ -102,8 +102,13 @@ class ProlificDreamer(BaseLift3DSystem):
     def training_step(self, batch, batch_idx):
         out = self(batch)
         text_embeddings = self.prompt_processor(**batch)
+
+        R_t = batch["c2w"]  # B x 3 x 4
+        R_t = torch.cat([R_t, torch.zeros_like(R_t[:, :1])], dim=1)
+        R_t[:, 3, 3] = 0.0
+
         guidance_out = self.guidance(
-            out["comp_rgb"], text_embeddings, batch["mvp_mtx"], rgb_as_latents=False
+            out["comp_rgb"], text_embeddings, R_t, rgb_as_latents=False
         )
 
         loss = 0.0
