@@ -297,11 +297,9 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 **Results obtained by threestudio (Stable Diffusion, 64x64, 15000 iterations)**
 
-
 https://github.com/threestudio-project/threestudio/assets/19284678/29ded457-60a9-4d7e-8a5e-ab71a7ef361a
 
-
-**IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper.**
+**IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
 
 We currently only experiment on the first stage (NeRF training), although the third stage is already implemented (mesh texture refinement), and the second stage is easy to implement too (mesh normal optimization). Some other important design factors that are not implemented:
 
