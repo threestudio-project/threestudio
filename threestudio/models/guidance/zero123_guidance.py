@@ -154,14 +154,14 @@ class Zero123Guidance(BaseObject):
             / 255.0
         )
         rgb = rgba[..., :3] * rgba[..., 3:] + (1 - rgba[..., 3:])
-        rgb_256: Float[Tensor, "1 3 H W"] = (
+        self.rgb_256: Float[Tensor, "1 3 H W"] = (
             torch.from_numpy(rgb)
             .unsqueeze(0)
             .permute(0, 3, 1, 2)
             .contiguous()
             .to(self.device)
         )
-        self.c_crossattn, self.c_concat = self.get_img_embeds(rgb_256)
+        self.c_crossattn, self.c_concat = self.get_img_embeds(self.rgb_256)
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
@@ -223,15 +223,15 @@ class Zero123Guidance(BaseObject):
             torch.cat([self.c_crossattn.repeat(len(T), 1, 1), T], dim=-1)
         )
         cond["c_crossattn"] = [
-            torch.cat([clip_emb, torch.zeros_like(clip_emb).to(self.device)], dim=0)
+            torch.cat([torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0)
         ]
         cond["c_concat"] = [
             torch.cat(
                 [
-                    self.c_concat.repeat(len(T), 1, 1, 1),
                     torch.zeros_like(self.c_concat)
                     .repeat(len(T), 1, 1, 1)
                     .to(self.device),
+                    self.c_concat.repeat(len(T), 1, 1, 1),
                 ],
                 dim=0,
             )
@@ -281,9 +281,9 @@ class Zero123Guidance(BaseObject):
             noise_pred = self.model.apply_model(x_in, t_in, cond)
 
         # perform guidance
-        noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-        noise_pred = noise_pred_text + self.cfg.guidance_scale * (
-            noise_pred_text - noise_pred_uncond
+        noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+            noise_pred_cond - noise_pred_uncond
         )
 
         w = (1 - self.alphas[t]).reshape(-1, 1, 1, 1)
@@ -310,3 +310,115 @@ class Zero123Guidance(BaseObject):
         # http://arxiv.org/abs/2303.15413
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+    # verification - requires `vram_O = False` in load_model_from_config
+    @torch.no_grad()
+    def generate(
+        self,
+        image,  # image tensor [1, 3, H, W] in [0, 1]
+        elevation=0,
+        azimuth=0,
+        camera_distances=0,  # new view params
+        scale=3,
+        ddim_steps=50,
+        ddim_eta=1,
+        c_crossattn=None,
+        c_concat=None,
+        post_process=True,
+    ):
+        if c_crossattn is None:
+            embeddings = self.get_img_embeds(image)
+
+        T = torch.stack(
+            [
+                torch.deg2rad(
+                    (90 - elevation) - (90 - self.cfg.cond_elevation_deg)
+                ),  # Zero123 polar is 90-elevation
+                torch.sin(torch.deg2rad(azimuth - self.cfg.cond_azimuth_deg)),
+                torch.cos(torch.deg2rad(azimuth - self.cfg.cond_azimuth_deg)),
+                camera_distances - self.cfg.cond_camera_distance,
+            ],
+            dim=-1,
+        )[:, None, :].to(self.device)
+
+        cond = {}
+        clip_emb = self.model.cc_projection(
+            torch.cat(
+                [embeddings["c_crossattn"] if c_crossattn is None else c_crossattn, T],
+                dim=-1,
+            )
+        )
+        cond["c_crossattn"] = [
+            torch.cat([torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0)
+        ]
+        cond["c_concat"] = (
+            [
+                torch.cat(
+                    [
+                        torch.zeros_like(embeddings["c_concat"]).to(self.device),
+                        embeddings["c_concat"],
+                    ],
+                    dim=0,
+                )
+            ]
+            if c_concat is None
+            else [
+                torch.cat([torch.zeros_like(c_concat).to(self.device), c_concat], dim=0)
+            ]
+        )
+
+        # produce latents loop
+        latents = torch.randn((1, 4, 32, 32), device=self.device)
+        self.scheduler.set_timesteps(ddim_steps)
+
+        for i, t in enumerate(self.scheduler.timesteps):
+            x_in = torch.cat([latents] * 2)
+            t_in = torch.cat([t.view(1)] * 2).to(self.device)
+
+            noise_pred = self.model.apply_model(x_in, t_in, cond)
+            noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + scale * (
+                noise_pred_cond - noise_pred_uncond
+            )
+
+            latents = self.scheduler.step(noise_pred, t, latents, eta=ddim_eta)[
+                "prev_sample"
+            ]
+
+        imgs = self.decode_latents(latents)
+        imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
+
+        return imgs
+
+    # verification - requires `vram_O = False` in load_model_from_config
+    @torch.no_grad()
+    def gen_from_cond(
+        self,
+        cond,
+        ddim_steps=50,
+        scale=3,
+        post_process=True,
+    ):
+        # produce latents loop
+        B = cond["c_crossattn"][0].shape[0] // 2
+        latents = torch.randn((B, 4, 32, 32), device=self.device)
+        self.scheduler.set_timesteps(ddim_steps)
+
+        for t in self.scheduler.timesteps:
+            x_in = torch.cat([latents] * 2)
+            t_in = torch.cat([t.reshape(1).repeat(B)] * 2).to(self.device)
+
+            noise_pred = self.model.apply_model(x_in, t_in, cond)
+            noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + scale * (
+                noise_pred_cond - noise_pred_uncond
+            )
+
+            latents = self.scheduler.step(noise_pred, t, latents, eta=1)["prev_sample"]
+
+        imgs = self.decode_latents(latents)
+        imgs = (
+            imgs.detach().cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
+        )
+
+        return imgs
