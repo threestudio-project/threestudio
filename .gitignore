@@ -178,3 +178,4 @@ pyrightconfig.json
 .vscode/
 .threestudio_cache/
 outputs/
+*.ckpt
