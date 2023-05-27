@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+import random
 
 import torch
 import torch.nn as nn
@@ -39,6 +40,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         guidance_scale: float = 7.5
         guidance_scale_lora: float = 1.0
         half_precision_weights: bool = True
+        lora_cfg_training: bool = True
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
@@ -369,6 +371,8 @@ class StableDiffusionVSDGuidance(BaseModule):
                 f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
             )
         text_embeddings, _ = text_embeddings.chunk(2)  # conditional text embeddings
+        if self.cfg.lora_cfg_training and random.random() < 0.1:
+            mvp_mtx = torch.zeros_like(mvp_mtx)
         noise_pred = self.forward_unet(
             self.unet_lora,
             noisy_latents,
