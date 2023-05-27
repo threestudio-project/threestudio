@@ -91,7 +91,7 @@ config = {
     "max_iters": 6000,
     "seed": 42,
     "scheduler": None,
-    "mode": "rgb",
+    "mode": "latent",
     "prompt_processor_type": "stable-diffusion-prompt-processor",
     "prompt_processor": {
         "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
@@ -110,8 +110,8 @@ config = {
         "anneal_start_step": 100000,  # do not anneal
     },
     "image": {
-        "width": 512,
-        "height": 512,
+        "width": 64,
+        "height": 64,
     },
     "n_particle": 8,
     "batch_size": 2,
@@ -185,25 +185,20 @@ for step in tqdm(range(num_steps * n_accumulation_steps + 1)):
         actual_step = (step + 1) // n_accumulation_steps
         guidance.update_step(epoch=0, global_step=actual_step)
         optimizer.step()
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
 
         if actual_step % save_interval == 0:
             if mode == "rgb":
                 rgb = target
-                # vis_grad = grad[..., :3]
-                # vis_grad_norm = grad.norm(dim=-1)
             else:
-                rgb = guidance.decode_latents(target.permute(0, 3, 1, 2)).permute(
-                    0, 2, 3, 1
-                )
-                # vis_grad = grad
-                # vis_grad_norm = grad.norm(dim=-1)
+                del loss
+                torch.cuda.empty_cache()
+                with torch.no_grad():
+                    rgb = guidance.decode_latents(target.permute(0, 3, 1, 2)).permute(
+                        0, 2, 3, 1
+                    )
 
-            # vis_grad_norm = vis_grad_norm / vis_grad_norm.max()
-            # vis_grad = vis_grad / vis_grad.max()
             img_rgb = rgb.clamp(0, 1).detach().squeeze(0).cpu().numpy()
-            # img_grad = vis_grad.clamp(0, 1).detach().squeeze(0).cpu().numpy()
-            # img_grad_norm = vis_grad_norm.clamp(0, 1).detach().squeeze(0).cpu().numpy()
 
             fig, ax = plt.subplots(1, n_images, figsize=(5 * n_images, 5))
             for col in range(n_images):
