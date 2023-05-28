@@ -7,9 +7,9 @@ from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 
 import threestudio
+from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
-from threestudio.utils.ops import SpecifyGradient
 from threestudio.utils.typing import *
 
 
@@ -37,6 +37,8 @@ class StableDiffusionGuidance(BaseObject):
 
         token_merging: bool = False
         token_merging_params: Optional[dict] = field(default_factory=dict)
+
+        view_dependent_prompting: bool = True
 
     cfg: Config
 
@@ -249,8 +251,12 @@ class StableDiffusionGuidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        text_embeddings: Float[Tensor, "BB 77 768"],
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
+        **kwargs,
     ):
         batch_size = rgb.shape[0]
 
@@ -266,6 +272,10 @@ class StableDiffusionGuidance(BaseObject):
             )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
+
+        text_embeddings = prompt_utils.get_text_embeddings(
+            elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+        )
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(

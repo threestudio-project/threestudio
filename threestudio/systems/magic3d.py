@@ -100,9 +100,9 @@ class Magic3D(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
-        text_embeddings = self.prompt_processor(**batch)
+        prompt_utils = self.prompt_processor()
         guidance_out = self.guidance(
-            out["comp_rgb"], text_embeddings, rgb_as_latents=False
+            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
         )
 
         loss = 0.0
