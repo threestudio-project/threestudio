@@ -100,14 +100,17 @@ class Magic3D(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
-        text_embeddings = self.prompt_processor(**batch)
+        prompt_utils = self.prompt_processor()
         guidance_out = self.guidance(
-            out["comp_rgb"], text_embeddings, rgb_as_latents=False
+            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
         )
 
         loss = 0.0
 
-        loss += guidance_out["sds"] * self.C(self.cfg.loss.lambda_sds)
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         if not self.cfg.refinement:
             if self.C(self.cfg.loss.lambda_orient) > 0:

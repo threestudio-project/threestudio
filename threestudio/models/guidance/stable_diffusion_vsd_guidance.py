@@ -1,6 +1,6 @@
+import random
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-import random
 
 import torch
 import torch.nn as nn
@@ -12,6 +12,7 @@ from diffusers.models.embeddings import TimestepEmbedding
 from diffusers.utils.import_utils import is_xformers_available
 
 import threestudio
+from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup, parse_version
 from threestudio.utils.typing import *
@@ -46,6 +47,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         max_step_percent: float = 0.98
         max_step_percent_annealed: float = 0.5
         anneal_start_step: int = 5000
+
+        view_dependent_prompting: bool = True
+        camera_condition_type: str = "extrinsics"
 
     cfg: Config
 
@@ -267,8 +271,9 @@ class StableDiffusionVSDGuidance(BaseModule):
     def compute_grad_vsd(
         self,
         latents: Float[Tensor, "B 4 64 64"],
+        text_embeddings_vd: Float[Tensor, "BB 77 768"],
         text_embeddings: Float[Tensor, "BB 77 768"],
-        mvp_mtx: Float[Tensor, "B 4 4"],
+        camera_condition: Float[Tensor, "B 4 4"],
     ):
         B = latents.shape[0]
 
@@ -292,17 +297,22 @@ class StableDiffusionVSDGuidance(BaseModule):
                     self.unet,
                     latent_model_input,
                     torch.cat([t] * 2),
-                    encoder_hidden_states=text_embeddings,
+                    encoder_hidden_states=text_embeddings_vd,
                     cross_attention_kwargs=cross_attention_kwargs,
                 )
 
+            # use view-independent text embeddings in LoRA
             noise_pred_est = self.forward_unet(
                 self.unet_lora,
                 latent_model_input,
                 torch.cat([t] * 2),
                 encoder_hidden_states=text_embeddings,
                 class_labels=torch.cat(
-                    [mvp_mtx.view(B, -1), torch.zeros_like(mvp_mtx.view(B, -1))], dim=0
+                    [
+                        camera_condition.view(B, -1),
+                        torch.zeros_like(camera_condition.view(B, -1)),
+                    ],
+                    dim=0,
                 ),
                 cross_attention_kwargs={"scale": 1.0},
             )
@@ -347,7 +357,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         self,
         latents: Float[Tensor, "B 4 64 64"],
         text_embeddings: Float[Tensor, "BB 77 768"],
-        mvp_mtx: Float[Tensor, "B 4 4"],
+        camera_condition: Float[Tensor, "B 4 4"],
     ):
         B = latents.shape[0]
         latents = latents.detach()
@@ -370,15 +380,16 @@ class StableDiffusionVSDGuidance(BaseModule):
             raise ValueError(
                 f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
             )
-        text_embeddings, _ = text_embeddings.chunk(2)  # conditional text embeddings
+        # use view-independent text embeddings in LoRA
+        text_embeddings, _ = text_embeddings.chunk(2)
         if self.cfg.lora_cfg_training and random.random() < 0.1:
-            mvp_mtx = torch.zeros_like(mvp_mtx)
+            camera_condition = torch.zeros_like(camera_condition)
         noise_pred = self.forward_unet(
             self.unet_lora,
             noisy_latents,
             t,
             encoder_hidden_states=text_embeddings,
-            class_labels=mvp_mtx.view(B, -1),
+            class_labels=camera_condition.view(B, -1),
             cross_attention_kwargs={"scale": 1.0},
         )
         return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
@@ -401,29 +412,58 @@ class StableDiffusionVSDGuidance(BaseModule):
     def forward(
         self,
         rgb: Float[Tensor, "B H W C"],
-        text_embeddings: Float[Tensor, "BB 77 768"],
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
         mvp_mtx: Float[Tensor, "B 4 4"],
+        c2w: Float[Tensor, "B 4 4"],
         rgb_as_latents=False,
+        **kwargs,
     ):
         batch_size = rgb.shape[0]
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
 
-        grad = self.compute_grad_vsd(latents, text_embeddings, mvp_mtx)
+        # view-dependent text embeddings
+        text_embeddings_vd = prompt_utils.get_text_embeddings(
+            elevation,
+            azimuth,
+            camera_distances,
+            view_dependent_prompting=self.cfg.view_dependent_prompting,
+        )
+
+        # input text embeddings, view-independent
+        text_embeddings = prompt_utils.get_text_embeddings(
+            elevation, azimuth, camera_distances, view_dependent_prompting=False
+        )
+
+        if self.cfg.camera_condition_type == "extrinsics":
+            camera_condition = c2w
+        elif self.cfg.camera_condition_type == "mvp":
+            camera_condition = mvp_mtx
+        else:
+            raise ValueError(
+                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
+            )
+
+        grad = self.compute_grad_vsd(
+            latents, text_embeddings_vd, text_embeddings, camera_condition
+        )
 
         grad = torch.nan_to_num(grad)
 
         # reparameterization trick
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
-        vsd_loss = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        lora_loss = self.train_lora(latents, text_embeddings, mvp_mtx)
+        loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
 
         return {
-            "vsd": vsd_loss,
-            "lora": lora_loss,
+            "loss_vsd": loss_vsd,
+            "loss_lora": loss_lora,
             "grad_norm": grad.norm(),
         }
 
