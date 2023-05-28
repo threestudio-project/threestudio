@@ -224,7 +224,7 @@ class RandomCameraIterableDataset(IterableDataset):
         c2w: Float[Tensor, "B 4 4"] = torch.cat(
             [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
         )
-        c2w[:, 3, 3] = 0.0
+        c2w[:, 3, 3] = 1.0
 
         # get directions by dividing directions_unit_focal by focal length
         focal_length: Float[Tensor, "B"] = 0.5 * self.cfg.height / torch.tan(0.5 * fovy)
@@ -320,8 +320,7 @@ class RandomCameraDataset(Dataset):
         c2w: Float[Tensor, "B 4 4"] = torch.cat(
             [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
         )
-        c2w[:, 3, 3] = 0.0
-        print(c2w.shape, c2w3x4.shape)
+        c2w[:, 3, 3] = 1.0
 
         # get directions by dividing directions_unit_focal by focal length
         focal_length: Float[Tensor, "B"] = (

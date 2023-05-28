@@ -271,8 +271,8 @@ class StableDiffusionVSDGuidance(BaseModule):
     def compute_grad_vsd(
         self,
         latents: Float[Tensor, "B 4 64 64"],
+        text_embeddings_vd: Float[Tensor, "BB 77 768"],
         text_embeddings: Float[Tensor, "BB 77 768"],
-        text_embeddings_inp: Float[Tensor, "BB 77 768"],
         camera_condition: Float[Tensor, "B 4 4"],
     ):
         B = latents.shape[0]
@@ -297,7 +297,7 @@ class StableDiffusionVSDGuidance(BaseModule):
                     self.unet,
                     latent_model_input,
                     torch.cat([t] * 2),
-                    encoder_hidden_states=text_embeddings,
+                    encoder_hidden_states=text_embeddings_vd,
                     cross_attention_kwargs=cross_attention_kwargs,
                 )
 
@@ -306,7 +306,7 @@ class StableDiffusionVSDGuidance(BaseModule):
                 self.unet_lora,
                 latent_model_input,
                 torch.cat([t] * 2),
-                encoder_hidden_states=text_embeddings_inp,
+                encoder_hidden_states=text_embeddings,
                 class_labels=torch.cat(
                     [
                         camera_condition.view(B, -1),
@@ -357,7 +357,6 @@ class StableDiffusionVSDGuidance(BaseModule):
         self,
         latents: Float[Tensor, "B 4 64 64"],
         text_embeddings: Float[Tensor, "BB 77 768"],
-        text_embeddings_inp: Float[Tensor, "BB 77 768"],
         camera_condition: Float[Tensor, "B 4 4"],
     ):
         B = latents.shape[0]
@@ -382,14 +381,14 @@ class StableDiffusionVSDGuidance(BaseModule):
                 f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
             )
         # use view-independent text embeddings in LoRA
-        text_embeddings_inp, _ = text_embeddings_inp.chunk(2)
+        text_embeddings, _ = text_embeddings.chunk(2)
         if self.cfg.lora_cfg_training and random.random() < 0.1:
             camera_condition = torch.zeros_like(camera_condition)
         noise_pred = self.forward_unet(
             self.unet_lora,
             noisy_latents,
             t,
-            encoder_hidden_states=text_embeddings_inp,
+            encoder_hidden_states=text_embeddings,
             class_labels=camera_condition.view(B, -1),
             cross_attention_kwargs={"scale": 1.0},
         )
@@ -410,7 +409,7 @@ class StableDiffusionVSDGuidance(BaseModule):
             latents = self.encode_images(rgb_BCHW_512)
         return latents
 
-    def __call__(
+    def forward(
         self,
         rgb: Float[Tensor, "B H W C"],
         prompt_utils: PromptProcessorOutput,
@@ -428,7 +427,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         latents = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
 
         # view-dependent text embeddings
-        text_embeddings = prompt_utils.get_text_embeddings(
+        text_embeddings_vd = prompt_utils.get_text_embeddings(
             elevation,
             azimuth,
             camera_distances,
@@ -436,7 +435,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         )
 
         # input text embeddings, view-independent
-        text_embeddings_inp = prompt_utils.get_text_embeddings(
+        text_embeddings = prompt_utils.get_text_embeddings(
             elevation, azimuth, camera_distances, view_dependent_prompting=False
         )
 
@@ -450,7 +449,7 @@ class StableDiffusionVSDGuidance(BaseModule):
             )
 
         grad = self.compute_grad_vsd(
-            latents, text_embeddings, text_embeddings_inp, camera_condition
+            latents, text_embeddings_vd, text_embeddings, camera_condition
         )
 
         grad = torch.nan_to_num(grad)
@@ -460,9 +459,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         target = (latents - grad).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        loss_lora = self.train_lora(
-            latents, text_embeddings, text_embeddings_inp, camera_condition
-        )
+        loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
 
         return {
             "loss_vsd": loss_vsd,
