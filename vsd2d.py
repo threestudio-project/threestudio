@@ -107,7 +107,7 @@ config = {
         "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1",
         "min_step_percent": 0.02,
         "max_step_percent": 0.98,
-        "anneal_start_step": 100000,  # do not anneal
+        "anneal_start_step": 2000,  # do not anneal
     },
     "image": {
         "width": 64,
@@ -171,6 +171,8 @@ n_accumulation_steps = config["n_accumulation_steps"]
 for step in tqdm(range(num_steps * n_accumulation_steps + 1)):
     # random select batch_size images from target with replacement
     particles = target[torch.randint(0, n_images, [batch_size])]
+    if mode == "latent":
+        particles = torch.tanh(particles)
 
     loss_dict = guidance(
         rgb=particles,
@@ -204,4 +206,4 @@ for step in tqdm(range(num_steps * n_accumulation_steps + 1)):
             for col in range(n_images):
                 ax[col].imshow(img_rgb[col])
                 ax[col].axis("off")
-            plt.savefig(os.path.join(out_dir, f"{step:05d}.png"))
+            plt.savefig(os.path.join(out_dir, f"{actual_step:05d}.png"))
