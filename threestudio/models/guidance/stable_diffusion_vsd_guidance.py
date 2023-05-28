@@ -458,15 +458,15 @@ class StableDiffusionVSDGuidance(BaseModule):
         # reparameterization trick
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
-        vsd_loss = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        lora_loss = self.train_lora(
+        loss_lora = self.train_lora(
             latents, text_embeddings, text_embeddings_inp, camera_condition
         )
 
         return {
-            "vsd": vsd_loss,
-            "lora": lora_loss,
+            "loss_vsd": loss_vsd,
+            "loss_lora": loss_lora,
             "grad_norm": grad.norm(),
         }
 

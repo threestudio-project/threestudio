@@ -200,10 +200,10 @@ class DeepFloydGuidance(BaseObject):
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         target = (latents - grad).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        loss = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
         return {
-            "sds": loss,
+            "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
         }
 

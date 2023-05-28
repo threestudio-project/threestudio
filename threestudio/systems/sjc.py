@@ -58,7 +58,11 @@ class ScoreJacobianChaining(BaseLift3DSystem):
         )
 
         loss = 0.0
-        loss += guidance_out["sds"] * self.C(self.cfg.loss.lambda_sds)
+
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         loss_emptiness = (
             self.C(self.cfg.loss.lambda_emptiness)

@@ -67,7 +67,10 @@ class Fantasia3D(BaseLift3DSystem):
                 guidance_inp, prompt_utils, **batch, rgb_as_latents=False
             )
 
-        loss += guidance_out["sds"] * self.C(self.cfg.loss.lambda_sds)
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))

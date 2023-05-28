@@ -109,13 +109,10 @@ class ProlificDreamer(BaseLift3DSystem):
 
         loss = 0.0
 
-        loss_vsd = guidance_out["vsd"]
-        self.log("train/loss_vsd", loss_vsd)
-        loss += loss_vsd * self.C(self.cfg.loss.lambda_vsd)
-
-        loss_lora = guidance_out["lora"]
-        self.log("train/loss_lora", loss_lora)
-        loss += loss_lora * self.C(self.cfg.loss.lambda_lora)
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         if not self.cfg.refinement:
             if self.C(self.cfg.loss.lambda_orient) > 0:
