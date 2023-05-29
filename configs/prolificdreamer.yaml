@@ -23,7 +23,7 @@ system:
     normal_type: null
 
     density_bias: "blob_magic3d"
-    density_activation: trunc_exp
+    density_activation: softplus
     density_blob_scale: 10.
     density_blob_std: 0.5
 
@@ -43,6 +43,7 @@ system:
   background_type: "neural-environment-map-background"
   background:
     color_activation: sigmoid
+    random_aug: true
 
   renderer_type: "nerf-volume-renderer"
   renderer:
