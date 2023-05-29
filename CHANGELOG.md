@@ -20,13 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A simple jupyter notebook (#55).
 - `sdf_bias` as an alternative way for SDF initialization in `implicit-volume` (#57).
-- Automatically remove outliers with a small number of faces when extracting surfaces.
+- Automatically remove outliers with a small number of faces when extracting surfaces (#61).
+- An experimental implementation of ProlificDreamer (#74).
 
 ### Changed
 
 - Remove `trainer` from the constructor arguments of prompt processors (#56).
 - Use a reparametrization trick for the SDS loss (#57).
 - Make Magic3D coarse stage use analytic normal and orientation loss.
+- Move the logic of getting text embeddings according to camera settings from prompt processors to guidance (#77).
 
 ## [v0.1.0]
 

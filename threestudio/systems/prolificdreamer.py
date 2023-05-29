@@ -14,7 +14,6 @@ from threestudio.utils.typing import *
 class ProlificDreamer(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        camera_condition_type: str = "extrinsics"
         # only used when refinement=True and from_coarse=True
         geometry_coarse_type: str = "implicit-volume"
         geometry_coarse: dict = field(default_factory=dict)
@@ -102,33 +101,18 @@ class ProlificDreamer(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
-        text_embeddings = self.prompt_processor(**batch)
-
-        if self.cfg.camera_condition_type == "extrinsics":
-            Rt = batch["c2w"]  # B x 3 x 4
-            Rt = torch.cat([Rt, torch.zeros_like(Rt[:, :1])], dim=1)
-            Rt[:, 3, 3] = 0.0
-            camera_condition = Rt
-        elif self.cfg.camera_condition_type == "mvp":
-            camera_condition = batch["mvp_mtx"]
-        else:
-            raise ValueError(
-                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
-            )
+        prompt_utils = self.prompt_processor()
 
         guidance_out = self.guidance(
-            out["comp_rgb"], text_embeddings, camera_condition, rgb_as_latents=False
+            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
         )
 
         loss = 0.0
 
-        loss_vsd = guidance_out["vsd"]
-        self.log("train/loss_vsd", loss_vsd)
-        loss += loss_vsd * self.C(self.cfg.loss.lambda_vsd)
-
-        loss_lora = guidance_out["lora"]
-        self.log("train/loss_lora", loss_lora)
-        loss += loss_lora * self.C(self.cfg.loss.lambda_lora)
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         if not self.cfg.refinement:
             if self.C(self.cfg.loss.lambda_orient) > 0:

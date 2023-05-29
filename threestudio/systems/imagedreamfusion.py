@@ -111,9 +111,9 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     valid_gt_depth, valid_pred_depth
                 )
         else:
-            text_embeddings = self.prompt_processor(**batch)
+            prompt_utils = self.prompt_processor()
             guidance_out = self.guidance(
-                out["comp_rgb"], text_embeddings, rgb_as_latents=False
+                out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
             )
 
             loss += guidance_out["sds"]
