@@ -168,12 +168,11 @@ class Zero123Guidance(BaseObject):
     def get_img_embeds(
         self,
         img: Float[Tensor, "B 3 256 256"],
-    ):
-        # x: image tensor [B, 3, 256, 256] in [0, 1]
+    ) -> Tuple[Float[Tensor, "B 1 768"], Float[Tensor, "B 4 32 32"]]:
         img = img * 2.0 - 1.0
-        c = self.model.get_learned_conditioning(img.to(self.weights_dtype))
-        v = self.model.encode_first_stage(img.to(self.weights_dtype)).mode()
-        return c, v
+        c_crossattn = self.model.get_learned_conditioning(img.to(self.weights_dtype))
+        c_concat = self.model.encode_first_stage(img.to(self.weights_dtype)).mode()
+        return c_crossattn, c_concat
 
     @torch.cuda.amp.autocast(enabled=False)
     def encode_images(
@@ -205,6 +204,8 @@ class Zero123Guidance(BaseObject):
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
+        c_crossattn=None,
+        c_concat=None,
         **kwargs,
     ) -> dict:
         T = torch.stack(
@@ -217,10 +218,18 @@ class Zero123Guidance(BaseObject):
                 camera_distances - self.cfg.cond_camera_distance,
             ],
             dim=-1,
-        )[:, None, :]
+        )[:, None, :].to(self.device)
         cond = {}
         clip_emb = self.model.cc_projection(
-            torch.cat([self.c_crossattn.repeat(len(T), 1, 1), T], dim=-1)
+            torch.cat(
+                [
+                    (self.c_crossattn if c_crossattn is None else c_crossattn).repeat(
+                        len(T), 1, 1
+                    ),
+                    T,
+                ],
+                dim=-1,
+            )
         )
         cond["c_crossattn"] = [
             torch.cat([torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0)
@@ -231,7 +240,9 @@ class Zero123Guidance(BaseObject):
                     torch.zeros_like(self.c_concat)
                     .repeat(len(T), 1, 1, 1)
                     .to(self.device),
-                    self.c_concat.repeat(len(T), 1, 1, 1),
+                    (self.c_concat if c_concat is None else c_concat).repeat(
+                        len(T), 1, 1, 1
+                    ),
                 ],
                 dim=0,
             )
@@ -327,66 +338,13 @@ class Zero123Guidance(BaseObject):
         post_process=True,
     ):
         if c_crossattn is None:
-            embeddings = self.get_img_embeds(image)
+            c_crossattn, c_concat = self.get_img_embeds(image)
 
-        T = torch.stack(
-            [
-                torch.deg2rad(
-                    (90 - elevation) - (90 - self.cfg.cond_elevation_deg)
-                ),  # Zero123 polar is 90-elevation
-                torch.sin(torch.deg2rad(azimuth - self.cfg.cond_azimuth_deg)),
-                torch.cos(torch.deg2rad(azimuth - self.cfg.cond_azimuth_deg)),
-                camera_distances - self.cfg.cond_camera_distance,
-            ],
-            dim=-1,
-        )[:, None, :].to(self.device)
-
-        cond = {}
-        clip_emb = self.model.cc_projection(
-            torch.cat(
-                [embeddings["c_crossattn"] if c_crossattn is None else c_crossattn, T],
-                dim=-1,
-            )
-        )
-        cond["c_crossattn"] = [
-            torch.cat([torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0)
-        ]
-        cond["c_concat"] = (
-            [
-                torch.cat(
-                    [
-                        torch.zeros_like(embeddings["c_concat"]).to(self.device),
-                        embeddings["c_concat"],
-                    ],
-                    dim=0,
-                )
-            ]
-            if c_concat is None
-            else [
-                torch.cat([torch.zeros_like(c_concat).to(self.device), c_concat], dim=0)
-            ]
+        cond = self.get_cond(
+            elevation, azimuth, camera_distances, c_crossattn, c_concat
         )
 
-        # produce latents loop
-        latents = torch.randn((1, 4, 32, 32), device=self.device)
-        self.scheduler.set_timesteps(ddim_steps)
-
-        for i, t in enumerate(self.scheduler.timesteps):
-            x_in = torch.cat([latents] * 2)
-            t_in = torch.cat([t.view(1)] * 2).to(self.device)
-
-            noise_pred = self.model.apply_model(x_in, t_in, cond)
-            noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + scale * (
-                noise_pred_cond - noise_pred_uncond
-            )
-
-            latents = self.scheduler.step(noise_pred, t, latents, eta=ddim_eta)[
-                "prev_sample"
-            ]
-
-        imgs = self.decode_latents(latents)
-        imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
+        imgs = self.gen_from_cond(cond)
 
         return imgs
 
@@ -398,6 +356,7 @@ class Zero123Guidance(BaseObject):
         ddim_steps=50,
         scale=3,
         post_process=True,
+        ddim_eta=1,
     ):
         # produce latents loop
         B = cond["c_crossattn"][0].shape[0] // 2
@@ -414,11 +373,11 @@ class Zero123Guidance(BaseObject):
                 noise_pred_cond - noise_pred_uncond
             )
 
-            latents = self.scheduler.step(noise_pred, t, latents, eta=1)["prev_sample"]
+            latents = self.scheduler.step(noise_pred, t, latents, eta=ddim_eta)[
+                "prev_sample"
+            ]
 
         imgs = self.decode_latents(latents)
-        imgs = (
-            imgs.detach().cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
-        )
+        imgs = imgs.cpu().numpy().transpose(0, 2, 3, 1) if post_process else imgs
 
         return imgs

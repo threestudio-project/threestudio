@@ -18,6 +18,7 @@ OmegaConf.register_new_resolver("div", lambda a, b: a / b)
 OmegaConf.register_new_resolver("idiv", lambda a, b: a // b)
 OmegaConf.register_new_resolver("basename", lambda p: os.path.basename(p))
 OmegaConf.register_new_resolver("rmspace", lambda s, sub: s.replace(" ", sub))
+OmegaConf.register_new_resolver("tuple2", lambda s: [float(s), float(s)])
 # ======================================================= #
 
 

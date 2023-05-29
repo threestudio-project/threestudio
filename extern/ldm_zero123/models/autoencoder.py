@@ -5,9 +5,11 @@ import torch
 import torch.nn.functional as F
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 
-from ldm_zero123.modules.diffusionmodules.model import Decoder, Encoder
-from ldm_zero123.modules.distributions.distributions import DiagonalGaussianDistribution
-from ldm_zero123.util import instantiate_from_config
+from extern.ldm_zero123.modules.diffusionmodules.model import Decoder, Encoder
+from extern.ldm_zero123.modules.distributions.distributions import (
+    DiagonalGaussianDistribution,
+)
+from extern.ldm_zero123.util import instantiate_from_config
 
 
 class VQModel(pl.LightningModule):

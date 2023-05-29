@@ -11,7 +11,7 @@ from torch.nn import (
     Sequential,
 )
 
-from ldm_zero123.thirdp.psp.helpers import (
+from extern.ldm_zero123.thirdp.psp.helpers import (
     Flatten,
     bottleneck_IR,
     bottleneck_IR_SE,

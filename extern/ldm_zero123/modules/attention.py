@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 from torch import einsum, nn
 
-from ldm_zero123.modules.diffusionmodules.util import checkpoint
+from extern.ldm_zero123.modules.diffusionmodules.util import checkpoint
 
 
 def exists(val):

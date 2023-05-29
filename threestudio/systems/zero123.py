@@ -55,19 +55,19 @@ class Zero123(BaseLift3DSystem):
         )
         loss = 0.0
 
-        if not do_ref:
+        if do_ref:
+            # bg_color = torch.rand_like(batch['rays_o'])
+            ambient_ratio = 1.0
+            shading = "diffuse"
+            batch["shading"] = shading
+            bg_color = None
+        else:
             batch = batch["random_camera"]
             if random.random() > 0.5:
                 bg_color = None
             else:
                 bg_color = torch.rand(3).to(self.device)
             ambient_ratio = 0.1 + 0.9 * random.random()
-        else:
-            # bg_color = torch.rand_like(batch['rays_o'])
-            ambient_ratio = 1.0
-            shading = "diffuse"
-            batch["shading"] = shading
-            bg_color = None
 
         batch["bg_color"] = bg_color
         batch["ambient_ratio"] = ambient_ratio
@@ -113,7 +113,7 @@ class Zero123(BaseLift3DSystem):
             cond = self.guidance.get_cond(**batch)
             guidance_out = self.guidance(out["comp_rgb"], cond, rgb_as_latents=False)
             self.log("train/loss_guidance", guidance_out["sds"])
-            loss += guidance_out["sds"]
+            loss += self.C(self.cfg.loss.lambda_sds) * guidance_out["sds"]
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
             if "normal" not in out:

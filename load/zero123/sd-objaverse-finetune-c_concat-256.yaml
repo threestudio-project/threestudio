@@ -1,6 +1,6 @@
 model:
   base_learning_rate: 1.0e-04
-  target: ldm_zero123.models.diffusion.ddpm.LatentDiffusion
+  target: extern.ldm_zero123.models.diffusion.ddpm.LatentDiffusion
   params:
     linear_start: 0.00085
     linear_end: 0.0120
@@ -17,7 +17,7 @@ model:
     scale_factor: 0.18215
 
     scheduler_config: # 10000 warmup steps
-      target: ldm_zero123.lr_scheduler.LambdaLinearScheduler
+      target: extern.ldm_zero123.lr_scheduler.LambdaLinearScheduler
       params:
         warm_up_steps: [ 100 ]
         cycle_lengths: [ 10000000000000 ] # incredibly large number to prevent corner cases
@@ -26,7 +26,7 @@ model:
         f_min: [ 1. ]
 
     unet_config:
-      target: ldm_zero123.modules.diffusionmodules.openaimodel.UNetModel
+      target: extern.ldm_zero123.modules.diffusionmodules.openaimodel.UNetModel
       params:
         image_size: 32 # unused
         in_channels: 8
@@ -43,7 +43,7 @@ model:
         legacy: False
 
     first_stage_config:
-      target: ldm_zero123.models.autoencoder.AutoencoderKL
+      target: extern.ldm_zero123.models.autoencoder.AutoencoderKL
       params:
         embed_dim: 4
         monitor: val/rec_loss
@@ -66,11 +66,11 @@ model:
           target: torch.nn.Identity
 
     cond_stage_config:
-      target: ldm_zero123.modules.encoders.modules.FrozenCLIPImageEmbedder
+      target: extern.ldm_zero123.modules.encoders.modules.FrozenCLIPImageEmbedder
 
 
 # data:
-#   target: ldm_zero123.data.simple.ObjaverseDataModuleFromConfig
+#   target: extern.ldm_zero123.data.simple.ObjaverseDataModuleFromConfig
 #   params:
 #     root_dir: 'views_whole_sphere'
 #     batch_size: 192

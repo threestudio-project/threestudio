@@ -7,12 +7,12 @@ import torch
 from einops import rearrange
 from tqdm import tqdm
 
-from ldm_zero123.models.diffusion.sampling_util import (
+from extern.ldm_zero123.models.diffusion.sampling_util import (
     norm_thresholding,
     renorm_thresholding,
     spatial_norm_thresholding,
 )
-from ldm_zero123.modules.diffusionmodules.util import (
+from extern.ldm_zero123.modules.diffusionmodules.util import (
     extract_into_tensor,
     make_ddim_sampling_parameters,
     make_ddim_timesteps,

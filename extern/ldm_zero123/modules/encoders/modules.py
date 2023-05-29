@@ -6,11 +6,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from ldm_zero123.modules.x_transformer import (  # TODO: can we directly rely on lucidrains code and simply add this as a reuirement? --> test
+from extern.ldm_zero123.modules.x_transformer import (  # TODO: can we directly rely on lucidrains code and simply add this as a reuirement? --> test
     Encoder,
     TransformerWrapper,
 )
-from ldm_zero123.util import default
+from extern.ldm_zero123.util import default
 
 
 class AbstractEncoder(nn.Module):
@@ -262,7 +262,7 @@ class FrozenT5Embedder(AbstractEncoder):
 
 import kornia.augmentation as K
 
-from ldm_zero123.thirdp.psp.id_loss import IDFeatures
+from extern.ldm_zero123.thirdp.psp.id_loss import IDFeatures
 
 
 class FrozenFaceEncoder(AbstractEncoder):
@@ -588,12 +588,12 @@ class SpatialRescaler(nn.Module):
         return self(x)
 
 
-from ldm_zero123.modules.diffusionmodules.util import (
+from extern.ldm_zero123.modules.diffusionmodules.util import (
     extract_into_tensor,
     make_beta_schedule,
     noise_like,
 )
-from ldm_zero123.util import instantiate_from_config
+from extern.ldm_zero123.util import instantiate_from_config
 
 
 class LowScaleEncoder(nn.Module):
@@ -692,7 +692,7 @@ class LowScaleEncoder(nn.Module):
 
 
 if __name__ == "__main__":
-    from ldm_zero123.util import count_params
+    from extern.ldm_zero123.util import count_params
 
     sentences = [
         "a hedgehog drinking a whiskey",

@@ -8,8 +8,8 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ldm_zero123.modules.attention import SpatialTransformer
-from ldm_zero123.modules.diffusionmodules.util import (
+from extern.ldm_zero123.modules.attention import SpatialTransformer
+from extern.ldm_zero123.modules.diffusionmodules.util import (
     avg_pool_nd,
     checkpoint,
     conv_nd,
@@ -18,7 +18,7 @@ from ldm_zero123.modules.diffusionmodules.util import (
     timestep_embedding,
     zero_module,
 )
-from ldm_zero123.util import exists
+from extern.ldm_zero123.util import exists
 
 
 # dummy replace

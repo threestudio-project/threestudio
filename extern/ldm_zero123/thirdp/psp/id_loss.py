@@ -2,7 +2,7 @@
 import torch
 from torch import nn
 
-from ldm_zero123.thirdp.psp.model_irse import Backbone
+from extern.ldm_zero123.thirdp.psp.model_irse import Backbone
 
 
 class IDFeatures(nn.Module):

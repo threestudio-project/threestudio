@@ -23,7 +23,7 @@ from scipy import ndimage
 from scipy.interpolate import interp2d
 from scipy.linalg import orth
 
-import ldm_zero123.modules.image_degradation.utils_image as util
+import extern.ldm_zero123.modules.image_degradation.utils_image as util
 
 
 def modcrop_np(img, sf):

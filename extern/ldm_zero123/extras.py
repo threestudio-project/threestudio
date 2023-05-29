@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 from omegaconf import OmegaConf
 
-from ldm_zero123.util import instantiate_from_config
+from extern.ldm_zero123.util import instantiate_from_config
 
 
 @contextmanager

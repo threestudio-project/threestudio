@@ -21,24 +21,24 @@ from torch.optim.lr_scheduler import LambdaLR
 from torchvision.utils import make_grid
 from tqdm import tqdm
 
-from ldm_zero123.models.autoencoder import (
+from extern.ldm_zero123.models.autoencoder import (
     AutoencoderKL,
     IdentityFirstStage,
     VQModelInterface,
 )
-from ldm_zero123.models.diffusion.ddim import DDIMSampler
-from ldm_zero123.modules.attention import CrossAttention
-from ldm_zero123.modules.diffusionmodules.util import (
+from extern.ldm_zero123.models.diffusion.ddim import DDIMSampler
+from extern.ldm_zero123.modules.attention import CrossAttention
+from extern.ldm_zero123.modules.diffusionmodules.util import (
     extract_into_tensor,
     make_beta_schedule,
     noise_like,
 )
-from ldm_zero123.modules.distributions.distributions import (
+from extern.ldm_zero123.modules.distributions.distributions import (
     DiagonalGaussianDistribution,
     normal_kl,
 )
-from ldm_zero123.modules.ema import LitEma
-from ldm_zero123.util import (
+from extern.ldm_zero123.modules.ema import LitEma
+from extern.ldm_zero123.util import (
     count_params,
     default,
     exists,

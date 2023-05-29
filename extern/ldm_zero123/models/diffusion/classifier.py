@@ -11,8 +11,16 @@ from torch.nn import functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 
-from ldm_zero123.modules.diffusionmodules.openaimodel import EncoderUNetModel, UNetModel
-from ldm_zero123.util import default, instantiate_from_config, ismap, log_txt_as_img
+from extern.ldm_zero123.modules.diffusionmodules.openaimodel import (
+    EncoderUNetModel,
+    UNetModel,
+)
+from extern.ldm_zero123.util import (
+    default,
+    instantiate_from_config,
+    ismap,
+    log_txt_as_img,
+)
 
 __models__ = {"class_label": EncoderUNetModel, "segmentation": UNetModel}
 
