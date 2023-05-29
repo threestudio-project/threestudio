@@ -74,6 +74,8 @@ system:
   renderer_type: "nerf-volume-renderer"
   renderer:
     num_samples_per_ray: 512
+    lambda_normal_smooth: ${system.loss.lambda_normal_smooth}
+    lambda_3d_normal_smooth: ${system.loss.lambda_3d_normal_smooth}
 
   prompt_processor_type: "zero123-prompt-processor"
   prompt_processor:

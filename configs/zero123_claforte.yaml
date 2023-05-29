@@ -1,12 +1,11 @@
 name: "zero123"
-tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}"
+tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_claforte"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  # image_path: ./load/images/anya_front_rgba.png
   height: 96
   width: 96
   default_elevation_deg: 0.0
@@ -84,6 +83,8 @@ system:
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
+    lambda_normal_smooth: ${system.loss.lambda_normal_smooth}
+    lambda_3d_normal_smooth: ${system.loss.lambda_3d_normal_smooth}
 
   prompt_processor_type: "zero123-prompt-processor"
   prompt_processor:
