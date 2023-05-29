@@ -14,7 +14,6 @@ from omegaconf import OmegaConf
 import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
-from threestudio.utils.ops import SpecifyGradient
 from threestudio.utils.typing import *
 
 
@@ -252,8 +251,11 @@ class Zero123Guidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        cond: dict,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
+        **kwargs,
     ):
         batch_size = rgb.shape[0]
 
@@ -271,6 +273,8 @@ class Zero123Guidance(BaseObject):
             )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
+
+        cond = self.get_cond(elevation, azimuth, camera_distances)
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
@@ -308,10 +312,10 @@ class Zero123Guidance(BaseObject):
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         target = (latents - grad).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        loss = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
         return {
-            "sds": loss,
+            "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
         }
 
@@ -330,12 +334,12 @@ class Zero123Guidance(BaseObject):
         elevation=0,
         azimuth=0,
         camera_distances=0,  # new view params
-        scale=3,
-        ddim_steps=50,
-        ddim_eta=1,
         c_crossattn=None,
         c_concat=None,
+        scale=3,
+        ddim_steps=50,
         post_process=True,
+        ddim_eta=1,
     ):
         if c_crossattn is None:
             c_crossattn, c_concat = self.get_img_embeds(image)
@@ -344,7 +348,7 @@ class Zero123Guidance(BaseObject):
             elevation, azimuth, camera_distances, c_crossattn, c_concat
         )
 
-        imgs = self.gen_from_cond(cond)
+        imgs = self.gen_from_cond(cond, scale, ddim_steps, post_process, ddim_eta)
 
         return imgs
 
@@ -353,8 +357,8 @@ class Zero123Guidance(BaseObject):
     def gen_from_cond(
         self,
         cond,
-        ddim_steps=50,
         scale=3,
+        ddim_steps=50,
         post_process=True,
         ddim_eta=1,
     ):

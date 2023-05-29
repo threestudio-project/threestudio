@@ -79,22 +79,16 @@ class Zero123(BaseLift3DSystem):
             gt_rgb = batch["rgb"]
             gt_depth = batch["depth"]
 
+            guidance_out = {}
+
             # color loss
             gt_rgb = gt_rgb * gt_mask.float() + out["comp_rgb_bg"] * (
                 1 - gt_mask.float()
             )
-            loss += self.C(self.cfg.loss.lambda_rgb) * F.mse_loss(
-                gt_rgb, out["comp_rgb"]
-            )
+            guidance_out["loss_rgb"] = F.mse_loss(gt_rgb, out["comp_rgb"])
 
             # mask loss
-            loss += self.C(self.cfg.loss.lambda_mask) * F.mse_loss(
-                gt_mask.float(), out["opacity"]
-            )
-
-            # opacity_clamped = out['opacity'].clamp(1e-3, 1-1e-3)
-            # gt_mask_clamped = gt_mask.float().clamp(1e-3, 1-1e-3)
-            # loss += self.C(self.cfg.loss.lambda_mask) * binary_cross_entropy(gt_mask_clamped, opacity_clamped)
+            guidance_out["loss_mask"] = F.mse_loss(gt_mask.float(), out["opacity"])
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
@@ -106,14 +100,17 @@ class Zero123(BaseLift3DSystem):
                     )  # [B, 2]
                     X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
                     valid_gt_depth = A @ X  # [B, 1]
-                loss += self.C(self.cfg.loss.lambda_depth) * F.mse_loss(
+                guidance_out["loss_depth"] = F.mse_loss(
                     valid_gt_depth, valid_pred_depth
                 )
         else:
-            cond = self.guidance.get_cond(**batch)
-            guidance_out = self.guidance(out["comp_rgb"], cond, rgb_as_latents=False)
-            self.log("train/loss_guidance", guidance_out["sds"])
-            loss += self.C(self.cfg.loss.lambda_sds) * guidance_out["sds"]
+            guidance_out = self.guidance(out["comp_rgb"], **batch, rgb_as_latents=False)
+
+        loss = 0.0
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
             if "normal" not in out:
@@ -173,10 +170,6 @@ class Zero123(BaseLift3DSystem):
         self.log("train/loss", loss, prog_bar=True)
 
         return {"loss": loss}
-        # self.manual_backward(loss)
-        # opt.step()
-        # sch = self.lr_schedulers()
-        # sch.step()
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
