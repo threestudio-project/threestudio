@@ -42,6 +42,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         guidance_scale_lora: float = 1.0
         half_precision_weights: bool = True
         lora_cfg_training: bool = True
+        lora_n_timestamp_samples: int = 1
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
@@ -360,12 +361,12 @@ class StableDiffusionVSDGuidance(BaseModule):
         camera_condition: Float[Tensor, "B 4 4"],
     ):
         B = latents.shape[0]
-        latents = latents.detach()
+        latents = latents.detach().repeat(self.cfg.lora_n_timestamp_samples, 1, 1, 1)
 
         t = torch.randint(
             int(self.num_train_timesteps * 0.0),
             int(self.num_train_timesteps * 1.0),
-            [B],
+            [B * self.cfg.lora_n_timestamp_samples],
             dtype=torch.long,
             device=self.device,
         )
@@ -388,8 +389,12 @@ class StableDiffusionVSDGuidance(BaseModule):
             self.unet_lora,
             noisy_latents,
             t,
-            encoder_hidden_states=text_embeddings,
-            class_labels=camera_condition.view(B, -1),
+            encoder_hidden_states=text_embeddings.repeat(
+                self.cfg.lora_n_timestamp_samples, 1, 1
+            ),
+            class_labels=camera_condition.view(B, -1).repeat(
+                self.cfg.lora_n_timestamp_samples, 1
+            ),
             cross_attention_kwargs={"scale": 1.0},
         )
         return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
