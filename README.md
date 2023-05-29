@@ -296,9 +296,11 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 ### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
 
-**Results obtained by threestudio (Stable Diffusion, 64x64, 15000 iterations)**
+**Results obtained by threestudio (Stable Diffusion, 256x256, 25000 iterations)**
 
-https://github.com/threestudio-project/threestudio/assets/19284678/29ded457-60a9-4d7e-8a5e-ab71a7ef361a
+
+https://github.com/threestudio-project/threestudio/assets/19284678/1f0081bf-c877-4e7a-9047-a8aa6431a561
+
 
 **IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
 
