@@ -179,4 +179,5 @@ pyrightconfig.json
 .threestudio_cache/
 outputs/
 
+# pretrained model weights
 *.ckpt

@@ -29,6 +29,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
+- 05/26/2023: An experimental implementation of ProlificDreamer! Following the instruction [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to have a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
@@ -292,6 +293,29 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 **Tips**
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
+
+### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
+
+**Results obtained by threestudio (Stable Diffusion, 256x256, 25000 iterations)**
+
+
+https://github.com/threestudio-project/threestudio/assets/19284678/1f0081bf-c877-4e7a-9047-a8aa6431a561
+
+
+**IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
+
+We currently only experiment on the first stage (NeRF training), although the third stage is already implemented (mesh texture refinement), and the second stage is easy to implement too (mesh normal optimization). Some other important design factors that are not implemented:
+
+- multiple particles
+
+```sh
+# object geneartion with 64x64 NeRF rendering, ~14GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=64 data.height=64
+# object generation with 512x512 NeRF rendering (original paper), >24GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=512 data.height=512
+# scene generation
+python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k" data.width=64 data.height=64
+```
 
 ### More to come, please stay tuned.
 

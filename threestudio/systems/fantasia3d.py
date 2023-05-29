@@ -52,22 +52,25 @@ class Fantasia3D(BaseLift3DSystem):
         loss = 0.0
 
         out = self(batch)
-        text_embeddings = self.prompt_processor(**batch)
+        prompt_utils = self.prompt_processor()
 
         if self.true_global_step < self.cfg.latent_steps:
             guidance_inp = torch.cat(
                 [out["comp_normal"] * 2.0 - 1.0, out["opacity"]], dim=-1
             )
             guidance_out = self.guidance(
-                guidance_inp, text_embeddings, rgb_as_latents=True
+                guidance_inp, prompt_utils, **batch, rgb_as_latents=True
             )
         else:
             guidance_inp = out["comp_normal"] * 2.0 - 1.0
             guidance_out = self.guidance(
-                guidance_inp, text_embeddings, rgb_as_latents=False
+                guidance_inp, prompt_utils, **batch, rgb_as_latents=False
             )
 
-        loss += guidance_out["sds"] * self.C(self.cfg.loss.lambda_sds)
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))

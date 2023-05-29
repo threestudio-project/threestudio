@@ -10,8 +10,8 @@ from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
-@threestudio.register("magic3d-system")
-class Magic3D(BaseLift3DSystem):
+@threestudio.register("prolificdreamer-system")
+class ProlificDreamer(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         # only used when refinement=True and from_coarse=True
@@ -51,7 +51,7 @@ class Magic3D(BaseLift3DSystem):
                     os.path.dirname(self.cfg.from_coarse), "../configs/parsed.yaml"
                 )
             )  # TODO: hard-coded relative path
-            coarse_system_cfg: Magic3D.Config = parse_structured(
+            coarse_system_cfg: ProlificDreamer.Config = parse_structured(
                 self.Config, coarse_cfg.system
             )
             coarse_geometry_cfg = coarse_system_cfg.geometry
@@ -83,6 +83,8 @@ class Magic3D(BaseLift3DSystem):
             material=self.material,
             background=self.background,
         )
+        # FIXME: not necessary in validation/testing
+        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -96,11 +98,11 @@ class Magic3D(BaseLift3DSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
         prompt_utils = self.prompt_processor()
+
         guidance_out = self.guidance(
             out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
         )
