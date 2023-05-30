@@ -37,6 +37,7 @@ class PromptProcessor(BaseObject):
 
         # for perp-neg
         use_perp_neg: bool = False
+        perp_neg_decay_func: str = "exp"
         # a*e(-b*r) + c
         # a * e(-b) + c = 0
         #
@@ -45,10 +46,20 @@ class PromptProcessor(BaseObject):
         # f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
         # f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
 
+        # f_sb: Tuple[float, float, float] = (1, 0.5, -0.606)
+        # f_fsb: Tuple[float, float, float] = (1, 0.5, +0.967)
+        # f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
+        # f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
+
         f_sb: Tuple[float, float, float] = (4, 0.5, -2.426)
-        f_fsb: Tuple[float, float, float] = (4, 0.5, -2.426)
+        f_fsb: Tuple[float, float, float] = (4, 0.5, -0.852)
         f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
         f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
+
+        # f_sb: Tuple[float, float, float] = (2, 0.5, -1.213)
+        # f_fsb: Tuple[float, float, float] = (2, 0.5, -0.426)
+        # f_fs: Tuple[float, float, float] = (2, 0.5, -1.213)  # f_fs(1) = 0, a, b > 0
+        # f_sf: Tuple[float, float, float] = (2, 0.5, -1.213)
 
     cfg: Config
 
@@ -378,7 +389,7 @@ class PromptProcessor(BaseObject):
             else:  # interpolating views
                 if torch.abs(azi) < 90:
                     # front-side interpolation
-                    # 0 - complete front, 1 - complete side
+                    # 0 - complete side, 1 - complete front
                     r_inter = 1 - torch.abs(azi) / 90
                     pos_text_embeddings.append(
                         r_inter * front_emb + (1 - r_inter) * side_emb

@@ -158,9 +158,9 @@ class ImplicitVolume(BaseImplicitGeometry):
                 # use raw_density instead of density for numerical stability
                 # https://github.com/google-research/multinerf/blob/30005650e9e6a1d8a0f561aa848ea65d855fc787/internal/models.py#L488-L492
                 normal = -torch.autograd.grad(
-                    raw_density,
+                    density,
                     points_unscaled,
-                    grad_outputs=torch.ones_like(raw_density),
+                    grad_outputs=torch.ones_like(density),
                     create_graph=True,
                 )[0]
                 normal = F.normalize(normal, dim=-1)
