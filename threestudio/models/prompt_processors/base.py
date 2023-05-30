@@ -70,6 +70,11 @@ class PromptProcessorOutput:
         return torch.cat([text_embeddings, uncond_text_embeddings], dim=0)
 
 
+def shift_azimuth_deg(azimuth: Float[Tensor, "..."]) -> Float[Tensor, "..."]:
+    # shift azimuth angle (in degrees), to [180, 180]
+    return (azimuth + 180) % 360 - 180
+
+
 class PromptProcessor(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
@@ -110,15 +115,19 @@ class PromptProcessor(BaseObject):
                     "front",
                     lambda s: f"front view of {s}",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > -self.cfg.front_threshold)
-                    & (azi < self.cfg.front_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > -self.cfg.front_threshold
+                    )
+                    & (shift_azimuth_deg(azi) < self.cfg.front_threshold),
                 ),
                 DirectionConfig(
                     "back",
                     lambda s: f"backside view of {s}",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold)
-                    | (azi < -180 + self.cfg.back_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > 180 - self.cfg.back_threshold
+                    )
+                    | (shift_azimuth_deg(azi) < -180 + self.cfg.back_threshold),
                 ),
                 DirectionConfig(
                     "overhead",
@@ -139,15 +148,19 @@ class PromptProcessor(BaseObject):
                     "front",
                     lambda s: f"{s}, front view",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > -self.cfg.front_threshold)
-                    & (azi < self.cfg.front_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > -self.cfg.front_threshold
+                    )
+                    & (shift_azimuth_deg(azi) < self.cfg.front_threshold),
                 ),
                 DirectionConfig(
                     "back",
                     lambda s: f"{s}, back view",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold)
-                    | (azi < -180 + self.cfg.back_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > 180 - self.cfg.back_threshold
+                    )
+                    | (shift_azimuth_deg(azi) < -180 + self.cfg.back_threshold),
                 ),
                 DirectionConfig(
                     "overhead",

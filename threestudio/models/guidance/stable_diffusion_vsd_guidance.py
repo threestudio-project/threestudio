@@ -5,7 +5,12 @@ from dataclasses import dataclass, field
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
+from diffusers import (
+    DDPMScheduler,
+    DPMSolverMultistepScheduler,
+    StableDiffusionPipeline,
+    UNet2DConditionModel,
+)
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.models.embeddings import TimestepEmbedding
@@ -63,6 +68,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         pipe_kwargs = {
             "tokenizer": None,
+            "text_encoder": None,
             "safety_checker": None,
             "feature_extractor": None,
             "requires_safety_checker": False,
@@ -71,6 +77,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         pipe_lora_kwargs = {
             "tokenizer": None,
+            "text_encoder": None,
             "safety_checker": None,
             "feature_extractor": None,
             "requires_safety_checker": False,
@@ -100,6 +107,7 @@ class StableDiffusionVSDGuidance(BaseModule):
             ).to(self.device)
             del pipe_lora.vae
             cleanup()
+            pipe_lora.vae = pipe.vae
         self.submodules = SubModules(pipe=pipe, pipe_lora=pipe_lora)
 
         if self.cfg.enable_memory_efficient_attention:
@@ -169,17 +177,15 @@ class StableDiffusionVSDGuidance(BaseModule):
         self.lora_layers._load_state_dict_pre_hooks.clear()
         self.lora_layers._state_dict_hooks.clear()
 
-        self.scheduler = DDPMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="scheduler",
-            torch_dtype=self.weights_dtype,
+        self.scheduler = DPMSolverMultistepScheduler.from_config(
+            self.pipe.scheduler.config
         )
-        # used to get prediction type later in training
-        self.scheduler_lora = DDPMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path_lora,
-            subfolder="scheduler",
-            torch_dtype=self.weights_dtype,
+        self.scheduler_lora = DPMSolverMultistepScheduler.from_config(
+            self.pipe_lora.scheduler.config
         )
+
+        self.pipe.scheduler = self.scheduler
+        self.pipe_lora.scheduler = self.scheduler_lora
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
@@ -214,6 +220,152 @@ class StableDiffusionVSDGuidance(BaseModule):
     @property
     def vae_lora(self):
         return self.submodules.pipe_lora.vae
+
+    @torch.no_grad()
+    @torch.cuda.amp.autocast(enabled=False)
+    def _sample(
+        self,
+        pipe: StableDiffusionPipeline,
+        text_embeddings: Float[Tensor, "BB N Nf"],
+        num_inference_steps: int,
+        guidance_scale: float,
+        num_images_per_prompt: int = 1,
+        height: Optional[int] = None,
+        width: Optional[int] = None,
+        class_labels: Optional[Float[Tensor, "BB 16"]] = None,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
+        generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
+    ) -> Float[Tensor, "B H W 3"]:
+        vae_scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1)
+        height = height or pipe.unet.config.sample_size * vae_scale_factor
+        width = width or pipe.unet.config.sample_size * vae_scale_factor
+        batch_size = text_embeddings.shape[0] // 2
+        device = self.device
+
+        pipe.scheduler.set_timesteps(num_inference_steps, device=device)
+        timesteps = pipe.scheduler.timesteps
+        num_channels_latents = pipe.unet.config.in_channels
+
+        latents = pipe.prepare_latents(
+            batch_size * num_images_per_prompt,
+            num_channels_latents,
+            height,
+            width,
+            self.weights_dtype,
+            device,
+            generator,
+        )
+
+        for i, t in enumerate(timesteps):
+            # expand the latents if we are doing classifier free guidance
+            latent_model_input = torch.cat([latents] * 2)
+            latent_model_input = pipe.scheduler.scale_model_input(latent_model_input, t)
+
+            # predict the noise residual
+            if class_labels is None:
+                with self.disable_unet_class_embedding(pipe.unet) as unet:
+                    noise_pred = unet(
+                        latent_model_input,
+                        t,
+                        encoder_hidden_states=text_embeddings.to(self.weights_dtype),
+                        cross_attention_kwargs=cross_attention_kwargs,
+                    ).sample
+            else:
+                noise_pred = pipe.unet(
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=text_embeddings.to(self.weights_dtype),
+                    class_labels=class_labels,
+                    cross_attention_kwargs=cross_attention_kwargs,
+                ).sample
+
+            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (
+                noise_pred_text - noise_pred_uncond
+            )
+
+            # compute the previous noisy sample x_t -> x_t-1
+            latents = pipe.scheduler.step(noise_pred, t, latents).prev_sample
+
+        latents = 1 / pipe.vae.config.scaling_factor * latents
+        images = pipe.vae.decode(latents).sample
+        images = (images / 2 + 0.5).clamp(0, 1)
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+        images = images.permute(0, 2, 3, 1).float()
+        return images
+
+    def sample(
+        self,
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        seed: int = 0,
+        **kwargs,
+    ) -> Float[Tensor, "N H W 3"]:
+        # view-dependent text embeddings
+        text_embeddings_vd = prompt_utils.get_text_embeddings(
+            elevation,
+            azimuth,
+            camera_distances,
+            view_dependent_prompting=self.cfg.view_dependent_prompting,
+        )
+        cross_attention_kwargs = {"scale": 0.0} if self.single_model else None
+        generator = torch.Generator(device=self.device).manual_seed(seed)
+
+        return self._sample(
+            pipe=self.pipe,
+            text_embeddings=text_embeddings_vd,
+            num_inference_steps=25,
+            guidance_scale=self.cfg.guidance_scale,
+            cross_attention_kwargs=cross_attention_kwargs,
+            generator=generator,
+        )
+
+    def sample_lora(
+        self,
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        mvp_mtx: Float[Tensor, "B 4 4"],
+        c2w: Float[Tensor, "B 4 4"],
+        seed: int = 0,
+        **kwargs,
+    ) -> Float[Tensor, "N H W 3"]:
+        # input text embeddings, view-independent
+        text_embeddings = prompt_utils.get_text_embeddings(
+            elevation, azimuth, camera_distances, view_dependent_prompting=False
+        )
+
+        if self.cfg.camera_condition_type == "extrinsics":
+            camera_condition = c2w
+        elif self.cfg.camera_condition_type == "mvp":
+            camera_condition = mvp_mtx
+        else:
+            raise ValueError(
+                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
+            )
+
+        B = elevation.shape[0]
+        camera_condition_cfg = torch.cat(
+            [
+                camera_condition.view(B, -1),
+                torch.zeros_like(camera_condition.view(B, -1)),
+            ],
+            dim=0,
+        )
+
+        generator = torch.Generator(device=self.device).manual_seed(seed)
+        return self._sample(
+            pipe=self.pipe_lora,
+            text_embeddings=text_embeddings,
+            num_inference_steps=25,
+            guidance_scale=self.cfg.guidance_scale_lora,
+            class_labels=camera_condition_cfg,
+            cross_attention_kwargs={"scale": 1.0},
+            generator=generator,
+        )
 
     @torch.cuda.amp.autocast(enabled=False)
     def forward_unet(
@@ -261,13 +413,13 @@ class StableDiffusionVSDGuidance(BaseModule):
         return image.to(input_dtype)
 
     @contextmanager
-    def disable_unet_class_embedding(self):
-        class_embedding = self.unet.class_embedding
+    def disable_unet_class_embedding(self, unet: UNet2DConditionModel):
+        class_embedding = unet.class_embedding
         try:
-            self.unet.class_embedding = None
-            yield
+            unet.class_embedding = None
+            yield unet
         finally:
-            self.unet.class_embedding = class_embedding
+            unet.class_embedding = class_embedding
 
     def compute_grad_vsd(
         self,
@@ -292,10 +444,10 @@ class StableDiffusionVSDGuidance(BaseModule):
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
-            with self.disable_unet_class_embedding():
+            with self.disable_unet_class_embedding(self.unet) as unet:
                 cross_attention_kwargs = {"scale": 0.0} if self.single_model else None
                 noise_pred_pretrain = self.forward_unet(
-                    self.unet,
+                    unet,
                     latent_model_input,
                     torch.cat([t] * 2),
                     encoder_hidden_states=text_embeddings_vd,

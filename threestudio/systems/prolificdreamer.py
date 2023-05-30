@@ -25,6 +25,7 @@ class ProlificDreamer(BaseLift3DSystem):
         # for example isosurface_threshold
         coarse_geometry_override: dict = field(default_factory=dict)
         inherit_coarse_texture: bool = True
+        visualize_samples: bool = False
 
     cfg: Config
 
@@ -83,8 +84,11 @@ class ProlificDreamer(BaseLift3DSystem):
             material=self.material,
             background=self.background,
         )
-        # FIXME: not necessary in validation/testing
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
+            self.cfg.prompt_processor
+        )
+        self.prompt_utils = self.prompt_processor()
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -94,17 +98,12 @@ class ProlificDreamer(BaseLift3DSystem):
 
     def on_fit_start(self) -> None:
         super().on_fit_start()
-        # only used in training
-        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
-        )
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
-        prompt_utils = self.prompt_processor()
 
         guidance_out = self.guidance(
-            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
+            out["comp_rgb"], self.prompt_utils, **batch, rgb_as_latents=False
         )
 
         loss = 0.0
@@ -177,6 +176,25 @@ class ProlificDreamer(BaseLift3DSystem):
                 },
             ],
         )
+
+        if self.cfg.visualize_samples:
+            self.save_image_grid(
+                f"it{self.true_global_step}-{batch['index'][0]}-sample.png",
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.guidance.sample(
+                            self.prompt_utils, **batch, seed=self.global_step
+                        )[0],
+                        "kwargs": {"data_format": "HWC"},
+                    },
+                    {
+                        "type": "rgb",
+                        "img": self.guidance.sample_lora(self.prompt_utils, **batch)[0],
+                        "kwargs": {"data_format": "HWC"},
+                    },
+                ],
+            )
 
     def on_validation_epoch_end(self):
         pass
