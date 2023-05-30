@@ -104,23 +104,27 @@ config = {
         "view_dependent_prompting": False,
         "guidance_scale": 7.5,
         "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
-        "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1-base",
+        "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1",
         "min_step_percent": 0.02,
         "max_step_percent": 0.98,
-        "anneal_start_step": 2000,  # do not anneal
+        "anneal_start_step": 1000000,  # do not anneal
         "camera_condition_type": "extrinsics",
-        "train_lora_repeat": 4,
+        "train_lora_repeat": 1,
     },
     "image": {
         "width": 64,
         "height": 64,
     },
-    "n_particle": 16,
-    "batch_size": 2,
-    "n_accumulation_steps": 4,
+    "n_particle": 6,
+    "batch_size": 3,
+    "n_accumulation_steps": 2,
     "save_interval": 50,
     "clip": False,
     "tanh": False,
+    "lr": {
+        "image": 3e-2,
+        "guidance": 1e-4,
+    },
 }
 
 seed_everything(config["seed"])
@@ -143,10 +147,10 @@ else:
 
 optimizer = torch.optim.AdamW(
     [
-        {"params": [target], "lr": 3e-2},
-        {"params": guidance.parameters(), "lr": 1e-4},
+        {"params": [target], "lr": config["lr"]["image"]},
+        {"params": guidance.parameters(), "lr": config["lr"]["guidance"]},
     ],
-    lr=3e-2,
+    # lr=3e-2,
     weight_decay=0,
 )
 num_steps = config["max_iters"]
