@@ -24,8 +24,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
         randomized: bool = True
         eval_chunk_size: int = 160000
         grid_prune: bool = True
-        lambda_normal_smooth: float = 0
-        lambda_3d_normal_smooth: float = 0
+        return_comp_normal: bool = False
+        return_normal_perturb: bool = False
 
     cfg: Config
 
@@ -179,7 +179,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 }
             )
             if "normal" in geo_out:
-                if self.cfg.lambda_normal_smooth > 0:  # TODO
+                if self.cfg.return_comp_normal:
                     comp_normal: Float[Tensor, "Nr 3"] = nerfacc.accumulate_along_rays(
                         weights[..., 0],
                         values=geo_out["normal"],
@@ -197,7 +197,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                             ),
                         }
                     )
-                if self.cfg.lambda_3d_normal_smooth > 0:  # TODO
+                if self.cfg.return_normal_perturb:
                     normal_perturb = self.geometry(
                         positions + torch.randn_like(positions) * 1e-2,
                         output_normal=self.material.requires_normal,
@@ -205,7 +205,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                     out.update({"normal_perturb": normal_perturb})
         else:
             if "normal" in geo_out:
-                comp_normal: Float[Tensor, "Nr 3"] = nerfacc.accumulate_along_rays(
+                comp_normal = nerfacc.accumulate_along_rays(
                     weights[..., 0],
                     values=geo_out["normal"],
                     ray_indices=ray_indices,
