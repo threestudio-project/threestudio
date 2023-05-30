@@ -136,9 +136,10 @@ class RandomCameraIterableDataset(IterableDataset):
             None, :
         ].repeat(self.cfg.batch_size, 1)
 
-        # sample camera perturbations from a normal distribution with mean 0 and std camera_perturb
+        # sample camera perturbations from a uniform distribution [-camera_perturb, camera_perturb]
         camera_perturb: Float[Tensor, "B 3"] = (
-            torch.randn(self.cfg.batch_size, 3) * self.cfg.camera_perturb
+            torch.rand(self.cfg.batch_size, 3) * 2 * self.cfg.camera_perturb
+            - self.cfg.camera_perturb
         )
         camera_positions = camera_positions + camera_perturb
         # sample center perturbations from a normal distribution with mean 0 and std center_perturb
