@@ -506,7 +506,9 @@ class StableDiffusionVSDGuidance(BaseModule):
             alpha_t = alphas_cumprod[t] ** 0.5
             sigma_t = (1 - alphas_cumprod[t]) ** 0.5
 
-            noise_pred_est = latents_noisy * sigma_t + noise_pred_est * alpha_t
+            noise_pred_est = latent_model_input * torch.cat([sigma_t] * 2, dim=0).view(
+                -1, 1, 1, 1
+            ) + noise_pred_est * torch.cat([alpha_t] * 2, dim=0).view(-1, 1, 1, 1)
 
         (
             noise_pred_est_text,
