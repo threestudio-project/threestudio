@@ -146,12 +146,7 @@ def main() -> None:
         rank_zero_only(
             lambda: write_to_text(
                 os.path.join(cfg.trial_dir, "log.txt"),
-                ["python " + " ".join(sys.argv), str(args), str(cfg)],
-            )
-        )()
-        rank_zero_only(
-            lambda: shutil.copyfile(
-                args.config, os.path.join(cfg.trial_dir, os.path.basename(args.config))
+                ["python " + " ".join(sys.argv), str(args)],
             )
         )()
 

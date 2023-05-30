@@ -12,7 +12,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   default_azimuth_deg: 0.0
   default_camera_distance: 3.2
   default_fovy_deg: 20.0
-  random_camera:  # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
+  random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
     height: 64
     width: 64
     eval_height: 256
@@ -22,7 +22,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     elevation_range: [-10, 60]
     azimuth_range: [-180, 180]
     camera_distance_range: [3.2, 3.3]
-    fovy_range: [20.0, 20.0]  # Zero123 has fixed fovy
+    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
@@ -83,8 +83,8 @@ system:
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
-    lambda_normal_smooth: ${system.loss.lambda_normal_smooth}
-    lambda_3d_normal_smooth: ${system.loss.lambda_3d_normal_smooth}
+    return_comp_normal: ${gt0:${system.loss.lambda_normal_smooth}}
+    return_normal_perturb: ${gt0:${system.loss.lambda_3d_normal_smooth}}
 
   prompt_processor_type: "zero123-prompt-processor"
   prompt_processor:
