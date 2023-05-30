@@ -89,7 +89,7 @@ def seed_everything(seed):
 
 config = {
     "max_iters": 6000,
-    "seed": 42,
+    "seed": 7,
     "scheduler": None,
     "mode": "latent",
     "prompt_processor_type": "stable-diffusion-prompt-processor",
@@ -107,7 +107,7 @@ config = {
         "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1",
         "min_step_percent": 0.02,
         "max_step_percent": 0.98,
-        "anneal_start_step": 1000000,  # do not anneal
+        "anneal_start_step": 2001,  # do not anneal
         "camera_condition_type": "extrinsics",
         "train_lora_repeat": 1,
     },
@@ -122,7 +122,7 @@ config = {
     "clip": False,
     "tanh": False,
     "lr": {
-        "image": 3e-2,
+        "image": 6e-3,
         "guidance": 1e-4,
     },
 }
