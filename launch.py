@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import shutil
 import sys
 
 
@@ -127,6 +128,11 @@ def main() -> None:
             ),
         ]
 
+    def write_to_text(file, lines):
+        with open(file, "w") as f:
+            for line in lines:
+                f.write(line + "\n")
+
     loggers = []
     if args.train:
         # make tensorboard logging dir to suppress warning
@@ -137,6 +143,17 @@ def main() -> None:
             TensorBoardLogger(cfg.trial_dir, name="tb_logs"),
             CSVLogger(cfg.trial_dir, name="csv_logs"),
         ]
+        rank_zero_only(
+            lambda: write_to_text(
+                os.path.join(cfg.trial_dir, "log.txt"),
+                ["python " + " ".join(sys.argv), str(args), str(cfg)],
+            )
+        )()
+        rank_zero_only(
+            lambda: shutil.copyfile(
+                args.config, os.path.join(cfg.trial_dir, os.path.basename(args.config))
+            )
+        )()
 
     trainer = Trainer(
         callbacks=callbacks, logger=loggers, inference_mode=False, **cfg.trainer

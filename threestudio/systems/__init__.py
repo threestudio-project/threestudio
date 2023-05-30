@@ -6,4 +6,5 @@ from . import (
     magic3d,
     prolificdreamer,
     sjc,
+    zero123,
 )

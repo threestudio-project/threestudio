@@ -1,4 +1,6 @@
+import os
 import random
+import shutil
 from dataclasses import dataclass, field
 
 import torch
@@ -10,8 +12,8 @@ from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
 
-@threestudio.register("image-condition-dreamfusion-system")
-class ImageConditionDreamFusion(BaseLift3DSystem):
+@threestudio.register("zero123-system")
+class Zero123(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         freq: dict = field(default_factory=dict)
@@ -30,10 +32,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
 
     def on_fit_start(self) -> None:
         super().on_fit_start()
-        # only used in training
-        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
-        )
+        # no prompt processor
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
         # visualize all training images
@@ -56,19 +55,19 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
         )
         loss = 0.0
 
-        if not do_ref:
+        if do_ref:
+            # bg_color = torch.rand_like(batch['rays_o'])
+            ambient_ratio = 1.0
+            shading = "diffuse"
+            batch["shading"] = shading
+            bg_color = None
+        else:
             batch = batch["random_camera"]
             if random.random() > 0.5:
                 bg_color = None
             else:
                 bg_color = torch.rand(3).to(self.device)
             ambient_ratio = 0.1 + 0.9 * random.random()
-        else:
-            # bg_color = torch.rand_like(batch['rays_o'])
-            ambient_ratio = 1.0
-            shading = "diffuse"
-            batch["shading"] = shading
-            bg_color = None
 
         batch["bg_color"] = bg_color
         batch["ambient_ratio"] = ambient_ratio
@@ -80,22 +79,16 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             gt_rgb = batch["rgb"]
             gt_depth = batch["depth"]
 
+            guidance_out = {}
+
             # color loss
             gt_rgb = gt_rgb * gt_mask.float() + out["comp_rgb_bg"] * (
                 1 - gt_mask.float()
             )
-            loss += self.C(self.cfg.loss.lambda_rgb) * F.mse_loss(
-                gt_rgb, out["comp_rgb"]
-            )
+            guidance_out["loss_rgb"] = F.mse_loss(gt_rgb, out["comp_rgb"])
 
             # mask loss
-            loss += self.C(self.cfg.loss.lambda_mask) * F.mse_loss(
-                gt_mask.float(), out["opacity"]
-            )
-
-            # opacity_clamped = out['opacity'].clamp(1e-3, 1-1e-3)
-            # gt_mask_clamped = gt_mask.float().clamp(1e-3, 1-1e-3)
-            # loss += self.C(self.cfg.loss.lambda_mask) * binary_cross_entropy(gt_mask_clamped, opacity_clamped)
+            guidance_out["loss_mask"] = F.mse_loss(gt_mask.float(), out["opacity"])
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
@@ -107,14 +100,11 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     )  # [B, 2]
                     X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
                     valid_gt_depth = A @ X  # [B, 1]
-                loss += self.C(self.cfg.loss.lambda_depth) * F.mse_loss(
+                guidance_out["loss_depth"] = F.mse_loss(
                     valid_gt_depth, valid_pred_depth
                 )
         else:
-            prompt_utils = self.prompt_processor()
-            guidance_out = self.guidance(
-                out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
-            )
+            guidance_out = self.guidance(out["comp_rgb"], **batch, rgb_as_latents=False)
 
         loss = 0.0
         for name, value in guidance_out.items():
@@ -135,11 +125,11 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
-            if "normal" not in out:
+            if "comp_normal" not in out:
                 raise ValueError(
-                    "Normal is required for normal smooth loss, no normal is found in the output."
+                    "comp_normal is required for 2D normal smooth loss, no comp_normal is found in the output."
                 )
-            normal = out["normal"]
+            normal = out["comp_normal"]
             loss_normal_smooth = (
                 normal[:, 1:, :, :] - normal[:, :-1, :, :]
             ).square().mean() + (
@@ -147,6 +137,23 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             ).square().mean()
             self.log("train/loss_normal_smooth", loss_normal_smooth)
             loss += self.C(self.cfg.loss.lambda_normal_smooth) * loss_normal_smooth
+
+        if self.C(self.cfg.loss.lambda_3d_normal_smooth) > 0:
+            if "normal" not in out:
+                raise ValueError(
+                    "Normal is required for normal smooth loss, no normal is found in the output."
+                )
+            if "normal_perturb" not in out:
+                raise ValueError(
+                    "normal_perturb is required for normal smooth loss, no normal_perturb is found in the output."
+                )
+            normals = out["normal"]
+            normals_perturb = out["normal_perturb"]
+            loss_3d_normal_smooth = (normals - normals_perturb).abs().mean()
+            self.log("train/loss_3d_normal_smooth", loss_3d_normal_smooth)
+            loss += (
+                self.C(self.cfg.loss.lambda_3d_normal_smooth) * loss_3d_normal_smooth
+            )
 
         loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
         self.log("train/loss_sparsity", loss_sparsity)
@@ -167,7 +174,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}.png",
+            f"it{self.true_global_step}-val/{batch['index'][0]}.png",
             (
                 [
                     {
@@ -208,7 +215,16 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
         )
 
     def on_validation_epoch_end(self):
-        pass
+        self.save_img_sequence(
+            f"it{self.true_global_step}-val",
+            f"it{self.true_global_step}-val",
+            "(\d+)\.png",
+            save_format="mp4",
+            fps=30,
+        )
+        shutil.rmtree(
+            os.path.join(self.get_save_dir(), f"it{self.true_global_step}-val")
+        )
 
     def test_step(self, batch, batch_idx):
         out = self(batch)
