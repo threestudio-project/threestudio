@@ -10,7 +10,7 @@ from pytorch_lightning.utilities.rank_zero import rank_zero_only
 import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import barrier, cleanup, get_rank
-from threestudio.utils.ops import shifted_expotional_decay
+from threestudio.utils.ops import shifted_expotional_decay, shifted_cosine_decay
 from threestudio.utils.typing import *
 
 
@@ -40,6 +40,11 @@ class PromptProcessor(BaseObject):
         # a*e(-b*r) + c
         # a * e(-b) + c = 0
         #
+        # f_sb: Tuple[float, float, float] = (4, 0.5, -2.426)
+        # f_fsb: Tuple[float, float, float] = (4, 0.5, -2.426)
+        # f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
+        # f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
+
         f_sb: Tuple[float, float, float] = (4, 0.5, -2.426)
         f_fsb: Tuple[float, float, float] = (4, 0.5, -2.426)
         f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
@@ -369,7 +374,6 @@ class PromptProcessor(BaseObject):
                     self.uncond_text_embeddings_vd[idx],
                     self.uncond_text_embeddings_vd[idx],
                 ]
-
                 neg_guidance_weights += [0.0, 0.0]
             else:  # interpolating views
                 if torch.abs(azi) < 90:
@@ -399,11 +403,11 @@ class PromptProcessor(BaseObject):
         uncond_text_embeddings = torch.stack(uncond_text_embeddings, dim=0)
         pos_text_embeddings = torch.stack(pos_text_embeddings, dim=0)
         neg_text_embeddings = torch.stack(neg_text_embeddings, dim=0).reshape(
-            batch_size, 2, *uncond_text_embeddings.shape[1:]
+            batch_size, -1, *uncond_text_embeddings.shape[1:]
         )
         neg_guidance_weights = torch.as_tensor(
             neg_guidance_weights, device=elevation.device
-        ).reshape(batch_size, 2)
+        ).reshape(batch_size, -1)
         # breakpoint()
         return (
             uncond_text_embeddings,

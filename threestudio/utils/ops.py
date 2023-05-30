@@ -422,12 +422,17 @@ def shifted_expotional_decay(a, b, c, r):
     return a * torch.exp(-b * r) + c
 
 
+def shifted_cosine_decay(a, b, c, r):
+    return a * torch.cos(b * r + c) + a
+
+
 def perpendicular_component(x: Float[Tensor, "B C H W"], y: Float[Tensor, "B C H W"]):
     # get the component of x that is perpendicular to y
+    eps = torch.ones_like(x[:, 0, 0, 0]) * 1e-6
     return (
         x
         - (
-            torch.mul(x, y).sum(dim=[1, 2, 3]) / torch.mul(y, y).sum(dim=[1, 2, 3])
+            torch.mul(x, y).sum(dim=[1, 2, 3]) / torch.maximum(torch.mul(y, y).sum(dim=[1, 2, 3]), eps)
         ).view(-1, 1, 1, 1)
         * y
     )

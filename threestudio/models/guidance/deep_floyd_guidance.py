@@ -150,7 +150,7 @@ class DeepFloydGuidance(BaseObject):
             pos_text_embeddings = processor_output["pos_text_embeddings"]
             neg_text_embeddings = processor_output["neg_text_embeddings"]
             neg_guidance_weights = processor_output["neg_guidance_weights"]
-            n_negtive_prompts = 2
+            n_negtive_prompts = neg_text_embeddings.shape[1]
             with torch.no_grad():
                 noise = torch.randn_like(latents)
                 latents_noisy = self.scheduler.add_noise(latents, noise, t)
@@ -161,11 +161,11 @@ class DeepFloydGuidance(BaseObject):
                         neg_text_embeddings.permute(1, 0, 2, 3),
                     ],
                     dim=0,
-                ).reshape(batch_size * 4, *uncond_text_embeddings.shape[1:])
-                latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
+                ).reshape(batch_size * (n_negtive_prompts + 2), *uncond_text_embeddings.shape[1:])
+                latent_model_input = torch.cat([latents_noisy] * (n_negtive_prompts + 2), dim=0)
                 noise_pred = self.forward_unet(
                     latent_model_input,
-                    torch.cat([t] * 4),
+                    torch.cat([t] * (n_negtive_prompts + 2)),
                     encoder_hidden_states=input_text_embeddings,
                 )  # (4B, 6, 64, 64)
 
