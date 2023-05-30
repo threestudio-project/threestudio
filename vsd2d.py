@@ -96,27 +96,31 @@ config = {
     "prompt_processor": {
         "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
         "prompt": "an astronaut is riding a horse",
-        "view_dependent_prompting": False,
         "spawn": False,
     },
     "guidance_type": "stable-diffusion-vsd-guidance",
     "guidance": {
         "half_precision_weights": True,
+        "view_dependent_prompting": False,
         "guidance_scale": 7.5,
         "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
-        "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1",
+        "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1-base",
         "min_step_percent": 0.02,
         "max_step_percent": 0.98,
         "anneal_start_step": 2000,  # do not anneal
+        "camera_condition_type": "extrinsics",
+        "train_lora_repeat": 4,
     },
     "image": {
         "width": 64,
         "height": 64,
     },
-    "n_particle": 8,
+    "n_particle": 16,
     "batch_size": 2,
     "n_accumulation_steps": 4,
     "save_interval": 50,
+    "clip": False,
+    "tanh": False,
 }
 
 seed_everything(config["seed"])
@@ -135,7 +139,7 @@ mode = config["mode"]
 if mode == "rgb":
     target = nn.Parameter(torch.rand(n_images, h, w, 3, device=guidance.device))
 else:
-    target = nn.Parameter(torch.randn(n_images, h, w, 4, device=guidance.device))
+    target = nn.Parameter(2 * torch.rand(n_images, h, w, 4, device=guidance.device) - 1)
 
 optimizer = torch.optim.AdamW(
     [
@@ -162,7 +166,7 @@ plt.axis("off")
 elevation = torch.zeros([batch_size], device=guidance.device)
 azimuth = torch.zeros([batch_size], device=guidance.device)
 distance = torch.zeros([batch_size], device=guidance.device)
-text_embeddings = prompt_processor(elevation, azimuth, distance)
+prompt_utils = prompt_processor()
 save_interval = config["save_interval"]
 
 mvp_mtx = torch.zeros([batch_size, 4, 4], device=guidance.device)
@@ -171,16 +175,20 @@ n_accumulation_steps = config["n_accumulation_steps"]
 for step in tqdm(range(num_steps * n_accumulation_steps + 1)):
     # random select batch_size images from target with replacement
     particles = target[torch.randint(0, n_images, [batch_size])]
-    if mode == "latent":
+    if mode == "latent" and config["tanh"]:
         particles = torch.tanh(particles)
 
     loss_dict = guidance(
         rgb=particles,
-        text_embeddings=text_embeddings,
+        prompt_utils=prompt_utils,
         mvp_mtx=mvp_mtx,
+        elevation=elevation,
+        azimuth=azimuth,
+        camera_distances=distance,
+        c2w=mvp_mtx.clone(),
         rgb_as_latents=(mode != "rgb"),
     )
-    loss = (loss_dict["vsd"] + loss_dict["lora"]) / n_accumulation_steps
+    loss = (loss_dict["loss_vsd"] + loss_dict["loss_lora"]) / n_accumulation_steps
     loss.backward()
 
     if (step + 1) % n_accumulation_steps == 0:
@@ -188,6 +196,10 @@ for step in tqdm(range(num_steps * n_accumulation_steps + 1)):
         guidance.update_step(epoch=0, global_step=actual_step)
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
+
+        if mode == "latent" and config["clip"]:
+            with torch.no_grad():
+                particles.data = particles.data.clip(-1, 1)
 
         if actual_step % save_interval == 0:
             if mode == "rgb":

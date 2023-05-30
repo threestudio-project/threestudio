@@ -50,6 +50,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
+        train_lora_repeat: int = 1
 
     cfg: Config
 
@@ -461,7 +462,10 @@ class StableDiffusionVSDGuidance(BaseModule):
         target = (latents - grad).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
+        loss_lora = 0
+        for _ in range(self.cfg.train_lora_repeat):
+            loss_lora += self.train_lora(latents, text_embeddings, camera_condition)
+        loss_lora /= self.cfg.train_lora_repeat
 
         return {
             "loss_vsd": loss_vsd,
