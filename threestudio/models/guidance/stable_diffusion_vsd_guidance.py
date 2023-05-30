@@ -177,10 +177,22 @@ class StableDiffusionVSDGuidance(BaseModule):
         self.lora_layers._load_state_dict_pre_hooks.clear()
         self.lora_layers._state_dict_hooks.clear()
 
-        self.scheduler = DPMSolverMultistepScheduler.from_config(
+        self.scheduler = DDPMScheduler.from_pretrained(
+            self.cfg.pretrained_model_name_or_path,
+            subfolder="scheduler",
+            torch_dtype=self.weights_dtype,
+        )
+
+        self.scheduler_lora = DDPMScheduler.from_pretrained(
+            self.cfg.pretrained_model_name_or_path_lora,
+            subfolder="scheduler",
+            torch_dtype=self.weights_dtype,
+        )
+
+        self.scheduler_sample = DPMSolverMultistepScheduler.from_config(
             self.pipe.scheduler.config
         )
-        self.scheduler_lora = DPMSolverMultistepScheduler.from_config(
+        self.scheduler_lora_sample = DPMSolverMultistepScheduler.from_config(
             self.pipe_lora.scheduler.config
         )
 
@@ -226,6 +238,7 @@ class StableDiffusionVSDGuidance(BaseModule):
     def _sample(
         self,
         pipe: StableDiffusionPipeline,
+        sample_scheduler: DPMSolverMultistepScheduler,
         text_embeddings: Float[Tensor, "BB N Nf"],
         num_inference_steps: int,
         guidance_scale: float,
@@ -242,8 +255,8 @@ class StableDiffusionVSDGuidance(BaseModule):
         batch_size = text_embeddings.shape[0] // 2
         device = self.device
 
-        pipe.scheduler.set_timesteps(num_inference_steps, device=device)
-        timesteps = pipe.scheduler.timesteps
+        sample_scheduler.set_timesteps(num_inference_steps, device=device)
+        timesteps = sample_scheduler.timesteps
         num_channels_latents = pipe.unet.config.in_channels
 
         latents = pipe.prepare_latents(
@@ -259,7 +272,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         for i, t in enumerate(timesteps):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = torch.cat([latents] * 2)
-            latent_model_input = pipe.scheduler.scale_model_input(latent_model_input, t)
+            latent_model_input = sample_scheduler.scale_model_input(
+                latent_model_input, t
+            )
 
             # predict the noise residual
             if class_labels is None:
@@ -285,7 +300,7 @@ class StableDiffusionVSDGuidance(BaseModule):
             )
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = pipe.scheduler.step(noise_pred, t, latents).prev_sample
+            latents = sample_scheduler.step(noise_pred, t, latents).prev_sample
 
         latents = 1 / pipe.vae.config.scaling_factor * latents
         images = pipe.vae.decode(latents).sample
@@ -315,6 +330,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         return self._sample(
             pipe=self.pipe,
+            sample_scheduler=self.scheduler_sample,
             text_embeddings=text_embeddings_vd,
             num_inference_steps=25,
             guidance_scale=self.cfg.guidance_scale,
@@ -358,6 +374,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         generator = torch.Generator(device=self.device).manual_seed(seed)
         return self._sample(
+            sample_scheduler=self.scheduler_lora_sample,
             pipe=self.pipe_lora,
             text_embeddings=text_embeddings,
             num_inference_steps=25,
