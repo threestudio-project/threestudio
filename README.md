@@ -30,7 +30,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
-- 05/29/2023: An experimental implementation of Zero123! Following the instructions [here](https://github.com/threestudio-project/threestudio#zero123-) to have a try.
+- 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Following the instructions [here](https://github.com/threestudio-project/threestudio#zero123-) to have a try.
 - 05/26/2023: An experimental implementation of ProlificDreamer! Following the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to have a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
@@ -121,7 +121,7 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 r
 # which will continue using the same trial directory
 # if you want to save to a new trial directory, replace parsed.yaml with raw.yaml in the command
 
-# load weights from last checkpoint but dont resume training (i.e. dont load optimizer state):
+# only load weights from saved checkpoint but dont resume training (i.e. dont load optimizer state):
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 system.weights=path/to/trial/configs/last.ckpt
 ```
 
@@ -322,7 +322,7 @@ python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.pr
 python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k" data.width=64 data.height=64
 ```
 
-### Zero123 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
+### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
 
 **Installation**
 
@@ -332,15 +332,15 @@ cd load/zero123
 wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 ```
 
-**Results obtained by threestudio (Zero123, 256x256, 10000 iterations)**
+**Results obtained by threestudio (Zero-1-to-3, 256x256, 10000 iterations)**
 
 
 https://github.com/threestudio-project/threestudio/assets/22424247/4e4878d4-fb61-4d4f-af25-401bdf86011f
 
 
-**IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/cvlab-columbia/zero123](https://github.com/cvlab-columbia/zero123) for official code release.**
+**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.
 
-**IMPORTANT NOTE: This implementation is heavily inspired from the Zero123 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
+**IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
 
 ```sh
 # object geneartion with 64x64 NeRF rendering, ~14GB VRAM
