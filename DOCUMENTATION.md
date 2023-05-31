@@ -121,6 +121,17 @@ This system has all the common configurations, along with the following unique c
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | latent_steps | int  | Number of steps for geometry optimization in latent space. In the first `latent_steps` steps, low resolution normal and mask are concatenated and fed to the latent diffusion model. After this high resolution normal is used to perform RGB space optimziation. Details are described in the Fantasia3D paper. Default: 2500 |
 
+### prolificdreamer-system
+
+This system has all the common configurations, along with the following unique configurations:
+
+| name                     | type          | description                                                                                                                                                          |
+| ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| refinement               | bool          | Whether to perform refinement (third stage in the ProlificDreamer paper). Default: False                                                                             |
+| from_coarse              | Optional[str] | The path to the coarse stage model checkpoint. If not None and `refinement=True`, initialize the model for refinement from the specified coarse model. Default: None |
+| coarse_geometry_override | dict          | Configurations to override when initializing from coarse geometry. A typical use case is to specify an isosurface threshold value. Default: {}                       |
+| inherit_coarse_texture   | bool          | Whether to load the encoding and feature network from the coarse stage for refinement, used when `from_coarse=True`. Default: True                                   |
+
 ## Geometry
 
 Geometry models properties for locations in space, including density, SDF, feature and normal.
@@ -318,19 +329,20 @@ Given an image or its latent input, the guide should provide its gradient condit
 
 **Common configurations for guidance**
 
-| name                              | type          | description                                                                                                                                                                                           |
-| --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| enable_memory_efficient_attention | bool          | Whether to enable memory efficient attention in xformers. This will lead to lower GPU memory usage and a potential speed up at inference. Speed up at training time is not guaranteed. Default: false |
-| enable_sequential_cpu_offload     | bool          | Whether to offload all models to CPU. This will use `accelerate`, significantly reducing memory usage but slower. Default: False                                                                      |
-| enable_attention_slicing          | bool          | Whether to use sliced attention computation. This will save some memory in exchange for a small speed decrease. Default: False                                                                        |
-| enable_channels_last_format       | bool          | Whether to use Channels Last format for the unet. Default: False (Stable Diffusion) / True (DeepFloyd)                                                                                                |
-| pretrained_model_name_or_path     | str           | The pretrained model path in huggingface. Default: "runwayml/stable-diffusion-v1-5" (for `stable-diffusion-guidance`) / "DeepFloyd/IF-I-XL-v1.0" (for `deep-floyd-guidance`)                          |
-| guidance_scale                    | float         | The classifier free guidance scale. Default: 100.0 (for `stable-diffusion-guidance`) / 20.0 (for `deep-floyd-guidance`)                                                                               |
-| grad_clip                         | Optional[Any] | The gradient clip value. None or float or a list in the form of [start_step, start_value, end_value, end_step]. Default: None                                                                         |
-| half_precision_weights            | bool          | Whether to use float16 for the diffusion model. Default: True                                                                                                                                         |
-| min_step_percent                  | float         | The precent range (min value) of the random timesteps to add noise and denoise. Default: 0.02                                                                                                         |
-| max_step_percent                  | float         | The precent range (max value) of the random timesteps to add noise and denoise. Default: 0.98                                                                                                         |
-| weighting_strategy                | str           | The choice of w(t) of the sds loss, in ["sds", "uniform", "fantasia3d"]. Default: "sds"                                                                                                               |
+| name                              | type          | description                                                                                                                                                                                                                                                  |
+| --------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| enable_memory_efficient_attention | bool          | Whether to enable memory efficient attention in xformers. This will lead to lower GPU memory usage and a potential speed up at inference. Speed up at training time is not guaranteed. Default: false                                                        |
+| enable_sequential_cpu_offload     | bool          | Whether to offload all models to CPU. This will use `accelerate`, significantly reducing memory usage but slower. Default: False                                                                                                                             |
+| enable_attention_slicing          | bool          | Whether to use sliced attention computation. This will save some memory in exchange for a small speed decrease. Default: False                                                                                                                               |
+| enable_channels_last_format       | bool          | Whether to use Channels Last format for the unet. Default: False (Stable Diffusion) / True (DeepFloyd)                                                                                                                                                       |
+| pretrained_model_name_or_path     | str           | The pretrained model path in huggingface. Default: "runwayml/stable-diffusion-v1-5" (for `stable-diffusion-guidance`) / "DeepFloyd/IF-I-XL-v1.0" (for `deep-floyd-guidance`) / "stabilityai/stable-diffusion-2-1-base" (for `stable-diffusion-vsd-guidance`) |
+| guidance_scale                    | float         | The classifier free guidance scale. Default: 100.0 (for `stable-diffusion-guidance`) / 20.0 (for `deep-floyd-guidance`)                                                                                                                                      |
+| grad_clip                         | Optional[Any] | The gradient clip value. None or float or a list in the form of [start_step, start_value, end_value, end_step]. Default: None                                                                                                                                |
+| half_precision_weights            | bool          | Whether to use float16 for the diffusion model. Default: True                                                                                                                                                                                                |
+| min_step_percent                  | float         | The precent range (min value) of the random timesteps to add noise and denoise. Default: 0.02                                                                                                                                                                |
+| max_step_percent                  | float         | The precent range (max value) of the random timesteps to add noise and denoise. Default: 0.98                                                                                                                                                                |
+| weighting_strategy                | str           | The choice of w(t) of the sds loss, in ["sds", "uniform", "fantasia3d"]. Default: "sds"                                                                                                                                                                      |
+| view_dependent_prompting          | bool          | Whether to use view dependent prompt, i.e. add front/side/back/overhead view to the original prompt. Default: True                                                                                                                                           |
 
 For the first three options, you can check more details in [pipe_stable_diffusion.py](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py) and [pipeline_if.py](https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/deepfloyd_if/pipeline_if.py) in diffusers.
 
@@ -347,6 +359,17 @@ For the first three options, you can check more details in [pipe_stable_diffusio
 
 No specific configuration.
 
+## stable-diffusion-vsd-guidance
+
+| name                               | type  | description                                                                                                                                                     |
+| ---------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pretrained_model_name_or_path_lora | str   | The pretrained base model path for the LoRA model. Default: "stabilityai/stable-diffusion-2-1"                                                                  |
+| guidance_scale_lora                | float | The classifier free guidance scale for the LoRA model. Default: 1.                                                                                              |
+| lora_cfg_training                  | bool  | Whether to adopt classifier free guidance training strategy in LoRA training. If True, will zero out the camera condition with a probability 0.1. Default: True |
+| max_step_percent_annealed          | float | The precent range (max value) of the random timesteps to add noise and denoise after t annealing. Default: 0.5                                                  |
+| anneal_start_step                  | int   | At which step to perform t annealing. Default: 5000                                                                                                             |
+| camera_condition_type              | str   | Which to use as the camera condition for the LoRA model, in ["extrinsics", "mvp"]. Default: "extrinsics"                                                        |
+
 ## Prompt Processors
 
 Prompt processors take a user prompt and compute text embeddings for training. The type of the prompt processor should match that of the guidance.
@@ -358,7 +381,6 @@ Prompt processors take a user prompt and compute text embeddings for training. T
 | prompt                        | str   | The text prompt. Default: "a hamburger"                                                                                                                                                                                                          |
 | negative_prompt               | str   | The uncondition text input in Classifier Free Guidance. Default: ""                                                                                                                                                                              |
 | pretrained_model_name_or_path | str   | The pretrained model path in huggingface. Default: "runwayml/stable-diffusion-v1-5" (for `stable-diffusion-prompt-processor`) / "DeepFloyd/IF-I-XL-v1.0" (fpr `deep-floyd-prompt-processor`)                                                     |
-| view_dependent_prompting      | bool  | Whether to use view dependent prompt, i.e. add front/side/back/overhead view to the original prompt. Default: True                                                                                                                               |
 | overhead_threshold            | float | Consider the view as overhead when the elevation degree > overhead_threshold. Default: 60.0                                                                                                                                                      |
 | front_threshold               | float | Consider the view as front when the azimuth degree in [-front_threshold, front_threshold]. Default: 45.0                                                                                                                                         |
 | back_threshold                | float | Consider the view as back when the azimuth degree > 180 - back_threshold or < -180 + back_threshold. Default: 45.0                                                                                                                               |
