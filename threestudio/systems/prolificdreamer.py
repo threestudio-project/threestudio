@@ -134,6 +134,10 @@ class ProlificDreamer(BaseLift3DSystem):
             loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
             self.log("train/loss_opaque", loss_opaque)
             loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+
+            loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
+            self.log("train/loss_z_variance", loss_z_variance)
+            loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
         else:
             loss_normal_consistency = out["mesh"].normal_consistency()
             self.log("train/loss_normal_consistency", loss_normal_consistency)
