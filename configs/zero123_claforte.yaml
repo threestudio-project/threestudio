@@ -1,20 +1,22 @@
 name: "zero123"
-tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_claforte"
+tag: "ambInf_orient_s3_claforte_${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: 96
-  width: 96
+  # image_path: ./load/images/anya_front_rgba.png
+  # image_path: ./load/images/lego_batman_rgba.png
+  height: 192
+  width: 192
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.2
   default_fovy_deg: 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: 64
-    width: 64
+    height: 128
+    width: 128
     eval_height: 256
     eval_width: 256
     batch_size: 2
@@ -71,7 +73,7 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 1
+    ambient_only_steps: 100000
     textureless_prob: 0.05
     albedo_activation: sigmoid
 
@@ -99,7 +101,7 @@ system:
     cond_elevation_deg: ${data.default_elevation_deg}
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
-    guidance_scale: 7.5
+    guidance_scale: 3.0
     min_step_percent: 0.02
     max_step_percent: 0.98
 
@@ -115,6 +117,7 @@ system:
     lambda_normal_smooth: 0.0
     lambda_3d_normal_smooth: 0.5
     lambda_orient: 20.0
+    # lambda_orient: [0, 1., 50., 1000]
     lambda_sparsity: 2.0 # should be tweaked for every model
     lambda_opaque: 0.5
 
@@ -132,7 +135,7 @@ system:
         lr: ${system.optimizer.args.lr}
 
 trainer:
-  max_steps: 10000
+  max_steps: 25000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100

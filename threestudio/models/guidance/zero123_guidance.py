@@ -92,9 +92,6 @@ class Zero123Guidance(BaseObject):
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
-        token_merging: bool = False
-        token_merging_params: Optional[dict] = field(default_factory=dict)
-
     cfg: Config
 
     def configure(self) -> None:
