@@ -214,7 +214,7 @@ class Zero123(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
-            # claforte: don't hardcode the frame numbers to record... read them from cfg instead.
+            # claforte: TODO: don't hardcode the frame numbers to record... read them from cfg instead.
             name=f"validation_step_batchidx_{batch_idx}"
             if batch_idx in [0, 7, 15, 23, 29]
             else None,
@@ -232,7 +232,6 @@ class Zero123(BaseLift3DSystem):
             name="validation_epoch_end",
             step=self.true_global_step,
         )
-        # claforte: double-check whether deleting these files causes problems with wandb.
         shutil.rmtree(
             os.path.join(self.get_save_dir(), f"it{self.true_global_step}-val")
         )
