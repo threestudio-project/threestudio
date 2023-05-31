@@ -17,6 +17,7 @@ class Zero123(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         freq: dict = field(default_factory=dict)
+        guidance_val: bool = False
 
     cfg: Config
 
@@ -175,6 +176,13 @@ class Zero123(BaseLift3DSystem):
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
+        guidance_out = (
+            self.guidance.validation_step(
+                out["comp_rgb"], **batch, rgb_as_latents=False
+            )
+            if self.cfg.guidance_val
+            else None
+        )
         self.save_image_grid(
             f"it{self.true_global_step}-val/{batch['index'][0]}.png",
             (
@@ -186,6 +194,39 @@ class Zero123(BaseLift3DSystem):
                     }
                 ]
                 if "rgb" in batch
+                else []
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": guidance_out["imgs_noisy"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+                if self.cfg.guidance_val
+                else []
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": guidance_out["imgs_1step"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+                if self.cfg.guidance_val
+                else []
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": guidance_out["imgs_final"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+                if self.cfg.guidance_val
                 else []
             )
             + [

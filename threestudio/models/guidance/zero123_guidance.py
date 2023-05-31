@@ -76,6 +76,7 @@ class Zero123Guidance(BaseObject):
     class Config(BaseObject.Config):
         pretrained_model_name_or_path: str = "load/zero123/105000.ckpt"
         pretrained_config: str = "load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
+        vram_O: bool = True
 
         cond_image_path: str = "load/images/hamburger_rgba.png"
         cond_elevation_deg: float = 0.0
@@ -107,6 +108,7 @@ class Zero123Guidance(BaseObject):
             self.config,
             self.cfg.pretrained_model_name_or_path,
             device=self.device,
+            vram_O=self.cfg.vram_O
         )
 
         for p in self.model.parameters():
@@ -317,6 +319,85 @@ class Zero123Guidance(BaseObject):
         return {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
+        }
+
+    @torch.cuda.amp.autocast(enabled=False)
+    @torch.no_grad()
+    def validation_step(
+        self,
+        rgb: Float[Tensor, "B H W C"],
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        rgb_as_latents=False,
+        **kwargs,
+    ):
+        batch_size = 1
+
+        rgb_BCHW = rgb.permute(0, 3, 1, 2)[0:1]
+        latents: Float[Tensor, "B 4 64 64"]
+        if rgb_as_latents:
+            latents = (
+                F.interpolate(rgb_BCHW, (32, 32), mode="bilinear", align_corners=False)
+                * 2
+                - 1
+            )
+        else:
+            rgb_BCHW_512 = F.interpolate(
+                rgb_BCHW, (256, 256), mode="bilinear", align_corners=False
+            )
+            # encode image into latents with vae
+            latents = self.encode_images(rgb_BCHW_512)
+
+        cond = self.get_cond(elevation, azimuth, camera_distances)
+
+        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
+        self.scheduler.set_timesteps(50)
+        i = torch.randint(1, len(self.scheduler.timesteps), [batch_size])
+        t = self.scheduler.timesteps[i]
+
+        # add noise
+        noise = torch.randn_like(latents)  # TODO: use torch generator
+        latents_noisy = self.scheduler.add_noise(latents, noise, t)
+        imgs_noisy = self.decode_latents(latents_noisy).permute(0, 2, 3, 1)
+
+        # pred noise
+        x_in = torch.cat([latents_noisy] * 2)
+        t_in = torch.cat([t] * 2).to(self.device)
+        noise_pred = self.model.apply_model(x_in, t_in, cond)
+
+        # perform guidance
+        noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+            noise_pred_cond - noise_pred_uncond
+        )
+
+        # get prev latent
+        latents = self.scheduler.step(noise_pred, t[0], latents, eta=1)["prev_sample"]
+        imgs_1step = self.decode_latents(latents).permute(0, 2, 3, 1)
+
+        for t in self.scheduler.timesteps[i+1:]:
+            # pred noise
+            x_in = torch.cat([latents] * 2)
+            t_in = torch.cat([t.reshape(1).repeat(1)] * 2).to(self.device)
+            noise_pred = self.model.apply_model(x_in, t_in, cond)
+            # perform guidance
+            noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+                noise_pred_cond - noise_pred_uncond
+            )
+            # get prev latent
+            latents = self.scheduler.step(noise_pred, t, latents, eta=1)[
+                "prev_sample"
+            ]
+
+        imgs_final = self.decode_latents(latents).permute(0, 2, 3, 1)
+
+
+        return {
+            "imgs_noisy": imgs_noisy,
+            "imgs_1step": imgs_1step,
+            "imgs_final": imgs_final,
         }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
