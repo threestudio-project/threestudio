@@ -107,6 +107,11 @@ system:
     n_ref: 2
     ref_only_steps: 0
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_sds: 1.
     lambda_rgb: 1000.

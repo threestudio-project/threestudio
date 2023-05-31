@@ -55,6 +55,11 @@ system:
     min_step_percent: 0.02
     max_step_percent: 0.5
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_sds: 1.
     lambda_normal_consistency: 10000.

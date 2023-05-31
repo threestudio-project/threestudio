@@ -44,6 +44,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                 {"type": "rgb", "img": image, "kwargs": {"data_format": "HWC"}}
                 for image in all_images
             ],
+            name="fit_start",
+            step=self.true_global_step,
         )
 
     def training_step(self, batch, batch_idx):
@@ -205,6 +207,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
+            name="validation_step",
+            step=self.true_global_step,
         )
 
     def on_validation_epoch_end(self):
@@ -251,6 +255,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
+            name="test_step",
+            step=self.true_global_step,
         )
 
     def on_test_epoch_end(self):
@@ -260,4 +266,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
+            name="test",
+            step=self.true_global_step,
         )

@@ -310,7 +310,7 @@ We currently only experiment on the first stage (NeRF training), although the th
 - multiple particles
 
 ```sh
-# object geneartion with 64x64 NeRF rendering, ~14GB VRAM
+# object generation with 64x64 NeRF rendering, ~14GB VRAM
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=64 data.height=64
 # object generation with 512x512 NeRF rendering (original paper), >24GB VRAM
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=512 data.height=512
@@ -352,6 +352,17 @@ If you encounter CUDA OOM error, try the following in order (roughly sorted by r
 ## Documentation
 
 threestudio use [OmegaConf](https://github.com/omry/omegaconf) to manage configurations. You can literally change anything inside the yaml configuration file or by adding command line arguments without `--`. We list all arguments that you can change in the configuration in our [documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md). Happy experimenting!
+
+## wandb (Weights & Biases) logging
+
+To enable the (experimental) wandb support, set `system.loggers.wandb.enable=true`, e.g.:
+
+```bash
+python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wandb.enable=true`
+```
+
+If you're using a corporate wandb server, you may first need to login to your wandb instance, e.g.:
+`wandb login --host=https://COMPANY_XYZ.wandb.io --relogin`
 
 ## Contributing to threestudio
 

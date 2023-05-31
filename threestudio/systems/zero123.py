@@ -43,6 +43,8 @@ class Zero123(BaseLift3DSystem):
                 {"type": "rgb", "img": image, "kwargs": {"data_format": "HWC"}}
                 for image in all_images
             ],
+            name="on_fit_start",
+            step=self.true_global_step,
         )
 
     def training_step(self, batch, batch_idx):
@@ -212,15 +214,23 @@ class Zero123(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
+            # claforte: TODO: don't hardcode the frame numbers to record... read them from cfg instead.
+            name=f"validation_step_batchidx_{batch_idx}"
+            if batch_idx in [0, 7, 15, 23, 29]
+            else None,
+            step=self.true_global_step,
         )
 
     def on_validation_epoch_end(self):
+        filestem = f"it{self.true_global_step}-val"
         self.save_img_sequence(
-            f"it{self.true_global_step}-val",
-            f"it{self.true_global_step}-val",
+            filestem,
+            filestem,
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
+            name="validation_epoch_end",
+            step=self.true_global_step,
         )
         shutil.rmtree(
             os.path.join(self.get_save_dir(), f"it{self.true_global_step}-val")
@@ -267,6 +277,8 @@ class Zero123(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
+            name="test_step",
+            step=self.true_global_step,
         )
 
     def on_test_epoch_end(self):
@@ -276,4 +288,6 @@ class Zero123(BaseLift3DSystem):
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
+            name="test",
+            step=self.true_global_step,
         )
