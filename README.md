@@ -326,7 +326,8 @@ python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 sys
 **Installation**
 
 Download pretrained weights into `load/zero123`:
-```
+```sh
+cd load/zero123
 wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 ```
 
