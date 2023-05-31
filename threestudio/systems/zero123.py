@@ -196,6 +196,32 @@ class Zero123(BaseLift3DSystem):
                 if "rgb" in batch
                 else []
             )
+            + [
+                {
+                    "type": "rgb",
+                    "img": out["comp_rgb"][0],
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": out["comp_normal"][0],
+                        "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
+                    }
+                ]
+                if "comp_normal" in out
+                else []
+            )
+            + [{"type": "grayscale", "img": out["depth"][0], "kwargs": {}}]
+            + [
+                {
+                    "type": "grayscale",
+                    "img": out["opacity"][0, :, :, 0],
+                    "kwargs": {"cmap": None, "data_range": (0, 1)},
+                },
+            ]
             + (
                 [
                     {
@@ -228,33 +254,7 @@ class Zero123(BaseLift3DSystem):
                 ]
                 if self.cfg.guidance_val
                 else []
-            )
-            + [
-                {
-                    "type": "rgb",
-                    "img": out["comp_rgb"][0],
-                    "kwargs": {"data_format": "HWC"},
-                },
-            ]
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": out["comp_normal"][0],
-                        "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-                    }
-                ]
-                if "comp_normal" in out
-                else []
-            )
-            + [{"type": "grayscale", "img": out["depth"][0], "kwargs": {}}]
-            + [
-                {
-                    "type": "grayscale",
-                    "img": out["opacity"][0, :, :, 0],
-                    "kwargs": {"cmap": None, "data_range": (0, 1)},
-                },
-            ],
+            ),
             # claforte: TODO: don't hardcode the frame numbers to record... read them from cfg instead.
             name=f"validation_step_batchidx_{batch_idx}"
             if batch_idx in [0, 7, 15, 23, 29]
