@@ -11,13 +11,16 @@ import torch
 import trimesh
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
+from pytorch_lightning.loggers import WandbLogger
 
+import wandb
 from threestudio.models.mesh import Mesh
 from threestudio.utils.typing import *
 
 
 class SaverMixin:
     _save_dir: Optional[str] = None
+    _wandb_logger: Optional[WandbLogger] = None
 
     def set_save_dir(self, save_dir: str):
         self._save_dir = save_dir
@@ -48,6 +51,16 @@ class SaverMixin:
         save_path = os.path.join(self.get_save_dir(), filename)
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         return save_path
+
+    def create_loggers(self, cfg_loggers: DictConfig) -> None:
+        if "wandb" in cfg_loggers.keys() and cfg_loggers.wandb.enable:
+            self._wandb_logger = WandbLogger(project=cfg_loggers.wandb.project)
+
+    def get_loggers(self) -> List:
+        if self._wandb_logger:
+            return [self._wandb_logger]
+        else:
+            return []
 
     DEFAULT_RGB_KWARGS = {"data_format": "HWC", "data_range": (0, 1)}
     DEFAULT_UV_KWARGS = {
@@ -98,9 +111,18 @@ class SaverMixin:
         img,
         data_format,
         data_range,
+        name: Optional[str] = None,
+        step: Optional[int] = None,
     ):
         img = self.get_rgb_image_(img, data_format, data_range)
         cv2.imwrite(filename, img)
+        if name and self._wandb_logger:
+            wandb.log(
+                {
+                    name: wandb.Image(self.get_save_path(filename)),
+                    "trainer/global_step": step,
+                }
+            )
 
     def save_rgb_image(
         self,
@@ -108,8 +130,12 @@ class SaverMixin:
         img,
         data_format=DEFAULT_RGB_KWARGS["data_format"],
         data_range=DEFAULT_RGB_KWARGS["data_range"],
+        name: Optional[str] = None,
+        step: Optional[int] = None,
     ):
-        self._save_rgb_image(self.get_save_path(filename), img, data_format, data_range)
+        self._save_rgb_image(
+            self.get_save_path(filename), img, data_format, data_range, name, step
+        )
 
     def get_uv_image_(self, img, data_format, data_range, cmap):
         img = self.convert_data(img)
@@ -245,9 +271,19 @@ class SaverMixin:
                 cols[i] = cv2.resize(cols[i], (w, h), interpolation=cv2.INTER_LINEAR)
         return np.concatenate(cols, axis=1)
 
-    def save_image_grid(self, filename, imgs, align=DEFAULT_GRID_KWARGS["align"]):
+    def save_image_grid(
+        self,
+        filename,
+        imgs,
+        align=DEFAULT_GRID_KWARGS["align"],
+        name: Optional[str] = None,
+        step: Optional[int] = None,
+    ):
         img = self.get_image_grid_(imgs, align=align)
-        cv2.imwrite(self.get_save_path(filename), img)
+        filepath = self.get_save_path(filename)
+        cv2.imwrite(filepath, img)
+        if name and self._wandb_logger:
+            wandb.log({name: wandb.Image(filepath), "trainer/global_step": step})
 
     def save_image(self, filename, img):
         img = self.convert_data(img)
@@ -305,7 +341,16 @@ class SaverMixin:
     def save_state_dict(self, filename, data):
         torch.save(data, self.get_save_path(filename))
 
-    def save_img_sequence(self, filename, img_dir, matcher, save_format="mp4", fps=30):
+    def save_img_sequence(
+        self,
+        filename,
+        img_dir,
+        matcher,
+        save_format="mp4",
+        fps=30,
+        name: Optional[str] = None,
+        step: Optional[int] = None,
+    ):
         assert save_format in ["gif", "mp4"]
         if not filename.endswith(save_format):
             filename += f".{save_format}"
@@ -326,6 +371,13 @@ class SaverMixin:
         elif save_format == "mp4":
             imgs = [cv2.cvtColor(i, cv2.COLOR_BGR2RGB) for i in imgs]
             imageio.mimsave(self.get_save_path(filename), imgs, fps=fps)
+        if name and self._wandb_logger:
+            wandb.log(
+                {
+                    name: wandb.Video(self.get_save_path(filename), format="mp4"),
+                    "trainer/global_step": step,
+                }
+            )
 
     def save_mesh(self, filename, v_pos, t_pos_idx, v_tex=None, t_tex_idx=None):
         v_pos = self.convert_data(v_pos)
@@ -439,6 +491,7 @@ class SaverMixin:
         map_Ks=None,
         map_Bump=None,
         map_format="jpg",
+        step: Optional[int] = None,
     ):
         mtl_str = f"newmtl {matname}\n"
         mtl_str += f"Ka {Ka[0]} {Ka[1]} {Ka[2]}\n"
@@ -452,6 +505,8 @@ class SaverMixin:
                 map_Kd,
                 data_format="HWC",
                 data_range=(0, 1),
+                name=f"{matname}_Kd",
+                step=step,
             )
         else:
             mtl_str += f"Kd {Kd[0]} {Kd[1]} {Kd[2]}\n"
@@ -464,6 +519,8 @@ class SaverMixin:
                 map_Ks,
                 data_format="HWC",
                 data_range=(0, 1),
+                name=f"{matname}_Ks",
+                step=step,
             )
         else:
             mtl_str += f"Ks {Ks[0]} {Ks[1]} {Ks[2]}\n"
@@ -476,6 +533,8 @@ class SaverMixin:
                 map_Bump,
                 data_format="HWC",
                 data_range=(0, 1),
+                name=f"{matname}_Bump",
+                step=step,
             )
         with open(self.get_save_path(filename), "w") as f:
             f.write(mtl_str)

@@ -63,6 +63,11 @@ system:
     max_step_percent_annealed: 0.5
     anneal_start_step: 5000
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_vsd: 1.
     lambda_lora: 1.

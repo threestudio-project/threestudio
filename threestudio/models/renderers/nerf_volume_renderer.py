@@ -150,6 +150,15 @@ class NeRFVolumeRenderer(VolumeRenderer):
             weights[..., 0], values=rgb_fg_all, ray_indices=ray_indices, n_rays=n_rays
         )
 
+        # populate depth and opacity to each point
+        t_depth = depth[ray_indices]
+        z_variance = nerfacc.accumulate_along_rays(
+            weights[..., 0],
+            values=(t_positions - t_depth) ** 2,
+            ray_indices=ray_indices,
+            n_rays=n_rays,
+        )
+
         if bg_color is None:
             bg_color = comp_rgb_bg
         else:
@@ -164,6 +173,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
             "comp_rgb_bg": comp_rgb_bg.view(batch_size, height, width, -1),
             "opacity": opacity.view(batch_size, height, width, 1),
             "depth": depth.view(batch_size, height, width, 1),
+            "z_variance": z_variance.view(batch_size, height, width, 1),
         }
 
         if self.training:

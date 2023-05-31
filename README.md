@@ -9,12 +9,13 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="threestudio" src="https://user-images.githubusercontent.com/3117031/236739017-365626d9-bb35-4c47-b71d-b9de767b0644.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/0d81b70f-2bc9-4b42-9f61-973bed88199a.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2c83fd3f-7542-45c2-8856-9202c2871028.png" width="100%">
 </p>
 
 <p align="center"><b>
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
-| <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
+| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
 </b></p>
 
 <p align="center">
@@ -313,7 +314,7 @@ We currently only experiment on the first stage (NeRF training), although the th
 - multiple particles
 
 ```sh
-# object geneartion with 64x64 NeRF rendering, ~14GB VRAM
+# object generation with 64x64 NeRF rendering, ~14GB VRAM
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=64 data.height=64
 # object generation with 512x512 NeRF rendering (original paper), >24GB VRAM
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=512 data.height=512
@@ -380,6 +381,17 @@ If you encounter CUDA OOM error, try the following in order (roughly sorted by r
 ## Documentation
 
 threestudio use [OmegaConf](https://github.com/omry/omegaconf) to manage configurations. You can literally change anything inside the yaml configuration file or by adding command line arguments without `--`. We list all arguments that you can change in the configuration in our [documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md). Happy experimenting!
+
+## wandb (Weights & Biases) logging
+
+To enable the (experimental) wandb support, set `system.loggers.wandb.enable=true`, e.g.:
+
+```bash
+python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wandb.enable=true`
+```
+
+If you're using a corporate wandb server, you may first need to login to your wandb instance, e.g.:
+`wandb login --host=https://COMPANY_XYZ.wandb.io --relogin`
 
 ## Contributing to threestudio
 

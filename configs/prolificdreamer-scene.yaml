@@ -65,12 +65,18 @@ system:
     anneal_start_step: 10000
     view_dependent_prompting: false
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_vsd: 1.
     lambda_lora: 1.
     lambda_orient: 0.
     lambda_sparsity: 0.
     lambda_opaque: 0.
+    lambda_z_variance: 1.
   optimizer:
     name: AdamW
     args:

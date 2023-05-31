@@ -58,6 +58,11 @@ system:
     min_step_percent: 0.02
     max_step_percent: 0.98
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_sds: 1.
     lambda_orient: [0, 10., 1000., 5000]

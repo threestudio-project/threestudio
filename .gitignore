@@ -181,3 +181,4 @@ outputs/
 
 # pretrained model weights
 *.ckpt
+wandb/
