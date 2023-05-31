@@ -338,7 +338,7 @@ wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 https://github.com/threestudio-project/threestudio/assets/22424247/4e4878d4-fb61-4d4f-af25-401bdf86011f
 
 
-**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.
+**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
 
 **IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
 
