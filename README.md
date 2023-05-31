@@ -119,6 +119,9 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 r
 # note that the above commands use parsed configuration files from previous trials
 # which will continue using the same trial directory
 # if you want to save to a new trial directory, replace parsed.yaml with raw.yaml in the command
+
+# load weights from last checkpoint but dont resume training (i.e. dont load optimizer state):
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 system.weights=path/to/trial/configs/last.ckpt
 ```
 
 ### Export Meshes
@@ -327,9 +330,10 @@ Download pretrained weights into `load/zero123`:
 wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 ```
 
-**Results obtained by threestudio (Zero123, 256x256, 25000 iterations)**
+**Results obtained by threestudio (Zero123, 256x256, 10000 iterations)**
 
 
+https://github.com/threestudio-project/threestudio/assets/22424247/4e4878d4-fb61-4d4f-af25-401bdf86011f
 
 
 **IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/cvlab-columbia/zero123](https://github.com/cvlab-columbia/zero123) for official code release.**
