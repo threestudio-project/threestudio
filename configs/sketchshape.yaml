@@ -39,6 +39,11 @@ system:
     guidance_scale: 100.
     weighting_strategy: sds
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_sds: 1.0
     lambda_sparsity: 0.0

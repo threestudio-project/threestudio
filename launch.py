@@ -142,7 +142,7 @@ def main() -> None:
         loggers += [
             TensorBoardLogger(cfg.trial_dir, name="tb_logs"),
             CSVLogger(cfg.trial_dir, name="csv_logs"),
-        ]
+        ] + system.get_loggers()
         rank_zero_only(
             lambda: write_to_text(
                 os.path.join(cfg.trial_dir, "log.txt"),

@@ -25,6 +25,7 @@ xatlas
 trimesh
 networkx
 PyMCubes
+wandb
 
 # for zero123
 einops

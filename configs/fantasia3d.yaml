@@ -55,6 +55,11 @@ system:
     max_step_percent: 0.5
     weighting_strategy: fantasia3d
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_sds: 1.
 

@@ -65,6 +65,11 @@ system:
     anneal_start_step: 10000
     view_dependent_prompting: false
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_vsd: 1.
     lambda_lora: 1.

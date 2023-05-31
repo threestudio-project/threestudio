@@ -2,8 +2,10 @@ import os
 from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
+from lightning.pytorch.loggers import WandbLogger
 
 import threestudio
+import wandb
 from threestudio.models.exporters.base import Exporter, ExporterOutput
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
 from threestudio.utils.base import Updateable
@@ -16,6 +18,7 @@ from threestudio.utils.typing import *
 class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
     @dataclass
     class Config:
+        loggers: dict = field(default_factory=dict)
         loss: dict = field(default_factory=dict)
         optimizer: dict = field(default_factory=dict)
         scheduler: Optional[dict] = None
@@ -33,6 +36,9 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
         self._resumed: bool = resumed
         self._resumed_eval: bool = False
         self._resumed_eval_status: dict = {"global_step": 0, "current_epoch": 0}
+        if "loggers" in cfg:
+            self.create_loggers(cfg.loggers)
+
         self.configure()
         if self.cfg.weights is not None:
             self.load_weights(self.cfg.weights, self.cfg.weights_ignore_modules)
