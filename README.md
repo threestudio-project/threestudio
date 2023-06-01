@@ -332,10 +332,10 @@ cd load/zero123
 wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 ```
 
-**Results obtained by threestudio (Zero-1-to-3, 256x256, 10000 iterations)**
+**Results obtained by threestudio (Zero-1-to-3, 128x128, 25000 iterations)**
 
 
-https://github.com/threestudio-project/threestudio/assets/22424247/4e4878d4-fb61-4d4f-af25-401bdf86011f
+https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668-461f-abe5-668e7b42cd50
 
 
 **IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
