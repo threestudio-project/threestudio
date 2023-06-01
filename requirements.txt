@@ -14,6 +14,12 @@ imageio
 imageio[ffmpeg]
 trimesh
 git+https://github.com/NVlabs/nvdiffrast.git
+libigl
+xatlas
+trimesh[easy]
+networkx
+pysdf
+
 # deepfloyd
 xformers
 bitsandbytes
@@ -25,6 +31,7 @@ xatlas
 trimesh
 networkx
 PyMCubes
+wandb
 
 # for zero123
 einops

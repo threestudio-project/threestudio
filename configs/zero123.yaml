@@ -107,6 +107,11 @@ system:
     n_ref: 2
     ref_only_steps: 0
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_sds: 0.003
     lambda_rgb: 200.
@@ -114,7 +119,6 @@ system:
     lambda_depth: 1.
     lambda_normal_smooth: 0.0
     lambda_3d_normal_smooth: 0.5
-    # lambda_orient: 20.0
     lambda_orient: [0, 1., 20., 5000]
     lambda_sparsity: 2.0 # should be tweaked for every model
     lambda_opaque: 0.5
