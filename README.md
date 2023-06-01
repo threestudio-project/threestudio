@@ -360,9 +360,9 @@ python launch.py --config configs/zero123.yaml --train --gpu 0
 
 **Guidance evaluation**
 
-Also includes evaluation of the guidance during training. If `system.freq.guidance_eval` is set to a value > 0, this will save rendered image, noisy image (noise added to rendered image), 1-step-denoised image, 1-step prediction of original image, fully denoised image. For example:
+Also includes evaluation of the guidance during training. If `system.freq.guidance_eval` is set to a value > 0, this will save rendered image, noisy image (noise added mentioned at top left), 1-step-denoised image, 1-step prediction of original image, fully denoised image. For example:
 
-![it275-train](https://github.com/threestudio-project/threestudio/assets/22424247/781dafbf-50b7-47f6-b40e-c15bd19174dc)
+![it143-train](https://github.com/threestudio-project/threestudio/assets/22424247/c8e7d835-4937-4852-bfb0-3e906e6b66b7)
 
 
 ### More to come, please stay tuned.
