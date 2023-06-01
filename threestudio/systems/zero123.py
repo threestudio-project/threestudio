@@ -106,6 +106,7 @@ class Zero123(BaseLift3DSystem):
                     valid_gt_depth, valid_pred_depth
                 )
         else:
+            self.guidance.set_min_max_steps(self.C(self.guidance.cfg.min_step_percent), self.C(self.guidance.cfg.max_step_percent))
             guidance_out = self.guidance(out["comp_rgb"], **batch, rgb_as_latents=False)
 
         loss = 0.0
