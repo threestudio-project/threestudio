@@ -358,6 +358,13 @@ https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668
 python launch.py --config configs/zero123.yaml --train --gpu 0
 ```
 
+**Guidance evaluation**
+
+Also includes evaluation of the guidance during training. If `system.freq.guidance_eval` is set to a value > 0, this will save rendered image, noisy image (noise added mentioned at top left), 1-step-denoised image, 1-step prediction of original image, fully denoised image. For example:
+
+![it143-train](https://github.com/threestudio-project/threestudio/assets/22424247/c8e7d835-4937-4852-bfb0-3e906e6b66b7)
+
+
 ### More to come, please stay tuned.
 
 - [ ] [Dream3D](https://bluestyle97.github.io/dream3d/) [![arXiv](https://img.shields.io/badge/arXiv-2212.14704-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2212.14704)

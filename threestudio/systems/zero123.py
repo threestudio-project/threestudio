@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 import torch
 import torch.nn.functional as F
 
+from PIL import Image
+from PIL import ImageDraw
+
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
@@ -55,6 +58,13 @@ class Zero123(BaseLift3DSystem):
             self.true_global_step < self.cfg.freq.ref_only_steps
             or self.true_global_step % self.cfg.freq.n_ref == 0
         )
+
+        guidance_eval = (
+            not do_ref
+            and self.cfg.freq.guidance_eval > 0
+            and self.true_global_step % self.cfg.freq.guidance_eval == 0
+        )
+
         loss = 0.0
 
         if do_ref:
@@ -107,7 +117,12 @@ class Zero123(BaseLift3DSystem):
                 )
         else:
             self.guidance.set_min_max_steps(self.C(self.guidance.cfg.min_step_percent), self.C(self.guidance.cfg.max_step_percent))
-            guidance_out = self.guidance(out["comp_rgb"], **batch, rgb_as_latents=False)
+            guidance_out, guidance_eval_out = self.guidance(
+                out["comp_rgb"],
+                **batch,
+                rgb_as_latents=False,
+                guidance_eval=guidance_eval,
+            )
 
         loss = 0.0
         for name, value in guidance_out.items():
@@ -172,7 +187,75 @@ class Zero123(BaseLift3DSystem):
 
         self.log("train/loss", loss, prog_bar=True)
 
+        if guidance_eval:
+            self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
+
         return {"loss": loss}
+
+    def merge12(self, x):
+        return x.reshape(-1, *x.shape[2:])
+
+    def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
+        B, size = comp_rgb.shape[:2]
+        resize = lambda x: F.interpolate(
+            x.permute(0, 3, 1, 2), (size, size), mode="bilinear", align_corners=False
+        ).permute(0, 2, 3, 1)
+        filename = f"it{self.true_global_step}-train.png"
+        self.save_image_grid(
+            filename,
+            [
+                {
+                    "type": "rgb",
+                    "img": self.merge12(comp_rgb),
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.merge12(resize(guidance_eval_out["imgs_noisy"])),
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.merge12(resize(guidance_eval_out["imgs_1step"])),
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.merge12(resize(guidance_eval_out["imgs_1orig"])),
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.merge12(resize(guidance_eval_out["imgs_final"])),
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+            ),
+            name="train_step",
+            step=self.true_global_step,
+        )
+
+        img = Image.open(self.get_save_path(filename))
+        draw = ImageDraw.Draw(img)
+        for i, n in enumerate(guidance_eval_out["noise_levels"]):
+            draw.text((1, (img.size[1] // B) * i + 1), f"{n:.02f}", (255, 255, 255))
+            draw.text((0, (img.size[1] // B) * i), f"{n:.02f}", (0, 0, 0))
+        img.save(self.get_save_path(filename))
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
