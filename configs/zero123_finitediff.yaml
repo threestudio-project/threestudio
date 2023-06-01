@@ -86,7 +86,8 @@ system:
   guidance:
     pretrained_model_name_or_path: "./load/zero123/105000.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
-    vram_O: ${not:${system.guidance_val}}
+    guidance_eval: ${system.guidance_eval_train}
+    vram_O: ${nor:${system.guidance_eval_train},${system.guidance_eval_valid}}
     cond_image_path: ${data.image_path}
     cond_elevation_deg: ${data.default_elevation_deg}
     cond_azimuth_deg: ${data.default_azimuth_deg}
@@ -95,7 +96,8 @@ system:
     min_step_percent: 0.02
     max_step_percent: 0.98
 
-  guidance_val: false
+  guidance_eval_train: false
+  guidance_eval_valid: false
 
   freq:
     n_ref: 2

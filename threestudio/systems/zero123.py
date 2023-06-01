@@ -17,7 +17,8 @@ class Zero123(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         freq: dict = field(default_factory=dict)
-        guidance_val: bool = False
+        guidance_eval_train: bool = False
+        guidance_eval_valid: bool = False
 
     cfg: Config
 
@@ -107,7 +108,9 @@ class Zero123(BaseLift3DSystem):
                     valid_gt_depth, valid_pred_depth
                 )
         else:
-            guidance_out = self.guidance(out["comp_rgb"], **batch, rgb_as_latents=False)
+            guidance_out, guidance_eval_out = self.guidance(
+                out["comp_rgb"], **batch, rgb_as_latents=False
+            )
 
         loss = 0.0
         for name, value in guidance_out.items():
@@ -172,15 +175,55 @@ class Zero123(BaseLift3DSystem):
 
         self.log("train/loss", loss, prog_bar=True)
 
+        if self.guidance.cfg.guidance_eval and not do_ref:
+            self.guidance_evaluation_save(guidance_eval_out)
+
         return {"loss": loss}
+
+    def merge12(self, x):
+        return x.reshape(-1, *x.shape[2:])
+
+    def guidance_evaluation_save(self, guidance_eval_out):
+        self.save_image_grid(
+            f"it{self.true_global_step}-train.png",
+            (
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.merge12(guidance_eval_out["imgs_noisy"]),
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.merge12(guidance_eval_out["imgs_1step"]),
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+            )
+            + (
+                [
+                    {
+                        "type": "rgb",
+                        "img": self.merge12(guidance_eval_out["imgs_final"]),
+                        "kwargs": {"data_format": "HWC"},
+                    }
+                ]
+            ),
+            name="train_step",
+            step=self.true_global_step,
+        )
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
-        guidance_out = (
+        guidance_eval_out = (
             self.guidance.validation_step(
                 out["comp_rgb"], **batch, rgb_as_latents=False
             )
-            if self.cfg.guidance_val
+            if self.cfg.guidance_eval_valid
             else None
         )
         self.save_image_grid(
@@ -226,33 +269,33 @@ class Zero123(BaseLift3DSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": guidance_out["imgs_noisy"][0],
+                        "img": guidance_eval_out["imgs_noisy"][0],
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
-                if self.cfg.guidance_val
+                if "imgs_noisy" in guidance_eval_out
                 else []
             )
             + (
                 [
                     {
                         "type": "rgb",
-                        "img": guidance_out["imgs_1step"][0],
+                        "img": guidance_eval_out["imgs_1step"][0],
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
-                if self.cfg.guidance_val
+                if "imgs_1step" in guidance_eval_out
                 else []
             )
             + (
                 [
                     {
                         "type": "rgb",
-                        "img": guidance_out["imgs_final"][0],
+                        "img": guidance_eval_out["imgs_final"][0],
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
-                if self.cfg.guidance_val
+                if "imgs_final" in guidance_eval_out
                 else []
             ),
             # claforte: TODO: don't hardcode the frame numbers to record... read them from cfg instead.

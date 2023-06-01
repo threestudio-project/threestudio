@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
+from tqdm import tqdm
 
 import threestudio
 from threestudio.utils.base import BaseObject
@@ -93,8 +94,7 @@ class Zero123Guidance(BaseObject):
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
-        token_merging: bool = False
-        token_merging_params: Optional[dict] = field(default_factory=dict)
+        guidance_eval: bool = True
 
     cfg: Config
 
@@ -108,7 +108,7 @@ class Zero123Guidance(BaseObject):
             self.config,
             self.cfg.pretrained_model_name_or_path,
             device=self.device,
-            vram_O=self.cfg.vram_O
+            vram_O=self.cfg.vram_O,
         )
 
         for p in self.model.parameters():
@@ -316,9 +316,79 @@ class Zero123Guidance(BaseObject):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        return {
+        guidance_out = {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
+        }
+
+        guidance_eval_out = (
+            self.guidance_eval(cond, t, latents_noisy, noise_pred)
+            if self.cfg.guidance_eval
+            else {}
+        )
+
+        return guidance_out, guidance_eval_out
+
+    @torch.cuda.amp.autocast(enabled=False)
+    @torch.no_grad()
+    def guidance_eval(self, cond, t, latents, noise_pred):
+        # self.scheduler.set_timesteps(self.num_train_timesteps)
+        # index = torch.where(
+        #     self.scheduler.timesteps.reshape(-1, 1).repeat(len(t), 1) == t.cpu()
+        # )[0][: len(t)]
+        # use only 50 timesteps, and find nearest of those to t
+        self.scheduler.set_timesteps(50)
+        index = torch.min(
+            self.scheduler.timesteps.reshape(1, -1).repeat(2, 1)
+            > t.reshape(-1, 1).cpu(),
+            dim=1,
+        )[1]
+        t = self.scheduler.timesteps[index]
+
+        imgs_noisy = self.decode_latents(latents).permute(0, 2, 3, 1)
+
+        # get prev latent
+        latents_new = []
+        for b in range(len(t)):
+            latents_new.append(
+                self.scheduler.step(
+                    noise_pred[b : b + 1], t[b], latents[b : b + 1], eta=1
+                )["prev_sample"]
+            )
+        latents_new = torch.cat(latents_new)
+        imgs_1step = self.decode_latents(latents_new).permute(0, 2, 3, 1)
+
+        latents_final = []
+        # for i, time in enumerate(index):
+        for b, i in enumerate(index):
+            latents = latents_new[b : b + 1]
+            c = {
+                "c_crossattn": [cond["c_crossattn"][0][b * 2 : b * 2 + 2]],
+                "c_concat": [cond["c_concat"][0][b * 2 : b * 2 + 2]],
+            }
+            for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
+                # pred noise
+                x_in = torch.cat([latents] * 2)
+                t_in = torch.cat([t.reshape(1)] * 2).to(self.device)
+                noise_pred = self.model.apply_model(x_in, t_in, c)
+                # perform guidance
+                noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+                noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+                    noise_pred_cond - noise_pred_uncond
+                )
+                # get prev latent
+                latents = self.scheduler.step(noise_pred, t, latents, eta=1)[
+                    "prev_sample"
+                ]
+            latents_final.append(latents)
+
+        latents_final = torch.cat(latents_final)
+        imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
+
+        return {
+            "imgs_noisy": imgs_noisy,
+            "imgs_1step": imgs_1step,
+            "imgs_final": imgs_final,
         }
 
     @torch.cuda.amp.autocast(enabled=False)
@@ -332,9 +402,7 @@ class Zero123Guidance(BaseObject):
         rgb_as_latents=False,
         **kwargs,
     ):
-        batch_size = 1
-
-        rgb_BCHW = rgb.permute(0, 3, 1, 2)[0:1]
+        rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
         if rgb_as_latents:
             latents = (
@@ -353,7 +421,7 @@ class Zero123Guidance(BaseObject):
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         self.scheduler.set_timesteps(50)
-        i = torch.randint(1, len(self.scheduler.timesteps), [batch_size])
+        i = torch.randint(1, 50, [1])
         t = self.scheduler.timesteps[i]
 
         # add noise
@@ -376,10 +444,10 @@ class Zero123Guidance(BaseObject):
         latents = self.scheduler.step(noise_pred, t[0], latents, eta=1)["prev_sample"]
         imgs_1step = self.decode_latents(latents).permute(0, 2, 3, 1)
 
-        for t in self.scheduler.timesteps[i+1:]:
+        for t in self.scheduler.timesteps[i + 1 :]:
             # pred noise
             x_in = torch.cat([latents] * 2)
-            t_in = torch.cat([t.reshape(1).repeat(1)] * 2).to(self.device)
+            t_in = torch.cat([t.reshape(1)] * 2).to(self.device)
             noise_pred = self.model.apply_model(x_in, t_in, cond)
             # perform guidance
             noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
@@ -387,12 +455,9 @@ class Zero123Guidance(BaseObject):
                 noise_pred_cond - noise_pred_uncond
             )
             # get prev latent
-            latents = self.scheduler.step(noise_pred, t, latents, eta=1)[
-                "prev_sample"
-            ]
+            latents = self.scheduler.step(noise_pred, t, latents, eta=1)["prev_sample"]
 
         imgs_final = self.decode_latents(latents).permute(0, 2, 3, 1)
-
 
         return {
             "imgs_noisy": imgs_noisy,
