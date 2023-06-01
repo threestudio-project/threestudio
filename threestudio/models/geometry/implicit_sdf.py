@@ -45,8 +45,8 @@ class ImplicitSDF(BaseImplicitGeometry):
         finite_difference_normal_eps: float = 0.01
         shape_init: Optional[str] = None
         shape_init_params: Optional[Any] = None
-        shape_init_mesh_up: str = "z"
-        shape_init_mesh_front: str = "x"
+        shape_init_mesh_up: str = "+z"
+        shape_init_mesh_front: str = "+x"
         force_shape_init: bool = False
         sdf_bias: Union[float, str] = 0.0
         sdf_bias_params: Optional[Any] = None

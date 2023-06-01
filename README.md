@@ -292,7 +292,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 # or you can initialize from a mesh
 # here shape_init_params is the scale of the shape
 # also make sure to input the correct up and front axis (in +x, +y, +z, -x, -y, -z)
-python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="" system.geometry.shape_init=mesh:load/shapes/human.obj system.geometry.shape_init_params=0.9 system.geometry.shape_init_mesh_up=+y system.geometry.shape_init_mesh_front=+z
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="hulk" system.geometry.shape_init=mesh:load/shapes/human.obj system.geometry.shape_init_params=0.9 system.geometry.shape_init_mesh_up=+y system.geometry.shape_init_mesh_front=+z
 ```
 
 **Tips**
