@@ -328,7 +328,7 @@ class Zero123Guidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
-    def guidance_eval(self, cond, t, latents, noise_pred):
+    def guidance_eval(self, cond, t_orig, latents, noise_pred):
         # self.scheduler.set_timesteps(self.num_train_timesteps)
         # index = torch.where(
         #     self.scheduler.timesteps.reshape(-1, 1).repeat(len(t), 1) == t.cpu()
@@ -338,31 +338,31 @@ class Zero123Guidance(BaseObject):
         self.scheduler.set_timesteps(50)
         index = torch.min(
             self.scheduler.timesteps.reshape(1, -1).repeat(2, 1)
-            > t.reshape(-1, 1).cpu(),
+            > t_orig.reshape(-1, 1).cpu(),
             dim=1,
         )[1]
         t = self.scheduler.timesteps[index]
 
+        fracs = list((t / self.scheduler.config.num_train_timesteps).numpy())
         imgs_noisy = self.decode_latents(latents).permute(0, 2, 3, 1)
 
         # get prev latent
-        latents_new = []
-        pred_orig = []
+        latents_1step = []
+        pred_1orig = []
         for b in range(len(t)):
             step_output = self.scheduler.step(
                 noise_pred[b : b + 1], t[b], latents[b : b + 1], eta=1
             )
-            latents_new.append(step_output["prev_sample"])
-            pred_orig.append(step_output["pred_original_sample"])
-        latents_new = torch.cat(latents_new)
-        pred_orig = torch.cat(pred_orig)
-        imgs_1step = self.decode_latents(latents_new).permute(0, 2, 3, 1)
-        imgs_1orig = self.decode_latents(pred_orig).permute(0, 2, 3, 1)
+            latents_1step.append(step_output["prev_sample"])
+            pred_1orig.append(step_output["pred_original_sample"])
+        latents_1step = torch.cat(latents_1step)
+        pred_1orig = torch.cat(pred_1orig)
+        imgs_1step = self.decode_latents(latents_1step).permute(0, 2, 3, 1)
+        imgs_1orig = self.decode_latents(pred_1orig).permute(0, 2, 3, 1)
 
         latents_final = []
-        # for i, time in enumerate(index):
         for b, i in enumerate(index):
-            latents = latents_new[b : b + 1]
+            latents = latents_1step[b : b + 1]
             c = {
                 "c_crossattn": [cond["c_crossattn"][0][b * 2 : b * 2 + 2]],
                 "c_concat": [cond["c_concat"][0][b * 2 : b * 2 + 2]],
@@ -387,6 +387,7 @@ class Zero123Guidance(BaseObject):
         imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
 
         return {
+            "noise_levels": fracs,
             "imgs_noisy": imgs_noisy,
             "imgs_1step": imgs_1step,
             "imgs_1orig": imgs_1orig,

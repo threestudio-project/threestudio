@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 import torch
 import torch.nn.functional as F
 
+from PIL import Image
+from PIL import ImageDraw
+
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
@@ -192,12 +195,13 @@ class Zero123(BaseLift3DSystem):
         return x.reshape(-1, *x.shape[2:])
 
     def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
-        size = comp_rgb.shape[1]
+        B, size = comp_rgb.shape[:2]
         resize = lambda x: F.interpolate(
             x.permute(0, 3, 1, 2), (size, size), mode="bilinear", align_corners=False
         ).permute(0, 2, 3, 1)
+        filename = f"it{self.true_global_step}-train.png"
         self.save_image_grid(
-            f"it{self.true_global_step}-train.png",
+            filename,
             [
                 {
                     "type": "rgb",
@@ -244,6 +248,13 @@ class Zero123(BaseLift3DSystem):
             name="train_step",
             step=self.true_global_step,
         )
+
+        img = Image.open(self.get_save_path(filename))
+        draw = ImageDraw.Draw(img)
+        for i, n in enumerate(guidance_eval_out["noise_levels"]):
+            draw.text((1, (img.size[1] // B) * i + 1), f"{n:.02f}", (255, 255, 255))
+            draw.text((0, (img.size[1] // B) * i), f"{n:.02f}", (0, 0, 0))
+        img.save(self.get_save_path(filename))
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)

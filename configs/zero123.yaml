@@ -107,7 +107,7 @@ system:
   freq:
     n_ref: 2
     ref_only_steps: 0
-    guidance_eval: 0  # must not be a multiple of system.freq.n_ref
+    guidance_eval: 11  # must not be a multiple of system.freq.n_ref
 
   loggers:
     wandb:
