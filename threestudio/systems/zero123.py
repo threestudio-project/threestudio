@@ -17,8 +17,6 @@ class Zero123(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         freq: dict = field(default_factory=dict)
-        guidance_eval_train: bool = False
-        guidance_eval_valid: bool = False
 
     cfg: Config
 
@@ -57,6 +55,13 @@ class Zero123(BaseLift3DSystem):
             self.true_global_step < self.cfg.freq.ref_only_steps
             or self.true_global_step % self.cfg.freq.n_ref == 0
         )
+
+        guidance_eval = (
+            not do_ref
+            and self.cfg.freq.guidance_eval > 0
+            and self.true_global_step % self.cfg.freq.guidance_eval == 0
+        )
+
         loss = 0.0
 
         if do_ref:
@@ -109,7 +114,10 @@ class Zero123(BaseLift3DSystem):
                 )
         else:
             guidance_out, guidance_eval_out = self.guidance(
-                out["comp_rgb"], **batch, rgb_as_latents=False
+                out["comp_rgb"],
+                **batch,
+                rgb_as_latents=False,
+                guidance_eval=guidance_eval,
             )
 
         loss = 0.0
@@ -175,7 +183,7 @@ class Zero123(BaseLift3DSystem):
 
         self.log("train/loss", loss, prog_bar=True)
 
-        if self.guidance.cfg.guidance_eval and not do_ref:
+        if guidance_eval:
             self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
 
         return {"loss": loss}
@@ -239,13 +247,6 @@ class Zero123(BaseLift3DSystem):
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
-        guidance_eval_out = (
-            self.guidance.validation_step(
-                out["comp_rgb"], **batch, rgb_as_latents=False
-            )
-            if self.cfg.guidance_eval_valid
-            else None
-        )
         self.save_image_grid(
             f"it{self.true_global_step}-val/{batch['index'][0]}.png",
             (
@@ -284,51 +285,7 @@ class Zero123(BaseLift3DSystem):
                     "img": out["opacity"][0, :, :, 0],
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
-            ]
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": guidance_eval_out["imgs_noisy"][0],
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-                if "imgs_noisy" in guidance_eval_out
-                else []
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": guidance_eval_out["imgs_1step"][0],
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-                if "imgs_1step" in guidance_eval_out
-                else []
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": guidance_eval_out["imgs_1orig"][0],
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-                if "imgs_1orig" in guidance_eval_out
-                else []
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": guidance_eval_out["imgs_final"][0],
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-                if "imgs_final" in guidance_eval_out
-                else []
-            ),
+            ],
             # claforte: TODO: don't hardcode the frame numbers to record... read them from cfg instead.
             name=f"validation_step_batchidx_{batch_idx}"
             if batch_idx in [0, 7, 15, 23, 29]

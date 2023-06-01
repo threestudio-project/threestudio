@@ -94,8 +94,6 @@ class Zero123Guidance(BaseObject):
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
-        guidance_eval: bool = True
-
     cfg: Config
 
     def configure(self) -> None:
@@ -190,8 +188,6 @@ class Zero123Guidance(BaseObject):
     def decode_latents(
         self,
         latents: Float[Tensor, "B 4 H W"],
-        latent_height: int = 64,
-        latent_width: int = 64,
     ) -> Float[Tensor, "B 3 512 512"]:
         input_dtype = latents.dtype
         image = self.model.decode_first_stage(latents)
@@ -257,6 +253,7 @@ class Zero123Guidance(BaseObject):
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
+        guidance_eval=False,
         **kwargs,
     ):
         batch_size = rgb.shape[0]
@@ -323,7 +320,7 @@ class Zero123Guidance(BaseObject):
 
         guidance_eval_out = (
             self.guidance_eval(cond, t, latents_noisy, noise_pred)
-            if self.cfg.guidance_eval
+            if guidance_eval
             else {}
         )
 
@@ -388,84 +385,6 @@ class Zero123Guidance(BaseObject):
 
         latents_final = torch.cat(latents_final)
         imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
-
-        return {
-            "imgs_noisy": imgs_noisy,
-            "imgs_1step": imgs_1step,
-            "imgs_1orig": imgs_1orig,
-            "imgs_final": imgs_final,
-        }
-
-    @torch.cuda.amp.autocast(enabled=False)
-    @torch.no_grad()
-    def validation_step(
-        self,
-        rgb: Float[Tensor, "B H W C"],
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-        rgb_as_latents=False,
-        **kwargs,
-    ):
-        rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 64 64"]
-        if rgb_as_latents:
-            latents = (
-                F.interpolate(rgb_BCHW, (32, 32), mode="bilinear", align_corners=False)
-                * 2
-                - 1
-            )
-        else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (256, 256), mode="bilinear", align_corners=False
-            )
-            # encode image into latents with vae
-            latents = self.encode_images(rgb_BCHW_512)
-
-        cond = self.get_cond(elevation, azimuth, camera_distances)
-
-        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
-        self.scheduler.set_timesteps(50)
-        i = torch.randint(1, 50, [1])
-        t = self.scheduler.timesteps[i]
-
-        # add noise
-        noise = torch.randn_like(latents)  # TODO: use torch generator
-        latents_noisy = self.scheduler.add_noise(latents, noise, t)
-        imgs_noisy = self.decode_latents(latents_noisy).permute(0, 2, 3, 1)
-
-        # pred noise
-        x_in = torch.cat([latents_noisy] * 2)
-        t_in = torch.cat([t] * 2).to(self.device)
-        noise_pred = self.model.apply_model(x_in, t_in, cond)
-
-        # perform guidance
-        noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
-        noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-            noise_pred_cond - noise_pred_uncond
-        )
-
-        # get prev latent
-        step_output = self.scheduler.step(noise_pred, t[0], latents, eta=1)
-        latents = step_output["prev_sample"]
-        imgs_1step = self.decode_latents(latents).permute(0, 2, 3, 1)
-        pred_orig = step_output["pred_original_sample"]
-        imgs_1orig = self.decode_latents(pred_orig).permute(0, 2, 3, 1)
-
-        for t in self.scheduler.timesteps[i + 1 :]:
-            # pred noise
-            x_in = torch.cat([latents] * 2)
-            t_in = torch.cat([t.reshape(1)] * 2).to(self.device)
-            noise_pred = self.model.apply_model(x_in, t_in, cond)
-            # perform guidance
-            noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-                noise_pred_cond - noise_pred_uncond
-            )
-            # get prev latent
-            latents = self.scheduler.step(noise_pred, t, latents, eta=1)["prev_sample"]
-
-        imgs_final = self.decode_latents(latents).permute(0, 2, 3, 1)
 
         return {
             "imgs_noisy": imgs_noisy,
