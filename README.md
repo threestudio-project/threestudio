@@ -277,6 +277,15 @@ python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system
 
 https://user-images.githubusercontent.com/19284678/236694880-33b0db21-4530-47f1-9c3b-c70357bc84b3.mp4
 
+**Results obtained by threestudio (Stable Diffusion, mesh initialization)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/762903c1-665b-47b5-a2c2-bd7021a9e548.mp4
+
+<p align="center">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2d22e30f-4a32-454a-a06e-d6e6bd2a1b96.png" width="100%">
+</p>
+
+
 Notable differences from the paper: N/A.
 
 We currently only implement the geometry stage of Fantasia3D.
