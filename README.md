@@ -289,6 +289,10 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 # the default shape is a sphere with radius 0.5
 # change the shape initialization to match your input prompt
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
+# or you can initialize from a mesh
+# here shape_init_params is the scale of the shape
+# also make sure to input the correct up and front axis (in +x, +y, +z, -x, -y, -z)
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="" system.geometry.shape_init=mesh:load/shapes/human.obj system.geometry.shape_init_params=0.9 system.geometry.shape_init_mesh_up=+y system.geometry.shape_init_mesh_front=+z
 ```
 
 **Tips**
@@ -299,9 +303,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 **Results obtained by threestudio (Stable Diffusion, 256x256, 25000 iterations)**
 
-
 https://github.com/threestudio-project/threestudio/assets/19284678/1f0081bf-c877-4e7a-9047-a8aa6431a561
-
 
 **IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
 

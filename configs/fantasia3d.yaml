@@ -21,18 +21,22 @@ data:
 
 system_type: "fantasia3d-system"
 system:
+  latent_steps: 1000
   geometry_type: "implicit-sdf"
   geometry:
+    radius: 1.0
     n_feature_dims: 0
     isosurface_resolution: 128
     isosurface_deformable_grid: true
+    isosurface_coarse_to_fine: false
+
     # initialize SDF by optimization
     shape_init: sphere
     shape_init_params: 0.5
 
     # or you can initialize SDF using a guide mesh
-    # shape_init: mesh:load/shapes/animal.obj
-    # shape_init_params: 0.5
+    # shape_init: mesh:load/shapes/human.obj
+    # shape_init_params: 0.9
     # shape_init_mesh_up: +y
     # shape_init_mesh_front: +z
 
@@ -53,21 +57,22 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 100.
     max_step_percent: 0.5
     weighting_strategy: fantasia3d
 
   loss:
     lambda_sds: 1.
+    lambda_normal_consistency: 0.
 
   optimizer:
-    name: Adam
+    name: AdamW
     args:
       lr: 0.001
       betas: [0.9, 0.99]

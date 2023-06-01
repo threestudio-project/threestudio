@@ -164,7 +164,7 @@ class ImplicitSDF(BaseImplicitGeometry):
             mesh2std = np.linalg.inv(std2mesh)
 
             # scaling
-            scale = np.abs(mesh.vertices).max(0)
+            scale = np.abs(mesh.vertices).max()
             mesh.vertices = mesh.vertices / scale * self.cfg.shape_init_params
             mesh.vertices = np.dot(mesh2std, mesh.vertices.T).T
 
