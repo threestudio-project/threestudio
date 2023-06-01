@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
+from tqdm import tqdm
 
 import threestudio
 from threestudio.utils.base import BaseObject
@@ -76,6 +77,7 @@ class Zero123Guidance(BaseObject):
     class Config(BaseObject.Config):
         pretrained_model_name_or_path: str = "load/zero123/105000.ckpt"
         pretrained_config: str = "load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
+        vram_O: bool = True
 
         cond_image_path: str = "load/images/hamburger_rgba.png"
         cond_elevation_deg: float = 0.0
@@ -92,9 +94,6 @@ class Zero123Guidance(BaseObject):
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
-        token_merging: bool = False
-        token_merging_params: Optional[dict] = field(default_factory=dict)
-
     cfg: Config
 
     def configure(self) -> None:
@@ -107,6 +106,7 @@ class Zero123Guidance(BaseObject):
             self.config,
             self.cfg.pretrained_model_name_or_path,
             device=self.device,
+            vram_O=self.cfg.vram_O,
         )
 
         for p in self.model.parameters():
@@ -188,8 +188,6 @@ class Zero123Guidance(BaseObject):
     def decode_latents(
         self,
         latents: Float[Tensor, "B 4 H W"],
-        latent_height: int = 64,
-        latent_width: int = 64,
     ) -> Float[Tensor, "B 3 512 512"]:
         input_dtype = latents.dtype
         image = self.model.decode_first_stage(latents)
@@ -255,6 +253,7 @@ class Zero123Guidance(BaseObject):
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
+        guidance_eval=False,
         **kwargs,
     ):
         batch_size = rgb.shape[0]
@@ -314,9 +313,85 @@ class Zero123Guidance(BaseObject):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        return {
+        guidance_out = {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
+        }
+
+        guidance_eval_out = (
+            self.guidance_eval(cond, t, latents_noisy, noise_pred)
+            if guidance_eval
+            else {}
+        )
+
+        return guidance_out, guidance_eval_out
+
+    @torch.cuda.amp.autocast(enabled=False)
+    @torch.no_grad()
+    def guidance_eval(self, cond, t_orig, latents, noise_pred):
+        # self.scheduler.set_timesteps(self.num_train_timesteps)
+        # index = torch.where(
+        #     self.scheduler.timesteps.reshape(-1, 1).repeat(len(t), 1) == t.cpu()
+        # )[0][: len(t)]
+
+        # use only 50 timesteps, and find nearest of those to t
+        self.scheduler.set_timesteps(50)
+        index = torch.min(
+            self.scheduler.timesteps.reshape(1, -1).repeat(2, 1)
+            > t_orig.reshape(-1, 1).cpu(),
+            dim=1,
+        )[1]
+        t = self.scheduler.timesteps[index]
+
+        fracs = list((t / self.scheduler.config.num_train_timesteps).numpy())
+        imgs_noisy = self.decode_latents(latents).permute(0, 2, 3, 1)
+
+        # get prev latent
+        latents_1step = []
+        pred_1orig = []
+        for b in range(len(t)):
+            step_output = self.scheduler.step(
+                noise_pred[b : b + 1], t[b], latents[b : b + 1], eta=1
+            )
+            latents_1step.append(step_output["prev_sample"])
+            pred_1orig.append(step_output["pred_original_sample"])
+        latents_1step = torch.cat(latents_1step)
+        pred_1orig = torch.cat(pred_1orig)
+        imgs_1step = self.decode_latents(latents_1step).permute(0, 2, 3, 1)
+        imgs_1orig = self.decode_latents(pred_1orig).permute(0, 2, 3, 1)
+
+        latents_final = []
+        for b, i in enumerate(index):
+            latents = latents_1step[b : b + 1]
+            c = {
+                "c_crossattn": [cond["c_crossattn"][0][b * 2 : b * 2 + 2]],
+                "c_concat": [cond["c_concat"][0][b * 2 : b * 2 + 2]],
+            }
+            for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
+                # pred noise
+                x_in = torch.cat([latents] * 2)
+                t_in = torch.cat([t.reshape(1)] * 2).to(self.device)
+                noise_pred = self.model.apply_model(x_in, t_in, c)
+                # perform guidance
+                noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
+                noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+                    noise_pred_cond - noise_pred_uncond
+                )
+                # get prev latent
+                latents = self.scheduler.step(noise_pred, t, latents, eta=1)[
+                    "prev_sample"
+                ]
+            latents_final.append(latents)
+
+        latents_final = torch.cat(latents_final)
+        imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
+
+        return {
+            "noise_levels": fracs,
+            "imgs_noisy": imgs_noisy,
+            "imgs_1step": imgs_1step,
+            "imgs_1orig": imgs_1orig,
+            "imgs_final": imgs_final,
         }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
