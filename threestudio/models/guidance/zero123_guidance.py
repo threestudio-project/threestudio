@@ -336,6 +336,7 @@ class Zero123Guidance(BaseObject):
         # index = torch.where(
         #     self.scheduler.timesteps.reshape(-1, 1).repeat(len(t), 1) == t.cpu()
         # )[0][: len(t)]
+
         # use only 50 timesteps, and find nearest of those to t
         self.scheduler.set_timesteps(50)
         index = torch.min(
@@ -349,14 +350,17 @@ class Zero123Guidance(BaseObject):
 
         # get prev latent
         latents_new = []
+        pred_orig = []
         for b in range(len(t)):
-            latents_new.append(
-                self.scheduler.step(
-                    noise_pred[b : b + 1], t[b], latents[b : b + 1], eta=1
-                )["prev_sample"]
+            step_output = self.scheduler.step(
+                noise_pred[b : b + 1], t[b], latents[b : b + 1], eta=1
             )
+            latents_new.append(step_output["prev_sample"])
+            pred_orig.append(step_output["pred_original_sample"])
         latents_new = torch.cat(latents_new)
+        pred_orig = torch.cat(pred_orig)
         imgs_1step = self.decode_latents(latents_new).permute(0, 2, 3, 1)
+        imgs_1orig = self.decode_latents(pred_orig).permute(0, 2, 3, 1)
 
         latents_final = []
         # for i, time in enumerate(index):
@@ -388,6 +392,7 @@ class Zero123Guidance(BaseObject):
         return {
             "imgs_noisy": imgs_noisy,
             "imgs_1step": imgs_1step,
+            "imgs_1orig": imgs_1orig,
             "imgs_final": imgs_final,
         }
 
@@ -441,8 +446,11 @@ class Zero123Guidance(BaseObject):
         )
 
         # get prev latent
-        latents = self.scheduler.step(noise_pred, t[0], latents, eta=1)["prev_sample"]
+        step_output = self.scheduler.step(noise_pred, t[0], latents, eta=1)
+        latents = step_output["prev_sample"]
         imgs_1step = self.decode_latents(latents).permute(0, 2, 3, 1)
+        pred_orig = step_output["pred_original_sample"]
+        imgs_1orig = self.decode_latents(pred_orig).permute(0, 2, 3, 1)
 
         for t in self.scheduler.timesteps[i + 1 :]:
             # pred noise
@@ -462,6 +470,7 @@ class Zero123Guidance(BaseObject):
         return {
             "imgs_noisy": imgs_noisy,
             "imgs_1step": imgs_1step,
+            "imgs_1orig": imgs_1orig,
             "imgs_final": imgs_final,
         }
 
