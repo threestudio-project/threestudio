@@ -123,23 +123,16 @@ class Zero123(BaseLift3DSystem):
                 guidance_eval=guidance_eval,
             )
 
-        loss = 0.0
-        for name, value in guidance_out.items():
-            self.log(f"train/{name}", value)
-            if name.startswith("loss_"):
-                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
             if "normal" not in out:
                 raise ValueError(
                     "Normal is required for orientation loss, no normal is found in the output."
                 )
-            loss_orient = (
+            guidance_out["loss_orient"] = (
                 out["weights"].detach()
                 * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
             ).sum() / (out["opacity"] > 0).sum()
-            self.log("train/loss_orient", loss_orient)
-            loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
             if "comp_normal" not in out:
@@ -147,13 +140,11 @@ class Zero123(BaseLift3DSystem):
                     "comp_normal is required for 2D normal smooth loss, no comp_normal is found in the output."
                 )
             normal = out["comp_normal"]
-            loss_normal_smooth = (
+            guidance_out["loss_normal_smooth"] = (
                 normal[:, 1:, :, :] - normal[:, :-1, :, :]
             ).square().mean() + (
                 normal[:, :, 1:, :] - normal[:, :, :-1, :]
             ).square().mean()
-            self.log("train/loss_normal_smooth", loss_normal_smooth)
-            loss += self.C(self.cfg.loss.lambda_normal_smooth) * loss_normal_smooth
 
         if self.C(self.cfg.loss.lambda_3d_normal_smooth) > 0:
             if "normal" not in out:
@@ -166,20 +157,20 @@ class Zero123(BaseLift3DSystem):
                 )
             normals = out["normal"]
             normals_perturb = out["normal_perturb"]
-            loss_3d_normal_smooth = (normals - normals_perturb).abs().mean()
-            self.log("train/loss_3d_normal_smooth", loss_3d_normal_smooth)
-            loss += (
-                self.C(self.cfg.loss.lambda_3d_normal_smooth) * loss_3d_normal_smooth
-            )
+            guidance_out["loss_3d_normal_smooth"] = (normals - normals_perturb).abs().mean()
 
-        loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
-        self.log("train/loss_sparsity", loss_sparsity)
-        loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
+        guidance_out["loss_sparsity"] = (out["opacity"] ** 2 + 0.01).sqrt().mean()
 
         opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
-        loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
-        self.log("train/loss_opaque", loss_opaque)
-        loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+        guidance_out["loss_opaque"] = binary_cross_entropy(opacity_clamped, opacity_clamped)
+
+        loss = 0.0
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss_weighted = value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
+                self.log(f"train/{name}_w", loss_weighted)
+                loss += loss_weighted
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
