@@ -6,28 +6,28 @@ seed: 0
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: 96
-  width: 96
+  height: 192
+  width: 192
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.2
   default_fovy_deg: 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: 64
-    width: 64
+    height: 128
+    width: 128
     eval_height: 256
     eval_width: 256
     batch_size: 2
     eval_batch_size: 1
     elevation_range: [-10, 60]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.0, 3.5]
+    camera_distance_range: [3.2, 3.3]
     fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
     light_position_perturb: 1.0
-    light_distance_range: [4.5, 6.0]
+    light_distance_range: [7.5, 10.0]
     eval_elevation_deg: ${data.default_elevation_deg}
     eval_camera_distance: ${data.default_camera_distance}
     eval_fovy_deg: ${data.default_fovy_deg}
@@ -71,8 +71,8 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 1
-    textureless_prob: 0.2
+    ambient_only_steps: 100000
+    textureless_prob: 0.05
     albedo_activation: sigmoid
 
   background_type: "neural-environment-map-background"
@@ -99,7 +99,7 @@ system:
     cond_elevation_deg: ${data.default_elevation_deg}
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
-    guidance_scale: 7.5
+    guidance_scale: 3.0
     min_step_percent: 0.02
     max_step_percent: 0.98
 
@@ -113,23 +113,23 @@ system:
       project: 'threestudio'
 
   loss:
-    lambda_sds: 1.
-    lambda_rgb: 1000.
-    lambda_mask: 500.
-    lambda_depth: 10.
+    lambda_sds: 0.003
+    lambda_rgb: 200.
+    lambda_mask: 50.
+    lambda_depth: 1.
     lambda_normal_smooth: 0.0
-    lambda_3d_normal_smooth: 10.0
-    lambda_orient: 1.0
-    lambda_sparsity: 0.0
-    lambda_opaque: 0.0
+    lambda_3d_normal_smooth: 0.5
+    lambda_orient: [0, 1., 20., 5000]
+    lambda_sparsity: 2.0 # should be tweaked for every model
+    lambda_opaque: 0.5
 
   optimizer:
     name: Adan
     args:
-      lr: 0.005
+      lr: 0.01
       max_grad_norm: 5.0
       eps: 1.e-8
-      weight_decay: 2e-5
+      weight_decay: 1e-5
     params:
       geometry:
         lr: ${system.optimizer.args.lr}
