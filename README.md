@@ -30,8 +30,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
-- 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Following the instructions [here](https://github.com/threestudio-project/threestudio#zero123-) to have a try.
-- 05/26/2023: An experimental implementation of ProlificDreamer! Following the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to have a try.
+- 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
+- 05/26/2023: An experimental implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
@@ -332,10 +332,10 @@ cd load/zero123
 wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 ```
 
-**Results obtained by threestudio (Zero-1-to-3, 256x256, 10000 iterations)**
+**Results obtained by threestudio (Zero-1-to-3, 128x128, 25000 iterations)**
 
 
-https://github.com/threestudio-project/threestudio/assets/22424247/4e4878d4-fb61-4d4f-af25-401bdf86011f
+https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668-461f-abe5-668e7b42cd50
 
 
 **IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
