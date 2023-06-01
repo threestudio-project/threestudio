@@ -60,17 +60,17 @@ system:
   guidance_type: "stable-diffusion-vsd-guidance"
   guidance:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1-base"
+    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1"
     guidance_scale: 7.5
     min_step_percent: 0.02
     max_step_percent: 0.98
-    max_step_percent_annealed: 0.98 # temporarily disable
+    max_step_percent_annealed: 0.5
     anneal_start_step: 5000
 
   loggers:
     wandb:
       enable: false
-      project: 'threestudio'
+      project: "threestudio"
 
   loss:
     lambda_vsd: 1.
