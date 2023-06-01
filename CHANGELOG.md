@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sdf_bias` as an alternative way for SDF initialization in `implicit-volume` (#57).
 - Automatically remove outliers with a small number of faces when extracting surfaces (#61).
 - An experimental implementation of ProlificDreamer (#74).
+- An experimental implementation of using Zero-1-to-3 for 3D generation from a single image (#71).
+- Support mesh initialization for `implicit-sdf` (#90).
 
 ### Changed
 
