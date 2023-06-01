@@ -281,6 +281,15 @@ python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system
 
 https://user-images.githubusercontent.com/19284678/236694880-33b0db21-4530-47f1-9c3b-c70357bc84b3.mp4
 
+**Results obtained by threestudio (Stable Diffusion, mesh initialization)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/762903c1-665b-47b5-a2c2-bd7021a9e548.mp4
+
+<p align="center">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2d22e30f-4a32-454a-a06e-d6e6bd2a1b96.png" width="100%">
+</p>
+
+
 Notable differences from the paper: N/A.
 
 We currently only implement the geometry stage of Fantasia3D.
@@ -293,6 +302,10 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 # the default shape is a sphere with radius 0.5
 # change the shape initialization to match your input prompt
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
+# or you can initialize from a mesh
+# here shape_init_params is the scale of the shape
+# also make sure to input the correct up and front axis (in +x, +y, +z, -x, -y, -z)
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="hulk" system.geometry.shape_init=mesh:load/shapes/human.obj system.geometry.shape_init_params=0.9 system.geometry.shape_init_mesh_up=+y system.geometry.shape_init_mesh_front=+z
 ```
 
 **Tips**
@@ -303,9 +316,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 **Results obtained by threestudio (Stable Diffusion, 256x256, 25000 iterations)**
 
-
 https://github.com/threestudio-project/threestudio/assets/19284678/1f0081bf-c877-4e7a-9047-a8aa6431a561
-
 
 **IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
 
