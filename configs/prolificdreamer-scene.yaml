@@ -11,7 +11,9 @@ data:
   camera_distance_range: [0.1, 2.3]
   fovy_range: [40, 70]
   elevation_range: [-10, 45]
-  light_sample_strategy: "magic3d"
+  camera_perturb: 0.
+  center_perturb: 0.
+  up_perturb: 0.
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
