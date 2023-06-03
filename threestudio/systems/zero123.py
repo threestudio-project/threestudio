@@ -50,30 +50,18 @@ class Zero123(BaseLift3DSystem):
             step=self.true_global_step,
         )
 
-    def training_step(self, batch, batch_idx):
-        # opt = self.optimizers()
-        # opt.zero_grad()
-
-        do_ref = (
-            self.true_global_step < self.cfg.freq.ref_only_steps
-            or self.true_global_step % self.cfg.freq.n_ref == 0
-        )
-
-        guidance_eval = (
-            not do_ref
-            and self.cfg.freq.guidance_eval > 0
-            and self.true_global_step % self.cfg.freq.guidance_eval == 0
-        )
-
-        loss = 0.0
-
-        if do_ref:
+    def training_substep(self, batch, batch_idx, guidance: str):
+        """
+        Args:
+            guidance: one of "ref" (reference image supervision), "zero123"
+        """
+        if guidance == "ref":
             # bg_color = torch.rand_like(batch['rays_o'])
             ambient_ratio = 1.0
             shading = "diffuse"
             batch["shading"] = shading
             bg_color = None
-        else:
+        elif guidance == "zero123":
             batch = batch["random_camera"]
             if random.random() > 0.5:
                 bg_color = None
@@ -85,22 +73,32 @@ class Zero123(BaseLift3DSystem):
         batch["ambient_ratio"] = ambient_ratio
 
         out = self(batch)
+        loss_prefix = f"loss_{guidance}_"
 
-        if do_ref:
+        loss_terms = {}
+
+        def set_loss(name, value):
+            loss_terms[f"{loss_prefix}{name}"] = value
+
+        guidance_eval = (
+            guidance == "zero123"
+            and self.cfg.freq.guidance_eval > 0
+            and self.true_global_step % self.cfg.freq.guidance_eval == 0
+        )
+
+        if guidance == "ref":
             gt_mask = batch["mask"]
             gt_rgb = batch["rgb"]
             gt_depth = batch["depth"]
-
-            guidance_out = {}
 
             # color loss
             gt_rgb = gt_rgb * gt_mask.float() + out["comp_rgb_bg"] * (
                 1 - gt_mask.float()
             )
-            guidance_out["loss_rgb"] = F.mse_loss(gt_rgb, out["comp_rgb"])
+            set_loss("rgb", F.mse_loss(gt_rgb, out["comp_rgb"]))
 
             # mask loss
-            guidance_out["loss_mask"] = F.mse_loss(gt_mask.float(), out["opacity"])
+            set_loss("mask", F.mse_loss(gt_mask.float(), out["opacity"]))
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
@@ -112,35 +110,33 @@ class Zero123(BaseLift3DSystem):
                     )  # [B, 2]
                     X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
                     valid_gt_depth = A @ X  # [B, 1]
-                guidance_out["loss_depth"] = F.mse_loss(
-                    valid_gt_depth, valid_pred_depth
-                )
-        else:
-            self.guidance.set_min_max_steps(self.C(self.guidance.cfg.min_step_percent), self.C(self.guidance.cfg.max_step_percent))
+                set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
+        elif guidance == "zero123":
+            self.guidance.set_min_max_steps(
+                self.C(self.guidance.cfg.min_step_percent),
+                self.C(self.guidance.cfg.max_step_percent),
+            )
             guidance_out, guidance_eval_out = self.guidance(
                 out["comp_rgb"],
                 **batch,
                 rgb_as_latents=False,
                 guidance_eval=guidance_eval,
             )
-
-        loss = 0.0
-        for name, value in guidance_out.items():
-            self.log(f"train/{name}", value)
-            if name.startswith("loss_"):
-                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
+            set_loss("sds", guidance_out["loss_sds"])
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
             if "normal" not in out:
                 raise ValueError(
                     "Normal is required for orientation loss, no normal is found in the output."
                 )
-            loss_orient = (
-                out["weights"].detach()
-                * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
-            ).sum() / (out["opacity"] > 0).sum()
-            self.log("train/loss_orient", loss_orient)
-            loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
+            set_loss(
+                "orient",
+                (
+                    out["weights"].detach()
+                    * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
+                ).sum()
+                / (out["opacity"] > 0).sum(),
+            )
 
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
             if "comp_normal" not in out:
@@ -148,13 +144,11 @@ class Zero123(BaseLift3DSystem):
                     "comp_normal is required for 2D normal smooth loss, no comp_normal is found in the output."
                 )
             normal = out["comp_normal"]
-            loss_normal_smooth = (
-                normal[:, 1:, :, :] - normal[:, :-1, :, :]
-            ).square().mean() + (
-                normal[:, :, 1:, :] - normal[:, :, :-1, :]
-            ).square().mean()
-            self.log("train/loss_normal_smooth", loss_normal_smooth)
-            loss += self.C(self.cfg.loss.lambda_normal_smooth) * loss_normal_smooth
+            set_loss(
+                "normal_smooth",
+                (normal[:, 1:, :, :] - normal[:, :-1, :, :]).square().mean()
+                + (normal[:, :, 1:, :] - normal[:, :, :-1, :]).square().mean(),
+            )
 
         if self.C(self.cfg.loss.lambda_3d_normal_smooth) > 0:
             if "normal" not in out:
@@ -167,30 +161,62 @@ class Zero123(BaseLift3DSystem):
                 )
             normals = out["normal"]
             normals_perturb = out["normal_perturb"]
-            loss_3d_normal_smooth = (normals - normals_perturb).abs().mean()
-            self.log("train/loss_3d_normal_smooth", loss_3d_normal_smooth)
-            loss += (
-                self.C(self.cfg.loss.lambda_3d_normal_smooth) * loss_3d_normal_smooth
-            )
+            set_loss("3d_normal_smooth", (normals - normals_perturb).abs().mean())
 
-        loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
-        self.log("train/loss_sparsity", loss_sparsity)
-        loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
+        set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
 
         opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
-        loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
-        self.log("train/loss_opaque", loss_opaque)
-        loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+        set_loss("opaque", binary_cross_entropy(opacity_clamped, opacity_clamped))
+
+        loss = 0.0
+        for name, value in loss_terms.items():
+            self.log(f"train/{name}", value)
+            if name.startswith(loss_prefix):
+                loss_weighted = value * self.C(
+                    self.cfg.loss[name.replace(loss_prefix, "lambda_")]
+                )
+                self.log(f"train/{name}_w", loss_weighted)
+                loss += loss_weighted
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
-        self.log("train/loss", loss, prog_bar=True)
+        self.log(f"train/loss_{guidance}", loss)
+
+        if guidance_eval:
+            self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
 
         if guidance_eval:
             self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
 
         return {"loss": loss}
+
+    def training_step(self, batch, batch_idx):
+        if self.cfg.freq.ref_or_zero123 == "accumulate":
+            do_ref = True
+            do_zero123 = True
+        elif self.cfg.freq.ref_or_zero123 == "alternate":
+            do_ref = (
+                self.true_global_step < self.cfg.freq.ref_only_steps
+                or self.true_global_step % self.cfg.freq.n_ref == 0
+            )
+            do_zero123 = not do_ref
+
+        total_loss = 0.0
+        if do_zero123:
+            out = self.training_substep(batch, batch_idx, guidance="zero123")
+            total_loss += out["loss"]
+
+        if do_ref:
+            out = self.training_substep(batch, batch_idx, guidance="ref")
+            total_loss += out["loss"]
+
+        self.log("train/loss", total_loss, prog_bar=True)
+
+        # sch = self.lr_schedulers()
+        # sch.step()
+
+        return {"loss": total_loss}
 
     def merge12(self, x):
         return x.reshape(-1, *x.shape[2:])

@@ -2,10 +2,8 @@ import os
 from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
-from lightning.pytorch.loggers import WandbLogger
 
 import threestudio
-import wandb
 from threestudio.models.exporters.base import Exporter, ExporterOutput
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
 from threestudio.utils.base import Updateable

@@ -11,7 +11,9 @@ data:
   camera_distance_range: [1.0, 1.5]
   fovy_range: [40, 70]
   elevation_range: [-10, 45]
-  light_sample_strategy: "magic3d"
+  camera_perturb: 0.
+  center_perturb: 0.
+  up_perturb: 0.
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
@@ -77,8 +79,8 @@ system:
     lambda_lora: 1.
     lambda_orient: 0.
     lambda_sparsity: 10.
-    lambda_opaque: 0.
-    lambda_z_variance: 1.
+    lambda_opaque: [10000, 0.0, 1000.0, 10001]
+    lambda_z_variance: 0.
   optimizer:
     name: AdamW
     args:

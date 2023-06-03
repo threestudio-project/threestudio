@@ -9,7 +9,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/0d81b70f-2bc9-4b42-9f61-973bed88199a.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/54edef89-f76e-40ac-b1ea-5e64c3fce018.gif" width="100%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2c83fd3f-7542-45c2-8856-9202c2871028.png" width="100%">
 </p>
 
@@ -316,7 +316,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 **Results obtained by threestudio (Stable Diffusion, 256x256, 25000 iterations)**
 
-https://github.com/threestudio-project/threestudio/assets/19284678/1f0081bf-c877-4e7a-9047-a8aa6431a561
+https://github.com/threestudio-project/threestudio/assets/19284678/4e48bdf3-3f08-41f0-9419-e354377fb368
 
 **IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
 
