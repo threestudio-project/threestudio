@@ -5,9 +5,7 @@ from dataclasses import dataclass, field
 
 import torch
 import torch.nn.functional as F
-
-from PIL import Image
-from PIL import ImageDraw
+from PIL import Image, ImageDraw
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
@@ -116,12 +114,14 @@ class Zero123(BaseLift3DSystem):
                 self.C(self.guidance.cfg.min_step_percent),
                 self.C(self.guidance.cfg.max_step_percent),
             )
+            # zero123
             guidance_out, guidance_eval_out = self.guidance(
                 out["comp_rgb"],
                 **batch,
                 rgb_as_latents=False,
                 guidance_eval=guidance_eval,
             )
+            # claforte: TODO: rename the loss_terms keys
             set_loss("sds", guidance_out["loss_sds"])
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
@@ -163,7 +163,8 @@ class Zero123(BaseLift3DSystem):
             normals_perturb = out["normal_perturb"]
             set_loss("3d_normal_smooth", (normals - normals_perturb).abs().mean())
 
-        set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
+        if guidance != "ref":
+            set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
 
         opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
         set_loss("opaque", binary_cross_entropy(opacity_clamped, opacity_clamped))
@@ -182,9 +183,6 @@ class Zero123(BaseLift3DSystem):
             self.log(f"train_params/{name}", self.C(value))
 
         self.log(f"train/loss_{guidance}", loss)
-
-        if guidance_eval:
-            self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
 
         if guidance_eval:
             self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
