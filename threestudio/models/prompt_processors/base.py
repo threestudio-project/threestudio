@@ -1,11 +1,13 @@
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
+import torch.nn.functional as F
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
+from transformers import AutoTokenizer, BertForMaskedLM
 
 import threestudio
 from threestudio.utils.base import BaseObject
@@ -37,29 +39,19 @@ class PromptProcessor(BaseObject):
 
         # for perp-neg
         use_perp_neg: bool = False
-        perp_neg_decay_func: str = "exp"
         # a*e(-b*r) + c
         # a * e(-b) + c = 0
         #
-        # f_sb: Tuple[float, float, float] = (4, 0.5, -2.426)
-        # f_fsb: Tuple[float, float, float] = (4, 0.5, -2.426)
-        # f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
-        # f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
-
-        # f_sb: Tuple[float, float, float] = (1, 0.5, -0.606)
-        # f_fsb: Tuple[float, float, float] = (1, 0.5, +0.967)
-        # f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
-        # f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
-
-        f_sb: Tuple[float, float, float] = (4, 0.5, -2.426)
-        f_fsb: Tuple[float, float, float] = (4, 0.5, -0.852)
+        f_sb: Tuple[float, float, float] = (1, 0.5, -0.606)
+        f_fsb: Tuple[float, float, float] = (1, 0.5, +0.967)
         f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
         f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
 
-        # f_sb: Tuple[float, float, float] = (2, 0.5, -1.213)
-        # f_fsb: Tuple[float, float, float] = (2, 0.5, -0.426)
-        # f_fs: Tuple[float, float, float] = (2, 0.5, -1.213)  # f_fs(1) = 0, a, b > 0
-        # f_sf: Tuple[float, float, float] = (2, 0.5, -1.213)
+        # prompt debiasing
+        use_prompt_debiasing: bool = False
+        debias_pretrained_model_name_or_path: str = "bert-base-uncased"
+        debias_params: dict = field(default_factory=dict)
+        
 
     cfg: Config
 
@@ -153,7 +145,15 @@ class PromptProcessor(BaseObject):
         self.prompt = self.preprocess_prompt(self.cfg.prompt)
         # use provided negative prompt
         self.negative_prompt = self.cfg.negative_prompt
-        self.prompts_vd = [d.prompt(self.prompt) for d in self.directions]
+
+        # view-dependent prompt
+        if self.cfg.use_prompt_debiasing:
+            prompts = self.get_debias_prompt(self.prompt)
+            self.prompts_vd = [d.prompt(prompt) for d, prompt in zip(self.directions, prompts)]
+        else:
+            self.prompts_vd = [d.prompt(self.prompt) for d in self.directions]
+        
+        # negative prompts
         self.negative_prompts_vd = [
             d.negative_prompt(self.negative_prompt) for d in self.directions
         ]
@@ -262,6 +262,50 @@ class PromptProcessor(BaseObject):
         self, prompt: Union[str, List[str]], negative_prompt: Union[str, List[str]]
     ) -> Tuple[Float[Tensor, "B ..."], Float[Tensor, "B ..."]]:
         raise NotImplementedError
+
+    def get_debias_prompt(self, prompt: str) -> List[str]:
+        tokenizer = AutoTokenizer.from_pretrained(self.cfg.debias_pretrained_model_name_or_path)
+        model = BertForMaskedLM.from_pretrained(self.cfg.debias_pretrained_model_name_or_path)
+
+        view_ids = tokenizer(
+            " ".join(self.cfg.debias_params.independent_views), return_tensors="pt").input_ids[0]
+        view_ids = view_ids[1:5]
+        
+        def modulate(prompt):
+            prompt_vd = f"This image is depicting a [MASK] view of {prompt}"
+            tokens = tokenizer(
+                prompt_vd,
+                padding="max_length",
+                truncation=True,
+                add_special_tokens=True,
+                return_tensors="pt",
+                
+            )
+            mask_idx = torch.where(tokens.input_ids == tokenizer.mask_token_id)[1]
+
+            logits = model(**tokens).logits
+            logits = F.softmax(logits[0, mask_idx], dim=-1)
+            logits = logits[0, view_ids]
+            probes = logits / logits.sum()
+            return probes
+
+        prompts = [prompt.split(" ") for _ in range(4)]
+        full_probe = modulate(prompt)
+        for idx in self.cfg.debias_params.mask_ids:
+            prompt_ = prompt.split(" ")
+            prompt_ = " ".join(prompt_[:idx] + prompt_[(idx + 1):])
+            part_probe = modulate(prompt_)
+            
+            pmi = full_probe / torch.lerp(part_probe, full_probe, 0.5)
+            for i in range(pmi.shape[0]):
+                if pmi[i].item() < 0.95:
+                    prompts[i][idx] = ""
+
+        prompts = [[word for word in prompt if word] for prompt in prompts]
+        prompts = [" ".join(prompt) for prompt in prompts]
+        for d, prompt in zip(self.cfg.debias_params.independent_views, prompts):
+            threestudio.info(f"Debiased Prompt of {d} View is {prompt}")
+        return prompts
 
     def __call__(
         self,
