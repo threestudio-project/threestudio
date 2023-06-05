@@ -318,32 +318,28 @@ class Zero123Guidance(BaseObject):
             "grad_norm": grad.norm(),
         }
 
-        guidance_eval_out = (
-            self.guidance_eval(cond, t, latents_noisy, noise_pred)
-            if guidance_eval
-            else {}
-        )
-
+        if guidance_eval:
+            guidance_eval_out = self.guidance_eval(cond, t, latents_noisy, noise_pred)
+        else:
+            guidance_eval_out = {}
         return guidance_out, guidance_eval_out
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
     def guidance_eval(self, cond, t_orig, latents, noise_pred):
-        # self.scheduler.set_timesteps(self.num_train_timesteps)
-        # index = torch.where(
-        #     self.scheduler.timesteps.reshape(-1, 1).repeat(len(t), 1) == t.cpu()
-        # )[0][: len(t)]
-
         # use only 50 timesteps, and find nearest of those to t
         self.scheduler.set_timesteps(50)
-        index = torch.min(
-            self.scheduler.timesteps.reshape(1, -1).repeat(2, 1)
-            > t_orig.reshape(-1, 1).cpu(),
-            dim=1,
-        )[1]
-        t = self.scheduler.timesteps[index]
+        self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
+        bs = latents.shape[0]  # batch size
+        large_enough_idxs = self.scheduler.timesteps_gpu.expand(
+            [bs, -1]
+        ) > t_orig.unsqueeze(
+            -1
+        )  # sized [bs,50] > [bs,1]
+        idxs = torch.min(large_enough_idxs, dim=1)[1]
+        t = self.scheduler.timesteps_gpu[idxs]
 
-        fracs = list((t / self.scheduler.config.num_train_timesteps).numpy())
+        fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
         imgs_noisy = self.decode_latents(latents).permute(0, 2, 3, 1)
 
         # get prev latent
@@ -361,7 +357,7 @@ class Zero123Guidance(BaseObject):
         imgs_1orig = self.decode_latents(pred_1orig).permute(0, 2, 3, 1)
 
         latents_final = []
-        for b, i in enumerate(index):
+        for b, i in enumerate(idxs):
             latents = latents_1step[b : b + 1]
             c = {
                 "c_crossattn": [cond["c_crossattn"][0][b * 2 : b * 2 + 2]],

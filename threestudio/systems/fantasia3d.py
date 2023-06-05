@@ -62,7 +62,7 @@ class Fantasia3D(BaseLift3DSystem):
                 guidance_inp, prompt_utils, **batch, rgb_as_latents=True
             )
         else:
-            guidance_inp = out["comp_normal"] * 2.0 - 1.0
+            guidance_inp = out["comp_normal"]
             guidance_out = self.guidance(
                 guidance_inp, prompt_utils, **batch, rgb_as_latents=False
             )
