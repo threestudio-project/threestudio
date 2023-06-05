@@ -30,7 +30,7 @@ def get_device():
 
 
 def load_module_weights(
-    path, module_name=None, ignore_modules=None, map_location=None, return_state=False
+    path, module_name=None, ignore_modules=None, map_location=None
 ) -> Tuple[dict, int, int]:
     if module_name is not None and ignore_modules is not None:
         raise ValueError("module_name and ignore_modules cannot be both set")

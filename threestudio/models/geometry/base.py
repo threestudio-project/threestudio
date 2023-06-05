@@ -80,21 +80,23 @@ class BaseImplicitGeometry(BaseGeometry):
             ),
         )
         self.isosurface_helper: Optional[IsosurfaceHelper] = None
-        if self.cfg.isosurface:
+        self.unbounded: bool = False
+
+    def _initilize_isosurface_helper(self):
+        if self.cfg.isosurface and self.isosurface_helper is None:
             if self.cfg.isosurface_method == "mc-cpu":
                 self.isosurface_helper = MarchingCubeCPUHelper(
                     self.cfg.isosurface_resolution
-                )
+                ).to(self.device)
             elif self.cfg.isosurface_method == "mt":
                 self.isosurface_helper = MarchingTetrahedraHelper(
                     self.cfg.isosurface_resolution,
                     f"load/tets/{self.cfg.isosurface_resolution}_tets.npz",
-                )
+                ).to(self.device)
             else:
                 raise AttributeError(
                     "Unknown isosurface method {self.cfg.isosurface_method}"
                 )
-        self.unbounded: bool = False
 
     def forward(
         self, points: Float[Tensor, "*N Di"], output_normal: bool = False
@@ -171,6 +173,7 @@ class BaseImplicitGeometry(BaseGeometry):
             raise NotImplementedError(
                 "Isosurface is not enabled in the current configuration"
             )
+        self._initilize_isosurface_helper()
         if self.cfg.isosurface_coarse_to_fine:
             threestudio.debug("First run isosurface to get a tight bounding box ...")
             with torch.no_grad():
