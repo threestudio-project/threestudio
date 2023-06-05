@@ -9,7 +9,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/0d81b70f-2bc9-4b42-9f61-973bed88199a.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/de81cb0c-2fdb-4241-817a-0439f28747e8.gif" width="100%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2c83fd3f-7542-45c2-8856-9202c2871028.png" width="100%">
 </p>
 
@@ -31,7 +31,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 ## News
 
 - 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
-- 05/26/2023: An experimental implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
+- 05/26/2023: Implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
@@ -314,9 +314,15 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 **This is an unofficial experimental implementation! Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
 
-**Results obtained by threestudio (Stable Diffusion, 256x256, 25000 iterations)**
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1)**
 
-https://github.com/threestudio-project/threestudio/assets/19284678/1f0081bf-c877-4e7a-9047-a8aa6431a561
+https://github.com/threestudio-project/threestudio/assets/19284678/27b42d8f-4aa4-4b47-8ea0-0f77db90fd1e
+
+https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817-4663-a2bf-5e21a076bc3d
+
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1, 512x512 Stage2/3)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
 
 Notable differences from the paper: N/A.
 
