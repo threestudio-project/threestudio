@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 import threestudio
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import C
+from threestudio.utils.misc import C, cleanup
 from threestudio.utils.typing import *
 
 
@@ -92,6 +92,8 @@ class Zero123Guidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
+        max_step_percent_annealed: float = 0.5
+        anneal_start_step: Optional[int] = None
 
     cfg: Config
 
@@ -107,6 +109,8 @@ class Zero123Guidance(BaseObject):
             device=self.device,
             vram_O=self.cfg.vram_O,
         )
+
+        cleanup()
 
         for p in self.model.parameters():
             p.requires_grad_(False)
@@ -275,11 +279,11 @@ class Zero123Guidance(BaseObject):
                 - 1
             )
         else:
-            rgb_BCHW_256 = F.interpolate(
+            rgb_BCHW_512 = F.interpolate(
                 rgb_BCHW, (256, 256), mode="bilinear", align_corners=False
             )
             # encode image into latents with vae
-            latents = self.encode_images(rgb_BCHW_256)
+            latents = self.encode_images(rgb_BCHW_512)
 
         cond = self.get_cond(elevation, azimuth, camera_distances)
 
@@ -295,7 +299,7 @@ class Zero123Guidance(BaseObject):
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
             # add noise
-            noise = torch.randn_like(latents)
+            noise = torch.randn_like(latents)  # TODO: use torch generator
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
             # pred noise
             x_in = torch.cat([latents_noisy] * 2)
@@ -330,7 +334,6 @@ class Zero123Guidance(BaseObject):
             guidance_eval_out = self.guidance_eval(cond, t, latents_noisy, noise_pred)
         else:
             guidance_eval_out = {}
-
         return guidance_out, guidance_eval_out
 
     @torch.cuda.amp.autocast(enabled=False)
@@ -405,6 +408,15 @@ class Zero123Guidance(BaseObject):
         # http://arxiv.org/abs/2303.15413
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+        # t annealing from ProlificDreamer
+        if (
+            self.cfg.anneal_start_step is not None
+            and global_step > self.cfg.anneal_start_step
+        ):
+            self.max_step = int(
+                self.num_train_timesteps * self.cfg.max_step_percent_annealed
+            )
 
     # verification - requires `vram_O = False` in load_model_from_config
     @torch.no_grad()

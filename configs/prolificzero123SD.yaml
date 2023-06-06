@@ -1,4 +1,4 @@
-name: "prolificzero123"
+name: "prolificzero123SD"
 tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -70,22 +70,21 @@ system:
     # return_comp_normal: ${gt0:${system.loss.lambda_normal_smooth}}        # voletiv: CHECK!
     # return_normal_perturb: ${gt0:${system.loss.lambda_3d_normal_smooth}}  # voletiv: CHECK!
 
-  prompt_processor_type: "zero123-prompt-processor"
+  prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: ""
-    prompt: ""
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: ???
 
-  guidance_type: "zero123-vsd-guidance"
+  guidance_type: "zero123SD-vsd-guidance"
   guidance:
     pretrained_model_name_or_path: "./load/zero123/105000.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
-    pretrained_model_name_or_path_lora: "./load/zero123/105000.ckpt"
-    pretrained_config_lora: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     vram_O: ${not:${gt0:${system.guidance_eval_freq}}}
     cond_image_path: ${data.image_path}
     cond_elevation_deg: ${data.default_elevation_deg}
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
+    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1"
     guidance_scale: 3.0
     min_step_percent: 0.02
     max_step_percent: 0.98
