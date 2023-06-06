@@ -26,6 +26,8 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
     class Config(BaseExplicitGeometry.Config):
         isosurface_resolution: int = 128
         isosurface_deformable_grid: bool = True
+        isosurface_remove_outliers: bool = False
+        isosurface_outlier_n_faces_threshold: Union[int, float] = 0.01
 
         n_input_dims: int = 3
         n_feature_dims: int = 3
@@ -129,6 +131,8 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         mesh.v_pos = scale_tensor(
             mesh.v_pos, self.isosurface_helper.points_range, self.isosurface_bbox
         )
+        if self.cfg.isosurface_remove_outliers:
+            mesh = mesh.remove_outlier(self.cfg.isosurface_outlier_n_faces_threshold)
         self.mesh = mesh
         return mesh
 
@@ -156,11 +160,46 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         copy_net: bool = True,
         **kwargs,
     ) -> "TetrahedraSDFGrid":
-        if isinstance(other, ImplicitVolume):
-            mesh = other.isosurface()
+        if isinstance(other, TetrahedraSDFGrid):
             instance = TetrahedraSDFGrid(cfg, **kwargs)
+            assert instance.cfg.isosurface_resolution == other.cfg.isosurface_resolution
+            instance.isosurface_bbox = other.isosurface_bbox.clone()
+            instance.sdf.data = other.sdf.data.clone()
+            if (
+                instance.cfg.isosurface_deformable_grid
+                and other.cfg.isosurface_deformable_grid
+            ):
+                assert (
+                    instance.deformation is not None and other.deformation is not None
+                )
+                instance.deformation.data = other.deformation.data.clone()
+            if (
+                not instance.cfg.geometry_only
+                and not other.cfg.geometry_only
+                and copy_net
+            ):
+                instance.encoding.load_state_dict(other.encoding.state_dict())
+                instance.feature_network.load_state_dict(
+                    other.feature_network.state_dict()
+                )
+            return instance
+        elif isinstance(other, ImplicitVolume):
+            instance = TetrahedraSDFGrid(cfg, **kwargs)
+            if other.cfg.isosurface_method != "mt":
+                other.cfg.isosurface_method = "mt"
+                threestudio.warn(
+                    f"Override isosurface_method of the source geometry to 'mt'"
+                )
+            if other.cfg.isosurface_resolution != instance.cfg.isosurface_resolution:
+                other.cfg.isosurface_resolution = instance.cfg.isosurface_resolution
+                threestudio.warn(
+                    f"Override isosurface_resolution of the source geometry to {instance.cfg.isosurface_resolution}"
+                )
+            mesh = other.isosurface()
             instance.isosurface_bbox = mesh.extras["bbox"]
-            instance.sdf.data = mesh.extras["grid_level"].to(instance.sdf.data)
+            instance.sdf.data = (
+                mesh.extras["grid_level"].to(instance.sdf.data).clamp(-1, 1)
+            )
             if not instance.cfg.geometry_only and copy_net:
                 instance.encoding.load_state_dict(other.encoding.state_dict())
                 instance.feature_network.load_state_dict(
@@ -168,8 +207,18 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
                 )
             return instance
         elif isinstance(other, ImplicitSDF):
-            mesh = other.isosurface()
             instance = TetrahedraSDFGrid(cfg, **kwargs)
+            if other.cfg.isosurface_method != "mt":
+                other.cfg.isosurface_method = "mt"
+                threestudio.warn(
+                    f"Override isosurface_method of the source geometry to 'mt'"
+                )
+            if other.cfg.isosurface_resolution != instance.cfg.isosurface_resolution:
+                other.cfg.isosurface_resolution = instance.cfg.isosurface_resolution
+                threestudio.warn(
+                    f"Override isosurface_resolution of the source geometry to {instance.cfg.isosurface_resolution}"
+                )
+            mesh = other.isosurface()
             instance.isosurface_bbox = mesh.extras["bbox"]
             instance.sdf.data = mesh.extras["grid_level"].to(instance.sdf.data)
             if (

@@ -9,7 +9,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/54edef89-f76e-40ac-b1ea-5e64c3fce018.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/de81cb0c-2fdb-4241-817a-0439f28747e8.gif" width="100%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2c83fd3f-7542-45c2-8856-9202c2871028.png" width="100%">
 </p>
 
@@ -31,7 +31,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 ## News
 
 - 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
-- 05/26/2023: An experimental implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
+- 05/26/2023: Implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
@@ -140,7 +140,7 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0
 # decrease the threshold if the extracted model is incomplete, increase if it is extruded
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_threshold=10.
 # use marching cubes of higher resolutions to get more detailed models
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.geometry.isosurface_method=mc-cpu system.geometry.isosurface_resolution=256
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_method=mc-cpu system.geometry.isosurface_resolution=256
 ```
 
 For all the options you can specify when exporting, see [the documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#exporters).
@@ -214,12 +214,11 @@ Then convert the NeRF from the coarse stage to DMTet and train with differentiab
 
 ```sh
 # the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
-# NOTE: the meaning of system.from_coarse has changed from cfff05, it is now the path to the coarse stage weights instead of a boolean value
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/ckpts/last.ckpt
 # if you're unsatisfied with the surface extraced using the default threshold (25)
-# you can specify a threshold value using `system.coarse_geometry_override`
+# you can specify a threshold value using `system.geometry_convert_override`
 # decrease the value if the extracted surface is incomplete, increate if it is extruded
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.coarse_geometry_override.isosurface_threshold=10.
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/ckpts/last.ckpt system.geometry_convert_override.isosurface_threshold=10.
 ```
 
 **Tips**
@@ -289,7 +288,6 @@ https://github.com/threestudio-project/threestudio/assets/19284678/762903c1-665b
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2d22e30f-4a32-454a-a06e-d6e6bd2a1b96.png" width="100%">
 </p>
 
-
 Notable differences from the paper: N/A.
 
 We currently only implement the geometry stage of Fantasia3D.
@@ -314,23 +312,38 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 ### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
 
-**Results obtained by threestudio (Stable Diffusion, 256x256, 25000 iterations)**
+**This is an unofficial experimental implementation! Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
 
-https://github.com/threestudio-project/threestudio/assets/19284678/4e48bdf3-3f08-41f0-9419-e354377fb368
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1)**
 
-**IMPORTANT NOTE: This is an unofficial experimental implementation! The quality is still far from the paper. Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
+https://github.com/threestudio-project/threestudio/assets/19284678/27b42d8f-4aa4-4b47-8ea0-0f77db90fd1e
 
-We currently only experiment on the first stage (NeRF training), although the third stage is already implemented (mesh texture refinement), and the second stage is easy to implement too (mesh normal optimization). Some other important design factors that are not implemented:
+https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817-4663-a2bf-5e21a076bc3d
 
-- multiple particles
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1, 512x512 Stage2/3)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
+
+Notable differences from the paper: N/A.
+
+We currently don't support multiple particles.
 
 ```sh
+# --------- Stage 1 (NeRF) --------- #
 # object generation with 64x64 NeRF rendering, ~14GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=64 data.height=64
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
 # object generation with 512x512 NeRF rendering (original paper), >24GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of a delicious croissant" data.width=512 data.height=512
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=512 data.height=512
 # scene generation
 python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k" data.width=64 data.height=64
+
+# --------- Stage 2 (Geometry Refinement) --------- #
+# refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance
+python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/ckpts/last.ckpt
+
+# --------- Stage 3 (Texturing) --------- #
+# texturing with 512x512 rasterization, Stable Difusion VSD guidance
+python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
 ```
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
@@ -338,6 +351,7 @@ python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 sys
 **Installation**
 
 Download pretrained weights into `load/zero123`:
+
 ```sh
 cd load/zero123
 wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
@@ -345,9 +359,7 @@ wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 
 **Results obtained by threestudio (Zero-1-to-3, 128x128, 25000 iterations)**
 
-
 https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668-461f-abe5-668e7b42cd50
-
 
 **IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
 
@@ -363,7 +375,6 @@ python launch.py --config configs/zero123.yaml --train --gpu 0
 Also includes evaluation of the guidance during training. If `system.freq.guidance_eval` is set to a value > 0, this will save rendered image, noisy image (noise added mentioned at top left), 1-step-denoised image, 1-step prediction of original image, fully denoised image. For example:
 
 ![it143-train](https://github.com/threestudio-project/threestudio/assets/22424247/c8e7d835-4937-4852-bfb0-3e906e6b66b7)
-
 
 ### More to come, please stay tuned.
 
