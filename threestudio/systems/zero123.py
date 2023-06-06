@@ -24,6 +24,8 @@ class Zero123(BaseLift3DSystem):
     def configure(self):
         # create geometry, material, background, renderer
         super().configure()
+        # no prompt processor
+        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -33,8 +35,6 @@ class Zero123(BaseLift3DSystem):
 
     def on_fit_start(self) -> None:
         super().on_fit_start()
-        # no prompt processor
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
         # visualize all training images
         all_images = self.trainer.datamodule.train_dataloader().dataset.get_all_images()

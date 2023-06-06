@@ -31,7 +31,6 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     eval_elevation_deg: ${data.default_elevation_deg}
     eval_camera_distance: ${data.default_camera_distance}
     eval_fovy_deg: ${data.default_fovy_deg}
-    light_sample_strategy: "dreamfusion"
     batch_uniform_azimuth: False
     n_val_views: 30
     n_test_views: 120

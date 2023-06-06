@@ -7,14 +7,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
-from diffusers.utils.import_utils import is_xformers_available
+from diffusers import DDIMScheduler
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import threestudio
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import C, parse_version
+from threestudio.utils.misc import C
 from threestudio.utils.typing import *
 
 
@@ -84,7 +83,7 @@ class Zero123Guidance(BaseObject):
         cond_azimuth_deg: float = 0.0
         cond_camera_distance: float = 1.2
 
-        guidance_scale: float = 5.0
+        guidance_scale: float = 3.0
 
         grad_clip: Optional[
             Any
@@ -272,11 +271,11 @@ class Zero123Guidance(BaseObject):
                 - 1
             )
         else:
-            rgb_BCHW_512 = F.interpolate(
+            rgb_BCHW_256 = F.interpolate(
                 rgb_BCHW, (256, 256), mode="bilinear", align_corners=False
             )
             # encode image into latents with vae
-            latents = self.encode_images(rgb_BCHW_512)
+            latents = self.encode_images(rgb_BCHW_256)
 
         cond = self.get_cond(elevation, azimuth, camera_distances)
 
@@ -292,7 +291,7 @@ class Zero123Guidance(BaseObject):
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
             # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
+            noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
             # pred noise
             x_in = torch.cat([latents_noisy] * 2)
@@ -327,6 +326,7 @@ class Zero123Guidance(BaseObject):
             guidance_eval_out = self.guidance_eval(cond, t, latents_noisy, noise_pred)
         else:
             guidance_eval_out = {}
+
         return guidance_out, guidance_eval_out
 
     @torch.cuda.amp.autocast(enabled=False)
