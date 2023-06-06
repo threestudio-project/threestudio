@@ -4,6 +4,7 @@ from . import (
     imagedreamfusion,
     latentnerf,
     magic3d,
+    magic3d_multiview,
     prolificdreamer,
     sjc,
     zero123,
