@@ -81,7 +81,7 @@ class DeepFloydGuidance(BaseObject):
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
 
-        self.unet = self.pipe.unet
+        self.unet = self.pipe.unet.eval()
 
         for p in self.unet.parameters():
             p.requires_grad_(False)
