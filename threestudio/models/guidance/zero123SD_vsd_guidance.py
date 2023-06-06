@@ -93,18 +93,19 @@ class ToWeightsDType(nn.Module):
         return self.module(x).to(self.dtype)
 
 
-@threestudio.register("zero123-vsd-guidance")
-class Zero123VSDGuidance(BaseModule):
+@threestudio.register("zero123SD-vsd-guidance")
+class Zero123SDVSDGuidance(BaseModule):
     @dataclass
     class Config(BaseModule.Config):
         pretrained_model_name_or_path: str = "load/zero123/105000.ckpt"
         pretrained_config: str = "load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
-        pretrained_model_name_or_path_lora: str = "load/zero123/105000.ckpt"
-        pretrained_config_lora: str = (
-            "load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
-        )
+        pretrained_model_name_or_path_lora: str = "stabilityai/stable-diffusion-2-1"
 
         vram_O: bool = True
+        enable_memory_efficient_attention: bool = False
+        enable_sequential_cpu_offload: bool = False
+        enable_attention_slicing: bool = False
+        enable_channels_last_format: bool = False
 
         cond_image_path: str = "load/images/hamburger_rgba.png"
         cond_elevation_deg: float = 0.0
@@ -123,10 +124,13 @@ class Zero123VSDGuidance(BaseModule):
         max_step_percent_annealed: float = 0.5
         anneal_start_step: Optional[int] = 5000
 
+        view_dependent_prompting: bool = True
+        camera_condition_type: str = "extrinsics"
+
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading ProlificZero123...")
+        threestudio.info(f"Loading Zero123 + StableDiffusion...")
 
         self.config = OmegaConf.load(self.cfg.pretrained_config)
         # TODO: seems it cannot load into fp16...
@@ -138,32 +142,73 @@ class Zero123VSDGuidance(BaseModule):
             vram_O=self.cfg.vram_O,
         )
 
-        if (
-            self.cfg.pretrained_model_name_or_path
-            == self.cfg.pretrained_model_name_or_path_lora
-        ):
-            self.single_model = True
-            self.model_lora = self.model
-        else:
-            self.single_model = False
-            self.config_lora = OmegaConf.load(self.cfg.pretrained_config_lora)
-            self.model_lora = load_model_from_config(
-                self.config_lora,
-                self.cfg.pretrained_model_name_or_path_lora,
-                device=self.device,
-                vram_O=self.cfg.vram_O,
-            )
+        # self.weights_dtype = (
+        #     torch.float16 if self.cfg.half_precision_weights else torch.float32
+        # )
+        # TODO: seems Zero123 cannot load into fp16...
+        self.weights_dtype = torch.float32
+
+        pipe_lora_kwargs = {
+            "tokenizer": None,
+            "text_encoder": None,
+            "safety_checker": None,
+            "feature_extractor": None,
+            "requires_safety_checker": False,
+            "torch_dtype": self.weights_dtype,
+        }
+
+        @dataclass
+        class SubModules:
+            # pipe: StableDiffusionPipeline
+            pipe_lora: StableDiffusionPipeline
+
+        self.single_model = False
+        pipe_lora = StableDiffusionPipeline.from_pretrained(
+            self.cfg.pretrained_model_name_or_path_lora,
+            **pipe_lora_kwargs,
+        ).to(self.device)
+        # del pipe_lora.vae
+        # cleanup()
+        # pipe_lora.vae = pipe.vae
+        self.submodules = SubModules(pipe_lora=pipe_lora)
+
+        if self.cfg.enable_memory_efficient_attention:
+            if parse_version(torch.__version__) >= parse_version("2"):
+                threestudio.info(
+                    "PyTorch2.0 uses memory efficient attention by default."
+                )
+            elif not is_xformers_available():
+                threestudio.warn(
+                    "xformers is not available, memory efficient attention is not enabled."
+                )
+            else:
+                self.pipe_lora.enable_xformers_memory_efficient_attention()
+
+        if self.cfg.enable_sequential_cpu_offload:
+            self.pipe_lora.enable_sequential_cpu_offload()
+
+        if self.cfg.enable_attention_slicing:
+            self.pipe_lora.enable_attention_slicing(1)
+
+        if self.cfg.enable_channels_last_format:
+            self.pipe_lora.unet.to(memory_format=torch.channels_last)
 
         cleanup()
 
         for p in self.model.parameters():
             p.requires_grad_(False)
-        for p in self.model_lora.parameters():
+        for p in self.unet_lora.parameters():
             p.requires_grad_(False)
+
+        # FIXME: hard-coded dims
+        self.camera_embedding = ToWeightsDType(
+            TimestepEmbedding(16, 1280), self.weights_dtype
+        )
+        self.unet_lora.class_embedding = self.camera_embedding
 
         # set up LoRA layers
         lora_attn_procs = {}
-        for name in self.model_lora.unet.attn_processors.keys():
+        for name in self.unet_lora.attn_processors.keys():
             cross_attention_dim = (
                 None
                 if name.endswith("attn1.processor")
@@ -228,7 +273,7 @@ class Zero123VSDGuidance(BaseModule):
 
         self.prepare_embeddings(self.cfg.cond_image_path)
 
-        threestudio.info(f"Loaded ProlificZero123!")
+        threestudio.info(f"Loaded Zero123 + Stable Diffusion!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def prepare_embeddings(self, image_path: str) -> Float[Tensor, "B 3 256 256"]:
