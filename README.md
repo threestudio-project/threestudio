@@ -324,18 +324,18 @@ https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817
 
 https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
 
-Notable differences from the paper: N/A.
+Notable differences from the paper:
 
-We currently don't support multiple particles.
+- ProlificDreamer adopts a two-stage sampling strategy with 64 coarse samples and 32 fine samples, while we only use 512 coarse samples.
+- In the first stage, we only render 64x64 images at the first 1000 iterations. After that, as the empty space has been effectively pruned, rendering 512x512 images wouldn't cost too much VRAM.
+- We currently don't support multiple particles.
 
 ```sh
 # --------- Stage 1 (NeRF) --------- #
-# object generation with 64x64 NeRF rendering, ~14GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
-# object generation with 512x512 NeRF rendering (original paper), >24GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=512 data.height=512
-# scene generation
-python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k" data.width=64 data.height=64
+# object generation with 512x512 NeRF rendering
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
+# scene generation with 512x512 NeRF rendering
+python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
 
 # --------- Stage 2 (Geometry Refinement) --------- #
 # refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance

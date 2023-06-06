@@ -6,8 +6,11 @@ seed: 0
 data_type: "random-camera-datamodule"
 data:
   batch_size: 1
-  width: 256
-  height: 256
+  # 0-999: 64x64, >=1000: 512x512
+  # this drastically reduces VRAM usage as empty space is pruned in early training
+  width: [64, 512]
+  height: [64, 512]
+  resolution_milestones: [1000]
   camera_distance_range: [0.1, 2.3]
   fovy_range: [40, 70]
   elevation_range: [-10, 45]
