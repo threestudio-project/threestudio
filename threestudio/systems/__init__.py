@@ -5,6 +5,7 @@ from . import (
     latentnerf,
     magic3d,
     prolificdreamer,
+    prolificzero123,
     sjc,
     textmesh,
     zero123,
