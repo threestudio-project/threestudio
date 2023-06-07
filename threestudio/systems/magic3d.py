@@ -14,75 +14,13 @@ from threestudio.utils.typing import *
 class Magic3D(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        # only used when refinement=True and from_coarse=True
-        geometry_coarse_type: str = "implicit-volume"
-        geometry_coarse: dict = field(default_factory=dict)
-
         refinement: bool = False
-        # path to the coarse stage weights
-        from_coarse: Optional[str] = None
-        # used to override configurations of the coarse geometry when initialize from coarse
-        # for example isosurface_threshold
-        coarse_geometry_override: dict = field(default_factory=dict)
-        inherit_coarse_texture: bool = True
 
     cfg: Config
 
-    def configure(self) -> None:
-        # override the default configure function
-        self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
-        self.background = threestudio.find(self.cfg.background_type)(
-            self.cfg.background
-        )
-        if self.cfg.refinement:
-            self.background.requires_grad_(False)
-
-        if (
-            self.cfg.refinement
-            and self.cfg.from_coarse  # from_coarse must be specified
-            and not self.cfg.weights  # not initialized from coarse when weights are specified
-            and not self.resumed  # not initialized from coarse when resumed from checkpoints
-        ):
-            threestudio.info("Initializing from coarse stage ...")
-            from threestudio.utils.config import load_config, parse_structured
-
-            coarse_cfg = load_config(
-                os.path.join(
-                    os.path.dirname(self.cfg.from_coarse), "../configs/parsed.yaml"
-                )
-            )  # TODO: hard-coded relative path
-            coarse_system_cfg: Magic3D.Config = parse_structured(
-                self.Config, coarse_cfg.system
-            )
-            coarse_geometry_cfg = coarse_system_cfg.geometry
-            coarse_geometry_cfg.update(self.cfg.coarse_geometry_override)
-            self.geometry = threestudio.find(coarse_system_cfg.geometry_type)(
-                coarse_geometry_cfg
-            )
-
-            # load coarse stage geometry
-            # also load background parameters if are any
-            self.load_weights(self.cfg.from_coarse)
-
-            # convert from coarse stage geometry
-            self.geometry = self.geometry.to(get_device())
-            geometry_refine = threestudio.find(self.cfg.geometry_type).create_from(
-                self.geometry,
-                self.cfg.geometry,
-                copy_net=self.cfg.inherit_coarse_texture,
-            )
-            del self.geometry
-            cleanup()
-            self.geometry = geometry_refine
-        else:
-            self.geometry = threestudio.find(self.cfg.geometry_type)(self.cfg.geometry)
-
-        self.renderer = threestudio.find(self.cfg.renderer_type)(
-            self.cfg.renderer,
-            geometry=self.geometry,
-            material=self.material,
-            background=self.background,
-        )
+    def configure(self):
+        # create geometry, material, background, renderer
+        super().configure()
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)

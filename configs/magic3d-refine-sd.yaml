@@ -16,11 +16,12 @@ data:
 system_type: "magic3d-system"
 system:
   refinement: true
-  from_coarse: ???
+  geometry_convert_from: ???
+  geometry_convert_inherit_texture: true
   geometry_type: "tetrahedra-sdf-grid"
   geometry:
     radius: 2.0 # consistent with coarse
-    isosurface_resolution: 128 # consistent with coarse
+    isosurface_resolution: 128
     isosurface_deformable_grid: true
     pos_encoding_config: # consistent with coarse, no progressive band
       otype: HashGrid
@@ -36,7 +37,7 @@ system:
     ambient_only_steps: 0
     soft_shading: true
 
-  background_type: "neural-environment-map-background" # consistent with coarse
+  background_type: "neural-environment-map-background"
 
   renderer_type: "nvdiff-rasterizer"
   renderer:
@@ -58,7 +59,7 @@ system:
   loggers:
     wandb:
       enable: false
-      project: 'threestudio'
+      project: "threestudio"
 
   loss:
     lambda_sds: 1.

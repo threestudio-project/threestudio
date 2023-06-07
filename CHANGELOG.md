@@ -21,9 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A simple jupyter notebook (#55).
 - `sdf_bias` as an alternative way for SDF initialization in `implicit-volume` (#57).
 - Automatically remove outliers with a small number of faces when extracting surfaces (#61).
-- An experimental implementation of ProlificDreamer (#74).
+- The implementation of ProlificDreamer (#74, #105).
 - An experimental implementation of using Zero-1-to-3 for 3D generation from a single image (#71).
 - Support mesh initialization for `implicit-sdf` (#90).
+- Easy-to-use geometry conversion by `system.geometry_convert_from`. This is used in the Magic3D and ProlificDreamer system and may inspire applications connecting multiple systems/algorithms (#105).
 
 ### Changed
 
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use a reparametrization trick for the SDS loss (#57).
 - Make Magic3D coarse stage use analytic normal and orientation loss.
 - Move the logic of getting text embeddings according to camera settings from prompt processors to guidance (#77).
+- Remove `from_coarse` from the Magic3D system. Use `system.geometry_convert_from` instead (#105).
 
 ## [v0.1.0]
 
