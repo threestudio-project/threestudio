@@ -332,9 +332,11 @@ Notable differences from the paper:
 
 ```sh
 # --------- Stage 1 (NeRF) --------- #
-# object generation with 512x512 NeRF rendering
+# object generation with 512x512 NeRF rendering, ~25GB VRAM
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
-# scene generation with 512x512 NeRF rendering
+# if you don't have enough VRAM, try training with 64x64 NeRF rendering
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 data.resolution_milestones="[]"
+# scene generation with 512x512 NeRF rendering, ~25GB VRAM
 python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
 
 # --------- Stage 2 (Geometry Refinement) --------- #
