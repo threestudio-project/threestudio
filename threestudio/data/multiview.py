@@ -53,7 +53,7 @@ class MultiviewIterableDataset(IterableDataset):
         assert camera_dict["camera_model"] == "OPENCV"
 
         frames = camera_dict["frames"]
-        frames_intrinsic = []
+        frames_proj = []
         frames_c2w = []
         frames_position = []
         frames_direction = []
@@ -96,22 +96,31 @@ class MultiviewIterableDataset(IterableDataset):
 
             camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
-            # print(camera_position)
-            frames_intrinsic.append(intrinsic)
+            near = 0.1
+            far = 1000.0
+            K = intrinsic
+            proj = [
+                [2*K[0, 0]/self.frame_w,  -2*K[0, 1]/self.frame_w, (self.frame_w - 2*K[0, 2])/self.frame_w, 0],
+                [0, -2*K[1, 1]/self.frame_h, (self.frame_h - 2*K[1, 2])/self.frame_h,                       0],
+                [0, 0, (-far - near)/(far - near), -2*far*near/(far - near)],
+                [0, 0, -1, 0],
+            ]
+            proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
+            frames_proj.append(proj)
             frames_c2w.append(c2w)
             frames_position.append(camera_position)
             frames_direction.append(direction)
         print("Loaded frames.")
 
-        self.frames_intrinsic: Float[Tensor, "B 4 4"] = torch.stack(frames_intrinsic, dim=0)
+        self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
         self.frames_c2w: Float[Tensor, "B 4 4"] = torch.stack(frames_c2w, dim=0)
         self.frames_position: Float[Tensor, "B 3"] = torch.stack(frames_position, dim=0)
         self.frames_direction: Float[Tensor, "B H W 3"] = torch.stack(frames_direction, dim=0)
         self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
 
         self.rays_o, self.rays_d = get_rays(self.frames_direction, self.frames_c2w, keepdim=True)
-        self.mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(self.frames_c2w, self.frames_intrinsic)
-        self.light_positions: Float[Tensor, "B 3"] = torch.ones_like(self.frames_position)*4
+        self.mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(self.frames_c2w, self.frames_proj)
+        self.light_positions: Float[Tensor, "B 3"] = torch.zeros_like(self.frames_position)
        
     def __iter__(self):
         while True:
@@ -128,6 +137,8 @@ class MultiviewIterableDataset(IterableDataset):
             "camera_positions": self.frames_position[index:index+1],
             "light_positions": self.light_positions[index:index+1],
             "gt_rgb": self.frames_img[index:index+1],
+            "height": self.frame_h,
+            "width": self.frame_w
         }
 
 
@@ -144,7 +155,7 @@ class MultiviewDataset(Dataset):
         assert camera_dict["camera_model"] == "OPENCV"
 
         frames = camera_dict["frames"]
-        frames_intrinsic = []
+        frames_proj = []
         frames_c2w = []
         frames_position = []
         frames_direction = []
@@ -186,21 +197,31 @@ class MultiviewDataset(Dataset):
 
             camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
-            frames_intrinsic.append(intrinsic)
+            near = 0.1
+            far = 1000.0
+            K = intrinsic
+            proj = [
+                [2*K[0, 0]/self.frame_w,  -2*K[0, 1]/self.frame_w, (self.frame_w - 2*K[0, 2])/self.frame_w, 0],
+                [0, -2*K[1, 1]/self.frame_h, (self.frame_h - 2*K[1, 2])/self.frame_h,                       0],
+                [0, 0, (-far - near)/(far - near), -2*far*near/(far - near)],
+                [0, 0, -1, 0],
+            ]
+            proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
+            frames_proj.append(proj)
             frames_c2w.append(c2w)
             frames_position.append(camera_position)
             frames_direction.append(direction)
         print("Loaded frames.")
 
-        self.frames_intrinsic: Float[Tensor, "B 4 4"] = torch.stack(frames_intrinsic, dim=0)
+        self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
         self.frames_c2w: Float[Tensor, "B 4 4"] = torch.stack(frames_c2w, dim=0)
         self.frames_position: Float[Tensor, "B 3"] = torch.stack(frames_position, dim=0)
         self.frames_direction: Float[Tensor, "B H W 3"] = torch.stack(frames_direction, dim=0)
         self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
 
         self.rays_o, self.rays_d = get_rays(self.frames_direction, self.frames_c2w, keepdim=True)
-        self.mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(self.frames_c2w, self.frames_intrinsic)
-        self.light_positions: Float[Tensor, "B 3"] = torch.ones_like(self.frames_position)*4
+        self.mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(self.frames_c2w, self.frames_proj)
+        self.light_positions: Float[Tensor, "B 3"] = torch.zeros_like(self.frames_position)
             
     def __len__(self):
         return self.n_frames
