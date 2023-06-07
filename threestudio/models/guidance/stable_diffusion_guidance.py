@@ -83,8 +83,8 @@ class StableDiffusionGuidance(BaseObject):
             self.pipe.unet.to(memory_format=torch.channels_last)
 
         # Create model
-        self.vae = self.pipe.vae
-        self.unet = self.pipe.unet
+        self.vae = self.pipe.vae.eval()
+        self.unet = self.pipe.unet.eval()
 
         for p in self.vae.parameters():
             p.requires_grad_(False)
