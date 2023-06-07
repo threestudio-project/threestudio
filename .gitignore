@@ -183,3 +183,6 @@ outputs/
 *.ckpt
 *.pt
 wandb/
+
+# dataset
+dataset/
