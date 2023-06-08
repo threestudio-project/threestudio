@@ -327,7 +327,7 @@ https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc
 Notable differences from the paper:
 
 - ProlificDreamer adopts a two-stage sampling strategy with 64 coarse samples and 32 fine samples, while we only use 512 coarse samples.
-- In the first stage, we only render 64x64 images at the first 1000 iterations. After that, as the empty space has been effectively pruned, rendering 512x512 images wouldn't cost too much VRAM.
+- In the first stage, we only render 64x64 images at the first 5000 iterations. After that, as the empty space has been effectively pruned, rendering 512x512 images wouldn't cost too much VRAM.
 - We currently don't support multiple particles.
 
 ```sh
@@ -335,7 +335,7 @@ Notable differences from the paper:
 # object generation with 512x512 NeRF rendering, ~25GB VRAM
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
 # if you don't have enough VRAM, try training with 64x64 NeRF rendering
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 data.resolution_milestones="[]"
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
 # scene generation with 512x512 NeRF rendering, ~25GB VRAM
 python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
 
