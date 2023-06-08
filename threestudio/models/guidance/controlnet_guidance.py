@@ -1,6 +1,5 @@
 import sys
 import os
-sys.path.append(os.path.abspath('threestudio/models/guidance/controlnet'))
 
 from dataclasses import dataclass, field
 import torch
@@ -22,8 +21,7 @@ from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
-from threestudio.models.guidance.controlnet.annotator.normalbae import NormalBaeDetector
-from threestudio.models.guidance.controlnet.annotator.canny import CannyDetector
+from controlnet_aux import NormalBaeDetector, CannyDetector
 
 
 @threestudio.register("controlnet-guidance")
@@ -128,7 +126,8 @@ class ControlNetGuidance(BaseObject):
         self.controlnet = self.pipe.controlnet.eval()
 
         if self.cfg.control_type == 'normal':
-            self.preprocessor = NormalBaeDetector(self.device)
+            self.preprocessor = NormalBaeDetector.from_pretrained("lllyasviel/Annotators")
+            self.preprocessor.model.to(self.device)
         elif self.cfg.control_type == 'canny':
             self.preprocessor = CannyDetector()
 
@@ -265,7 +264,7 @@ class ControlNetGuidance(BaseObject):
                         down_block_additional_residuals=down_block_res_samples, 
                         mid_block_additional_residual=mid_block_res_sample)
                 # perform classifier-free guidance
-                noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
                 noise_pred = (
                     noise_pred_uncond 
                     + self.cfg.guidance_scale * (noise_pred_text - noise_pred_uncond)
@@ -276,20 +275,23 @@ class ControlNetGuidance(BaseObject):
     
     def prepare_image_cond(
         self, 
-        cond_rgb: Float[Tensor, "B H W C"]):
+        cond_rgb: Float[Tensor, "B H W C"]
+    ):
         if self.cfg.control_type == 'normal':
-            cond_rgb = cond_rgb.permute(0, 3, 1, 2)
-            control = self.preprocessor(cond_rgb)
+            cond_rgb = (cond_rgb[0].detach().cpu().numpy()*255).astype(np.uint8).copy()
+            detected_map = self.preprocessor(cond_rgb)
+            control = torch.from_numpy(np.array(detected_map)).float().to(self.device) / 255.0
+            control = control.unsqueeze(0)
+            control = control.permute(0, 3, 1, 2)
         elif self.cfg.control_type == 'canny':
             cond_rgb = (cond_rgb[0].detach().cpu().numpy()*255).astype(np.uint8).copy()
             blurred_img = cv2.blur(cond_rgb,ksize=(5,5))
             detected_map = self.preprocessor(blurred_img, self.cfg.canny_lower_bound, self.cfg.canny_upper_bound)
-            control = torch.from_numpy(detected_map.copy()).float().to(self.device) / 255.0
+            control = torch.from_numpy(np.array(detected_map)).float().to(self.device) / 255.0
             control = control.unsqueeze(-1).repeat(1, 1, 3)
             control = control.unsqueeze(0)
             control = control.permute(0, 3, 1, 2)
-        else:
-            pass
+            
         return F.interpolate(
             control, (512, 512), mode="bilinear", align_corners=False
         )
@@ -315,16 +317,8 @@ class ControlNetGuidance(BaseObject):
         image_cond = self.prepare_image_cond(cond_rgb)
 
         temp = torch.zeros(1).to(rgb.device)
-        # text_embeddings = prompt_utils.get_text_embeddings(
-        #     temp, temp, temp, False
-        # )
-
-        text_embeddings = self.pipe._encode_prompt(
-            prompt_utils.prompt, 
-            device=rgb.device, 
-            num_images_per_prompt=1, 
-            do_classifier_free_guidance=True, 
-            negative_prompt=prompt_utils.negative_prompt
+        text_embeddings = prompt_utils.get_text_embeddings(
+            temp, temp, temp, False
         )
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
@@ -355,7 +349,7 @@ if __name__ == '__main__':
     rgb_image = cv2.imread('assets/face.jpg')[:, :, ::-1].copy() / 255
     rgb_image = cv2.resize(rgb_image, (512, 512))
     rgb_image = torch.FloatTensor(rgb_image).unsqueeze(0).to(guidance.device)
-    prompt_utils = prompt_processor
+    prompt_utils = prompt_processor()
     guidance_out = guidance(
         rgb_image, rgb_image, prompt_utils
     )
