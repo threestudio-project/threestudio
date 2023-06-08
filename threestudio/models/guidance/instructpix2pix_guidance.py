@@ -188,6 +188,8 @@ class InstructPix2PixGuidance(BaseObject):
         image_cond_latents: Float[Tensor, "B 4 64 64"],
         t: Int[Tensor, "B"]
     ) -> Float[Tensor, "B 4 64 64"]:
+        self.scheduler.config.num_train_timesteps = t.item()
+        self.scheduler.set_timesteps(self.cfg.diffusion_steps)
         with torch.no_grad():
             # add noise
             noise = torch.randn_like(latents)
