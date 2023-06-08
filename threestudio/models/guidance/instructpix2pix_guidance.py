@@ -222,7 +222,7 @@ class InstructPix2PixGuidance(BaseObject):
         self,
         rgb: Float[Tensor, "B H W C"],
         cond_rgb: Float[Tensor, "B H W C"],
-        text_embeddings,
+        prompt_utils: PromptProcessorOutput,
         **kwargs,
     ):
         batch_size = rgb.shape[0]
@@ -241,9 +241,11 @@ class InstructPix2PixGuidance(BaseObject):
         )
         cond_latents = self.encode_cond_images(cond_rgb_BCHW_512)
 
-        # text_embeddings = prompt_utils.get_text_embeddings(
-        #     elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
-        # )
+        temp = torch.zeros(1).to(rgb.device)
+        text_embeddings = prompt_utils.get_text_embeddings(
+            temp, temp, temp, False
+        )
+        text_embeddings = torch.cat([text_embeddings, text_embeddings[-1:]], dim=0) # [positive, negative, negative]
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
@@ -267,20 +269,13 @@ if __name__ == '__main__':
     from threestudio.utils.typing import Optional
     cfg = load_config("configs/experimental/instructpix2pix.yaml")
     guidance = threestudio.find(cfg.system.guidance_type)(cfg.system.guidance)
-    # prompt_processor = threestudio.find(cfg.system.prompt_processor_type)(cfg.system.prompt_processor)
-    text_embeddings = guidance.pipe._encode_prompt(
-        cfg.system.prompt_processor.prompt, 
-        device=guidance.device, 
-        num_images_per_prompt=1, 
-        do_classifier_free_guidance=True, 
-        negative_prompt=cfg.system.prompt_processor.negative_prompt
-    )
+    prompt_processor = threestudio.find(cfg.system.prompt_processor_type)(cfg.system.prompt_processor)
     rgb_image = cv2.imread('assets/face.jpg')[:, :, ::-1].copy() / 255
     rgb_image = cv2.resize(rgb_image, (512, 512))
     rgb_image = torch.FloatTensor(rgb_image).unsqueeze(0).to(guidance.device)
-    # prompt_utils = prompt_processor()
+    prompt_utils = prompt_processor()
     guidance_out = guidance(
-        rgb_image, rgb_image, text_embeddings
+        rgb_image, rgb_image, prompt_utils
     )
     edit_image = (guidance_out['edit_images'][0].permute(1, 2, 0).detach().cpu().clip(0, 1).numpy()*255).astype(np.uint8)[:, :, ::-1].copy()
     import os
