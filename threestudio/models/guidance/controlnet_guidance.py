@@ -238,6 +238,8 @@ class ControlNetGuidance(BaseObject):
         image_cond: Float[Tensor, "B 3 512 512"],
         t: Int[Tensor, "B"]
     ) -> Float[Tensor, "B 4 64 64"]:
+        self.scheduler.config.num_train_timesteps = t.item()
+        self.scheduler.set_timesteps(self.cfg.diffusion_steps)
         with torch.no_grad():
             # add noise
             noise = torch.randn_like(latents)
@@ -277,7 +279,7 @@ class ControlNetGuidance(BaseObject):
         cond_rgb: Float[Tensor, "B H W C"]):
         if self.cfg.control_type == 'normal':
             cond_rgb = cond_rgb.permute(0, 3, 1, 2)
-            return self.preprocessor(cond_rgb)
+            control = self.preprocessor(cond_rgb)
         elif self.cfg.control_type == 'canny':
             cond_rgb = (cond_rgb[0].detach().cpu().numpy()*255).astype(np.uint8).copy()
             blurred_img = cv2.blur(cond_rgb,ksize=(5,5))
@@ -286,19 +288,22 @@ class ControlNetGuidance(BaseObject):
             control = control.unsqueeze(-1).repeat(1, 1, 3)
             control = control.unsqueeze(0)
             control = control.permute(0, 3, 1, 2)
-            return control
         else:
             pass
+        return F.interpolate(
+            control, (512, 512), mode="bilinear", align_corners=False
+        )
 
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
         cond_rgb: Float[Tensor, "B H W C"],
-        # prompt_utils: PromptProcessorOutput,
-        text_embeddings, 
+        prompt_utils,
+        # text_embeddings, 
         **kwargs,
     ):
         batch_size = rgb.shape[0]
+        assert batch_size == 1
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
@@ -309,9 +314,18 @@ class ControlNetGuidance(BaseObject):
 
         image_cond = self.prepare_image_cond(cond_rgb)
 
+        temp = torch.zeros(1).to(rgb.device)
         # text_embeddings = prompt_utils.get_text_embeddings(
-        #     elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+        #     temp, temp, temp, False
         # )
+
+        text_embeddings = self.pipe._encode_prompt(
+            prompt_utils.prompt, 
+            device=rgb.device, 
+            num_images_per_prompt=1, 
+            do_classifier_free_guidance=True, 
+            negative_prompt=prompt_utils.negative_prompt
+        )
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
@@ -326,7 +340,7 @@ class ControlNetGuidance(BaseObject):
         edit_images = self.decode_latents(edit_latents)
 
         return {
-            "edit_images": edit_images
+            "edit_images": edit_images.permute(0, 2, 3, 1)
         }
 
 
@@ -336,21 +350,15 @@ if __name__ == '__main__':
     from threestudio.utils.typing import Optional
     cfg = load_config("configs/experimental/controlnet-normal.yaml")
     guidance = threestudio.find(cfg.system.guidance_type)(cfg.system.guidance)
-    # prompt_processor = threestudio.find(cfg.system.prompt_processor_type)(cfg.system.prompt_processor)
-    text_embeddings = guidance.pipe._encode_prompt(
-        cfg.system.prompt_processor.prompt, 
-        device=guidance.device, 
-        num_images_per_prompt=1, 
-        do_classifier_free_guidance=True, 
-        negative_prompt=cfg.system.prompt_processor.negative_prompt
-    )
+    prompt_processor = threestudio.find(cfg.system.prompt_processor_type)(cfg.system.prompt_processor)
+
     rgb_image = cv2.imread('assets/face.jpg')[:, :, ::-1].copy() / 255
     rgb_image = cv2.resize(rgb_image, (512, 512))
     rgb_image = torch.FloatTensor(rgb_image).unsqueeze(0).to(guidance.device)
-    # prompt_utils = prompt_processor()
+    prompt_utils = prompt_processor
     guidance_out = guidance(
-        rgb_image, rgb_image, text_embeddings
+        rgb_image, rgb_image, prompt_utils
     )
-    edit_image = (guidance_out['edit_images'][0].permute(1, 2, 0).detach().cpu().clip(0, 1).numpy()*255).astype(np.uint8)[:, :, ::-1].copy()
+    edit_image = (guidance_out['edit_images'][0].detach().cpu().clip(0, 1).numpy()*255).astype(np.uint8)[:, :, ::-1].copy()
     os.makedirs('.threestudio_cache', exist_ok=True)
     cv2.imwrite('.threestudio_cache/edit_image.jpg', edit_image)

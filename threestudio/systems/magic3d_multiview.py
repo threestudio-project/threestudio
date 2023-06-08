@@ -29,6 +29,7 @@ class Magic3D(BaseLift3DSystem):
         per_editing_step: int = 10
         start_editing_step: int = 1000
         patch_size: int = 128
+        low_resolution_step: int = 1000
 
     cfg: Config
 
@@ -103,17 +104,29 @@ class Magic3D(BaseLift3DSystem):
             rays_o = batch["rays_o"]
             rays_d = batch["rays_d"]
             B, H, W, _ = rays_o.shape
-            patch_x = torch.randint(0, W-self.cfg.patch_size, (1,)).item()
-            patch_y = torch.randint(0, H-self.cfg.patch_size, (1,)).item()
-            batch["rays_o"] = rays_o[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size]
-            batch["rays_d"] = rays_d[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size]
-            render_out = self.renderer(**batch)
-            if batch_index not in self.cache_frames:
-                self.cache_frames[batch_index] = torch.zeros_like(rays_o).cpu()
-            cache_rgb = self.cache_frames[batch_index].to(rays_o.device)
-            cache_rgb[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size] = render_out["comp_rgb"]
-            render_out["comp_rgb"] = cache_rgb
-            self.cache_frames[batch_index] = cache_rgb.detach().cpu()
+            if self.global_step < self.cfg.low_resolution_step:
+                rays_o = torch.nn.functional.interpolate(
+                    rays_o.permute(0, 3, 1, 2), (H // 4, W // 4)).permute(0, 2, 3, 1)
+                rays_d = torch.nn.functional.interpolate(
+                    rays_d.permute(0, 3, 1, 2), (H // 4, W // 4)).permute(0, 2, 3, 1)
+                batch["rays_o"] = rays_o
+                batch["rays_d"] = rays_d
+                render_out = self.renderer(**batch)
+                render_out["comp_rgb"] = torch.nn.functional.interpolate(
+                    render_out["comp_rgb"].permute(0, 3, 1, 2), (H, W)
+                ).permute(0, 2, 3, 1)
+            else:
+                patch_x = torch.randint(0, W-self.cfg.patch_size, (1,)).item()
+                patch_y = torch.randint(0, H-self.cfg.patch_size, (1,)).item()
+                batch["rays_o"] = rays_o[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size]
+                batch["rays_d"] = rays_d[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size]
+                render_out = self.renderer(**batch)
+                if batch_index not in self.cache_frames:
+                    self.cache_frames[batch_index] = torch.zeros_like(rays_o).cpu()
+                cache_rgb = self.cache_frames[batch_index].to(rays_o.device)
+                cache_rgb[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size] = render_out["comp_rgb"]
+                render_out["comp_rgb"] = cache_rgb
+                self.cache_frames[batch_index] = cache_rgb.detach().cpu()
         else:
             render_out = self.renderer(**batch)
             self.cache_frames[batch_index] = render_out["comp_rgb"].detach().cpu()
