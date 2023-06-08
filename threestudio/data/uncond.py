@@ -65,8 +65,17 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             [self.cfg.width] if isinstance(self.cfg.width, int) else self.cfg.width
         )
         assert len(self.heights) == len(self.widths)
-        assert len(self.heights) == len(self.cfg.resolution_milestones) + 1
-        self.resolution_milestones: List[int] = [-1] + self.cfg.resolution_milestones
+        self.resolution_milestones: List[int]
+        if len(self.heights) == 1 and len(self.widths) == 1:
+            if len(self.cfg.resolution_milestones) > 0:
+                threestudio.warn(
+                    "Ignoring resolution_milestones since height and width are not changing"
+                )
+            self.resolution_milestones = [-1]
+        else:
+            assert len(self.heights) == len(self.cfg.resolution_milestones) + 1
+            self.resolution_milestones = [-1] + self.cfg.resolution_milestones
+
         self.directions_unit_focals = [
             get_ray_directions(H=height, W=width, focal=1.0)
             for (height, width) in zip(self.heights, self.widths)
