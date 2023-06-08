@@ -147,14 +147,46 @@ class SpatialSelfAttention(nn.Module):
         return x + h_
 
 
+class LoRALinearLayer(nn.Module):
+    def __init__(self, in_features, out_features, rank=4, network_alpha=None):
+        super().__init__()
+
+        if rank > min(in_features, out_features):
+            raise ValueError(f"LoRA rank {rank} must be less or equal than {min(in_features, out_features)}")
+
+        self.down = nn.Linear(in_features, rank, bias=False)
+        self.up = nn.Linear(rank, out_features, bias=False)
+        # This value has the same meaning as the `--network_alpha` option in the kohya-ss trainer script.
+        # See https://github.com/darkstorm2150/sd-scripts/blob/main/docs/train_network_README-en.md#execute-learning
+        self.network_alpha = network_alpha
+        self.rank = rank
+
+        nn.init.normal_(self.down.weight, std=1 / rank)
+        nn.init.zeros_(self.up.weight)
+
+    def forward(self, hidden_states):
+        orig_dtype = hidden_states.dtype
+        dtype = self.down.weight.dtype
+
+        down_hidden_states = self.down(hidden_states.to(dtype))
+        up_hidden_states = self.up(down_hidden_states)
+
+        if self.network_alpha is not None:
+            up_hidden_states *= self.network_alpha / self.rank
+
+        return up_hidden_states.to(orig_dtype)
+
+
 class CrossAttention(nn.Module):
-    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.0):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.0,
+                 lora=False, rank=4, network_alpha=None):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = default(context_dim, query_dim)
 
         self.scale = dim_head**-0.5
         self.heads = heads
+        self.lora = lora
 
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
@@ -164,6 +196,13 @@ class CrossAttention(nn.Module):
             nn.Linear(inner_dim, query_dim), nn.Dropout(dropout)
         )
 
+        if self.lora:
+            self.rank = rank
+            self.to_q_lora = LoRALinearLayer(query_dim, inner_dim, rank, network_alpha)
+            self.to_k_lora = LoRALinearLayer(context_dim, inner_dim, rank, network_alpha)
+            self.to_v_lora = LoRALinearLayer(inner_dim, inner_dim, rank, network_alpha)
+            self.to_out_lora = LoRALinearLayer(inner_dim, inner_dim, rank, network_alpha)
+
     def forward(self, x, context=None, mask=None):
         h = self.heads
 
@@ -171,6 +210,11 @@ class CrossAttention(nn.Module):
         context = default(context, x)
         k = self.to_k(context)
         v = self.to_v(context)
+
+        if self.lora:
+            q += self.to_q_lora(x)
+            k += self.to_k_lora(context)
+            v += self.to_v_lora(context)
 
         q, k, v = map(lambda t: rearrange(t, "b n (h d) -> (b h) n d", h=h), (q, k, v))
 
@@ -187,7 +231,15 @@ class CrossAttention(nn.Module):
 
         out = einsum("b i j, b j d -> b i d", attn, v)
         out = rearrange(out, "(b h) n d -> b n (h d)", h=h)
-        return self.to_out(out)
+
+        # linear proj
+        h = self.to_out[0](out)
+        if self.lora:
+            h += self.to_out_lora(out)
+        # dropout
+        out = self.to_out[1](h)
+
+        return out
 
 
 class BasicTransformerBlock(nn.Module):
