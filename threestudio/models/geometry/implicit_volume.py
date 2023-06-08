@@ -6,7 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import threestudio
-from threestudio.models.geometry.base import BaseImplicitGeometry, contract_to_unisphere
+from threestudio.models.geometry.base import (
+    BaseGeometry,
+    BaseImplicitGeometry,
+    contract_to_unisphere,
+)
 from threestudio.models.networks import get_encoding, get_mlp
 from threestudio.utils.ops import get_activation
 from threestudio.utils.typing import *
@@ -59,11 +63,12 @@ class ImplicitVolume(BaseImplicitGeometry):
         self.density_network = get_mlp(
             self.encoding.n_output_dims, 1, self.cfg.mlp_network_config
         )
-        self.feature_network = get_mlp(
-            self.encoding.n_output_dims,
-            self.cfg.n_feature_dims,
-            self.cfg.mlp_network_config,
-        )
+        if self.cfg.n_feature_dims > 0:
+            self.feature_network = get_mlp(
+                self.encoding.n_output_dims,
+                self.cfg.n_feature_dims,
+                self.cfg.mlp_network_config,
+            )
         if self.cfg.normal_type == "pred":
             self.normal_network = get_mlp(
                 self.encoding.n_output_dims, 3, self.cfg.mlp_network_config
@@ -114,15 +119,17 @@ class ImplicitVolume(BaseImplicitGeometry):
 
         enc = self.encoding(points.view(-1, self.cfg.n_input_dims))
         density = self.density_network(enc).view(*points.shape[:-1], 1)
-        features = self.feature_network(enc).view(
-            *points.shape[:-1], self.cfg.n_feature_dims
-        )
         raw_density, density = self.get_activated_density(points_unscaled, density)
 
         output = {
             "density": density,
-            "features": features,
         }
+
+        if self.cfg.n_feature_dims > 0:
+            features = self.feature_network(enc).view(
+                *points.shape[:-1], self.cfg.n_feature_dims
+            )
+            output.update({"features": features})
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":
@@ -212,3 +219,36 @@ class ImplicitVolume(BaseImplicitGeometry):
             }
         )
         return out
+
+    @staticmethod
+    @torch.no_grad()
+    def create_from(
+        other: BaseGeometry,
+        cfg: Optional[Union[dict, DictConfig]] = None,
+        copy_net: bool = True,
+        **kwargs,
+    ) -> "ImplicitVolume":
+        if isinstance(other, ImplicitVolume):
+            instance = ImplicitVolume(cfg, **kwargs)
+            instance.encoding.load_state_dict(other.encoding.state_dict())
+            instance.density_network.load_state_dict(other.density_network.state_dict())
+            if copy_net:
+                if (
+                    instance.cfg.n_feature_dims > 0
+                    and other.cfg.n_feature_dims == instance.cfg.n_feature_dims
+                ):
+                    instance.feature_network.load_state_dict(
+                        other.feature_network.state_dict()
+                    )
+                if (
+                    instance.cfg.normal_type == "pred"
+                    and other.cfg.normal_type == "pred"
+                ):
+                    instance.normal_network.load_state_dict(
+                        other.normal_network.state_dict()
+                    )
+            return instance
+        else:
+            raise TypeError(
+                f"Cannot create {ImplicitVolume.__name__} from {other.__class__.__name__}"
+            )

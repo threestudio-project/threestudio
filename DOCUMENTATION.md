@@ -65,22 +65,25 @@ Systems contain implementation of training/validation/testing logic for differen
 
 Currently all implemented systems inherit to `BaseLift3DSystem`, which has the following common configurations:
 
-| name                  | type | description                                                                                                                                                                                                                       |
-| --------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| geometry_type         | str  | Type of the geometry used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#geometry) for supported geometry.                                                               |
-| geometry              | dict | Configurations of the geometry.                                                                                                                                                                                                   |
-| material_type         | str  | Type of the material used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#material) for supported materials.                                                              |
-| matrial               | dict | Configurations of the material.                                                                                                                                                                                                   |
-| background_type       | str  | Type of the background used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#background) for supported background.                                                         |
-| background            | dict | Configurations of the background.                                                                                                                                                                                                 |
-| renderer_type         | str  | Type of the renderer used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#renderers) for supported renderers.                                                             |
-| renderer              | dict | Configurations of the renderer.                                                                                                                                                                                                   |
-| guidance_type         | str  | Type of the guidance used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#guidance) for supported guidance.                                                               |
-| guidance              | dict | Configurations of the guidance.                                                                                                                                                                                                   |
-| prompt_processor_type | str  | Type of the prompt processor used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported prompt processors.                                     |
-| prompt_processor      | dict | Configurations of the prompt processor.                                                                                                                                                                                           |
-| exporter_type         | str  | Type of the exporter used in the system. Only used in export stage. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported exporters. Default: "mesh-exporter" |
-| exporter              | dict | Configurations of the exporter.                                                                                                                                                                                                   |
+| name                             | type          | description                                                                                                                                                                                                                       |
+| -------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| geometry_type                    | str           | Type of the geometry used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#geometry) for supported geometry.                                                               |
+| geometry                         | dict          | Configurations of the geometry.                                                                                                                                                                                                   |
+| geometry_convert_from            | Optional[str] | The path to a checkpoint from which the geometry is converted. If not None, initialize the geometry from the specified source model. Default: None                                                                                |
+| geometry_convert_override        | dict          | Configurations to override when initializing from a source geometry, only used when `geometry_convert_from` is specified. A typical use case is to specify an isosurface threshold value. Default: {}                             |
+| geometry_convert_inherit_texture | bool          | Whether to load the encoding and feature network from the source geometry during conversion, only used when `geometry_convert_from` is specified. Default: False                                                                  |
+| material_type                    | str           | Type of the material used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#material) for supported materials.                                                              |
+| matrial                          | dict          | Configurations of the material.                                                                                                                                                                                                   |
+| background_type                  | str           | Type of the background used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#background) for supported background.                                                         |
+| background                       | dict          | Configurations of the background.                                                                                                                                                                                                 |
+| renderer_type                    | str           | Type of the renderer used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#renderers) for supported renderers.                                                             |
+| renderer                         | dict          | Configurations of the renderer.                                                                                                                                                                                                   |
+| guidance_type                    | str           | Type of the guidance used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#guidance) for supported guidance.                                                               |
+| guidance                         | dict          | Configurations of the guidance.                                                                                                                                                                                                   |
+| prompt_processor_type            | str           | Type of the prompt processor used in the system. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported prompt processors.                                     |
+| prompt_processor                 | dict          | Configurations of the prompt processor.                                                                                                                                                                                           |
+| exporter_type                    | str           | Type of the exporter used in the system. Only used in export stage. See [here](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#prompt-processors) for supported exporters. Default: "mesh-exporter" |
+| exporter                         | dict          | Configurations of the exporter.                                                                                                                                                                                                   |
 
 ### dreamfusion-system
 
@@ -90,12 +93,9 @@ This system has all the common configurations.
 
 This system has all the common configurations, along with the following unique configurations:
 
-| name                     | type          | description                                                                                                                                                          |
-| ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| refinement               | bool          | Whether to perform refinement (second stage in the Magic3D paper). Default: False                                                                                    |
-| from_coarse              | Optional[str] | The path to the coarse stage model checkpoint. If not None and `refinement=True`, initialize the model for refinement from the specified coarse model. Default: None |
-| coarse_geometry_override | dict          | Configurations to override when initializing from coarse geometry. A typical use case is to specify an isosurface threshold value. Default: {}                       |
-| inherit_coarse_texture   | bool          | Whether to load the encoding and feature network from the coarse stage for refinement, used when `from_coarse=True`. Default: True                                   |
+| name       | type | description                                                                       |
+| ---------- | ---- | --------------------------------------------------------------------------------- |
+| refinement | bool | Whether to perform refinement (second stage in the Magic3D paper). Default: False |
 
 ### sjc-system
 
@@ -125,12 +125,10 @@ This system has all the common configurations, along with the following unique c
 
 This system has all the common configurations, along with the following unique configurations:
 
-| name                     | type          | description                                                                                                                                                          |
-| ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| refinement               | bool          | Whether to perform refinement (third stage in the ProlificDreamer paper). Default: False                                                                             |
-| from_coarse              | Optional[str] | The path to the coarse stage model checkpoint. If not None and `refinement=True`, initialize the model for refinement from the specified coarse model. Default: None |
-| coarse_geometry_override | dict          | Configurations to override when initializing from coarse geometry. A typical use case is to specify an isosurface threshold value. Default: {}                       |
-| inherit_coarse_texture   | bool          | Whether to load the encoding and feature network from the coarse stage for refinement, used when `from_coarse=True`. Default: True                                   |
+| name              | type | description                                                                                            |
+| ----------------- | ---- | ------------------------------------------------------------------------------------------------------ |
+| stage             | str  | The training stage, in ["coarse", "geometry", "texture"]. Default: "coarse"                            |
+| visualize_samples | bool | Whether to visualize samples of the pretrained and LoRA diffusion models in validation. Default: False |
 
 ## Geometry
 
@@ -138,16 +136,18 @@ Geometry models properties for locations in space, including density, SDF, featu
 
 **Common configurations for implicit geometry**
 
-| name                       | type             | description                                                                                                                                                                                      |
-| -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| radius                     | float            | Half side length of the scene bounding box. Default: 1.0                                                                                                                                         |
-| isosurface                 | bool             | Whether to enable surface extraction. Default: True                                                                                                                                              |
-| isosusrface_method         | str              | Method for surface extraction, in ["mc", "mt"]. "mc" uses the marching cubes algorithm, not differentiable; "mt" uses the marching tetrahedra algorithm, differentiable. Default: "mt"           |
-| isosurface_resolution      | int              | Grid resolution for surface extraction. Default: 128                                                                                                                                             |
-| isosurface_threshold       | Union[float,str] | The threshold value to determine the surface location of the implicit field, in [float, "auto"]. If "auto", use the mean value of the field as the threshold. Default: 0                         |
-| isosurface_chunk           | int              | Chunk size when computing the field value on grid vertices, used to prevent OOM. If 0, does not use chunking. Default: 0                                                                         |
-| isosurface_coarse_to_fine  | bool             | Whether to extract the surface in a coarse-to-fine manner. If True, will first extract a coarse surface to get a tight bounding box, which is then used to extract a fine surface. Default: True |
-| isosurface_deformable_grid | bool             | Whether to optimize positions of grid vertices for surface extraction. Only support `isosurface_method=mt`. Default: False                                                                       |
+| name                                 | type              | description                                                                                                                                                                                                                                                                      |
+| ------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| radius                               | float             | Half side length of the scene bounding box. Default: 1.0                                                                                                                                                                                                                         |
+| isosurface                           | bool              | Whether to enable surface extraction. Default: True                                                                                                                                                                                                                              |
+| isosusrface_method                   | str               | Method for surface extraction, in ["mc", "mt"]. "mc" uses the marching cubes algorithm, not differentiable; "mt" uses the marching tetrahedra algorithm, differentiable. Default: "mt"                                                                                           |
+| isosurface_resolution                | int               | Grid resolution for surface extraction. Default: 128                                                                                                                                                                                                                             |
+| isosurface_threshold                 | Union[float,str]  | The threshold value to determine the surface location of the implicit field, in [float, "auto"]. If "auto", use the mean value of the field as the threshold. Default: 0                                                                                                         |
+| isosurface_chunk                     | int               | Chunk size when computing the field value on grid vertices, used to prevent OOM. If 0, does not use chunking. Default: 0                                                                                                                                                         |
+| isosurface_coarse_to_fine            | bool              | Whether to extract the surface in a coarse-to-fine manner. If True, will first extract a coarse surface to get a tight bounding box, which is then used to extract a fine surface. Default: True                                                                                 |
+| isosurface_deformable_grid           | bool              | Whether to optimize positions of grid vertices for surface extraction. Only support `isosurface_method=mt`. Default: False                                                                                                                                                       |
+| isosurface_remove_outliers           | bool              | Whether to remove outlier components according to the number of faces. Only remove if the isosurface process does not require gradient. Default: True                                                                                                                            |
+| isosurface_outlier_n_faces_threshold | Union[int, float] | Extracted mesh components with number of faces less than this threshold will be removed if `isosurface_remove_outliers=True`. If `int`, direcly used as the threshold number of faces; if `float`, used as the ratio of all face numbers to compute the threshold. Default: 0.01 |
 
 ### implicit-volume
 
@@ -203,17 +203,19 @@ An explicit geometry parameterized with a feature volume. The feature volume has
 
 ### tetrahedra-sdf-grid
 
-| name                       | type          | description                                                                                                                                                                                                                |
-| -------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| isosurface_resolution      | int           | Tetrahedra grid resolution for surface extraction. Default: 128                                                                                                                                                            |
-| isosurface_deformable_grid | bool          | Whether to optimize positions of tetrahedra grid vertices for surface extraction. Default: True                                                                                                                            |
-| pos_encoding_config        | dict          | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                         |
-| mlp_network_config         | dict          | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                              |
-| shape_init                 | Optional[str] | The shape to initializa the SDF as, in [None, "sphere", "ellipsoid"]. If None, does not initialize; if "sphere", initialized as a sphere; if "ellipsoid", initialized as an ellipsoid. Default: None                       |
-| shape_init_params          | Optional[Any] | Parameters to specify the SDF initialization. If `shape_init="sphere"`, a float is used for the sphere radius; if `shape_init="ellipsoid"`, a tuple of three floats is used for the radius along x/y/z axis. Default: None |
-| force_shape_init           | bool          | Whether to force initialization of the SDf even if weights are provided. Default:False                                                                                                                                     |
-| geometry_only              | bool          | Whether to only model the SDF. If True, the feature prediction is ommited. Default:False                                                                                                                                   |
-| fix_geometry               | bool          | Whether to optimize the geometry. If True, the SDF (and grid vertices if `isosurface_deformable_grid=True`) is fixed. Default: False                                                                                       |
+| name                                 | type              | description                                                                                                                                                                                                                                                                      |
+| ------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| isosurface_resolution                | int               | Tetrahedra grid resolution for surface extraction. Default: 128                                                                                                                                                                                                                  |
+| isosurface_deformable_grid           | bool              | Whether to optimize positions of tetrahedra grid vertices for surface extraction. Default: True                                                                                                                                                                                  |
+| isosurface_remove_outliers           | bool              | Whether to remove outlier components according to the number of faces. Only remove if the isosurface process does not require gradient. Default: False                                                                                                                           |
+| isosurface_outlier_n_faces_threshold | Union[int, float] | Extracted mesh components with number of faces less than this threshold will be removed if `isosurface_remove_outliers=True`. If `int`, direcly used as the threshold number of faces; if `float`, used as the ratio of all face numbers to compute the threshold. Default: 0.01 |
+| pos_encoding_config                  | dict              | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                                                               |
+| mlp_network_config                   | dict              | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                                                                                    |
+| shape_init                           | Optional[str]     | The shape to initializa the SDF as, in [None, "sphere", "ellipsoid"]. If None, does not initialize; if "sphere", initialized as a sphere; if "ellipsoid", initialized as an ellipsoid. Default: None                                                                             |
+| shape_init_params                    | Optional[Any]     | Parameters to specify the SDF initialization. If `shape_init="sphere"`, a float is used for the sphere radius; if `shape_init="ellipsoid"`, a tuple of three floats is used for the radius along x/y/z axis. Default: None                                                       |
+| force_shape_init                     | bool              | Whether to force initialization of the SDf even if weights are provided. Default:False                                                                                                                                                                                           |
+| geometry_only                        | bool              | Whether to only model the SDF. If True, the feature prediction is ommited. Default:False                                                                                                                                                                                         |
+| fix_geometry                         | bool              | Whether to optimize the geometry. If True, the SDF (and grid vertices if `isosurface_deformable_grid=True`) is fixed. Default: False                                                                                                                                             |
 
 ## Material
 
@@ -348,12 +350,14 @@ For the first three options, you can check more details in [pipe_stable_diffusio
 
 ### stable-diffusion-guidance
 
-| name                 | type           | description                                                                                                                                         |
-| -------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| use_sjc              | bool           | Whether to use score jacobian chaining (SJC) instead of SDS. Default: False                                                                         |
-| var_red              | bool           | Whether to use Eq. 16 in [SJC paper](https://arxiv.org/pdf/2212.00774.pdf). Default: True                                                           |
-| token_merging        | bool           | Whether to use token merging. This will speed up the unet forward and slightly affect the performance. Default: False                               |
-| token_merging_params | Optional[dict] | The config for token merging. See [here](https://github.com/dbolya/tomesd/blob/main/tomesd/patch.py#L183-L213) for supported arguments. Default: {} |
+| name                      | type           | description                                                                                                                                         |
+| ------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| use_sjc                   | bool           | Whether to use score jacobian chaining (SJC) instead of SDS. Default: False                                                                         |
+| var_red                   | bool           | Whether to use Eq. 16 in [SJC paper](https://arxiv.org/pdf/2212.00774.pdf). Default: True                                                           |
+| token_merging             | bool           | Whether to use token merging. This will speed up the unet forward and slightly affect the performance. Default: False                               |
+| token_merging_params      | Optional[dict] | The config for token merging. See [here](https://github.com/dbolya/tomesd/blob/main/tomesd/patch.py#L183-L213) for supported arguments. Default: {} |
+| max_step_percent_annealed | float          | The precent range (max value) of the random timesteps to add noise and denoise after t annealing. Default: 0.5                                      |
+| anneal_start_step         | Optional[int]  | If specified, denotes at which step to perform t annealing. Default: None                                                                           |
 
 ### deep-floyd-guidance
 
@@ -361,14 +365,14 @@ No specific configuration.
 
 ## stable-diffusion-vsd-guidance
 
-| name                               | type  | description                                                                                                                                                     |
-| ---------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| pretrained_model_name_or_path_lora | str   | The pretrained base model path for the LoRA model. Default: "stabilityai/stable-diffusion-2-1"                                                                  |
-| guidance_scale_lora                | float | The classifier free guidance scale for the LoRA model. Default: 1.                                                                                              |
-| lora_cfg_training                  | bool  | Whether to adopt classifier free guidance training strategy in LoRA training. If True, will zero out the camera condition with a probability 0.1. Default: True |
-| max_step_percent_annealed          | float | The precent range (max value) of the random timesteps to add noise and denoise after t annealing. Default: 0.5                                                  |
-| anneal_start_step                  | int   | At which step to perform t annealing. Default: 5000                                                                                                             |
-| camera_condition_type              | str   | Which to use as the camera condition for the LoRA model, in ["extrinsics", "mvp"]. Default: "extrinsics"                                                        |
+| name                               | type          | description                                                                                                                                                     |
+| ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pretrained_model_name_or_path_lora | str           | The pretrained base model path for the LoRA model. Default: "stabilityai/stable-diffusion-2-1"                                                                  |
+| guidance_scale_lora                | float         | The classifier free guidance scale for the LoRA model. Default: 1.                                                                                              |
+| lora_cfg_training                  | bool          | Whether to adopt classifier free guidance training strategy in LoRA training. If True, will zero out the camera condition with a probability 0.1. Default: True |
+| max_step_percent_annealed          | float         | The precent range (max value) of the random timesteps to add noise and denoise after t annealing. Default: 0.5                                                  |
+| anneal_start_step                  | Optional[int] | If specified, denotes at which step to perform t annealing. Default: 5000                                                                                       |
+| camera_condition_type              | str           | Which to use as the camera condition for the LoRA model, in ["extrinsics", "mvp"]. Default: "extrinsics"                                                        |
 
 ## Prompt Processors
 

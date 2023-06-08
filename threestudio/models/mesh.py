@@ -271,3 +271,38 @@ class Mesh:
             1.0 - torch.cosine_similarity(edge_nrm[:, 0], edge_nrm[:, 1], dim=-1)
         ).mean()
         return nc
+
+    def _laplacian_uniform(self):
+        # from stable-dreamfusion
+        # https://github.com/ashawkey/stable-dreamfusion/blob/8fb3613e9e4cd1ded1066b46e80ca801dfb9fd06/nerf/renderer.py#L224
+        verts, faces = self.v_pos, self.t_pos_idx
+
+        V = verts.shape[0]
+        F = faces.shape[0]
+
+        # Neighbor indices
+        ii = faces[:, [1, 2, 0]].flatten()
+        jj = faces[:, [2, 0, 1]].flatten()
+        adj = torch.stack([torch.cat([ii, jj]), torch.cat([jj, ii])], dim=0).unique(
+            dim=1
+        )
+        adj_values = torch.ones(adj.shape[1]).to(verts)
+
+        # Diagonal indices
+        diag_idx = adj[0]
+
+        # Build the sparse matrix
+        idx = torch.cat((adj, torch.stack((diag_idx, diag_idx), dim=0)), dim=1)
+        values = torch.cat((-adj_values, adj_values))
+
+        # The coalesce operation sums the duplicate indices, resulting in the
+        # correct diagonal
+        return torch.sparse_coo_tensor(idx, values, (V, V)).coalesce()
+
+    def laplacian(self) -> Float[Tensor, ""]:
+        with torch.no_grad():
+            L = self._laplacian_uniform()
+        loss = L.mm(self.v_pos)
+        loss = loss.norm(dim=1)
+        loss = loss.mean()
+        return loss
