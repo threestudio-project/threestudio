@@ -178,15 +178,13 @@ class LoRALinearLayer(nn.Module):
 
 
 class CrossAttention(nn.Module):
-    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.0,
-                 lora=False, rank=4, network_alpha=None):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.0):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = default(context_dim, query_dim)
 
         self.scale = dim_head**-0.5
         self.heads = heads
-        self.lora = lora
 
         self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
         self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
@@ -196,12 +194,24 @@ class CrossAttention(nn.Module):
             nn.Linear(inner_dim, query_dim), nn.Dropout(dropout)
         )
 
-        if self.lora:
-            self.rank = rank
-            self.to_q_lora = LoRALinearLayer(query_dim, inner_dim, rank, network_alpha)
-            self.to_k_lora = LoRALinearLayer(context_dim, inner_dim, rank, network_alpha)
-            self.to_v_lora = LoRALinearLayer(inner_dim, inner_dim, rank, network_alpha)
-            self.to_out_lora = LoRALinearLayer(inner_dim, inner_dim, rank, network_alpha)
+        self.lora = False
+        self.query_dim = query_dim
+        self.inner_dim = inner_dim
+        self.context_dim = context_dim
+
+    def setup_lora(self, rank=4, network_alpha=None):
+        self.lora = True
+        self.rank = rank
+        self.to_q_lora = LoRALinearLayer(self.query_dim, self.inner_dim, rank, network_alpha)
+        self.to_k_lora = LoRALinearLayer(self.context_dim, self.inner_dim, rank, network_alpha)
+        self.to_v_lora = LoRALinearLayer(self.inner_dim, self.inner_dim, rank, network_alpha)
+        self.to_out_lora = LoRALinearLayer(self.inner_dim, self.inner_dim, rank, network_alpha)
+        lora_layers = nn.ModuleList()
+        lora_layers.append(self.to_q_lora)
+        lora_layers.append(self.to_k_lora)
+        lora_layers.append(self.to_v_lora)
+        lora_layers.append(self.to_out_lora)
+        return lora_layers
 
     def forward(self, x, context=None, mask=None):
         h = self.heads

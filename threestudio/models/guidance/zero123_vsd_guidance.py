@@ -2,32 +2,22 @@ import cv2
 import importlib
 import numpy as np
 import os
-import random
-from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import (
-    DDPMScheduler,
-    DPMSolverMultistepScheduler,
-    StableDiffusionPipeline,
-    UNet2DConditionModel,
-    DDIMScheduler,
-)
-from diffusers.loaders import AttnProcsLayers
-from diffusers.models.attention_processor import LoRAAttnProcessor
-from diffusers.models.embeddings import TimestepEmbedding
-from diffusers.utils.import_utils import is_xformers_available
+from diffusers import DDIMScheduler
 
 import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import C, cleanup, parse_version
+from threestudio.utils.misc import C, cleanup
 from threestudio.utils.typing import *
+
+from extern.ldm_zero123.modules.attention import CrossAttention
 
 
 def get_obj_from_str(string, reload=False):
@@ -162,33 +152,11 @@ class Zero123VSDGuidance(BaseModule):
             p.requires_grad_(False)
 
         # set up LoRA layers
-        lora_attn_procs = {}
-        for name in self.model_lora.unet.attn_processors.keys():
-            cross_attention_dim = (
-                None
-                if name.endswith("attn1.processor")
-                else self.unet_lora.config.cross_attention_dim
-            )
-            if name.startswith("mid_block"):
-                hidden_size = self.unet_lora.config.block_out_channels[-1]
-            elif name.startswith("up_blocks"):
-                block_id = int(name[len("up_blocks.")])
-                hidden_size = list(reversed(self.unet_lora.config.block_out_channels))[
-                    block_id
-                ]
-            elif name.startswith("down_blocks"):
-                block_id = int(name[len("down_blocks.")])
-                hidden_size = self.unet_lora.config.block_out_channels[block_id]
-
-            lora_attn_procs[name] = LoRAAttnProcessor(
-                hidden_size=hidden_size, cross_attention_dim=cross_attention_dim
-            )
-
-        self.unet_lora.set_attn_processor(lora_attn_procs)
-
-        self.lora_layers = AttnProcsLayers(self.unet_lora.attn_processors)
-        self.lora_layers._load_state_dict_pre_hooks.clear()
-        self.lora_layers._state_dict_hooks.clear()
+        print("LoRA-training only unet attention layers")
+        self.lora_layers = nn.ModuleList()
+        for n, m in self.model.named_modules():
+            if isinstance(m, CrossAttention) and n.endswith("attn2"):
+                self.lora_layers.extend(m.setup_lora())
 
         # timesteps: use diffuser for convenience... hope it's alright.
         self.num_train_timesteps = self.config.model.params.timesteps
@@ -202,21 +170,15 @@ class Zero123VSDGuidance(BaseModule):
             steps_offset=1,
         )
 
-        self.scheduler_lora = DDPMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path_lora,
-            subfolder="scheduler",
-            torch_dtype=self.weights_dtype,
+        self.scheduler_lora = DDIMScheduler(
+            self.num_train_timesteps,
+            self.config.model.params.linear_start,
+            self.config.model.params.linear_end,
+            beta_schedule="scaled_linear",
+            clip_sample=False,
+            set_alpha_to_one=False,
+            steps_offset=1,
         )
-
-        # self.scheduler_sample = DPMSolverMultistepScheduler.from_config(
-        #     self.pipe.scheduler.config
-        # )
-        self.scheduler_lora_sample = DPMSolverMultistepScheduler.from_config(
-            self.pipe_lora.scheduler.config
-        )
-
-        # self.pipe.scheduler = self.scheduler
-        self.pipe_lora.scheduler = self.scheduler_lora
 
         # self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
@@ -252,18 +214,6 @@ class Zero123VSDGuidance(BaseModule):
             .to(self.device)
         )
         self.c_crossattn, self.c_concat = self.get_img_embeds(self.rgb_256)
-
-    @property
-    def pipe_lora(self):
-        return self.submodules.pipe_lora
-
-    @property
-    def unet_lora(self):
-        return self.submodules.pipe_lora.unet
-
-    @property
-    def vae_lora(self):
-        return self.submodules.pipe_lora.vae
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
@@ -349,31 +299,10 @@ class Zero123VSDGuidance(BaseModule):
         ]
         return cond
 
-    @torch.cuda.amp.autocast(enabled=False)
-    def forward_unet(
-        self,
-        unet: UNet2DConditionModel,
-        latents: Float[Tensor, "..."],
-        t: Float[Tensor, "..."],
-        encoder_hidden_states: Float[Tensor, "..."],
-        class_labels: Optional[Float[Tensor, "B 16"]] = None,
-        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> Float[Tensor, "..."]:
-        input_dtype = latents.dtype
-        return unet(
-            latents.to(self.weights_dtype),
-            t.to(self.weights_dtype),
-            encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
-            class_labels=class_labels,
-            cross_attention_kwargs=cross_attention_kwargs,
-        ).sample.to(input_dtype)
-
     def compute_grad_vsd(
         self,
         latents: Float[Tensor, "B 4 64 64"],
         cond: dict,
-        text_embeddings: Float[Tensor, "BB 77 768"],
-        camera_condition: Float[Tensor, "B 4 4"],
         guidance_eval: bool,
     ):
         B = latents.shape[0]
@@ -391,26 +320,14 @@ class Zero123VSDGuidance(BaseModule):
             # add noise
             noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
+
             # pred noise
             x_in = torch.cat([latents_noisy] * 2)
             t_in = torch.cat([t] * 2)
             noise_pred_pretrain = self.model.apply_model(x_in, t_in, cond)
 
-            # use view-independent text embeddings in LoRA
-            noise_pred_est = self.forward_unet(
-                self.unet_lora,
-                x_in,
-                t_in,
-                encoder_hidden_states=text_embeddings,
-                class_labels=torch.cat(
-                    [
-                        camera_condition.view(B, -1),
-                        torch.zeros_like(camera_condition.view(B, -1)),
-                    ],
-                    dim=0,
-                ),
-                cross_attention_kwargs={"scale": 1.0},
-            )
+            # lora pred noise
+            noise_pred_est = self.model_lora.apply_model(x_in, t_in, cond)
 
         (
             noise_pred_pretrain_text,
@@ -421,19 +338,6 @@ class Zero123VSDGuidance(BaseModule):
         noise_pred_pretrain = noise_pred_pretrain_uncond + self.cfg.guidance_scale * (
             noise_pred_pretrain_text - noise_pred_pretrain_uncond
         )
-
-        # # TODO: more general cases
-        # assert self.scheduler.config.prediction_type == "epsilon"
-        if self.scheduler_lora.config.prediction_type == "v_prediction":
-            alphas_cumprod = self.scheduler_lora.alphas_cumprod.to(
-                device=latents_noisy.device, dtype=latents_noisy.dtype
-            )
-            alpha_t = alphas_cumprod[t] ** 0.5
-            sigma_t = (1 - alphas_cumprod[t]) ** 0.5
-
-            noise_pred_est = x_in * torch.cat([sigma_t] * 2, dim=0).view(
-                -1, 1, 1, 1
-            ) + noise_pred_est * torch.cat([alpha_t] * 2, dim=0).view(-1, 1, 1, 1)
 
         (
             noise_pred_est_text,
@@ -461,8 +365,7 @@ class Zero123VSDGuidance(BaseModule):
     def train_lora(
         self,
         latents: Float[Tensor, "B 4 64 64"],
-        text_embeddings: Float[Tensor, "BB 77 768"],
-        camera_condition: Float[Tensor, "B 4 4"],
+        cond: dict,
     ):
         B = latents.shape[0]
         latents = latents.detach().repeat(self.cfg.lora_n_timestamp_samples, 1, 1, 1)
@@ -477,31 +380,13 @@ class Zero123VSDGuidance(BaseModule):
 
         noise = torch.randn_like(latents)
         noisy_latents = self.scheduler_lora.add_noise(latents, noise, t)
-        if self.scheduler_lora.config.prediction_type == "epsilon":
-            target = noise
-        elif self.scheduler_lora.config.prediction_type == "v_prediction":
-            target = self.scheduler_lora.get_velocity(latents, noise, t)
-        else:
-            raise ValueError(
-                f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
-            )
-        # use view-independent text embeddings in LoRA
-        text_embeddings, _ = text_embeddings.chunk(2)
-        if self.cfg.lora_cfg_training and random.random() < 0.1:
-            camera_condition = torch.zeros_like(camera_condition)
-        noise_pred = self.forward_unet(
-            self.unet_lora,
-            noisy_latents,
-            t,
-            encoder_hidden_states=text_embeddings.repeat(
-                self.cfg.lora_n_timestamp_samples, 1, 1
-            ),
-            class_labels=camera_condition.view(B, -1).repeat(
-                self.cfg.lora_n_timestamp_samples, 1
-            ),
-            cross_attention_kwargs={"scale": 1.0},
-        )
-        return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
+
+        # pred noise
+        x_in = torch.cat([noisy_latents] * 2)
+        t_in = torch.cat([t] * 2)
+        noise_pred = self.model.apply_model(x_in, t_in, cond)
+
+        return F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
 
     def get_latents(
         self, rgb_BCHW: Float[Tensor, "B C H W"], rgb_as_latents=False
@@ -521,12 +406,9 @@ class Zero123VSDGuidance(BaseModule):
     def forward(
         self,
         rgb: Float[Tensor, "B H W C"],
-        prompt_utils: PromptProcessorOutput,
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
-        mvp_mtx: Float[Tensor, "B 4 4"],
-        c2w: Float[Tensor, "B 4 4"],
         rgb_as_latents=False,
         guidance_eval=False,
         **kwargs,
@@ -538,23 +420,7 @@ class Zero123VSDGuidance(BaseModule):
 
         cond = self.get_cond(elevation, azimuth, camera_distances)
 
-        # input text embeddings, view-independent
-        text_embeddings = prompt_utils.get_text_embeddings(
-            elevation, azimuth, camera_distances, view_dependent_prompting=False
-        )
-
-        if self.cfg.camera_condition_type == "extrinsics":
-            camera_condition = c2w
-        elif self.cfg.camera_condition_type == "mvp":
-            camera_condition = mvp_mtx
-        else:
-            raise ValueError(
-                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
-            )
-
-        grad, guidance_eval_out = self.compute_grad_vsd(
-            latents, cond, text_embeddings, camera_condition, guidance_eval
-        )
+        grad, guidance_eval_out = self.compute_grad_vsd(latents, cond, guidance_eval)
 
         grad = torch.nan_to_num(grad)
 
@@ -563,7 +429,7 @@ class Zero123VSDGuidance(BaseModule):
         target = (latents - grad).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
+        loss_lora = self.train_lora(latents, cond)
 
         guidance_out = {
             "loss_vsd": loss_vsd,
@@ -647,163 +513,6 @@ class Zero123VSDGuidance(BaseModule):
             "imgs_1orig": imgs_1orig,
             "imgs_final": imgs_final,
         }
-
-    @torch.no_grad()
-    @torch.cuda.amp.autocast(enabled=False)
-    def _sample(
-        self,
-        pipe: StableDiffusionPipeline,
-        sample_scheduler: DPMSolverMultistepScheduler,
-        text_embeddings: Float[Tensor, "BB N Nf"],
-        num_inference_steps: int,
-        guidance_scale: float,
-        num_images_per_prompt: int = 1,
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        class_labels: Optional[Float[Tensor, "BB 16"]] = None,
-        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-        generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
-    ) -> Float[Tensor, "B H W 3"]:
-        vae_scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1)
-        height = height or pipe.unet.config.sample_size * vae_scale_factor
-        width = width or pipe.unet.config.sample_size * vae_scale_factor
-        batch_size = text_embeddings.shape[0] // 2
-        device = self.device
-
-        sample_scheduler.set_timesteps(num_inference_steps, device=device)
-        timesteps = sample_scheduler.timesteps
-        num_channels_latents = pipe.unet.config.in_channels
-
-        latents = pipe.prepare_latents(
-            batch_size * num_images_per_prompt,
-            num_channels_latents,
-            height,
-            width,
-            self.weights_dtype,
-            device,
-            generator,
-        )
-
-        for i, t in enumerate(timesteps):
-            # expand the latents if we are doing classifier free guidance
-            latent_model_input = torch.cat([latents] * 2)
-            latent_model_input = sample_scheduler.scale_model_input(
-                latent_model_input, t
-            )
-
-            # predict the noise residual
-            if class_labels is None:
-                with self.disable_unet_class_embedding(pipe.unet) as unet:
-                    noise_pred = unet(
-                        latent_model_input,
-                        t,
-                        encoder_hidden_states=text_embeddings.to(self.weights_dtype),
-                        cross_attention_kwargs=cross_attention_kwargs,
-                    ).sample
-            else:
-                noise_pred = pipe.unet(
-                    latent_model_input,
-                    t,
-                    encoder_hidden_states=text_embeddings.to(self.weights_dtype),
-                    class_labels=class_labels,
-                    cross_attention_kwargs=cross_attention_kwargs,
-                ).sample
-
-            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (
-                noise_pred_text - noise_pred_uncond
-            )
-
-            # compute the previous noisy sample x_t -> x_t-1
-            latents = sample_scheduler.step(noise_pred, t, latents).prev_sample
-
-        latents = 1 / pipe.vae.config.scaling_factor * latents
-        images = pipe.vae.decode(latents).sample
-        images = (images / 2 + 0.5).clamp(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
-        images = images.permute(0, 2, 3, 1).float()
-        return images
-
-    def sample_lora(
-        self,
-        prompt_utils: PromptProcessorOutput,
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-        mvp_mtx: Float[Tensor, "B 4 4"],
-        c2w: Float[Tensor, "B 4 4"],
-        seed: int = 0,
-        **kwargs,
-    ) -> Float[Tensor, "N H W 3"]:
-        # input text embeddings, view-independent
-        text_embeddings = prompt_utils.get_text_embeddings(
-            elevation, azimuth, camera_distances, view_dependent_prompting=False
-        )
-
-        if self.cfg.camera_condition_type == "extrinsics":
-            camera_condition = c2w
-        elif self.cfg.camera_condition_type == "mvp":
-            camera_condition = mvp_mtx
-        else:
-            raise ValueError(
-                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
-            )
-
-        B = elevation.shape[0]
-        camera_condition_cfg = torch.cat(
-            [
-                camera_condition.view(B, -1),
-                torch.zeros_like(camera_condition.view(B, -1)),
-            ],
-            dim=0,
-        )
-
-        generator = torch.Generator(device=self.device).manual_seed(seed)
-        return self._sample(
-            sample_scheduler=self.scheduler_lora_sample,
-            pipe=self.pipe_lora,
-            text_embeddings=text_embeddings,
-            num_inference_steps=25,
-            guidance_scale=self.cfg.guidance_scale_lora,
-            class_labels=camera_condition_cfg,
-            cross_attention_kwargs={"scale": 1.0},
-            generator=generator,
-        )
-
-    @torch.cuda.amp.autocast(enabled=False)
-    def encode_images_sd(
-        self, imgs: Float[Tensor, "B 3 512 512"]
-    ) -> Float[Tensor, "B 4 64 64"]:
-        input_dtype = imgs.dtype
-        imgs = imgs * 2.0 - 1.0
-        posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
-        latents = posterior.sample() * self.vae.config.scaling_factor
-        return latents.to(input_dtype)
-
-    @torch.cuda.amp.autocast(enabled=False)
-    def decode_latents_sd(
-        self,
-        latents: Float[Tensor, "B 4 H W"],
-        latent_height: int = 64,
-        latent_width: int = 64,
-    ) -> Float[Tensor, "B 3 512 512"]:
-        input_dtype = latents.dtype
-        latents = F.interpolate(
-            latents, (latent_height, latent_width), mode="bilinear", align_corners=False
-        )
-        latents = 1 / self.vae.config.scaling_factor * latents
-        image = self.vae.decode(latents.to(self.weights_dtype)).sample
-        image = (image * 0.5 + 0.5).clamp(0, 1)
-        return image.to(input_dtype)
-
-    @contextmanager
-    def disable_unet_class_embedding(self, unet: UNet2DConditionModel):
-        class_embedding = unet.class_embedding
-        try:
-            unet.class_embedding = None
-            yield unet
-        finally:
-            unet.class_embedding = class_embedding
 
     # verification - requires `vram_O = False` in load_model_from_config
     @torch.no_grad()

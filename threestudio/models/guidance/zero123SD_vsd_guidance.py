@@ -93,7 +93,7 @@ class ToWeightsDType(nn.Module):
         return self.module(x).to(self.dtype)
 
 
-@threestudio.register("zero123SD-vsd-guidance")
+@threestudio.register("zero123sd-vsd-guidance")
 class Zero123SDVSDGuidance(BaseModule):
     @dataclass
     class Config(BaseModule.Config):
