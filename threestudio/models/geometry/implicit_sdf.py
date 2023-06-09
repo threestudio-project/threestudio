@@ -12,6 +12,7 @@ from threestudio.models.networks import get_encoding, get_mlp
 from threestudio.utils.misc import get_rank
 from threestudio.utils.typing import *
 
+import pytorch_volumetric as pv
 
 @threestudio.register("implicit-sdf")
 class ImplicitSDF(BaseImplicitGeometry):
@@ -50,6 +51,8 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         # no need to removal outlier for SDF
         isosurface_remove_outliers: bool = False
+        smpl_model_dir: str = "/home/penghy/diffusion/avatars/models"
+        smpl_out_dir: str = "smpl.obj"
 
     cfg: Config
 
@@ -80,6 +83,10 @@ class ImplicitSDF(BaseImplicitGeometry):
             self.deformation_network = get_mlp(
                 self.encoding.n_output_dims, 3, self.cfg.mlp_network_config
             )
+        if self.cfg.sdf_bias == "smpl":
+            save_smpl_to_obj(self.cfg.smpl_model_dir, out_dir=self.cfg.smpl_out_dir, bbox=self.bbox)
+            obj = pv.MeshObjectFactory(self.cfg.smpl_out_dir)
+            self.sdf = pv.MeshSDF(obj)
 
     def initialize_shape(self) -> None:
         if self.cfg.shape_init is None and not self.cfg.force_shape_init:
@@ -119,6 +126,9 @@ class ImplicitSDF(BaseImplicitGeometry):
                 assert isinstance(self.cfg.shape_init_params, float)
                 radius = self.cfg.shape_init_params
                 sdf_gt = (points_rand**2).sum(dim=-1, keepdim=True).sqrt() - radius
+            elif self.cfg.shape_init == "smpl":
+                with torch.no_grad():
+                    sdf_gt, sdf_grad = self.sdf(points_rand)
             elif self.cfg.shape_init == "mesh":
                 raise NotImplementedError
             else:
@@ -148,6 +158,9 @@ class ImplicitSDF(BaseImplicitGeometry):
             assert isinstance(self.cfg.sdf_bias_params, float)
             radius = self.cfg.sdf_bias_params
             sdf_bias = (points**2).sum(dim=-1, keepdim=True).sqrt() - radius
+        elif self.cfg.sdf_bias == "smpl":
+            with torch.no_grad():
+                sdf_bias, _ = self.sdf(points)
         elif isinstance(self.cfg.sdf_bias, float):
             sdf_bias = self.cfg.sdf_bias
         else:

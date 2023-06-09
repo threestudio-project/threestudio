@@ -23,6 +23,7 @@ system_type: "fantasia3d-system"
 system:
   geometry_type: "implicit-sdf"
   geometry:
+    radius: 1.0
     n_feature_dims: 0
     isosurface_resolution: 128
     isosurface_deformable_grid: true
