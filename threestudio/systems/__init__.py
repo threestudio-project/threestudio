@@ -7,4 +7,5 @@ from . import (
     prolificdreamer,
     sjc,
     zero123,
+    dreamavatar
 )
