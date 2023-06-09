@@ -29,10 +29,15 @@ class ProlificZero123(BaseLift3DSystem):
         super().configure()
 
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
-        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
-        )
-        self.prompt_utils = self.prompt_processor()
+
+        # When no-prompt-processor is used, will skip
+        try:
+            self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
+                self.cfg.prompt_processor
+            )
+            self.prompt_utils = self.prompt_processor()
+        except KeyError as e:
+            print(e)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         if self.cfg.stage == "geometry":
@@ -111,7 +116,6 @@ class ProlificZero123(BaseLift3DSystem):
         )
         guidance_out, guidance_eval_out = self.guidance(
             guidance_inp,
-            self.prompt_utils,
             **batch,
             rgb_as_latents=False,
             guidance_eval=guidance_eval,

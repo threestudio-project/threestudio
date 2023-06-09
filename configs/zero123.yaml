@@ -85,7 +85,7 @@ system:
     return_comp_normal: ${gt0:${system.loss.lambda_normal_smooth}}
     return_normal_perturb: ${gt0:${system.loss.lambda_3d_normal_smooth}}
 
-  prompt_processor_type: "zero123-prompt-processor"
+  prompt_processor_type: "no-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: ""
     prompt: ""
