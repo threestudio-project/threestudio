@@ -154,7 +154,7 @@ class Zero123VSDGuidance(BaseModule):
         # set up LoRA layers
         print("LoRA-training only unet attention layers")
         self.lora_layers = nn.ModuleList()
-        for n, m in self.model.named_modules():
+        for n, m in self.model_lora.named_modules():
             if isinstance(m, CrossAttention) and n.endswith("attn2"):
                 self.lora_layers.extend(m.setup_lora())
 
@@ -299,6 +299,14 @@ class Zero123VSDGuidance(BaseModule):
         ]
         return cond
 
+    @torch.cuda.amp.autocast(enabled=False)
+    @torch.no_grad()
+    def extract_from_cond(self, cond, n_samples=1) -> dict:
+        only_cond = {}
+        for key in cond:
+            only_cond[key] = [torch.cat(n_samples * [cond[key][0][1:2]])]
+        return only_cond
+
     def compute_grad_vsd(
         self,
         latents: Float[Tensor, "B 4 64 64"],
@@ -381,10 +389,8 @@ class Zero123VSDGuidance(BaseModule):
         noise = torch.randn_like(latents)
         noisy_latents = self.scheduler_lora.add_noise(latents, noise, t)
 
-        # pred noise
-        x_in = torch.cat([noisy_latents] * 2)
-        t_in = torch.cat([t] * 2)
-        noise_pred = self.model.apply_model(x_in, t_in, cond)
+        only_cond = self.extract_from_cond(cond, self.cfg.lora_n_timestamp_samples)
+        noise_pred = self.model_lora.apply_model(noisy_latents, t, only_cond)
 
         return F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
 

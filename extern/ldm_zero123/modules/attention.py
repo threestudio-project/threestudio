@@ -204,8 +204,8 @@ class CrossAttention(nn.Module):
         self.rank = rank
         self.to_q_lora = LoRALinearLayer(self.query_dim, self.inner_dim, rank, network_alpha)
         self.to_k_lora = LoRALinearLayer(self.context_dim, self.inner_dim, rank, network_alpha)
-        self.to_v_lora = LoRALinearLayer(self.inner_dim, self.inner_dim, rank, network_alpha)
-        self.to_out_lora = LoRALinearLayer(self.inner_dim, self.inner_dim, rank, network_alpha)
+        self.to_v_lora = LoRALinearLayer(self.context_dim, self.inner_dim, rank, network_alpha)
+        self.to_out_lora = LoRALinearLayer(self.inner_dim, self.query_dim, rank, network_alpha)
         lora_layers = nn.ModuleList()
         lora_layers.append(self.to_q_lora)
         lora_layers.append(self.to_k_lora)
