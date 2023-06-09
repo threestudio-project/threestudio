@@ -5,6 +5,7 @@ from . import (
     latentnerf,
     magic3d,
     magic3d_multiview,
+    control4d_multiview,
     prolificdreamer,
     sjc,
     zero123,
