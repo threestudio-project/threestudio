@@ -34,6 +34,8 @@ class MultiviewsDataModuleConfig:
     dataroot: str = "dataset/face"
     train_downsample_resolution: int = 3 # 2^3
     eval_downsample_resolution: int = 3 # 2^3
+    train_data_interval: int = 1
+    eval_data_interval: int = 1
     batch_size: int = 1
     eval_batch_size: int = 1
     light_position_perturb: float = 1.0
@@ -53,13 +55,13 @@ class MultiviewIterableDataset(IterableDataset):
         assert camera_dict["camera_model"] == "OPENCV"
 
         frames = camera_dict["frames"]
+        frames = frames[::self.cfg.train_data_interval]
         frames_proj = []
         frames_c2w = []
         frames_position = []
         frames_direction = []
         frames_img = []
 
-        # frames = frames[:30]
         self.frame_w = frames[0]["w"] // scale
         self.frame_h = frames[0]["h"] // scale
         print("Loading frames...")
@@ -85,9 +87,9 @@ class MultiviewIterableDataset(IterableDataset):
                 use_pixel_centers=False
             )
 
-            extr_rot: Float[Tenosr, "3 3"] = extrinsic[:3, :3]
+            extr_rot: Float[Tensor, "3 3"] = extrinsic[:3, :3]
             extr_trans: Float[Tensor, "3 1"] = extrinsic[:3, 3:]
-            c2w_rot: Float[Tenosr, "3 3"] = extr_rot.T
+            c2w_rot: Float[Tensor, "3 3"] = extr_rot.T
             c2w_trans: Float[Tensor, "3 1"] = - extr_rot.T @ extr_trans
             c2w: Float[Tensor, "4 4"] = torch.eye(4)
             c2w[:3, :3] = c2w_rot
@@ -155,6 +157,7 @@ class MultiviewDataset(Dataset):
         assert camera_dict["camera_model"] == "OPENCV"
 
         frames = camera_dict["frames"]
+        frames = frames[::self.cfg.eval_data_interval]
         frames_proj = []
         frames_c2w = []
         frames_position = []
@@ -186,9 +189,9 @@ class MultiviewDataset(Dataset):
                 use_pixel_centers=False
             )
 
-            extr_rot: Float[Tenosr, "3 3"] = extrinsic[:3, :3]
+            extr_rot: Float[Tensor, "3 3"] = extrinsic[:3, :3]
             extr_trans: Float[Tensor, "3 1"] = extrinsic[:3, 3:]
-            c2w_rot: Float[Tenosr, "3 3"] = extr_rot.T
+            c2w_rot: Float[Tensor, "3 3"] = extr_rot.T
             c2w_trans: Float[Tensor, "3 1"] = - extr_rot.T @ extr_trans
             c2w: Float[Tensor, "4 4"] = torch.eye(4)
             c2w[:3, :3] = c2w_rot
