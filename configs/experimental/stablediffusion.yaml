@@ -1,0 +1,17 @@
+system:
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: "A cute panda"
+    front_threshold: 30.
+    back_threshold: 30.
+
+  guidance_type: "stable-diffusion-vsd-guidance"
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1"
+    guidance_scale: 7.5
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+    max_step_percent_annealed: 0.5
+    anneal_start_step: 5000
