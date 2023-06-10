@@ -29,7 +29,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 ## News
-
+- 06/11/2023: An experimental implementation of using Control4D for high-fidelity 3D editing! Follow the instructions [here](https://github.com/threestudio-project/threestudio#control4d-) to give it a try.
 - 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
 - 05/26/2023: Implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
@@ -344,6 +344,23 @@ python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 
 # --------- Stage 3 (Texturing) --------- #
 # texturing with 512x512 rasterization, Stable Difusion VSD guidance
 python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
+```
+
+
+### Control4D [![arXiv](https://img.shields.io/badge/arXiv-2305.20082-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.20082)
+
+**This is an experimental implementation of Control4D using threestudio! Control4D will release full code including static and dynamic editing after paper acceptance**
+
+**Results obtained by threestudio (Control4D, 512x512)**
+
+We currently don't support dynamic editing.
+
+Download the data sample of control4D using this ![link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EcqOaEuNwH1KpR0JTzL4Ur0BO_iJr8RiY2rNAGVC7h3fng?e=Dyr2gu)
+
+```sh
+# --------- Control4D --------- #
+# static editing with 128x128 NeRF + GAN rendering, ~20GB VRAM
+python launch.py --config configs/experimental/control4d-multiviews.yaml --train --gpu 0
 ```
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
