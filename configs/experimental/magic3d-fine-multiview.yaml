@@ -42,17 +42,17 @@ system:
   renderer:
     context_type: cuda
 
-  prompt_processor_type: "stable-diffusion-prompt-processor"
-  prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    prompt: "test"
-
   guidance_type: "controlnet-guidance"
   guidance:
     cache_dir: "/root/autodl-tmp/cache"
     control_type: "canny"
-    min_step_percent: 0.8
-    max_step_percent: 0.98
+    min_step_percent: 0.05
+    max_step_percent: 0.8
+  
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: "Handsome boy, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
 
   loggers:
     wandb:
@@ -61,7 +61,7 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_normal_consistency: 1000.
+    lambda_normal_consistency: 10.
     lambda_l1: 10.
     lambda_p: 10.
 

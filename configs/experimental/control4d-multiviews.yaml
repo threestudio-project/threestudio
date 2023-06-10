@@ -1,21 +1,22 @@
-name: "magic3d-multiview-coarse-sd"
+name: "control4d-multiview"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "multiview-camera-datamodule"
 data:
-  train_downsample_resolution: 2
-  eval_downsample_resolution: 2
+  train_downsample_resolution: 1
+  eval_downsample_resolution: 1
   dataroot: dataset/twindom
 
-system_type: "magic3d-multiview-system"
+system_type: "control4d-multiview-system"
 system:
-  start_editing_step: 10000
+  start_editing_step: 2000
   patch_size: 128
   geometry_type: "implicit-volume"
   geometry:
     radius: 1.
+    n_feature_dims: 35
     normal_type: analytic
     pos_encoding_config:
       otype: HashGrid
@@ -32,17 +33,17 @@ system:
     isosurface_threshold: auto
     isosurface_coarse_to_fine: true
 
-  material_type: "diffuse-with-point-light-material"
+  material_type: "hybrid-rgb-latent-material"
   material:
-    ambient_only_steps: 2001
-    soft_shading: false
-    ambient_light_color: [0.9, 0.9, 0.9]
-    diffuse_light_color: [0.1, 0.1, 0.1]
-    textureless_prob: 0.
+    n_output_dims: 35
 
-  background_type: "neural-environment-map-background"
+  background_type: "solid-rgb-feature-background"
+  background:
+    n_output_dims: 35
+    color: 0.0
+    feature: 0.0
 
-  renderer_type: "nerf-volume-renderer"
+  renderer_type: "gan-volume-renderer"
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
@@ -53,12 +54,13 @@ system:
     control_type: "normal"
     min_step_percent: 0.05
     max_step_percent: 0.8
+    condition_scale: 0.75
   
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     prompt: "Elon Musk wearing white shirt, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
-    negative_prompt: "(overexposed, underexposed, out of focus, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4)"
+    # negative_prompt: "(overexposed, underexposed, out of focus, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck"
 
   loggers:
     wandb:
@@ -73,6 +75,9 @@ system:
     lambda_opaque: 1.0
     lambda_l1: 10.
     lambda_p: 10.
+    lambda_kl: 0.000001
+    lambda_G: 0.0001
+    lambda_D: 1.
   optimizer:
     name: Adam
     args:
@@ -84,6 +89,21 @@ system:
         lr: 0.01
       background:
         lr: 0.001
+      renderer.generator:
+        lr: 0.0002
+      renderer.local_encoder:
+        lr: 0.0001
+      renderer.global_encoder:
+        lr: 0.0001
+    optimizer_dis:
+      name: Adam
+      args:
+        lr: 0.01
+        betas: [0.9, 0.99]
+        eps: 1.e-15
+      params:
+        renderer.discriminator:
+          lr: 0.00001
 
 trainer:
   max_steps: 10000
