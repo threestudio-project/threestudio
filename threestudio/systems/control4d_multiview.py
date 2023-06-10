@@ -87,31 +87,28 @@ class Control4D(BaseLift3DSystem):
         origin_gt_rgb = batch["gt_rgb"]
         B, H, W, C = origin_gt_rgb.shape
         if batch_index in self.edit_frames:
-            batch["gt_rgb"] = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
+            gt_rgb = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
+            gt_rgb = torch.nn.functional.interpolate(
+                gt_rgb.permute(0, 3, 1, 2), (H, W), mode='bilinear', align_corners=False
+            ).permute(0, 2, 3, 1)
+            batch["gt_rgb"] = gt_rgb
+        else:
+            gt_rgb = origin_gt_rgb
         out = self(batch)
         if self.per_editing_step > 0 and self.global_step > self.start_editing_step:
             prompt_utils = self.prompt_processor()
             if not batch_index in self.edit_frames or self.global_step % self.per_editing_step == 0:
                 result = self.guidance(out["comp_gan_rgb"], origin_gt_rgb, prompt_utils)
                 self.edit_frames[batch_index] = result["edit_images"].detach().cpu()
-            gt_rgb = batch["gt_rgb"]
-            gt_rgb = torch.nn.functional.interpolate(
-                gt_rgb.permute(0, 3, 1, 2), (H, W), mode='bilinear', align_corners=False
-            ).permute(0, 2, 3, 1)
-        else:
-            gt_rgb = origin_gt_rgb
         
         loss = 0.0
         # loss of generator level 0
-        loss_l1 = F.l1_loss(out["comp_rgb"], out["comp_gt_rgb"])
-        loss_p = self.perceptual_loss(
-            out["comp_rgb"].permute(0, 3, 1, 2).contiguous(), 
-            out["comp_gt_rgb"].permute(0, 3, 1, 2).contiguous()
-        ).sum()
+        loss_l1 = F.l1_loss(out["comp_int_rgb"], out["comp_gt_rgb"])
+        loss_p = 0.0
         loss_kl = out["posterior"].kl().mean()
         loss_G = generator_loss(self.renderer.discriminator, 
-            out["comp_gan_rgb"].permute(0, 3, 1, 2), 
             gt_rgb.permute(0, 3, 1, 2), 
+            out["comp_gan_rgb"].permute(0, 3, 1, 2), 
             out["comp_rgb"].permute(0, 3, 1, 2).detach()
         )
 
@@ -172,8 +169,8 @@ class Control4D(BaseLift3DSystem):
 
         self.toggle_optimizer(optimizer_d)
         loss_D = discriminator_loss(self.renderer.discriminator, 
-            out["comp_gan_rgb"].permute(0, 3, 1, 2), 
             gt_rgb.permute(0, 3, 1, 2), 
+            out["comp_gan_rgb"].permute(0, 3, 1, 2), 
             out["comp_rgb"].permute(0, 3, 1, 2).detach()
         )
         loss_D *= self.C(self.cfg.loss["lambda_D"])

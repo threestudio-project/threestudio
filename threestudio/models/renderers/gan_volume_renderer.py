@@ -41,10 +41,11 @@ class GANVolumeRenderer(VolumeRenderer):
         background: BaseBackground,
     ) -> None:
         self.base_renderer = NeRFVolumeRenderer(self.cfg, geometry, material, background)
-        self.generator = Generator(ch=64, out_ch=3, ch_mult=(1,2,4), num_res_blocks=2,
+        self.ch_mult = [1, 2, 4]
+        self.generator = Generator(ch=32, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=2,
                  attn_resolutions=[], dropout=0.0, resamp_with_conv=True, in_channels=7,
                  resolution=512, z_channels=16)
-        self.local_encoder = LocalEncoder(ch=32, out_ch=3, ch_mult=(1,2,4), num_res_blocks=1,
+        self.local_encoder = LocalEncoder(ch=32, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=1,
                  attn_resolutions=[], dropout=0.0, resamp_with_conv=True, in_channels=3,
                  resolution=512, z_channels=16)
         self.global_encoder = GlobalEncoder(n_class=64)
@@ -65,19 +66,24 @@ class GANVolumeRenderer(VolumeRenderer):
         B, H, W, _ = rays_o.shape
         if gt_rgb is not None and multi_level_guidance:
             generator_level = torch.randint(0, 3, (1,)).item()
-            # interval = torch.randint(0, 4, (1,)).item()
-            # rays_o = rays_o[:, interval::4, interval::4]
-            # rays_d = rays_d[:, interval::4, interval::4]
+            interval_x = torch.randint(0, 8, (1,)).item()
+            interval_y = torch.randint(0, 8, (1,)).item()
+            int_rays_o = rays_o[:, interval_y::8, interval_x::8]
+            int_rays_d = rays_d[:, interval_y::8, interval_x::8]
+            out = self.base_renderer(int_rays_o, int_rays_d, light_positions, bg_color, **kwargs)
+            comp_int_rgb = out["comp_rgb"][..., :3]
+            comp_gt_rgb = gt_rgb[:, interval_y::8, interval_x::8]
         else:
             generator_level = 0
+        scale_ratio = 2**(len(self.ch_mult) - 1)
         rays_o = torch.nn.functional.interpolate(
-            rays_o.permute(0, 3, 1, 2), (H // 4, W // 4), mode='bilinear').permute(0, 2, 3, 1)
+            rays_o.permute(0, 3, 1, 2), (H // scale_ratio, W // scale_ratio), mode='bilinear'
+        ).permute(0, 2, 3, 1)
         rays_d = torch.nn.functional.interpolate(
-            rays_d.permute(0, 3, 1, 2), (H // 4, W // 4), mode='bilinear').permute(0, 2, 3, 1)
+            rays_d.permute(0, 3, 1, 2), (H // scale_ratio, W // scale_ratio), mode='bilinear'
+        ).permute(0, 2, 3, 1)
+
         out = self.base_renderer(rays_o, rays_d, light_positions, bg_color, **kwargs)
-        # if gt_rgb is not None and multi_level_guidance:
-        #     out["comp_gt_rgb"] = gt_rgb[:, interval::4, interval::4]
-        out["comp_gt_rgb"] = gt_rgb
         comp_rgb = out["comp_rgb"][..., :3]
         latent = out["comp_rgb"][..., 3:]
         out["comp_lr_rgb"] = comp_rgb.clone()
@@ -108,6 +114,12 @@ class GANVolumeRenderer(VolumeRenderer):
             "comp_rgb": comp_rgb.permute(0, 2, 3, 1),
             "generator_level": generator_level
         })
+
+        if gt_rgb is not None and multi_level_guidance:
+            out.update({
+                "comp_int_rgb": comp_int_rgb,
+                "comp_gt_rgb": comp_gt_rgb
+            })
         return out
 
     def update_step(
