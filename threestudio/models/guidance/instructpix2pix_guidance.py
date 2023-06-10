@@ -25,7 +25,7 @@ CONST_SCALE = 0.18215
 class InstructPix2PixGuidance(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
-        cache_dir: str = None
+        cache_dir: Optional[str] = None
         # pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         ddim_scheduler_name_or_path: str = "CompVis/stable-diffusion-v1-4"
         ip2p_name_or_path: str = "timbrooks/instruct-pix2pix"

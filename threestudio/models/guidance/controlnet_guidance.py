@@ -28,7 +28,7 @@ from controlnet_aux import NormalBaeDetector, CannyDetector
 class ControlNetGuidance(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
-        cache_dir: str = None
+        cache_dir: Optional[str] = None
         pretrained_model_name_or_path: str = "SG161222/Realistic_Vision_V2.0"
         ddim_scheduler_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         control_type: str = 'normal' # normal/canny
