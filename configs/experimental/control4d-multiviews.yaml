@@ -7,6 +7,7 @@ data_type: "multiview-camera-datamodule"
 data:
   train_downsample_resolution: 1
   eval_downsample_resolution: 1
+  train_data_interval: 1
   dataroot: dataset/twindom
 
 system_type: "control4d-multiview-system"
@@ -15,13 +16,13 @@ system:
   patch_size: 128
   geometry_type: "implicit-volume"
   geometry:
-    radius: 1.
+    radius: 2.
     n_feature_dims: 35
     normal_type: analytic
     pos_encoding_config:
       otype: HashGrid
       n_levels: 16
-      n_features_per_level: 2
+      n_features_per_level: 8
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.4472692374403782 # max resolution 4096
@@ -50,16 +51,16 @@ system:
 
   guidance_type: "controlnet-guidance"
   guidance:
-    cache_dir: "/root/autodl-tmp/cache"
     control_type: "normal"
     min_step_percent: 0.05
     max_step_percent: 0.8
-    condition_scale: 0.75
+    condition_scale: 1.0
   
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     prompt: "Elon Musk wearing white shirt, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
+    # prompt: "Handsome Thor wearing white shirt, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
     # negative_prompt: "(overexposed, underexposed, out of focus, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck"
 
   loggers:
@@ -76,7 +77,7 @@ system:
     lambda_l1: 10.
     lambda_p: 10.
     lambda_kl: 0.000001
-    lambda_G: 0.0001
+    lambda_G: 0.001
     lambda_D: 1.
   optimizer:
     name: Adam
@@ -90,7 +91,7 @@ system:
       background:
         lr: 0.001
       renderer.generator:
-        lr: 0.0002
+        lr: 0.0001
       renderer.local_encoder:
         lr: 0.0001
       renderer.global_encoder:
@@ -106,7 +107,7 @@ system:
           lr: 0.00001
 
 trainer:
-  max_steps: 10000
+  max_steps: 20000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 200
