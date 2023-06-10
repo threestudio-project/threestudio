@@ -300,8 +300,7 @@ class ControlNetGuidance(BaseObject):
         self,
         rgb: Float[Tensor, "B H W C"],
         cond_rgb: Float[Tensor, "B H W C"],
-        prompt_utils,
-        # text_embeddings, 
+        prompt_utils: PromptProcessorOutput,
         **kwargs,
     ):
         batch_size = rgb.shape[0]
