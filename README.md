@@ -151,6 +151,47 @@ For feature requests, bug reports, or discussions about technical problems, plea
 
 ## Supported Models
 
+### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
+
+**This is an unofficial experimental implementation! Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
+
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/27b42d8f-4aa4-4b47-8ea0-0f77db90fd1e
+
+https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817-4663-a2bf-5e21a076bc3d
+
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1, 512x512 Stage2+3)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
+
+Notable differences from the paper:
+
+- ProlificDreamer adopts a two-stage sampling strategy with 64 coarse samples and 32 fine samples, while we only use 512 coarse samples.
+- In the first stage, we only render 64x64 images at the first 5000 iterations. After that, as the empty space has been effectively pruned, rendering 512x512 images wouldn't cost too much VRAM.
+- We currently don't support multiple particles.
+
+```sh
+# --------- Stage 1 (NeRF) --------- #
+# object generation with 512x512 NeRF rendering, ~30GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
+# if you don't have enough VRAM, try training with 64x64 NeRF rendering, ~15GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
+# using the same model for pretrained and LoRA enables 64x64 training with <10GB VRAM
+# but the quality is worse due to the use of an epsilon prediction model for LoRA training
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1"
+# scene generation with 512x512 NeRF rendering, ~30GB VRAM
+python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
+
+# --------- Stage 2 (Geometry Refinement) --------- #
+# refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance
+python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/ckpts/last.ckpt
+
+# --------- Stage 3 (Texturing) --------- #
+# texturing with 512x512 rasterization, Stable Difusion VSD guidance
+python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
+```
+
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
 **Results obtained by threestudio (DeepFloyd IF, batch size 8)**
@@ -309,44 +350,6 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 **Tips**
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
-
-### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
-
-**This is an unofficial experimental implementation! Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
-
-**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1)**
-
-https://github.com/threestudio-project/threestudio/assets/19284678/27b42d8f-4aa4-4b47-8ea0-0f77db90fd1e
-
-https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817-4663-a2bf-5e21a076bc3d
-
-**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1, 512x512 Stage2/3)**
-
-https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
-
-Notable differences from the paper:
-
-- ProlificDreamer adopts a two-stage sampling strategy with 64 coarse samples and 32 fine samples, while we only use 512 coarse samples.
-- In the first stage, we only render 64x64 images at the first 5000 iterations. After that, as the empty space has been effectively pruned, rendering 512x512 images wouldn't cost too much VRAM.
-- We currently don't support multiple particles.
-
-```sh
-# --------- Stage 1 (NeRF) --------- #
-# object generation with 512x512 NeRF rendering, ~25GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
-# if you don't have enough VRAM, try training with 64x64 NeRF rendering
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
-# scene generation with 512x512 NeRF rendering, ~25GB VRAM
-python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
-
-# --------- Stage 2 (Geometry Refinement) --------- #
-# refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance
-python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/ckpts/last.ckpt
-
-# --------- Stage 3 (Texturing) --------- #
-# texturing with 512x512 rasterization, Stable Difusion VSD guidance
-python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
-```
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
 
