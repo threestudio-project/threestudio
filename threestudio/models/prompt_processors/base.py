@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, BertForMaskedLM
 import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import barrier, cleanup, get_rank
-from threestudio.utils.ops import shifted_expotional_decay, shifted_cosine_decay
+from threestudio.utils.ops import shifted_cosine_decay, shifted_expotional_decay
 from threestudio.utils.typing import *
 
 
@@ -23,13 +23,159 @@ def hash_prompt(model: str, prompt: str) -> str:
     return hashlib.md5(identifier.encode()).hexdigest()
 
 
+@dataclass
+class DirectionConfig:
+    name: str
+    prompt: Callable[[str], str]
+    negative_prompt: Callable[[str], str]
+    condition: Callable[
+        [Float[Tensor, "B"], Float[Tensor, "B"], Float[Tensor, "B"]],
+        Float[Tensor, "B"],
+    ]
+
+
+@dataclass
+class PromptProcessorOutput:
+    text_embeddings: Float[Tensor, "N Nf"]
+    uncond_text_embeddings: Float[Tensor, "N Nf"]
+    text_embeddings_vd: Float[Tensor, "Nv N Nf"]
+    uncond_text_embeddings_vd: Float[Tensor, "Nv N Nf"]
+    directions: List[DirectionConfig]
+    direction2idx: Dict[str, int]
+    use_perp_neg: bool
+    perp_neg_f_sb: Tuple[float, float, float]
+    perp_neg_f_fsb: Tuple[float, float, float]
+    perp_neg_f_fs: Tuple[float, float, float]
+    perp_neg_f_sf: Tuple[float, float, float]
+
+    def get_text_embeddings(
+        self,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        view_dependent_prompting: bool = True,
+    ) -> Float[Tensor, "BB N Nf"]:
+        batch_size = elevation.shape[0]
+
+        if view_dependent_prompting:
+            # Get direction
+            direction_idx = torch.zeros_like(elevation, dtype=torch.long)
+            for d in self.directions:
+                direction_idx[
+                    d.condition(elevation, azimuth, camera_distances)
+                ] = self.direction2idx[d.name]
+
+            # Get text embeddings
+            text_embeddings = self.text_embeddings_vd[direction_idx]  # type: ignore
+            uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]  # type: ignore
+        else:
+            text_embeddings = self.text_embeddings.expand(batch_size, -1, -1)  # type: ignore
+            uncond_text_embeddings = self.uncond_text_embeddings.expand(  # type: ignore
+                batch_size, -1, -1
+            )
+
+        # IMPORTANT: we return (cond, uncond), which is in different order than other implementations!
+        return torch.cat([text_embeddings, uncond_text_embeddings], dim=0)
+
+    def get_text_embeddings_perp_neg(
+        self,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        view_dependent_prompting: bool = True,
+    ) -> Tuple[Float[Tensor, "BBBB N Nf"], Float[Tensor, "B 2"]]:
+        assert (
+            view_dependent_prompting
+        ), "Perp-Neg only works with view-dependent prompting"
+
+        batch_size = elevation.shape[0]
+
+        direction_idx = torch.zeros_like(elevation, dtype=torch.long)
+        for d in self.directions:
+            direction_idx[
+                d.condition(elevation, azimuth, camera_distances)
+            ] = self.direction2idx[d.name]
+        # 0 - side view
+        # 1 - front view
+        # 2 - back view
+        # 3 - overhead view
+
+        pos_text_embeddings = []
+        neg_text_embeddings = []
+        neg_guidance_weights = []
+        uncond_text_embeddings = []
+
+        side_emb = self.text_embeddings_vd[0]
+        front_emb = self.text_embeddings_vd[1]
+        back_emb = self.text_embeddings_vd[2]
+        overhead_emb = self.text_embeddings_vd[3]
+
+        for idx, ele, azi, dis in zip(
+            direction_idx, elevation, azimuth, camera_distances
+        ):
+            azi = shift_azimuth_deg(azi)  # to (-180, 180)
+            uncond_text_embeddings.append(
+                self.uncond_text_embeddings_vd[idx]
+            )  # should be ""
+            if idx.item() == 3:  # overhead view
+                pos_text_embeddings.append(overhead_emb)  # side view
+                # dummy
+                neg_text_embeddings += [
+                    self.uncond_text_embeddings_vd[idx],
+                    self.uncond_text_embeddings_vd[idx],
+                ]
+                neg_guidance_weights += [0.0, 0.0]
+            else:  # interpolating views
+                if torch.abs(azi) < 90:
+                    # front-side interpolation
+                    # 0 - complete side, 1 - complete front
+                    r_inter = 1 - torch.abs(azi) / 90
+                    pos_text_embeddings.append(
+                        r_inter * front_emb + (1 - r_inter) * side_emb
+                    )
+                    neg_text_embeddings += [front_emb, side_emb]
+                    neg_guidance_weights += [
+                        -shifted_expotional_decay(*self.perp_neg_f_fs, r_inter),
+                        -shifted_expotional_decay(*self.perp_neg_f_sf, 1 - r_inter),
+                    ]
+                else:
+                    # side-back interpolation
+                    # 0 - complete back, 1 - complete side
+                    r_inter = 2.0 - torch.abs(azi) / 90
+                    pos_text_embeddings.append(
+                        r_inter * side_emb + (1 - r_inter) * back_emb
+                    )
+                    neg_text_embeddings += [side_emb, front_emb]
+                    neg_guidance_weights += [
+                        -shifted_expotional_decay(*self.perp_neg_f_sb, r_inter),
+                        -shifted_expotional_decay(*self.perp_neg_f_fsb, r_inter),
+                    ]
+
+        text_embeddings = torch.cat(
+            [
+                torch.stack(pos_text_embeddings, dim=0),
+                torch.stack(uncond_text_embeddings, dim=0),
+                torch.stack(neg_text_embeddings, dim=0),
+            ],
+            dim=0,
+        )
+
+        return text_embeddings, torch.as_tensor(
+            neg_guidance_weights, device=elevation.device
+        ).reshape(batch_size, 2)
+
+
+def shift_azimuth_deg(azimuth: Float[Tensor, "..."]) -> Float[Tensor, "..."]:
+    # shift azimuth angle (in degrees), to [-180, 180]
+    return (azimuth + 180) % 360 - 180
+
+
 class PromptProcessor(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
         prompt: str = "a hamburger"
         negative_prompt: str = ""
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
-        view_dependent_prompting: bool = True
         overhead_threshold: float = 60.0
         front_threshold: float = 45.0
         back_threshold: float = 45.0
@@ -37,21 +183,23 @@ class PromptProcessor(BaseObject):
         use_cache: bool = True
         spawn: bool = True
 
-        # for perp-neg
+        # perp neg
         use_perp_neg: bool = False
         # a*e(-b*r) + c
         # a * e(-b) + c = 0
-        #
-        f_sb: Tuple[float, float, float] = (1, 0.5, -0.606)
-        f_fsb: Tuple[float, float, float] = (1, 0.5, +0.967)
-        f_fs: Tuple[float, float, float] = (4, 0.5, -2.426)  # f_fs(1) = 0, a, b > 0
-        f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
+        perp_neg_f_sb: Tuple[float, float, float] = (1, 0.5, -0.606)
+        perp_neg_f_fsb: Tuple[float, float, float] = (1, 0.5, +0.967)
+        perp_neg_f_fs: Tuple[float, float, float] = (
+            4,
+            0.5,
+            -2.426,
+        )  # f_fs(1) = 0, a, b > 0
+        perp_neg_f_sf: Tuple[float, float, float] = (4, 0.5, -2.426)
 
         # prompt debiasing
         use_prompt_debiasing: bool = False
-        debias_pretrained_model_name_or_path: str = "bert-base-uncased"
-        debias_params: dict = field(default_factory=dict)
-        
+        pretrained_model_name_or_path_prompt_debiasing: str = "bert-base-uncased"
+        prompt_debiasing_params: dict = field(default_factory=dict)
 
     cfg: Config
 
@@ -65,16 +213,6 @@ class PromptProcessor(BaseObject):
 
     def configure(self) -> None:
         self._cache_dir = ".threestudio_cache/text_embeddings"  # FIXME: hard-coded path
-
-        @dataclass
-        class DirectionConfig:
-            name: str
-            prompt: Callable[[str], str]
-            negative_prompt: Callable[[str], str]
-            condition: Callable[
-                [Float[Tensor, "B"], Float[Tensor, "B"], Float[Tensor, "B"]],
-                Float[Tensor, "B"],
-            ]
 
         # view-dependent text embeddings
         self.directions: List[DirectionConfig]
@@ -90,15 +228,19 @@ class PromptProcessor(BaseObject):
                     "front",
                     lambda s: f"front view of {s}",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > -self.cfg.front_threshold)
-                    & (azi < self.cfg.front_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > -self.cfg.front_threshold
+                    )
+                    & (shift_azimuth_deg(azi) < self.cfg.front_threshold),
                 ),
                 DirectionConfig(
                     "back",
                     lambda s: f"backside view of {s}",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold)
-                    | (azi < -180 + self.cfg.back_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > 180 - self.cfg.back_threshold
+                    )
+                    | (shift_azimuth_deg(azi) < -180 + self.cfg.back_threshold),
                 ),
                 DirectionConfig(
                     "overhead",
@@ -119,15 +261,19 @@ class PromptProcessor(BaseObject):
                     "front",
                     lambda s: f"{s}, front view",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > -self.cfg.front_threshold)
-                    & (azi < self.cfg.front_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > -self.cfg.front_threshold
+                    )
+                    & (shift_azimuth_deg(azi) < self.cfg.front_threshold),
                 ),
                 DirectionConfig(
                     "back",
                     lambda s: f"{s}, back view",
                     lambda s: s,
-                    lambda ele, azi, dis: (azi > 180 - self.cfg.back_threshold)
-                    | (azi < -180 + self.cfg.back_threshold),
+                    lambda ele, azi, dis: (
+                        shift_azimuth_deg(azi) > 180 - self.cfg.back_threshold
+                    )
+                    | (shift_azimuth_deg(azi) < -180 + self.cfg.back_threshold),
                 ),
                 DirectionConfig(
                     "overhead",
@@ -146,14 +292,20 @@ class PromptProcessor(BaseObject):
         # use provided negative prompt
         self.negative_prompt = self.cfg.negative_prompt
 
-        # view-dependent prompt
+        # view-dependent prompting
         if self.cfg.use_prompt_debiasing:
-            prompts = self.get_debias_prompt(self.prompt)
-            self.prompts_vd = [d.prompt(prompt) for d, prompt in zip(self.directions, prompts)]
+            prompts = self.get_debiased_prompt(self.prompt)
+            self.prompts_vd = [
+                d.prompt(prompt) for d, prompt in zip(self.directions, prompts)
+            ]
         else:
             self.prompts_vd = [d.prompt(self.prompt) for d in self.directions]
-        
+
         # negative prompts
+        threestudio.info(
+            f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
+        )
+
         self.negative_prompts_vd = [
             d.negative_prompt(self.negative_prompt) for d in self.directions
         ]
@@ -254,6 +406,7 @@ class PromptProcessor(BaseObject):
                 raise ValueError(
                     f"Cannot find prompt with keywords {keywords} in library"
                 )
+            threestudio.info("Find matched prompt in library: " + candidate)
             return candidate
         else:
             return prompt
@@ -263,14 +416,20 @@ class PromptProcessor(BaseObject):
     ) -> Tuple[Float[Tensor, "B ..."], Float[Tensor, "B ..."]]:
         raise NotImplementedError
 
-    def get_debias_prompt(self, prompt: str) -> List[str]:
-        tokenizer = AutoTokenizer.from_pretrained(self.cfg.debias_pretrained_model_name_or_path)
-        model = BertForMaskedLM.from_pretrained(self.cfg.debias_pretrained_model_name_or_path)
+    def get_debiased_prompt(self, prompt: str) -> List[str]:
+        tokenizer = AutoTokenizer.from_pretrained(
+            self.cfg.pretrained_model_name_or_path_prompt_debiasing
+        )
+        model = BertForMaskedLM.from_pretrained(
+            self.cfg.pretrained_model_name_or_path_prompt_debiasing
+        )
 
         view_ids = tokenizer(
-            " ".join(self.cfg.debias_params.independent_views), return_tensors="pt").input_ids[0]
+            " ".join(self.cfg.prompt_debiasing_params.independent_views),
+            return_tensors="pt",
+        ).input_ids[0]
         view_ids = view_ids[1:5]
-        
+
         def modulate(prompt):
             prompt_vd = f"This image is depicting a [MASK] view of {prompt}"
             tokens = tokenizer(
@@ -279,7 +438,6 @@ class PromptProcessor(BaseObject):
                 truncation=True,
                 add_special_tokens=True,
                 return_tensors="pt",
-                
             )
             mask_idx = torch.where(tokens.input_ids == tokenizer.mask_token_id)[1]
 
@@ -291,11 +449,11 @@ class PromptProcessor(BaseObject):
 
         prompts = [prompt.split(" ") for _ in range(4)]
         full_probe = modulate(prompt)
-        for idx in self.cfg.debias_params.mask_ids:
+        for idx in self.cfg.prompt_debiasing_params.mask_ids:
             prompt_ = prompt.split(" ")
-            prompt_ = " ".join(prompt_[:idx] + prompt_[(idx + 1):])
+            prompt_ = " ".join(prompt_[:idx] + prompt_[(idx + 1) :])
             part_probe = modulate(prompt_)
-            
+
             pmi = full_probe / torch.lerp(part_probe, full_probe, 0.5)
             for i in range(pmi.shape[0]):
                 if pmi[i].item() < 0.95:
@@ -303,170 +461,27 @@ class PromptProcessor(BaseObject):
 
         prompts = [[word for word in prompt if word] for prompt in prompts]
         prompts = [" ".join(prompt) for prompt in prompts]
-        for d, prompt in zip(self.cfg.debias_params.independent_views, prompts):
-            threestudio.info(f"Debiased Prompt of {d} View is {prompt}")
+        for d, prompt in zip(
+            self.cfg.prompt_debiasing_params.independent_views, prompts
+        ):
+            threestudio.info(f"Debiased prompt of {d} view is {prompt}")
+
+        del tokenizer, model
+        cleanup()
+
         return prompts
 
-    def __call__(
-        self,
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-        **kwargs,
-    ) -> Dict[str, Any]:
-        res = {}
-
-        if self.cfg.view_dependent_prompting:
-            if self.cfg.use_perp_neg:
-                (
-                    uncond_text_embeddings,
-                    pos_text_embeddings,
-                    neg_text_embeddings,
-                    neg_guidance_weights,
-                ) = self.get_perp_neg_view_dependent_text_embeddings(
-                    elevation, azimuth, camera_distances
-                )
-                res.update(
-                    {
-                        "uncond_text_embeddings": uncond_text_embeddings,
-                        "pos_text_embeddings": pos_text_embeddings,
-                        "neg_text_embeddings": neg_text_embeddings,
-                        "neg_guidance_weights": neg_guidance_weights,
-                    }
-                )
-            else:
-                (
-                    text_embeddings,
-                    uncond_text_embeddings,
-                ) = self.get_vanilla_view_dependent_text_embeddings(
-                    elevation, azimuth, camera_distances
-                )
-                res.update(
-                    {
-                        "text_embeddings": torch.cat(
-                            [text_embeddings, uncond_text_embeddings], dim=0
-                        )
-                    }
-                )
-        else:
-            batch_size = elevation.shape[0]
-            text_embeddings = self.text_embeddings.expand(batch_size, -1, -1)  # type: ignore
-            uncond_text_embeddings = self.uncond_text_embeddings.expand(  # type: ignore
-                batch_size, -1, -1
-            )
-
-            # IMPORTANT: we return (cond, uncond), which is in different order than other implementations!
-            res.update(
-                {
-                    "text_embeddings": torch.cat(
-                        [text_embeddings, uncond_text_embeddings], dim=0
-                    )
-                }
-            )
-        return res
-
-    def get_vanilla_view_dependent_text_embeddings(
-        self,
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-    ) -> Tuple[Float[Tensor, "B ..."], Float[Tensor, "B ..."]]:
-        # Get direction
-        direction_idx = torch.zeros_like(elevation, dtype=torch.long)
-        for d in self.directions:
-            direction_idx[
-                d.condition(elevation, azimuth, camera_distances)
-            ] = self.direction2idx[d.name]
-
-        # Get text embeddings
-        text_embeddings = self.text_embeddings_vd[direction_idx]  # type: ignore
-        uncond_text_embeddings = self.uncond_text_embeddings_vd[direction_idx]  # type: ignore
-        return text_embeddings, uncond_text_embeddings
-
-    def get_perp_neg_view_dependent_text_embeddings(
-        self,
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-    ) -> Tuple[
-        Float[Tensor, "B ..."],
-        Float[Tensor, "B ..."],
-        Float[Tensor, "B 2 ..."],
-        Float[Tensor, "B 2"],
-    ]:
-        batch_size = elevation.shape[0]
-
-        direction_idx = torch.zeros_like(elevation, dtype=torch.long)
-        for d in self.directions:
-            direction_idx[
-                d.condition(elevation, azimuth, camera_distances)
-            ] = self.direction2idx[d.name]
-        # 0 - side view
-        # 1 - front view
-        # 2 - back view
-        # 3 - overhead view
-
-        pos_text_embeddings = []
-        neg_text_embeddings = []
-        neg_guidance_weights = []
-        uncond_text_embeddings = []
-
-        side_emb = self.text_embeddings_vd[0]
-        front_emb = self.text_embeddings_vd[1]
-        back_emb = self.text_embeddings_vd[2]
-        overhead_emb = self.text_embeddings_vd[3]
-
-        for idx, ele, azi, dis in zip(
-            direction_idx, elevation, azimuth, camera_distances
-        ):
-            uncond_text_embeddings.append(
-                self.uncond_text_embeddings_vd[idx]
-            )  # should be ""
-            if idx.item() == 3:  # overhead view
-                pos_text_embeddings.append(overhead_emb)  # side view
-                # dummy
-                neg_text_embeddings += [
-                    self.uncond_text_embeddings_vd[idx],
-                    self.uncond_text_embeddings_vd[idx],
-                ]
-                neg_guidance_weights += [0.0, 0.0]
-            else:  # interpolating views
-                if torch.abs(azi) < 90:
-                    # front-side interpolation
-                    # 0 - complete side, 1 - complete front
-                    r_inter = 1 - torch.abs(azi) / 90
-                    pos_text_embeddings.append(
-                        r_inter * front_emb + (1 - r_inter) * side_emb
-                    )
-                    neg_text_embeddings += [front_emb, side_emb]
-                    neg_guidance_weights += [
-                        -shifted_expotional_decay(*self.cfg.f_fs, r_inter),
-                        -shifted_expotional_decay(*self.cfg.f_sf, 1 - r_inter),
-                    ]
-                else:
-                    # side-back interpolation
-                    # 0 - complete back, 1 - complete side
-                    r_inter = 2.0 - torch.abs(azi) / 90
-                    pos_text_embeddings.append(
-                        r_inter * side_emb + (1 - r_inter) * back_emb
-                    )
-                    neg_text_embeddings += [side_emb, front_emb]
-                    neg_guidance_weights += [
-                        -shifted_expotional_decay(*self.cfg.f_sb, r_inter),
-                        -shifted_expotional_decay(*self.cfg.f_fsb, r_inter),
-                    ]
-        uncond_text_embeddings = torch.stack(uncond_text_embeddings, dim=0)
-        pos_text_embeddings = torch.stack(pos_text_embeddings, dim=0)
-        neg_text_embeddings = torch.stack(neg_text_embeddings, dim=0).reshape(
-            batch_size, -1, *uncond_text_embeddings.shape[1:]
-        )
-        neg_guidance_weights = torch.as_tensor(
-            neg_guidance_weights, device=elevation.device
-        ).reshape(batch_size, -1)
-        # breakpoint()
-        return (
-            uncond_text_embeddings,
-            pos_text_embeddings,
-            neg_text_embeddings,
-            neg_guidance_weights,
+    def __call__(self) -> PromptProcessorOutput:
+        return PromptProcessorOutput(
+            text_embeddings=self.text_embeddings,
+            uncond_text_embeddings=self.uncond_text_embeddings,
+            text_embeddings_vd=self.text_embeddings_vd,
+            uncond_text_embeddings_vd=self.uncond_text_embeddings_vd,
+            directions=self.directions,
+            direction2idx=self.direction2idx,
+            use_perp_neg=self.cfg.use_perp_neg,
+            perp_neg_f_sb=self.cfg.perp_neg_f_sb,
+            perp_neg_f_fsb=self.cfg.perp_neg_f_fsb,
+            perp_neg_f_fs=self.cfg.perp_neg_f_fs,
+            perp_neg_f_sf=self.cfg.perp_neg_f_sf,
         )

@@ -7,9 +7,10 @@ from diffusers import IFPipeline
 from diffusers.utils.import_utils import is_xformers_available
 
 import threestudio
+from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
-from threestudio.utils.ops import SpecifyGradient, perpendicular_component
+from threestudio.utils.ops import perpendicular_component
 from threestudio.utils.typing import *
 
 
@@ -33,7 +34,8 @@ class DeepFloydGuidance(BaseObject):
         max_step_percent: float = 0.98
 
         weighting_strategy: str = "sds"
-        use_perp_neg: bool = False
+
+        view_dependent_prompting: bool = True
 
     cfg: Config
 
@@ -80,7 +82,7 @@ class DeepFloydGuidance(BaseObject):
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
 
-        self.unet = self.pipe.unet
+        self.unet = self.pipe.unet.eval()
 
         for p in self.unet.parameters():
             p.requires_grad_(False)
@@ -116,8 +118,12 @@ class DeepFloydGuidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        processor_output: Dict[str, Any],
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
+        **kwargs,
     ):
         batch_size = rgb.shape[0]
 
@@ -138,48 +144,34 @@ class DeepFloydGuidance(BaseObject):
             device=self.device,
         )
 
-        # {
-        #     "uncond_text_embeddings": uncond_text_embeddings,
-        #     "pos_text_embeddings": pos_text_embeddings,
-        #     "neg_text_embeddings": neg_text_embeddings,
-        #     "neg_guidance_weights": neg_guidance_weights,
-        # }
-
-        if self.cfg.use_perp_neg:
-            uncond_text_embeddings = processor_output["uncond_text_embeddings"]
-            pos_text_embeddings = processor_output["pos_text_embeddings"]
-            neg_text_embeddings = processor_output["neg_text_embeddings"]
-            neg_guidance_weights = processor_output["neg_guidance_weights"]
-            n_negtive_prompts = neg_text_embeddings.shape[1]
+        if prompt_utils.use_perp_neg:
+            (
+                text_embeddings,
+                neg_guidance_weights,
+            ) = prompt_utils.get_text_embeddings_perp_neg(
+                elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+            )
             with torch.no_grad():
                 noise = torch.randn_like(latents)
                 latents_noisy = self.scheduler.add_noise(latents, noise, t)
-                input_text_embeddings = torch.cat(
-                    [
-                        uncond_text_embeddings.unsqueeze(0),
-                        pos_text_embeddings.unsqueeze(0),
-                        neg_text_embeddings.permute(1, 0, 2, 3),
-                    ],
-                    dim=0,
-                ).reshape(batch_size * (n_negtive_prompts + 2), *uncond_text_embeddings.shape[1:])
-                latent_model_input = torch.cat([latents_noisy] * (n_negtive_prompts + 2), dim=0)
+                latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
                 noise_pred = self.forward_unet(
                     latent_model_input,
-                    torch.cat([t] * (n_negtive_prompts + 2)),
-                    encoder_hidden_states=input_text_embeddings,
+                    torch.cat([t] * 4),
+                    encoder_hidden_states=text_embeddings,
                 )  # (4B, 6, 64, 64)
 
-            noise_pred_uncond, _ = noise_pred[:batch_size].split(3, dim=1)
-            noise_pred_pos, _ = noise_pred[batch_size : batch_size * 2].split(3, dim=1)
+            noise_pred_text, _ = noise_pred[:batch_size].split(3, dim=1)
+            noise_pred_uncond, _ = noise_pred[batch_size : batch_size * 2].split(
+                3, dim=1
+            )
             noise_pred_neg, _ = noise_pred[batch_size * 2 :].split(3, dim=1)
 
-            e_pos = noise_pred_pos - noise_pred_uncond
+            e_pos = noise_pred_text - noise_pred_uncond
             accum_grad = 0
-            for i in range(n_negtive_prompts):
-                e_i_neg = (
-                    noise_pred_neg[i * batch_size : (i + 1) * batch_size]
-                    - noise_pred_uncond
-                )
+            n_negative_prompts = neg_guidance_weights.shape[-1]
+            for i in range(n_negative_prompts):
+                e_i_neg = noise_pred_neg[i::n_negative_prompts] - noise_pred_uncond
                 accum_grad += neg_guidance_weights[:, i].view(
                     -1, 1, 1, 1
                 ) * perpendicular_component(e_i_neg, e_pos)
@@ -187,9 +179,10 @@ class DeepFloydGuidance(BaseObject):
             noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
                 e_pos + accum_grad
             )
-
         else:
-            text_embeddings = processor_output["text_embeddings"]
+            text_embeddings = prompt_utils.get_text_embeddings(
+                elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+            )
             # predict the noise residual with unet, NO grad!
             with torch.no_grad():
                 # add noise
@@ -243,10 +236,10 @@ class DeepFloydGuidance(BaseObject):
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         target = (latents - grad).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        loss = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
         return {
-            "sds": loss,
+            "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
         }
 

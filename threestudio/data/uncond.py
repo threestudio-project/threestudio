@@ -136,9 +136,10 @@ class RandomCameraIterableDataset(IterableDataset):
             None, :
         ].repeat(self.cfg.batch_size, 1)
 
-        # sample camera perturbations from a normal distribution with mean 0 and std camera_perturb
+        # sample camera perturbations from a uniform distribution [-camera_perturb, camera_perturb]
         camera_perturb: Float[Tensor, "B 3"] = (
-            torch.randn(self.cfg.batch_size, 3) * self.cfg.camera_perturb
+            torch.rand(self.cfg.batch_size, 3) * 2 * self.cfg.camera_perturb
+            - self.cfg.camera_perturb
         )
         camera_positions = camera_positions + camera_perturb
         # sample center perturbations from a normal distribution with mean 0 and std center_perturb
@@ -217,10 +218,14 @@ class RandomCameraIterableDataset(IterableDataset):
         lookat: Float[Tensor, "B 3"] = F.normalize(center - camera_positions, dim=-1)
         right: Float[Tensor, "B 3"] = F.normalize(torch.cross(lookat, up), dim=-1)
         up = F.normalize(torch.cross(right, lookat), dim=-1)
-        c2w: Float[Tensor, "B 3 4"] = torch.cat(
+        c2w3x4: Float[Tensor, "B 3 4"] = torch.cat(
             [torch.stack([right, up, -lookat], dim=-1), camera_positions[:, :, None]],
             dim=-1,
         )
+        c2w: Float[Tensor, "B 4 4"] = torch.cat(
+            [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
+        )
+        c2w[:, 3, 3] = 1.0
 
         # get directions by dividing directions_unit_focal by focal length
         focal_length: Float[Tensor, "B"] = 0.5 * self.cfg.height / torch.tan(0.5 * fovy)
@@ -244,6 +249,7 @@ class RandomCameraIterableDataset(IterableDataset):
             "rays_d": rays_d,
             "mvp_mtx": mvp_mtx,
             "camera_positions": camera_positions,
+            "c2w": c2w,
             "light_positions": light_positions,
             "elevation": elevation_deg,
             "azimuth": azimuth_deg,
@@ -308,10 +314,14 @@ class RandomCameraDataset(Dataset):
         lookat: Float[Tensor, "B 3"] = F.normalize(center - camera_positions, dim=-1)
         right: Float[Tensor, "B 3"] = F.normalize(torch.cross(lookat, up), dim=-1)
         up = F.normalize(torch.cross(right, lookat), dim=-1)
-        c2w: Float[Tensor, "B 3 4"] = torch.cat(
+        c2w3x4: Float[Tensor, "B 3 4"] = torch.cat(
             [torch.stack([right, up, -lookat], dim=-1), camera_positions[:, :, None]],
             dim=-1,
         )
+        c2w: Float[Tensor, "B 4 4"] = torch.cat(
+            [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
+        )
+        c2w[:, 3, 3] = 1.0
 
         # get directions by dividing directions_unit_focal by focal length
         focal_length: Float[Tensor, "B"] = (
@@ -335,9 +345,11 @@ class RandomCameraDataset(Dataset):
 
         self.rays_o, self.rays_d = rays_o, rays_d
         self.mvp_mtx = mvp_mtx
+        self.c2w = c2w
         self.camera_positions = camera_positions
         self.light_positions = light_positions
         self.elevation, self.azimuth = elevation, azimuth
+        self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
         self.camera_distances = camera_distances
 
     def __len__(self):
@@ -349,10 +361,11 @@ class RandomCameraDataset(Dataset):
             "rays_o": self.rays_o[index],
             "rays_d": self.rays_d[index],
             "mvp_mtx": self.mvp_mtx[index],
+            "c2w": self.c2w[index],
             "camera_positions": self.camera_positions[index],
             "light_positions": self.light_positions[index],
-            "elevation": self.elevation[index],
-            "azimuth": self.azimuth[index],
+            "elevation": self.elevation_deg[index],
+            "azimuth": self.azimuth_deg[index],
             "camera_distances": self.camera_distances[index],
         }
 

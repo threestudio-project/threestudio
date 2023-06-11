@@ -17,7 +17,7 @@ system:
   geometry_type: "implicit-volume"
   geometry:
     radius: 2.
-    normal_type: pred
+    normal_type: analytic
     pos_encoding_config:
       otype: HashGrid
       n_levels: 16
@@ -58,9 +58,14 @@ system:
     min_step_percent: 0.02
     max_step_percent: 0.98
 
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
   loss:
     lambda_sds: 1.
-    lambda_orient: 0.
+    lambda_orient: [0, 10., 1000., 5000]
     lambda_sparsity: 1.
     lambda_opaque: 0.
   optimizer:
