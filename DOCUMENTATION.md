@@ -292,13 +292,14 @@ A background with colors parameterized with a texture map.
 
 A background parameterized with a neural network (MLP).
 
-| name                | type  | description                                                                                                                   |
-| ------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------- |
-| color_activation    | str   | The activation mapping the network output to the color. Default: "sigmoid"                                                    |
-| dir_encoding_config | dict  | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3}     |
-| mlp_network_config  | dict  | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
-| random_aug          | bool  | Whether to use random color augmentation. May be able to improve the correctness of the model. Default: False                 |
-| random_aug_prob     | float | The probability to use random color augmentation. Default: 0.5.                                                               |
+| name                | type                               | description                                                                                                                   |
+| ------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| color_activation    | str                                | The activation mapping the network output to the color. Default: "sigmoid"                                                    |
+| dir_encoding_config | dict                               | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3}     |
+| mlp_network_config  | dict                               | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
+| random_aug          | bool                               | Whether to use random color augmentation. May be able to improve the correctness of the model. Default: False                 |
+| random_aug_prob     | float                              | The probability to use random color augmentation. Default: 0.5.                                                               |
+| eval_color          | Optional[Tuple[float,float,float]] | The color used in validation/testing. Default: None                                                                           |
 
 ## Renderers
 

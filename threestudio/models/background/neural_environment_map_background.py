@@ -31,6 +31,7 @@ class NeuralEnvironmentMapBackground(BaseBackground):
         )
         random_aug: bool = False
         random_aug_prob: float = 0.5
+        eval_color: Optional[Tuple[float, float, float]] = None
 
     cfg: Config
 
@@ -43,6 +44,10 @@ class NeuralEnvironmentMapBackground(BaseBackground):
         )
 
     def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B 3"]:
+        if not self.training and self.cfg.eval_color is not None:
+            return torch.ones(*dirs.shape[:-1], self.cfg.n_output_dims).to(
+                dirs
+            ) * torch.as_tensor(self.cfg.eval_color).to(dirs)
         # viewdirs must be normalized before passing to this function
         squeezed_dim = dirs.view(-1, 3).shape[0]
         dirs = (dirs + 1.0) / 2.0  # (-1, 1) => (0, 1)
