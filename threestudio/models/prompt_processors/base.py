@@ -199,7 +199,8 @@ class PromptProcessor(BaseObject):
         # prompt debiasing
         use_prompt_debiasing: bool = False
         pretrained_model_name_or_path_prompt_debiasing: str = "bert-base-uncased"
-        prompt_debiasing_params: dict = field(default_factory=dict)
+        # index of words that can potentially be removed
+        prompt_debiasing_mask_ids: List[int] = field(default_factory=list)
 
     cfg: Config
 
@@ -424,10 +425,8 @@ class PromptProcessor(BaseObject):
             self.cfg.pretrained_model_name_or_path_prompt_debiasing
         )
 
-        view_ids = tokenizer(
-            " ".join(self.cfg.prompt_debiasing_params.independent_views),
-            return_tensors="pt",
-        ).input_ids[0]
+        views = [d.name for d in self.directions]
+        view_ids = tokenizer(" ".join(views), return_tensors="pt").input_ids[0]
         view_ids = view_ids[1:5]
 
         def modulate(prompt):
@@ -449,9 +448,9 @@ class PromptProcessor(BaseObject):
 
         prompts = [prompt.split(" ") for _ in range(4)]
         full_probe = modulate(prompt)
-        for idx in self.cfg.prompt_debiasing_params.mask_ids:
-            prompt_ = prompt.split(" ")
-            prompt_ = " ".join(prompt_[:idx] + prompt_[(idx + 1) :])
+        for idx in self.cfg.prompt_debiasing_mask_ids:
+            words = prompt.split(" ")
+            prompt_ = " ".join(words[:idx] + words[(idx + 1) :])
             part_probe = modulate(prompt_)
 
             pmi = full_probe / torch.lerp(part_probe, full_probe, 0.5)
@@ -459,17 +458,14 @@ class PromptProcessor(BaseObject):
                 if pmi[i].item() < 0.95:
                     prompts[i][idx] = ""
 
-        prompts = [[word for word in prompt if word] for prompt in prompts]
-        prompts = [" ".join(prompt) for prompt in prompts]
-        for d, prompt in zip(
-            self.cfg.prompt_debiasing_params.independent_views, prompts
-        ):
-            threestudio.info(f"Debiased prompt of {d} view is {prompt}")
+        debiased_prompts = [" ".join([word for word in p if word]) for p in prompts]
+        for d, debiased_prompt in zip(views, debiased_prompts):
+            threestudio.info(f"Debiased prompt of {d} view is [{debiased_prompt}]")
 
         del tokenizer, model
         cleanup()
 
-        return prompts
+        return debiased_prompts
 
     def __call__(self) -> PromptProcessorOutput:
         return PromptProcessorOutput(

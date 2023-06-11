@@ -77,7 +77,7 @@ class DreamFusion(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"val/it{self.true_global_step}-{batch['index'][0]}.png",
+            f"it{self.true_global_step}-{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
