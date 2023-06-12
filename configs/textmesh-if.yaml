@@ -25,7 +25,7 @@ system:
     finite_difference_normal_eps: progressive
 
     sdf_bias: sphere
-    sdf_bias_params: 0.8
+    sdf_bias_params: 0.5
 
     # coarse to fine hash grid encoding
     pos_encoding_config:
@@ -42,11 +42,11 @@ system:
   material_type: "diffuse-with-point-light-material"
   material:
     ambient_only_steps: 2001
-    albedo_activation: scale_-11_01
+    albedo_activation: sigmoid
 
   background_type: "neural-environment-map-background"
   background:
-    color_activation: scale_-11_01
+    color_activation: sigmoid
 
   renderer_type: "neus-volume-renderer"
   renderer:
