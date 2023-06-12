@@ -72,7 +72,14 @@ class NeRFVolumeRenderer(VolumeRenderer):
             t_positions = (t_starts + t_ends) / 2.0
             t_dirs = rays_d_flatten[ray_indices]
             positions = t_origins + t_dirs * t_positions
-            sigma = self.geometry.forward_density(positions)[..., 0]
+            if self.training:
+                sigma = self.geometry.forward_density(positions)[..., 0]
+            else:
+                sigma = chunk_batch(
+                    self.geometry.forward_density,
+                    self.cfg.eval_chunk_size,
+                    positions,
+                )[..., 0]
             return sigma
 
         if not self.cfg.grid_prune:
