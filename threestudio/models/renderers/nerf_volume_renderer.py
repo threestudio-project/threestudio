@@ -24,6 +24,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
         randomized: bool = True
         eval_chunk_size: int = 160000
         grid_prune: bool = True
+        prune_alpha_threshold: bool = True
         return_comp_normal: bool = False
         return_normal_perturb: bool = False
 
@@ -65,6 +66,22 @@ class NeRFVolumeRenderer(VolumeRenderer):
         )
         n_rays = rays_o_flatten.shape[0]
 
+        def sigma_fn(t_starts, t_ends, ray_indices):
+            t_starts, t_ends = t_starts[..., None], t_ends[..., None]
+            t_origins = rays_o_flatten[ray_indices]
+            t_positions = (t_starts + t_ends) / 2.0
+            t_dirs = rays_d_flatten[ray_indices]
+            positions = t_origins + t_dirs * t_positions
+            if self.training:
+                sigma = self.geometry.forward_density(positions)[..., 0]
+            else:
+                sigma = chunk_batch(
+                    self.geometry.forward_density,
+                    self.cfg.eval_chunk_size,
+                    positions,
+                )[..., 0]
+            return sigma
+
         if not self.cfg.grid_prune:
             with torch.no_grad():
                 ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
@@ -82,9 +99,9 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
                     rays_o_flatten,
                     rays_d_flatten,
-                    sigma_fn=None,
+                    sigma_fn=sigma_fn if self.cfg.prune_alpha_threshold else None,
                     render_step_size=self.render_step_size,
-                    alpha_thre=0.0,
+                    alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
                     stratified=self.randomized,
                     cone_angle=0.0,
                 )
