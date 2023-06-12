@@ -17,12 +17,12 @@ system:
   geometry_type: "implicit-volume"
   geometry:
     radius: 2.
-    n_feature_dims: 35
+    n_feature_dims: 11
     normal_type: analytic
     pos_encoding_config:
       otype: HashGrid
       n_levels: 16
-      n_features_per_level: 8
+      n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.4472692374403782 # max resolution 4096
@@ -36,11 +36,12 @@ system:
 
   material_type: "hybrid-rgb-latent-material"
   material:
-    n_output_dims: 35
+    n_output_dims: 11
+    requires_normal: true
 
   background_type: "solid-rgb-feature-background"
   background:
-    n_output_dims: 35
+    n_output_dims: 11
     color: 0.0
     feature: 0.0
 
