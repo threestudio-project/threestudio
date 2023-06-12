@@ -7,9 +7,9 @@ from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 
 import threestudio
+from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import C, parse_version
-from threestudio.utils.ops import SpecifyGradient
+from threestudio.utils.misc import C, cleanup, parse_version
 from threestudio.utils.typing import *
 
 
@@ -30,6 +30,8 @@ class StableDiffusionGuidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
+        max_step_percent_annealed: float = 0.5
+        anneal_start_step: Optional[int] = None
 
         use_sjc: bool = False
         var_red: bool = True
@@ -37,6 +39,8 @@ class StableDiffusionGuidance(BaseObject):
 
         token_merging: bool = False
         token_merging_params: Optional[dict] = field(default_factory=dict)
+
+        view_dependent_prompting: bool = True
 
     cfg: Config
 
@@ -80,9 +84,12 @@ class StableDiffusionGuidance(BaseObject):
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
 
+        del self.pipe.text_encoder
+        cleanup()
+
         # Create model
-        self.vae = self.pipe.vae
-        self.unet = self.pipe.unet
+        self.vae = self.pipe.vae.eval()
+        self.unet = self.pipe.unet.eval()
 
         for p in self.vae.parameters():
             p.requires_grad_(False)
@@ -249,8 +256,12 @@ class StableDiffusionGuidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        text_embeddings: Float[Tensor, "BB 77 768"],
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
+        **kwargs,
     ):
         batch_size = rgb.shape[0]
 
@@ -266,6 +277,10 @@ class StableDiffusionGuidance(BaseObject):
             )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
+
+        text_embeddings = prompt_utils.get_text_embeddings(
+            elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+        )
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
@@ -286,12 +301,14 @@ class StableDiffusionGuidance(BaseObject):
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
-        # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)
-        # latents.backward(grad, retain_graph=True)
+        # loss = SpecifyGradient.apply(latents, grad)
+        # SpecifyGradient is not straghtforward, use a reparameterization trick instead
+        target = (latents - grad).detach()
+        # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
+        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
         return {
-            "sds": loss,
+            "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
         }
 
@@ -301,3 +318,12 @@ class StableDiffusionGuidance(BaseObject):
         # http://arxiv.org/abs/2303.15413
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+        # t annealing from ProlificDreamer
+        if (
+            self.cfg.anneal_start_step is not None
+            and global_step > self.cfg.anneal_start_step
+        ):
+            self.max_step = int(
+                self.num_train_timesteps * self.cfg.max_step_percent_annealed
+            )

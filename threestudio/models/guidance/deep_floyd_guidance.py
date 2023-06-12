@@ -7,9 +7,9 @@ from diffusers import IFPipeline
 from diffusers.utils.import_utils import is_xformers_available
 
 import threestudio
+from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
-from threestudio.utils.ops import SpecifyGradient
 from threestudio.utils.typing import *
 
 
@@ -33,6 +33,8 @@ class DeepFloydGuidance(BaseObject):
         max_step_percent: float = 0.98
 
         weighting_strategy: str = "sds"
+
+        view_dependent_prompting: bool = True
 
     cfg: Config
 
@@ -79,7 +81,7 @@ class DeepFloydGuidance(BaseObject):
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
 
-        self.unet = self.pipe.unet
+        self.unet = self.pipe.unet.eval()
 
         for p in self.unet.parameters():
             p.requires_grad_(False)
@@ -115,8 +117,12 @@ class DeepFloydGuidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        text_embeddings: Float[Tensor, "BB 77 768"],
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
+        **kwargs,
     ):
         batch_size = rgb.shape[0]
 
@@ -126,6 +132,10 @@ class DeepFloydGuidance(BaseObject):
         rgb_BCHW = rgb_BCHW * 2.0 - 1.0  # scale to [-1, 1] to match the diffusion range
         latents = F.interpolate(
             rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
+        )
+
+        text_embeddings = prompt_utils.get_text_embeddings(
+            elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
         )
 
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
@@ -186,12 +196,14 @@ class DeepFloydGuidance(BaseObject):
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
-        # since we omitted an item in grad, we need to use the custom function to specify the gradient
-        loss = SpecifyGradient.apply(latents, grad)
-        # latents.backward(grad, retain_graph=True)
+        # loss = SpecifyGradient.apply(latents, grad)
+        # SpecifyGradient is not straghtforward, use a reparameterization trick instead
+        target = (latents - grad).detach()
+        # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
+        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
         return {
-            "sds": loss,
+            "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
         }
 

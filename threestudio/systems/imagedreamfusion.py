@@ -32,7 +32,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
         super().on_fit_start()
         # only used in training
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor, self.trainer
+            self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
@@ -44,6 +44,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                 {"type": "rgb", "img": image, "kwargs": {"data_format": "HWC"}}
                 for image in all_images
             ],
+            name="fit_start",
+            step=self.true_global_step,
         )
 
     def training_step(self, batch, batch_idx):
@@ -111,12 +113,16 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     valid_gt_depth, valid_pred_depth
                 )
         else:
-            text_embeddings = self.prompt_processor(**batch)
+            prompt_utils = self.prompt_processor()
             guidance_out = self.guidance(
-                out["comp_rgb"], text_embeddings, rgb_as_latents=False
+                out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
             )
 
-            loss += guidance_out["sds"]
+        loss = 0.0
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
             if "normal" not in out:
@@ -159,10 +165,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
         self.log("train/loss", loss, prog_bar=True)
 
         return {"loss": loss}
-        # self.manual_backward(loss)
-        # opt.step()
-        # sch = self.lr_schedulers()
-        # sch.step()
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
@@ -205,6 +207,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
+            name="validation_step",
+            step=self.true_global_step,
         )
 
     def on_validation_epoch_end(self):
@@ -251,6 +255,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
+            name="test_step",
+            step=self.true_global_step,
         )
 
     def on_test_epoch_end(self):
@@ -260,4 +266,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
+            name="test",
+            step=self.true_global_step,
         )

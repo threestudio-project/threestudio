@@ -1,13 +1,16 @@
+import bisect
 import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
+import threestudio
 from threestudio import register
+from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_device
 from threestudio.utils.ops import (
@@ -21,8 +24,11 @@ from threestudio.utils.typing import *
 
 @dataclass
 class RandomCameraDataModuleConfig:
-    height: int = 64
-    width: int = 64
+    # height and width should be Union[int, List[int]]
+    # but OmegaConf does not support Union of containers
+    height: Any = 64
+    width: Any = 64
+    resolution_milestones: List[int] = field(default_factory=lambda: [])
     eval_height: int = 512
     eval_width: int = 512
     batch_size: int = 1
@@ -48,13 +54,42 @@ class RandomCameraDataModuleConfig:
     batch_uniform_azimuth: bool = True
 
 
-class RandomCameraIterableDataset(IterableDataset):
+class RandomCameraIterableDataset(IterableDataset, Updateable):
     def __init__(self, cfg: Any) -> None:
         super().__init__()
         self.cfg: RandomCameraDataModuleConfig = cfg
-        self.directions_unit_focal = get_ray_directions(
-            H=self.cfg.height, W=self.cfg.width, focal=1.0
+        self.heights: List[int] = (
+            [self.cfg.height] if isinstance(self.cfg.height, int) else self.cfg.height
         )
+        self.widths: List[int] = (
+            [self.cfg.width] if isinstance(self.cfg.width, int) else self.cfg.width
+        )
+        assert len(self.heights) == len(self.widths)
+        self.resolution_milestones: List[int]
+        if len(self.heights) == 1 and len(self.widths) == 1:
+            if len(self.cfg.resolution_milestones) > 0:
+                threestudio.warn(
+                    "Ignoring resolution_milestones since height and width are not changing"
+                )
+            self.resolution_milestones = [-1]
+        else:
+            assert len(self.heights) == len(self.cfg.resolution_milestones) + 1
+            self.resolution_milestones = [-1] + self.cfg.resolution_milestones
+
+        self.directions_unit_focals = [
+            get_ray_directions(H=height, W=width, focal=1.0)
+            for (height, width) in zip(self.heights, self.widths)
+        ]
+        self.height: int = self.heights[0]
+        self.width: int = self.widths[0]
+        self.directions_unit_focal = self.directions_unit_focals[0]
+
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
+        self.height = self.heights[size_ind]
+        self.width = self.widths[size_ind]
+        self.directions_unit_focal = self.directions_unit_focals[size_ind]
+        threestudio.debug(f"Training height: {self.height}, width: {self.width}")
 
     def __iter__(self):
         while True:
@@ -136,9 +171,10 @@ class RandomCameraIterableDataset(IterableDataset):
             None, :
         ].repeat(self.cfg.batch_size, 1)
 
-        # sample camera perturbations from a normal distribution with mean 0 and std camera_perturb
+        # sample camera perturbations from a uniform distribution [-camera_perturb, camera_perturb]
         camera_perturb: Float[Tensor, "B 3"] = (
-            torch.randn(self.cfg.batch_size, 3) * self.cfg.camera_perturb
+            torch.rand(self.cfg.batch_size, 3) * 2 * self.cfg.camera_perturb
+            - self.cfg.camera_perturb
         )
         camera_positions = camera_positions + camera_perturb
         # sample center perturbations from a normal distribution with mean 0 and std center_perturb
@@ -217,13 +253,17 @@ class RandomCameraIterableDataset(IterableDataset):
         lookat: Float[Tensor, "B 3"] = F.normalize(center - camera_positions, dim=-1)
         right: Float[Tensor, "B 3"] = F.normalize(torch.cross(lookat, up), dim=-1)
         up = F.normalize(torch.cross(right, lookat), dim=-1)
-        c2w: Float[Tensor, "B 3 4"] = torch.cat(
+        c2w3x4: Float[Tensor, "B 3 4"] = torch.cat(
             [torch.stack([right, up, -lookat], dim=-1), camera_positions[:, :, None]],
             dim=-1,
         )
+        c2w: Float[Tensor, "B 4 4"] = torch.cat(
+            [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
+        )
+        c2w[:, 3, 3] = 1.0
 
         # get directions by dividing directions_unit_focal by focal length
-        focal_length: Float[Tensor, "B"] = 0.5 * self.cfg.height / torch.tan(0.5 * fovy)
+        focal_length: Float[Tensor, "B"] = 0.5 * self.height / torch.tan(0.5 * fovy)
         directions: Float[Tensor, "B H W 3"] = self.directions_unit_focal[
             None, :, :, :
         ].repeat(self.cfg.batch_size, 1, 1, 1)
@@ -235,7 +275,7 @@ class RandomCameraIterableDataset(IterableDataset):
         rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
 
         proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.cfg.width / self.cfg.height, 0.1, 1000.0
+            fovy, self.width / self.height, 0.1, 1000.0
         )  # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
 
@@ -244,12 +284,13 @@ class RandomCameraIterableDataset(IterableDataset):
             "rays_d": rays_d,
             "mvp_mtx": mvp_mtx,
             "camera_positions": camera_positions,
+            "c2w": c2w,
             "light_positions": light_positions,
             "elevation": elevation_deg,
             "azimuth": azimuth_deg,
             "camera_distances": camera_distances,
-            "height": self.cfg.height,
-            "width": self.cfg.width,
+            "height": self.height,
+            "width": self.width,
         }
 
 
@@ -308,10 +349,14 @@ class RandomCameraDataset(Dataset):
         lookat: Float[Tensor, "B 3"] = F.normalize(center - camera_positions, dim=-1)
         right: Float[Tensor, "B 3"] = F.normalize(torch.cross(lookat, up), dim=-1)
         up = F.normalize(torch.cross(right, lookat), dim=-1)
-        c2w: Float[Tensor, "B 3 4"] = torch.cat(
+        c2w3x4: Float[Tensor, "B 3 4"] = torch.cat(
             [torch.stack([right, up, -lookat], dim=-1), camera_positions[:, :, None]],
             dim=-1,
         )
+        c2w: Float[Tensor, "B 4 4"] = torch.cat(
+            [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
+        )
+        c2w[:, 3, 3] = 1.0
 
         # get directions by dividing directions_unit_focal by focal length
         focal_length: Float[Tensor, "B"] = (
@@ -329,15 +374,17 @@ class RandomCameraDataset(Dataset):
 
         rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
         proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.cfg.width / self.cfg.height, 0.1, 1000.0
+            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.1, 1000.0
         )  # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
 
         self.rays_o, self.rays_d = rays_o, rays_d
         self.mvp_mtx = mvp_mtx
+        self.c2w = c2w
         self.camera_positions = camera_positions
         self.light_positions = light_positions
         self.elevation, self.azimuth = elevation, azimuth
+        self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
         self.camera_distances = camera_distances
 
     def __len__(self):
@@ -349,10 +396,11 @@ class RandomCameraDataset(Dataset):
             "rays_o": self.rays_o[index],
             "rays_d": self.rays_d[index],
             "mvp_mtx": self.mvp_mtx[index],
+            "c2w": self.c2w[index],
             "camera_positions": self.camera_positions[index],
             "light_positions": self.light_positions[index],
-            "elevation": self.elevation[index],
-            "azimuth": self.azimuth[index],
+            "elevation": self.elevation_deg[index],
+            "azimuth": self.azimuth_deg[index],
             "camera_distances": self.camera_distances[index],
         }
 
@@ -384,7 +432,9 @@ class RandomCameraDataModule(pl.LightningDataModule):
     def general_loader(self, dataset, batch_size, collate_fn=None) -> DataLoader:
         return DataLoader(
             dataset,
-            num_workers=1,  # type: ignore
+            # very important to disable multi-processing if you want to change self attributes at runtime!
+            # (for example setting self.width and self.height in update_step)
+            num_workers=0,  # type: ignore
             batch_size=batch_size,
             collate_fn=collate_fn,
         )

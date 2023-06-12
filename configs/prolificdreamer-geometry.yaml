@@ -1,0 +1,84 @@
+name: "prolificdreamer-geometry"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "random-camera-datamodule"
+data:
+  batch_size: 1
+  width: 512
+  height: 512
+  camera_distance_range: [1.0, 1.5]
+  fovy_range: [40, 70]
+  elevation_range: [-10, 45]
+  camera_perturb: 0.
+  center_perturb: 0.
+  up_perturb: 0.
+  eval_camera_distance: 1.5
+  eval_fovy_deg: 70.
+
+system_type: "prolificdreamer-system"
+system:
+  stage: geometry
+  geometry_convert_from: ???
+  geometry_type: "tetrahedra-sdf-grid"
+  geometry:
+    radius: 1.0 # consistent with coarse
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
+    geometry_only: true
+
+  material_type: "no-material" # unused
+  material:
+    n_output_dims: 0
+
+  background_type: "solid-color-background" # unused
+
+  renderer_type: "nvdiff-rasterizer"
+  renderer:
+    context_type: gl
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: lib:michelangelo_dog
+
+  guidance_type: "stable-diffusion-guidance"
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    guidance_scale: 100.
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+    weighting_strategy: sds
+    max_step_percent_annealed: 0.5
+    anneal_start_step: 5000
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+
+  loss:
+    lambda_sds: 1.
+    lambda_normal_consistency: 10000.
+    lambda_laplacian_smoothness: 10000.
+
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.005
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+
+trainer:
+  max_steps: 15000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 1
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 32
+
+checkpoint:
+  save_last: true
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

@@ -9,13 +9,20 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="threestudio" src="https://user-images.githubusercontent.com/3117031/236739017-365626d9-bb35-4c47-b71d-b9de767b0644.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/de81cb0c-2fdb-4241-817a-0439f28747e8.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2c83fd3f-7542-45c2-8856-9202c2871028.png" width="100%">
 </p>
 
 <p align="center"><b>
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
-| <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
+| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
 </b></p>
+
+<p align="center">
+  <a href="https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg">
+  </a>
+</p>
 
 <p align="center">
     Did not find what you want? Submit a feature request or upvote others' requests <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
@@ -23,6 +30,10 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
+- 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
+- 05/26/2023: Implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
+- 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
+- 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
 
 ![export-blender](https://github.com/threestudio-project/threestudio/assets/19284678/ccae2820-e702-484c-a43f-81678a365427)
@@ -109,6 +120,9 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 r
 # note that the above commands use parsed configuration files from previous trials
 # which will continue using the same trial directory
 # if you want to save to a new trial directory, replace parsed.yaml with raw.yaml in the command
+
+# only load weights from saved checkpoint but dont resume training (i.e. dont load optimizer state):
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 system.weights=path/to/trial/configs/last.ckpt
 ```
 
 ### Export Meshes
@@ -119,9 +133,14 @@ To export the scene to texture meshes, use the `--export` option. We currently s
 # this uses default mesh-exporter configurations which exports obj+mtl
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter
 # specify system.exporter.fmt=obj to get obj with vertex colors
+# you may also add system.exporter.save_uv=false to accelerate the process, suitable for a quick peek of the result
 python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.exporter.fmt=obj
+# for NeRF-based methods (DreamFusion, Magic3D coarse, Latent-NeRF, SJC)
+# you may need to adjust the isosurface threshold (25 by default) to get satisfying outputs
+# decrease the threshold if the extracted model is incomplete, increase if it is extruded
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_threshold=10.
 # use marching cubes of higher resolutions to get more detailed models
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.geometry.isosurface_method=mc system.geometry.isosurface_resolution=256
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/configs/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_method=mc-cpu system.geometry.isosurface_resolution=256
 ```
 
 For all the options you can specify when exporting, see [the documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#exporters).
@@ -131,6 +150,47 @@ See [here](https://github.com/threestudio-project/threestudio#supported-models) 
 For feature requests, bug reports, or discussions about technical problems, please [file an issue](https://github.com/threestudio-project/threestudio/issues/new). In case you want to discuss the generation quality or showcase your generation results, please feel free to participate in the [discussion panel](https://github.com/threestudio-project/threestudio/discussions).
 
 ## Supported Models
+
+### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
+
+**This is an unofficial experimental implementation! Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
+
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/27b42d8f-4aa4-4b47-8ea0-0f77db90fd1e
+
+https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817-4663-a2bf-5e21a076bc3d
+
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1, 512x512 Stage2+3)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
+
+Notable differences from the paper:
+
+- ProlificDreamer adopts a two-stage sampling strategy with 64 coarse samples and 32 fine samples, while we only use 512 coarse samples.
+- In the first stage, we only render 64x64 images at the first 5000 iterations. After that, as the empty space has been effectively pruned, rendering 512x512 images wouldn't cost too much VRAM.
+- We currently don't support multiple particles.
+
+```sh
+# --------- Stage 1 (NeRF) --------- #
+# object generation with 512x512 NeRF rendering, ~30GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
+# if you don't have enough VRAM, try training with 64x64 NeRF rendering, ~15GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
+# using the same model for pretrained and LoRA enables 64x64 training with <10GB VRAM
+# but the quality is worse due to the use of an epsilon prediction model for LoRA training
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1"
+# scene generation with 512x512 NeRF rendering, ~30GB VRAM
+python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
+
+# --------- Stage 2 (Geometry Refinement) --------- #
+# refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance
+python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/ckpts/last.ckpt
+
+# --------- Stage 3 (Texturing) --------- #
+# texturing with 512x512 rasterization, Stable Difusion VSD guidance
+python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
+```
 
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
@@ -176,6 +236,8 @@ https://user-images.githubusercontent.com/19284678/236694858-0ed6939e-cd7a-408f-
 
 - We use open-source T2I models (StableDiffusion, DeepFloyd IF) for the coarse stage, while the paper uses eDiff-I.
 - In the coarse stage, we use a guiandance scale of 20 for DeepFloyd IF, while the paper uses 100 for eDiff-I.
+- In the coarse stage, we use analytic normal, while the paper uses predicted normal.
+- In the coarse stage, we use orientation loss as in DreamFusion, while the paper does not.
 - There are many things that are ommited from the paper such as the weighting of loss terms and the DMTet grid resolution, which could be different.
 
 **Example running commands**
@@ -193,18 +255,19 @@ Then convert the NeRF from the coarse stage to DMTet and train with differentiab
 
 ```sh
 # the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
-# NOTE: the meaning of system.from_coarse has changed from cfff05, it is now the path to the coarse stage weights instead of a boolean value
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt
-# if you're unsatisfied with the surface extraced using automatically determined threshold,
-# you can specify a threshold value using `system.coarse_geometry_override`
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.from_coarse=path/to/coarse/stage/trial/ckpts/last.ckpt system.coarse_geometry_override.isosurface_threshold=10.
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/ckpts/last.ckpt
+# if you're unsatisfied with the surface extraced using the default threshold (25)
+# you can specify a threshold value using `system.geometry_convert_override`
+# decrease the value if the extracted surface is incomplete, increate if it is extruded
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/ckpts/last.ckpt system.geometry_convert_override.isosurface_threshold=10.
 ```
 
 **Tips**
 
 - For the coarse stage, DeepFloyd IF performs **way better than** StableDiffusion.
-- Magic3D uses a neural network to predict the surface normal, which may not resemble the true geometric normal, so it's common to see that your object becomes extremely dark after `system.material.ambient_only_steps`.
+- Magic3D uses a neural network to predict the surface normal, which may not resemble the true geometric normal and degrade geometry quality, so we use analytic normal instead.
 - Try increasing/decreasing `system.loss.lambda_sparsity` if your scene is stuffed with floaters/becoming empty.
+- Try increasing/decreasing `system.loss.lambda_orient` if you object is foggy/over-smoothed.
 - Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
 
 ### Score Jacobian Chaining [![arXiv](https://img.shields.io/badge/arXiv-2212.00774-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2212.00774)
@@ -258,6 +321,14 @@ python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system
 
 https://user-images.githubusercontent.com/19284678/236694880-33b0db21-4530-47f1-9c3b-c70357bc84b3.mp4
 
+**Results obtained by threestudio (Stable Diffusion, mesh initialization)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/762903c1-665b-47b5-a2c2-bd7021a9e548.mp4
+
+<p align="center">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2d22e30f-4a32-454a-a06e-d6e6bd2a1b96.png" width="100%">
+</p>
+
 Notable differences from the paper: N/A.
 
 We currently only implement the geometry stage of Fantasia3D.
@@ -270,11 +341,45 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 # the default shape is a sphere with radius 0.5
 # change the shape initialization to match your input prompt
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="The leaning tower of Pisa" system.geometry.shape_init=ellipsoid system.geometry.shape_init_params="[0.3,0.3,0.8]"
+# or you can initialize from a mesh
+# here shape_init_params is the scale of the shape
+# also make sure to input the correct up and front axis (in +x, +y, +z, -x, -y, -z)
+python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="hulk" system.geometry.shape_init=mesh:load/shapes/human.obj system.geometry.shape_init_params=0.9 system.geometry.shape_init_mesh_up=+y system.geometry.shape_init_mesh_front=+z
 ```
 
 **Tips**
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
+
+### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
+
+**Installation**
+
+Download pretrained weights into `load/zero123`:
+
+```sh
+cd load/zero123
+wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
+```
+
+**Results obtained by threestudio (Zero-1-to-3, 128x128, 25000 iterations)**
+
+https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668-461f-abe5-668e7b42cd50
+
+**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
+
+**IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
+
+```sh
+# object geneartion with 64x64 NeRF rendering, ~14GB VRAM
+python launch.py --config configs/zero123.yaml --train --gpu 0
+```
+
+**Guidance evaluation**
+
+Also includes evaluation of the guidance during training. If `system.freq.guidance_eval` is set to a value > 0, this will save rendered image, noisy image (noise added mentioned at top left), 1-step-denoised image, 1-step prediction of original image, fully denoised image. For example:
+
+![it143-train](https://github.com/threestudio-project/threestudio/assets/22424247/c8e7d835-4937-4852-bfb0-3e906e6b66b7)
 
 ### More to come, please stay tuned.
 
@@ -295,6 +400,7 @@ It's important to note that existing techniques that lift 2D T2I models to 3D ca
 - **Train longer.** This helps if you can already obtain reasonable results and would like to enhance the details. If the result is still a mess after several thousand steps, training for a longer time often won't help. You can set the total training iterations by `trainer.max_steps=N`.
 - **Try different seeds.** This is a simple solution if your results have correct overall geometry but suffer from the multi-face Janus problem. You can change the seed by setting `seed=N`. Good luck!
 - **Tuning regularization weights.** Some methods have regularizaion terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/threestudio-project/threestudio#supported-models) for more detailed instructions.
+- **Try debiasing methods.** When conventional SDS techniques like DreamFusion, Magic3D, SJC, and others fail to produce the desired 3D results, Debiased Score Distillation Sampling (D-SDS) can be a solution. D-SDS is devised to tackle challenges such as artifacts or the Janus problem, employing two strategies: score debiasing and prompt debiasing. You can activate score debiasing by just setting `system.guidance.grad_clip=[0,0.5,2.0,10000]`, where the order is `start_step, start_value, end_value, end_step`. Prompt debiasing is currently under development. For a detailed explanation of these techniques, refer to [the D-SDS paper](https://arxiv.org/abs/2303.15413) or check [the project page](https://susunghong.github.io/Debiased-Score-Distillation-Sampling/).
 
 ## VRAM Optimization
 
@@ -310,6 +416,17 @@ If you encounter CUDA OOM error, try the following in order (roughly sorted by r
 ## Documentation
 
 threestudio use [OmegaConf](https://github.com/omry/omegaconf) to manage configurations. You can literally change anything inside the yaml configuration file or by adding command line arguments without `--`. We list all arguments that you can change in the configuration in our [documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md). Happy experimenting!
+
+## wandb (Weights & Biases) logging
+
+To enable the (experimental) wandb support, set `system.loggers.wandb.enable=true`, e.g.:
+
+```bash
+python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wandb.enable=true`
+```
+
+If you're using a corporate wandb server, you may first need to login to your wandb instance, e.g.:
+`wandb login --host=https://COMPANY_XYZ.wandb.io --relogin`
 
 ## Contributing to threestudio
 

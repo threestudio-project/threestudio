@@ -42,6 +42,11 @@ class Updateable:
         pass
 
 
+def update_if_possible(module: Any, epoch: int, global_step: int) -> None:
+    if isinstance(module, Updateable):
+        module.do_update_step(epoch, global_step)
+
+
 class BaseObject(Updateable):
     @dataclass
     class Config:
