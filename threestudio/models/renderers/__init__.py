@@ -5,4 +5,5 @@ from . import (
     neus_volume_renderer,
     nvdiff_rasterizer,
     gan_volume_renderer,
+    patch_renderer,
 )
