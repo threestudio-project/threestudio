@@ -588,8 +588,11 @@ class Decoder(nn.Module):
         h = self.norm_out(h)
         h = nonlinearity(h)
         h = self.conv_out(h)
-        # rgb = rgb + torch.tanh(h)
-        # return rgb
+
+        rgb = torch.nn.functional.interpolate(rgb, scale_factor=4.0, mode="bilinear")
+        rgb = torch.sigmoid(torch.logit(rgb, eps=1e-3) + h)
+        return rgb
+    
         return torch.sigmoid(h)
 
 

@@ -40,14 +40,15 @@ class GANVolumeRenderer(VolumeRenderer):
         material: BaseMaterial,
         background: BaseBackground,
     ) -> None:
-        self.base_renderer = NeRFVolumeRenderer(self.cfg, geometry, material, background)
+        cfg_copy = self.cfg.copy()
+        self.base_renderer = NeRFVolumeRenderer(cfg_copy, geometry, material, background)
         self.ch_mult = [1, 2, 4]
-        self.generator = Generator(ch=32, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=2,
+        self.generator = Generator(ch=32, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=1,
                  attn_resolutions=[], dropout=0.0, resamp_with_conv=True, in_channels=7,
-                 resolution=512, z_channels=16)
+                 resolution=512, z_channels=4)
         self.local_encoder = LocalEncoder(ch=32, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=1,
                  attn_resolutions=[], dropout=0.0, resamp_with_conv=True, in_channels=3,
-                 resolution=512, z_channels=16)
+                 resolution=512, z_channels=4)
         self.global_encoder = GlobalEncoder(n_class=64)
         self.discriminator = NLayerDiscriminator(input_nc=6,
             n_layers=3, use_actnorm=False, ndf=64
@@ -89,9 +90,11 @@ class GANVolumeRenderer(VolumeRenderer):
         out["comp_lr_rgb"] = comp_rgb.clone()
 
         posterior = DiagonalGaussianDistribution(latent.permute(0, 3, 1, 2))
-        z_map = posterior.sample()
-        # z_map = posterior.mode()
-        lr_rgb = comp_rgb.permute(0, 3, 1, 2).detach()
+        if multi_level_guidance:
+            z_map = posterior.sample()
+        else:
+            z_map = posterior.mode()
+        lr_rgb = comp_rgb.permute(0, 3, 1, 2)
 
         if generator_level == 0:
             g_code_rgb = self.global_encoder(F.interpolate(lr_rgb, (224, 224)))
@@ -104,9 +107,9 @@ class GANVolumeRenderer(VolumeRenderer):
             l_code_rgb = self.local_encoder(gt_rgb.permute(0, 3, 1, 2))
             posterior = DiagonalGaussianDistribution(l_code_rgb)
             z_map = posterior.sample()
-            # z_map = posterior.mode()
             comp_gan_rgb = self.generator(torch.cat([lr_rgb, z_map], dim=1), g_code_rgb)
 
+        
         comp_rgb = F.interpolate(comp_rgb.permute(0, 3, 1, 2), (H, W), mode='bilinear')
         out.update({
             "posterior": posterior,
