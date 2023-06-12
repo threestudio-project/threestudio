@@ -19,7 +19,6 @@ class TextMesh(BaseLift3DSystem):
     def configure(self):
         # create geometry, material, background, renderer
         super().configure()
-        self.automatic_optimization = False
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -31,7 +30,7 @@ class TextMesh(BaseLift3DSystem):
         super().on_fit_start()
         # only used in training
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor, self.trainer
+            self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
@@ -40,14 +39,17 @@ class TextMesh(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
-        text_embeddings = self.prompt_processor(**batch)
+        prompt_utils = self.prompt_processor()
         guidance_out = self.guidance(
-            out["comp_rgb"], text_embeddings, rgb_as_latents=False
+            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
         )
 
         loss = 0.0
 
-        loss += guidance_out["sds"] * self.C(self.cfg.loss.lambda_sds)
+        for name, value in guidance_out.items():
+            self.log(f"train/{name}", value)
+            if name.startswith("loss_"):
+                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
         self.log("train/loss_sparsity", loss_sparsity)
@@ -69,10 +71,7 @@ class TextMesh(BaseLift3DSystem):
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
-        opt = self.optimizers()
-        opt.zero_grad()
-        self.manual_backward(loss)
-        opt.step()
+        return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
@@ -104,9 +103,6 @@ class TextMesh(BaseLift3DSystem):
                 },
             ],
         )
-        # mesh = self.geometry.isosurface()
-        # self.save_mesh("sphere.obj", mesh.v_pos, mesh.t_pos_idx)
-        # exit(1)
 
     def on_validation_epoch_end(self):
         pass

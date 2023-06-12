@@ -36,6 +36,7 @@ class NeuSVolumeRenderer(VolumeRenderer):
         randomized: bool = True
         eval_chunk_size: int = 160000
         grid_prune: bool = True
+        prune_alpha_threshold: bool = True
         learned_variance_init: float = 0.3
         cos_anneal_end_steps: int = 0
 
@@ -102,6 +103,31 @@ class NeuSVolumeRenderer(VolumeRenderer):
         )
         n_rays = rays_o_flatten.shape[0]
 
+        def alpha_fn(t_starts, t_ends, ray_indices):
+            t_starts, t_ends = t_starts[..., None], t_ends[..., None]
+            t_origins = rays_o_flatten[ray_indices]
+            t_positions = (t_starts + t_ends) / 2.0
+            t_dirs = rays_d_flatten[ray_indices]
+            positions = t_origins + t_dirs * t_positions
+            if self.training:
+                sdf = self.geometry.forward_sdf(positions)[..., 0]
+            else:
+                sdf = chunk_batch(
+                    self.geometry.forward_sdf,
+                    self.cfg.eval_chunk_size,
+                    positions,
+                )[..., 0]
+
+            inv_std = self.variance(sdf)
+            estimated_next_sdf = sdf - self.render_step_size * 0.5
+            estimated_prev_sdf = sdf + self.render_step_size * 0.5
+            prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
+            next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
+            p = prev_cdf - next_cdf
+            c = prev_cdf
+            alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
+            return alpha
+
         if not self.cfg.grid_prune:
             with torch.no_grad():
                 ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
@@ -119,9 +145,9 @@ class NeuSVolumeRenderer(VolumeRenderer):
                 ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
                     rays_o_flatten,
                     rays_d_flatten,
-                    alpha_fn=None,
+                    alpha_fn=alpha_fn if self.cfg.prune_alpha_threshold else None,
                     render_step_size=self.render_step_size,
-                    alpha_thre=0.0,
+                    alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
                     stratified=self.randomized,
                     cone_angle=0.0,
                 )

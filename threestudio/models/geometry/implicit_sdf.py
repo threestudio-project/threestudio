@@ -42,7 +42,9 @@ class ImplicitSDF(BaseImplicitGeometry):
         normal_type: Optional[
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
-        finite_difference_normal_eps: float = 0.01
+        finite_difference_normal_eps: Union[
+            float, str
+        ] = 0.01  # in [float, "progressive"]
         shape_init: Optional[str] = None
         shape_init_params: Optional[Any] = None
         shape_init_mesh_up: str = "+z"
@@ -83,6 +85,8 @@ class ImplicitSDF(BaseImplicitGeometry):
             self.deformation_network = get_mlp(
                 self.encoding.n_output_dims, 3, self.cfg.mlp_network_config
             )
+
+        self.finite_difference_normal_eps: Optional[float] = None
 
     def initialize_shape(self) -> None:
         if self.cfg.shape_init is None and not self.cfg.force_shape_init:
@@ -255,7 +259,8 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":
-                eps = self.cfg.finite_difference_normal_eps
+                assert self.finite_difference_normal_eps is not None
+                eps: float = self.finite_difference_normal_eps
                 offsets: Float[Tensor, "6 3"] = torch.as_tensor(
                     [
                         [eps, 0.0, 0.0],
@@ -340,3 +345,31 @@ class ImplicitSDF(BaseImplicitGeometry):
             }
         )
         return out
+
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        if self.cfg.normal_type == "finite_difference":
+            if isinstance(self.cfg.finite_difference_normal_eps, float):
+                self.finite_difference_eps = self.cfg.finite_difference_normal_eps
+            elif self.cfg.finite_difference_normal_eps == "progressive":
+                # progressive finite difference eps from Neuralangelo
+                # https://arxiv.org/abs/2306.03092
+                hg_conf: Any = self.cfg.pos_encoding_config
+                assert (
+                    hg_conf.otype == "ProgressiveBandHashGrid"
+                ), "finite_difference_normal_eps=progressive only works with ProgressiveBandHashGrid"
+                current_level = min(
+                    hg_conf.start_level
+                    + max(global_step - hg_conf.start_step, 0) // hg_conf.update_steps,
+                    hg_conf.n_levels,
+                )
+                grid_res = hg_conf.base_resolution * hg_conf.per_level_scale ** (
+                    current_level - 1
+                )
+                grid_size = 2 * self.cfg.radius / grid_res
+                if grid_size != self.finite_difference_normal_eps:
+                    threestudio.info(f"Update finite_difference_eps to {grid_size}")
+                self.finite_difference_normal_eps = grid_size
+            else:
+                raise ValueError(
+                    f"Unknown finite_difference_normal_eps={self.cfg.finite_difference_normal_eps}"
+                )

@@ -6,8 +6,6 @@ seed: 0
 data_type: "random-camera-datamodule"
 data:
   batch_size: 1
-  eval_width: 64
-  eval_height: 64
   width: 64
   height: 64
   camera_distance_range: [1.5, 2.0]
@@ -22,38 +20,24 @@ system:
   geometry_type: "implicit-sdf"
   geometry:
     radius: 2.0
-    normal_type: "analytic"
+    normal_type: finite_difference
+    # progressive eps from Neuralangelo
+    finite_difference_normal_eps: progressive
 
-    # shape_init: sphere
-    # shape_init_params: 0.3
+    sdf_bias: sphere
+    sdf_bias_params: 0.8
 
     # coarse to fine hash grid encoding
-    # to ensure smooth analytic normals
-    # pos_encoding_config:
-    #   otype: ProgressiveBandHashGrid
-    #   n_levels: 16
-    #   n_features_per_level: 2
-    #   log2_hashmap_size: 19
-    #   base_resolution: 16
-    #   per_level_scale: 1.447269237440378 # max resolution 4096
-    #   start_level: 8 # resolution ~200
-    #   start_step: 2000
-    #   update_steps: 500
     pos_encoding_config:
-      otype: HashGrid
+      otype: ProgressiveBandHashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
-      per_level_scale: 1.447269237440378 # max resolution 4096
-      include_xyz: true
-    mlp_network_config:
-      otype: SphereInitVanillaMLP
-      activation: ReLU
-      n_neurons: 64
-      n_hidden_layers: 1
-      sphere_init_radius: 0.5
-      inside_out: false
+      per_level_scale: 1.381912879967776 # max resolution 2048
+      start_level: 8 # resolution ~200
+      start_step: 2000
+      update_steps: 500
 
   material_type: "diffuse-with-point-light-material"
   material:
@@ -96,12 +80,16 @@ system:
       betas: [0.9, 0.99]
       eps: 1.e-15
     params:
-      geometry:
+      geometry.encoding:
         lr: 0.01
+      geometry.sdf_network:
+        lr: 0.001
+      geometry.feature_network:
+        lr: 0.001
       background:
         lr: 0.001
       renderer:
-        lr: 0.01
+        lr: 0.001
 
 trainer:
   max_steps: 10000
