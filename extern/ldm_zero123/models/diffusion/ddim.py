@@ -4,7 +4,6 @@ from functools import partial
 
 import numpy as np
 import torch
-from einops import rearrange
 from tqdm import tqdm
 
 from extern.ldm_zero123.models.diffusion.sampling_util import (

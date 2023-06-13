@@ -17,7 +17,7 @@ from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup
 from threestudio.utils.typing import *
 
-from extern.ldm_zero123.modules.attention import CrossAttention
+from extern.ldm_zero123.modules.attention import BasicTransformerBlock, CrossAttention
 
 
 def get_obj_from_str(string, reload=False):
@@ -155,8 +155,14 @@ class Zero123VSDGuidance(BaseModule):
         print("LoRA-training only unet attention layers")
         self.lora_layers = nn.ModuleList()
         for n, m in self.model_lora.named_modules():
+            if isinstance(m, BasicTransformerBlock) and n.endswith(
+                "transformer_blocks.0"
+            ):
+                tx = m
             if isinstance(m, CrossAttention) and n.endswith("attn2"):
-                self.lora_layers.extend(m.setup_lora())
+                tx.checkpoint = False
+                m.setup_lora()
+                self.lora_layers.append(m.lora_layers)
 
         # timesteps: use diffuser for convenience... hope it's alright.
         self.num_train_timesteps = self.config.model.params.timesteps
@@ -426,6 +432,8 @@ class Zero123VSDGuidance(BaseModule):
 
         cond = self.get_cond(elevation, azimuth, camera_distances)
 
+        loss_lora = self.train_lora(latents, cond)
+
         grad, guidance_eval_out = self.compute_grad_vsd(latents, cond, guidance_eval)
 
         grad = torch.nan_to_num(grad)
@@ -434,8 +442,6 @@ class Zero123VSDGuidance(BaseModule):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-
-        loss_lora = self.train_lora(latents, cond)
 
         guidance_out = {
             "loss_vsd": loss_vsd,
