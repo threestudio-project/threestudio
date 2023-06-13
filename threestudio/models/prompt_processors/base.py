@@ -174,6 +174,12 @@ class PromptProcessor(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
         prompt: str = "a hamburger"
+
+        # manually assigned view-dependent prompts
+        prompt_side: Optional[str] = None
+        prompt_back: Optional[str] = None
+        prompt_overhead: Optional[str] = None
+
         negative_prompt: str = ""
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         overhead_threshold: float = 60.0
@@ -200,7 +206,7 @@ class PromptProcessor(BaseObject):
         use_prompt_debiasing: bool = False
         pretrained_model_name_or_path_prompt_debiasing: str = "bert-base-uncased"
         # index of words that can potentially be removed
-        prompt_debiasing_mask_ids: List[int] = field(default_factory=list)
+        prompt_debiasing_mask_ids: Optional[List[int]] = None
 
     cfg: Config
 
@@ -293,19 +299,34 @@ class PromptProcessor(BaseObject):
         # use provided negative prompt
         self.negative_prompt = self.cfg.negative_prompt
 
+        threestudio.info(
+            f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
+        )
+
         # view-dependent prompting
         if self.cfg.use_prompt_debiasing:
+            assert (
+                self.cfg.prompt_side is None
+                and self.cfg.prompt_back is None
+                and self.cfg.prompt_overhead is None
+            ), "Do not manually assign prompt_side, prompt_back or prompt_overhead when using prompt debiasing"
             prompts = self.get_debiased_prompt(self.prompt)
             self.prompts_vd = [
                 d.prompt(prompt) for d, prompt in zip(self.directions, prompts)
             ]
         else:
-            self.prompts_vd = [d.prompt(self.prompt) for d in self.directions]
+            self.prompts_vd = [
+                d.prompt(self.cfg.get(f"prompt_{d.name}", None) or self.prompt)  # type: ignore
+                for d in self.directions
+            ]
 
-        # negative prompts
-        threestudio.info(
-            f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
+        prompts_vd_display = " ".join(
+            [
+                f"[{d.name}]:[{prompt}]"
+                for prompt, d in zip(self.prompts_vd, self.directions)
+            ]
         )
+        threestudio.info(f"Using view-dependent prompts {prompts_vd_display}")
 
         self.negative_prompts_vd = [
             d.negative_prompt(self.negative_prompt) for d in self.directions
@@ -418,6 +439,8 @@ class PromptProcessor(BaseObject):
         raise NotImplementedError
 
     def get_debiased_prompt(self, prompt: str) -> List[str]:
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
         tokenizer = AutoTokenizer.from_pretrained(
             self.cfg.pretrained_model_name_or_path_prompt_debiasing
         )
@@ -448,7 +471,15 @@ class PromptProcessor(BaseObject):
 
         prompts = [prompt.split(" ") for _ in range(4)]
         full_probe = modulate(prompt)
-        for idx in self.cfg.prompt_debiasing_mask_ids:
+        n_words = len(prompt.split(" "))
+        prompt_debiasing_mask_ids = (
+            self.cfg.prompt_debiasing_mask_ids
+            if self.cfg.prompt_debiasing_mask_ids is not None
+            else list(range(n_words))
+        )
+        words_to_debias = [prompt.split(" ")[idx] for idx in prompt_debiasing_mask_ids]
+        threestudio.info(f"Words that can potentially be removed: {words_to_debias}")
+        for idx in prompt_debiasing_mask_ids:
             words = prompt.split(" ")
             prompt_ = " ".join(words[:idx] + words[(idx + 1) :])
             part_probe = modulate(prompt_)
@@ -460,7 +491,7 @@ class PromptProcessor(BaseObject):
 
         debiased_prompts = [" ".join([word for word in p if word]) for p in prompts]
         for d, debiased_prompt in zip(views, debiased_prompts):
-            threestudio.info(f"Debiased prompt of {d} view is [{debiased_prompt}]")
+            threestudio.info(f"Debiased prompt of the {d} view is [{debiased_prompt}]")
 
         del tokenizer, model
         cleanup()
