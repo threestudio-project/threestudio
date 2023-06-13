@@ -349,7 +349,9 @@ class ImplicitSDF(BaseImplicitGeometry):
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         if self.cfg.normal_type == "finite_difference":
             if isinstance(self.cfg.finite_difference_normal_eps, float):
-                self.finite_difference_eps = self.cfg.finite_difference_normal_eps
+                self.finite_difference_normal_eps = (
+                    self.cfg.finite_difference_normal_eps
+                )
             elif self.cfg.finite_difference_normal_eps == "progressive":
                 # progressive finite difference eps from Neuralangelo
                 # https://arxiv.org/abs/2306.03092
@@ -367,7 +369,9 @@ class ImplicitSDF(BaseImplicitGeometry):
                 )
                 grid_size = 2 * self.cfg.radius / grid_res
                 if grid_size != self.finite_difference_normal_eps:
-                    threestudio.info(f"Update finite_difference_eps to {grid_size}")
+                    threestudio.info(
+                        f"Update finite_difference_normal_eps to {grid_size}"
+                    )
                 self.finite_difference_normal_eps = grid_size
             else:
                 raise ValueError(

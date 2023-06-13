@@ -51,6 +51,18 @@ class TextMesh(BaseLift3DSystem):
             if name.startswith("loss_"):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
+        if self.C(self.cfg.loss.lambda_orient) > 0:
+            if "normal" not in out:
+                raise ValueError(
+                    "Normal is required for orientation loss, no normal is found in the output."
+                )
+            loss_orient = (
+                out["weights"].detach()
+                * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
+            ).sum() / (out["opacity"] > 0).sum()
+            self.log("train/loss_orient", loss_orient)
+            loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
+
         loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
         self.log("train/loss_sparsity", loss_sparsity)
         loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
