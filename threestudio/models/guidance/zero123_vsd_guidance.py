@@ -310,7 +310,7 @@ class Zero123VSDGuidance(BaseModule):
     def extract_from_cond(self, cond, n_samples=1) -> dict:
         only_cond = {}
         for key in cond:
-            only_cond[key] = [torch.cat(n_samples * [cond[key][0][1:2]])]
+            only_cond[key] = [torch.cat(n_samples * [cond[key][0][-len(cond[key][0])//2:]])]
         return only_cond
 
     def compute_grad_vsd(
@@ -432,8 +432,6 @@ class Zero123VSDGuidance(BaseModule):
 
         cond = self.get_cond(elevation, azimuth, camera_distances)
 
-        loss_lora = self.train_lora(latents, cond)
-
         grad, guidance_eval_out = self.compute_grad_vsd(latents, cond, guidance_eval)
 
         grad = torch.nan_to_num(grad)
@@ -442,6 +440,8 @@ class Zero123VSDGuidance(BaseModule):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+
+        loss_lora = self.train_lora(latents, cond)
 
         guidance_out = {
             "loss_vsd": loss_vsd,
