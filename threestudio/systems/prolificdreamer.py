@@ -1,11 +1,9 @@
 import os
+import shutil
 from dataclasses import dataclass, field
-
-import torch
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
-from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
@@ -113,7 +111,7 @@ class ProlificDreamer(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}.png",
+            f"it{self.true_global_step}-val/{batch['index'][0]}.png",
             (
                 [
                     {
@@ -136,6 +134,7 @@ class ProlificDreamer(BaseLift3DSystem):
                 if "comp_normal" in out
                 else []
             )
+            + [{"type": "grayscale", "img": out["depth"][0], "kwargs": {}}]
             + [
                 {
                     "type": "grayscale",
@@ -169,7 +168,19 @@ class ProlificDreamer(BaseLift3DSystem):
             )
 
     def on_validation_epoch_end(self):
-        pass
+        filestem = f"it{self.true_global_step}-val"
+        self.save_img_sequence(
+            filestem,
+            filestem,
+            "(\d+)\.png",
+            save_format="mp4",
+            fps=30,
+            name="validation_epoch_end",
+            step=self.true_global_step,
+        )
+        shutil.rmtree(
+            os.path.join(self.get_save_dir(), f"it{self.true_global_step}-val")
+        )
 
     def test_step(self, batch, batch_idx):
         out = self(batch)
