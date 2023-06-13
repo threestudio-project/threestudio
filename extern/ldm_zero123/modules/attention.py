@@ -212,142 +212,38 @@ class CrossAttention(nn.Module):
         self.lora_layers.append(self.to_v_lora)
         self.lora_layers.append(self.to_out_lora)
 
-    def batch_to_head_dim(self, tensor):
-        head_size = self.heads
-        batch_size, seq_len, dim = tensor.shape
-        tensor = tensor.reshape(batch_size // head_size, head_size, seq_len, dim)
-        tensor = tensor.permute(0, 2, 1, 3).reshape(batch_size // head_size, seq_len, dim * head_size)
-        return tensor
-
-    def head_to_batch_dim(self, tensor, out_dim=3):
-        head_size = self.heads
-        batch_size, seq_len, dim = tensor.shape
-        tensor = tensor.reshape(batch_size, seq_len, head_size, dim // head_size)
-        tensor = tensor.permute(0, 2, 1, 3)
-
-        if out_dim == 3:
-            tensor = tensor.reshape(batch_size * head_size, seq_len, dim // head_size)
-
-        return tensor
-
-    def get_attention_scores(self, query, key, attention_mask=None):
-        dtype = query.dtype
-        # if self.upcast_attention:
-        #     query = query.float()
-        #     key = key.float()
-
-        if attention_mask is None:
-            baddbmm_input = torch.empty(
-                query.shape[0], query.shape[1], key.shape[1], dtype=query.dtype, device=query.device
-            )
-            beta = 0
-        else:
-            baddbmm_input = attention_mask
-            beta = 1
-
-        attention_scores = torch.baddbmm(
-            baddbmm_input,
-            query,
-            key.transpose(-1, -2),
-            beta=beta,
-            alpha=self.scale,
-        )
-        del baddbmm_input
-
-        # if self.upcast_softmax:
-        #     attention_scores = attention_scores.float()
-
-        attention_probs = attention_scores.softmax(dim=-1)
-        del attention_scores
-
-        attention_probs = attention_probs.to(dtype)
-
-        return attention_probs
-
-    def prepare_attention_mask(self, attention_mask, target_length, batch_size=None, out_dim=3):
-        if batch_size is None:
-            # deprecate(
-            #     "batch_size=None",
-            #     "0.0.15",
-            #     (
-            #         "Not passing the `batch_size` parameter to `prepare_attention_mask` can lead to incorrect"
-            #         " attention mask preparation and is deprecated behavior. Please make sure to pass `batch_size` to"
-            #         " `prepare_attention_mask` when preparing the attention_mask."
-            #     ),
-            # )
-            batch_size = 1
-
-        head_size = self.heads
-        if attention_mask is None:
-            return attention_mask
-
-        current_length: int = attention_mask.shape[-1]
-        if current_length != target_length:
-            if attention_mask.device.type == "mps":
-                # HACK: MPS: Does not support padding by greater than dimension of input tensor.
-                # Instead, we can manually construct the padding tensor.
-                padding_shape = (attention_mask.shape[0], attention_mask.shape[1], target_length)
-                padding = torch.zeros(padding_shape, dtype=attention_mask.dtype, device=attention_mask.device)
-                attention_mask = torch.cat([attention_mask, padding], dim=2)
-            else:
-                # TODO: for pipelines such as stable-diffusion, padding cross-attn mask:
-                #       we want to instead pad by (0, remaining_length), where remaining_length is:
-                #       remaining_length: int = target_length - current_length
-                # TODO: re-enable tests/models/test_models_unet_2d_condition.py#test_model_xattn_padding
-                attention_mask = F.pad(attention_mask, (0, target_length), value=0.0)
-
-        if out_dim == 3:
-            if attention_mask.shape[0] < batch_size * head_size:
-                attention_mask = attention_mask.repeat_interleave(head_size, dim=0)
-        elif out_dim == 4:
-            attention_mask = attention_mask.unsqueeze(1)
-            attention_mask = attention_mask.repeat_interleave(head_size, dim=1)
-
-        return attention_mask
-
     def forward(self, x, context=None, mask=None):
-        # h = self.heads
-        context = default(context, x)
+        h = self.heads
 
         q = self.to_q(x)
+        context = default(context, x)
         k = self.to_k(context)
         v = self.to_v(context)
 
         if self.lora:
-            # with torch.enable_grad():
             q += self.to_q_lora(x)
             k += self.to_k_lora(context)
             v += self.to_v_lora(context)
 
-        # q, k, v = map(lambda t: rearrange(t, "b n (h d) -> (b h) n d", h=h), (q, k, v))
-        q = self.head_to_batch_dim(q)
-        k = self.head_to_batch_dim(k)
-        v = self.head_to_batch_dim(v)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
 
-        batch_size, sequence_length, _ = x.shape
-        attention_mask = self.prepare_attention_mask(mask, sequence_length, batch_size)
-        attention_probs = self.get_attention_scores(q, k, attention_mask)
-        hidden_states = torch.bmm(attention_probs, v)
-        out = self.batch_to_head_dim(hidden_states)
+        sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
 
-        # sim = einsum("b i d, b j d -> b i j", q, k) * self.scale
+        if exists(mask):
+            mask = rearrange(mask, 'b ... -> b (...)')
+            max_neg_value = -torch.finfo(sim.dtype).max
+            mask = repeat(mask, 'b j -> (b h) () j', h=h)
+            sim.masked_fill_(~mask, max_neg_value)
 
-        # if exists(mask):
-        #     mask = rearrange(mask, "b ... -> b (...)")
-        #     max_neg_value = -torch.finfo(sim.dtype).max
-        #     mask = repeat(mask, "b j -> (b h) () j", h=h)
-        #     sim.masked_fill_(~mask, max_neg_value)
+        # attention, what we cannot get enough of
+        attn = sim.softmax(dim=-1)
 
-        # # attention, what we cannot get enough of
-        # attn = sim.softmax(dim=-1)
-
-        # out = einsum("b i j, b j d -> b i d", attn, v)
-        # out = rearrange(out, "(b h) n d -> b n (h d)", h=h)
+        out = einsum('b i j, b j d -> b i d', attn, v)
+        out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
 
         # linear proj
         o = self.to_out[0](out)
         if self.lora:
-            # with torch.enable_grad():
             o += self.to_out_lora(out)
         # dropout
         out = self.to_out[1](o)
@@ -459,11 +355,9 @@ class SpatialTransformer(nn.Module):
         x_in = x
         x = self.norm(x)
         x = self.proj_in(x)
-        # x = rearrange(x, "b c h w -> b (h w) c").contiguous()
-        x = x.permute(0, 2, 3, 1).reshape(b, h * w, c)
+        x = rearrange(x, 'b c h w -> b (h w) c').contiguous()
         for block in self.transformer_blocks:
             x = block(x, context=context)
-        # x = rearrange(x, "b (h w) c -> b c h w", h=h, w=w).contiguous()
-        x = x.permute(0, 2, 1).reshape(b, c, h, w)
+        x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w).contiguous()
         x = self.proj_out(x)
         return x + x_in
