@@ -19,6 +19,8 @@ from threestudio.models.networks import get_encoding, get_mlp
 from threestudio.utils.ops import scale_tensor
 from threestudio.utils.typing import *
 
+import pytorch_volumetric as pv
+from threestudio.utils.smpl_utils import convert_sdf_to_alpha, save_smpl_to_obj
 
 @threestudio.register("tetrahedra-sdf-grid")
 class TetrahedraSDFGrid(BaseExplicitGeometry):
@@ -26,6 +28,8 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
     class Config(BaseExplicitGeometry.Config):
         isosurface_resolution: int = 128
         isosurface_deformable_grid: bool = True
+        isosurface_remove_outliers: bool = False
+        isosurface_outlier_n_faces_threshold: Union[int, float] = 0.01
 
         n_input_dims: int = 3
         n_feature_dims: int = 3
@@ -53,6 +57,8 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         force_shape_init: bool = False
         geometry_only: bool = False
         fix_geometry: bool = False
+        smpl_model_dir: str = "/home/penghy/diffusion/avatars/models"
+        smpl_out_dir: str = "smpl.obj"
 
     cfg: Config
 
@@ -71,6 +77,12 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         self.sdf: Float[Tensor, "Nv 1"]
         self.deformation: Optional[Float[Tensor, "Nv 3"]]
 
+        if self.cfg.shape_init is not None and self.cfg.shape_init == "smpl":
+            save_smpl_to_obj(self.cfg.smpl_model_dir, out_dir=self.cfg.smpl_out_dir, bbox=None)
+            obj = pv.MeshObjectFactory(self.cfg.smpl_out_dir)
+            self.init_sdf = pv.MeshSDF(obj)
+        else:
+            self.init_sdf = None
         if not self.cfg.fix_geometry:
             self.register_parameter(
                 "sdf",
@@ -105,7 +117,10 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
                 )
             else:
                 self.deformation = None
-
+        if self.init_sdf is not None:
+            self.sdf = torch.nn.Parameter(self.init_sdf(self.isosurface_helper.grid_vertices)[0])
+            self.export_sdf_shape()
+            exit()
         if not self.cfg.geometry_only:
             self.encoding = get_encoding(
                 self.cfg.n_input_dims, self.cfg.pos_encoding_config
@@ -121,6 +136,12 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
     def initialize_shape(self) -> None:
         raise NotImplementedError
 
+    def export_sdf_shape(self) -> None:
+        import trimesh
+        mesh = self.isosurface_helper(self.sdf, self.deformation)
+        mesh = trimesh.base.Trimesh(mesh.v_pos.cpu().detach().numpy(), mesh.t_pos_idx.cpu().detach().numpy())
+        mesh.export("test.obj")
+    
     def isosurface(self) -> Mesh:
         # return cached mesh if fix_geometry is True to save computation
         if self.cfg.fix_geometry and self.mesh is not None:
@@ -129,6 +150,8 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         mesh.v_pos = scale_tensor(
             mesh.v_pos, self.isosurface_helper.points_range, self.isosurface_bbox
         )
+        if self.cfg.isosurface_remove_outliers:
+            mesh = mesh.remove_outlier(self.cfg.isosurface_outlier_n_faces_threshold)
         self.mesh = mesh
         return mesh
 
@@ -156,11 +179,46 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         copy_net: bool = True,
         **kwargs,
     ) -> "TetrahedraSDFGrid":
-        if isinstance(other, ImplicitVolume):
-            mesh = other.isosurface()
+        if isinstance(other, TetrahedraSDFGrid):
             instance = TetrahedraSDFGrid(cfg, **kwargs)
+            assert instance.cfg.isosurface_resolution == other.cfg.isosurface_resolution
+            instance.isosurface_bbox = other.isosurface_bbox.clone()
+            instance.sdf.data = other.sdf.data.clone()
+            if (
+                instance.cfg.isosurface_deformable_grid
+                and other.cfg.isosurface_deformable_grid
+            ):
+                assert (
+                    instance.deformation is not None and other.deformation is not None
+                )
+                instance.deformation.data = other.deformation.data.clone()
+            if (
+                not instance.cfg.geometry_only
+                and not other.cfg.geometry_only
+                and copy_net
+            ):
+                instance.encoding.load_state_dict(other.encoding.state_dict())
+                instance.feature_network.load_state_dict(
+                    other.feature_network.state_dict()
+                )
+            return instance
+        elif isinstance(other, ImplicitVolume):
+            instance = TetrahedraSDFGrid(cfg, **kwargs)
+            if other.cfg.isosurface_method != "mt":
+                other.cfg.isosurface_method = "mt"
+                threestudio.warn(
+                    f"Override isosurface_method of the source geometry to 'mt'"
+                )
+            if other.cfg.isosurface_resolution != instance.cfg.isosurface_resolution:
+                other.cfg.isosurface_resolution = instance.cfg.isosurface_resolution
+                threestudio.warn(
+                    f"Override isosurface_resolution of the source geometry to {instance.cfg.isosurface_resolution}"
+                )
+            mesh = other.isosurface()
             instance.isosurface_bbox = mesh.extras["bbox"]
-            instance.sdf.data = mesh.extras["grid_level"].to(instance.sdf.data)
+            instance.sdf.data = (
+                mesh.extras["grid_level"].to(instance.sdf.data).clamp(-1, 1)
+            )
             if not instance.cfg.geometry_only and copy_net:
                 instance.encoding.load_state_dict(other.encoding.state_dict())
                 instance.feature_network.load_state_dict(
@@ -168,8 +226,18 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
                 )
             return instance
         elif isinstance(other, ImplicitSDF):
-            mesh = other.isosurface()
             instance = TetrahedraSDFGrid(cfg, **kwargs)
+            if other.cfg.isosurface_method != "mt":
+                other.cfg.isosurface_method = "mt"
+                threestudio.warn(
+                    f"Override isosurface_method of the source geometry to 'mt'"
+                )
+            if other.cfg.isosurface_resolution != instance.cfg.isosurface_resolution:
+                other.cfg.isosurface_resolution = instance.cfg.isosurface_resolution
+                threestudio.warn(
+                    f"Override isosurface_resolution of the source geometry to {instance.cfg.isosurface_resolution}"
+                )
+            mesh = other.isosurface()
             instance.isosurface_bbox = mesh.extras["bbox"]
             instance.sdf.data = mesh.extras["grid_level"].to(instance.sdf.data)
             if (

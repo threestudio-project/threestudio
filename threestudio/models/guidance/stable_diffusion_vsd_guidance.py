@@ -52,7 +52,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
         max_step_percent_annealed: float = 0.5
-        anneal_start_step: int = 5000
+        anneal_start_step: Optional[int] = 5000
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
@@ -68,7 +68,6 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         pipe_kwargs = {
             "tokenizer": None,
-            "text_encoder": None,
             "safety_checker": None,
             "feature_extractor": None,
             "requires_safety_checker": False,
@@ -77,7 +76,6 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         pipe_lora_kwargs = {
             "tokenizer": None,
-            "text_encoder": None,
             "safety_checker": None,
             "feature_extractor": None,
             "requires_safety_checker": False,
@@ -134,6 +132,11 @@ class StableDiffusionVSDGuidance(BaseModule):
         if self.cfg.enable_channels_last_format:
             self.pipe.unet.to(memory_format=torch.channels_last)
             self.pipe_lora.unet.to(memory_format=torch.channels_last)
+
+        del self.pipe.text_encoder
+        if not self.single_model:
+            del self.pipe_lora.text_encoder
+        cleanup()
 
         for p in self.vae.parameters():
             p.requires_grad_(False)
@@ -644,7 +647,10 @@ class StableDiffusionVSDGuidance(BaseModule):
         }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        if global_step > self.cfg.anneal_start_step:
+        if (
+            self.cfg.anneal_start_step is not None
+            and global_step > self.cfg.anneal_start_step
+        ):
             self.max_step = int(
                 self.num_train_timesteps * self.cfg.max_step_percent_annealed
             )

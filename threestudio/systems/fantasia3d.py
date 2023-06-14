@@ -22,7 +22,7 @@ class Fantasia3D(BaseLift3DSystem):
         renderer: dict = field(default_factory=dict)
         ##################################################
 
-        latent_steps: int = 2500
+        latent_steps: int = 1000
 
     cfg: Config
 
@@ -62,10 +62,16 @@ class Fantasia3D(BaseLift3DSystem):
                 guidance_inp, prompt_utils, **batch, rgb_as_latents=True
             )
         else:
-            guidance_inp = out["comp_normal"] * 2.0 - 1.0
+            guidance_inp = out["comp_normal"]
             guidance_out = self.guidance(
                 guidance_inp, prompt_utils, **batch, rgb_as_latents=False
             )
+
+        loss_normal_consistency = out["mesh"].normal_consistency()
+        self.log("train/loss_normal_consistency", loss_normal_consistency)
+        loss += loss_normal_consistency * self.C(
+            self.cfg.loss.lambda_normal_consistency
+        )
 
         for name, value in guidance_out.items():
             self.log(f"train/{name}", value)

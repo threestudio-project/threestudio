@@ -9,7 +9,7 @@ from threestudio.utils.typing import *
 
 
 @threestudio.register("dreamavatar-sdf-system")
-class DreamAvatar(BaseLift3DSystem):
+class DreamAvatarSDF(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         # only used when refinement=True and from_coarse=True
@@ -20,8 +20,10 @@ class DreamAvatar(BaseLift3DSystem):
         background: dict = field(default_factory=dict)
         renderer_type: str = "nvdiff-rasterizer"
         renderer: dict = field(default_factory=dict)
-        geometry_type: str = "implicit-sdf"
+        geometry_type: str = "tetrahedra_sdf_grid"
         geometry: dict = field(default_factory=dict)
+
+        latent_steps: int = 1000
     cfg: Config
 
     def configure(self):
@@ -41,10 +43,6 @@ class DreamAvatar(BaseLift3DSystem):
             self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
-
-        # initialize SDF
-        # FIXME: what if using other geometry types?
-        self.geometry.initialize_shape()
 
     def training_step(self, batch, batch_idx):
         loss = 0.0

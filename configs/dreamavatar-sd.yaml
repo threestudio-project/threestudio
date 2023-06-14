@@ -15,7 +15,7 @@ data:
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
-system_type: "dreamavatar-system"
+system_type: "dreamavatar-sdf-system"
 system:
   geometry_type: "implicit-sdf"
   geometry:
@@ -24,7 +24,8 @@ system:
     isosurface_resolution: 128
     isosurface_deformable_grid: true
     # initialize SDF by optimization
-    shape_init: smpl
+    shape_init: sphere
+    sdf_bias: smpl
     shape_init_params: 0.5
     # or you can initialize SDF by add a bias value
     # which leads to more smooth initialized shape

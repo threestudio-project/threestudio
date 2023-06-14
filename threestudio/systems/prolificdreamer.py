@@ -14,76 +14,16 @@ from threestudio.utils.typing import *
 class ProlificDreamer(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        # only used when refinement=True and from_coarse=True
-        geometry_coarse_type: str = "implicit-volume"
-        geometry_coarse: dict = field(default_factory=dict)
-
-        refinement: bool = False
-        # path to the coarse stage weights
-        from_coarse: Optional[str] = None
-        # used to override configurations of the coarse geometry when initialize from coarse
-        # for example isosurface_threshold
-        coarse_geometry_override: dict = field(default_factory=dict)
-        inherit_coarse_texture: bool = True
+        # in ['coarse', 'geometry', 'texture']
+        stage: str = "coarse"
         visualize_samples: bool = False
 
     cfg: Config
 
     def configure(self) -> None:
-        # override the default configure function
-        self.material = threestudio.find(self.cfg.material_type)(self.cfg.material)
-        self.background = threestudio.find(self.cfg.background_type)(
-            self.cfg.background
-        )
-        if self.cfg.refinement:
-            self.background.requires_grad_(False)
+        # set up geometry, material, background, renderer
+        super().configure()
 
-        if (
-            self.cfg.refinement
-            and self.cfg.from_coarse  # from_coarse must be specified
-            and not self.cfg.weights  # not initialized from coarse when weights are specified
-            and not self.resumed  # not initialized from coarse when resumed from checkpoints
-        ):
-            threestudio.info("Initializing from coarse stage ...")
-            from threestudio.utils.config import load_config, parse_structured
-
-            coarse_cfg = load_config(
-                os.path.join(
-                    os.path.dirname(self.cfg.from_coarse), "../configs/parsed.yaml"
-                )
-            )  # TODO: hard-coded relative path
-            coarse_system_cfg: ProlificDreamer.Config = parse_structured(
-                self.Config, coarse_cfg.system
-            )
-            coarse_geometry_cfg = coarse_system_cfg.geometry
-            coarse_geometry_cfg.update(self.cfg.coarse_geometry_override)
-            self.geometry = threestudio.find(coarse_system_cfg.geometry_type)(
-                coarse_geometry_cfg
-            )
-
-            # load coarse stage geometry
-            # also load background parameters if are any
-            self.load_weights(self.cfg.from_coarse)
-
-            # convert from coarse stage geometry
-            self.geometry = self.geometry.to(get_device())
-            geometry_refine = threestudio.find(self.cfg.geometry_type).create_from(
-                self.geometry,
-                self.cfg.geometry,
-                copy_net=self.cfg.inherit_coarse_texture,
-            )
-            del self.geometry
-            cleanup()
-            self.geometry = geometry_refine
-        else:
-            self.geometry = threestudio.find(self.cfg.geometry_type)(self.cfg.geometry)
-
-        self.renderer = threestudio.find(self.cfg.renderer_type)(
-            self.cfg.renderer,
-            geometry=self.geometry,
-            material=self.material,
-            background=self.background,
-        )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
@@ -91,7 +31,10 @@ class ProlificDreamer(BaseLift3DSystem):
         self.prompt_utils = self.prompt_processor()
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        render_out = self.renderer(**batch)
+        if self.cfg.stage == "geometry":
+            render_out = self.renderer(**batch, render_normal=True, render_rgb=False)
+        else:
+            render_out = self.renderer(**batch)
         return {
             **render_out,
         }
@@ -102,9 +45,16 @@ class ProlificDreamer(BaseLift3DSystem):
     def training_step(self, batch, batch_idx):
         out = self(batch)
 
-        guidance_out = self.guidance(
-            out["comp_rgb"], self.prompt_utils, **batch, rgb_as_latents=False
-        )
+        if self.cfg.stage == "geometry":
+            guidance_inp = out["comp_normal"]
+            guidance_out = self.guidance(
+                guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
+            )
+        else:
+            guidance_inp = out["comp_rgb"]
+            guidance_out = self.guidance(
+                guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
+            )
 
         loss = 0.0
 
@@ -113,7 +63,7 @@ class ProlificDreamer(BaseLift3DSystem):
             if name.startswith("loss_"):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
-        if not self.cfg.refinement:
+        if self.cfg.stage == "coarse":
             if self.C(self.cfg.loss.lambda_orient) > 0:
                 if "normal" not in out:
                     raise ValueError(
@@ -140,12 +90,23 @@ class ProlificDreamer(BaseLift3DSystem):
             loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
             self.log("train/loss_z_variance", loss_z_variance)
             loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
-        else:
+        elif self.cfg.stage == "geometry":
             loss_normal_consistency = out["mesh"].normal_consistency()
             self.log("train/loss_normal_consistency", loss_normal_consistency)
             loss += loss_normal_consistency * self.C(
                 self.cfg.loss.lambda_normal_consistency
             )
+
+            if self.C(self.cfg.loss.lambda_laplacian_smoothness) > 0:
+                loss_laplacian_smoothness = out["mesh"].laplacian()
+                self.log("train/loss_laplacian_smoothness", loss_laplacian_smoothness)
+                loss += loss_laplacian_smoothness * self.C(
+                    self.cfg.loss.lambda_laplacian_smoothness
+                )
+        elif self.cfg.stage == "texture":
+            pass
+        else:
+            raise ValueError(f"Unknown stage {self.cfg.stage}")
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
@@ -156,13 +117,17 @@ class ProlificDreamer(BaseLift3DSystem):
         out = self(batch)
         self.save_image_grid(
             f"it{self.true_global_step}-{batch['index'][0]}.png",
-            [
-                {
-                    "type": "rgb",
-                    "img": out["comp_rgb"][0],
-                    "kwargs": {"data_format": "HWC"},
-                },
-            ]
+            (
+                [
+                    {
+                        "type": "rgb",
+                        "img": out["comp_rgb"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    },
+                ]
+                if "comp_rgb" in out
+                else []
+            )
             + (
                 [
                     {
@@ -213,13 +178,17 @@ class ProlificDreamer(BaseLift3DSystem):
         out = self(batch)
         self.save_image_grid(
             f"it{self.true_global_step}-test/{batch['index'][0]}.png",
-            [
-                {
-                    "type": "rgb",
-                    "img": out["comp_rgb"][0],
-                    "kwargs": {"data_format": "HWC"},
-                },
-            ]
+            (
+                [
+                    {
+                        "type": "rgb",
+                        "img": out["comp_rgb"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    },
+                ]
+                if "comp_rgb" in out
+                else []
+            )
             + (
                 [
                     {
