@@ -455,6 +455,10 @@ python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wa
 If you're using a corporate wandb server, you may first need to login to your wandb instance, e.g.:
 `wandb login --host=https://COMPANY_XYZ.wandb.io --relogin`
 
+By default the runs will have a random name, recorded in the `threestudio` project. You can override them to give a more descriptive name, e.g.:
+
+`python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wandb.enable=true system.loggers.wandb.name="zero123xl_accum;bs=4;lr=0.05"`
+
 ## Contributing to threestudio
 
 - Fork the repository and create your branch from `main`.
