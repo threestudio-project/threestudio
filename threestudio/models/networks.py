@@ -106,7 +106,7 @@ class ProgressiveBandHashGrid(nn.Module, Updateable):
 
 
 class CompositeEncoding(nn.Module, Updateable):
-    def __init__(self, encoding, include_xyz=False, xyz_scale=1.0, xyz_offset=0.0):
+    def __init__(self, encoding, include_xyz=False, xyz_scale=2.0, xyz_offset=-1.0):
         super(CompositeEncoding, self).__init__()
         self.encoding = encoding
         self.include_xyz, self.xyz_scale, self.xyz_offset = (
@@ -187,6 +187,78 @@ class VanillaMLP(nn.Module):
         return nn.ReLU(inplace=True)
 
 
+class SphereInitVanillaMLP(nn.Module):
+    def __init__(self, dim_in, dim_out, config):
+        super().__init__()
+        self.n_neurons, self.n_hidden_layers = (
+            config["n_neurons"],
+            config["n_hidden_layers"],
+        )
+        self.sphere_init, self.weight_norm = True, True
+        self.sphere_init_radius = config["sphere_init_radius"]
+        self.sphere_init_inside_out = config["inside_out"]
+
+        self.layers = [
+            self.make_linear(dim_in, self.n_neurons, is_first=True, is_last=False),
+            self.make_activation(),
+        ]
+        for i in range(self.n_hidden_layers - 1):
+            self.layers += [
+                self.make_linear(
+                    self.n_neurons, self.n_neurons, is_first=False, is_last=False
+                ),
+                self.make_activation(),
+            ]
+        self.layers += [
+            self.make_linear(self.n_neurons, dim_out, is_first=False, is_last=True)
+        ]
+        self.layers = nn.Sequential(*self.layers)
+        self.output_activation = get_activation(config.get("output_activation", None))
+
+    def forward(self, x):
+        # disable autocast
+        # strange that the parameters will have empty gradients if autocast is enabled in AMP
+        with torch.cuda.amp.autocast(enabled=False):
+            x = self.layers(x)
+            x = self.output_activation(x)
+        return x
+
+    def make_linear(self, dim_in, dim_out, is_first, is_last):
+        layer = nn.Linear(dim_in, dim_out, bias=True)
+
+        if is_last:
+            if not self.sphere_init_inside_out:
+                torch.nn.init.constant_(layer.bias, -self.sphere_init_radius)
+                torch.nn.init.normal_(
+                    layer.weight,
+                    mean=math.sqrt(math.pi) / math.sqrt(dim_in),
+                    std=0.0001,
+                )
+            else:
+                torch.nn.init.constant_(layer.bias, self.sphere_init_radius)
+                torch.nn.init.normal_(
+                    layer.weight,
+                    mean=-math.sqrt(math.pi) / math.sqrt(dim_in),
+                    std=0.0001,
+                )
+        elif is_first:
+            torch.nn.init.constant_(layer.bias, 0.0)
+            torch.nn.init.constant_(layer.weight[:, 3:], 0.0)
+            torch.nn.init.normal_(
+                layer.weight[:, :3], 0.0, math.sqrt(2) / math.sqrt(dim_out)
+            )
+        else:
+            torch.nn.init.constant_(layer.bias, 0.0)
+            torch.nn.init.normal_(layer.weight, 0.0, math.sqrt(2) / math.sqrt(dim_out))
+
+        if self.weight_norm:
+            layer = nn.utils.weight_norm(layer)
+        return layer
+
+    def make_activation(self):
+        return nn.Softplus(beta=100)
+
+
 class TCNNNetwork(nn.Module):
     def __init__(self, dim_in: int, dim_out: int, config: dict) -> None:
         super().__init__()
@@ -201,6 +273,10 @@ def get_mlp(n_input_dims, n_output_dims, config) -> nn.Module:
     network: nn.Module
     if config.otype == "VanillaMLP":
         network = VanillaMLP(n_input_dims, n_output_dims, config_to_primitive(config))
+    elif config.otype == "SphereInitVanillaMLP":
+        network = SphereInitVanillaMLP(
+            n_input_dims, n_output_dims, config_to_primitive(config)
+        )
     else:
         assert (
             config.get("sphere_init", False) is False
@@ -247,7 +323,7 @@ def create_network_with_input_encoding(
     if encoding_config.otype in [
         "VanillaFrequency",
         "ProgressiveBandHashGrid",
-    ] or network_config.otype in ["VanillaMLP"]:
+    ] or network_config.otype in ["VanillaMLP", "SphereInitVanillaMLP"]:
         encoding = get_encoding(n_input_dims, encoding_config)
         network = get_mlp(encoding.n_output_dims, n_output_dims, network_config)
         network_with_input_encoding = NetworkWithInputEncoding(encoding, network)

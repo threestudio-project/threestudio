@@ -42,7 +42,9 @@ class ImplicitSDF(BaseImplicitGeometry):
         normal_type: Optional[
             str
         ] = "finite_difference"  # in ['pred', 'finite_difference']
-        finite_difference_normal_eps: float = 0.01
+        finite_difference_normal_eps: Union[
+            float, str
+        ] = 0.01  # in [float, "progressive"]
         shape_init: Optional[str] = None
         shape_init_params: Optional[Any] = None
         shape_init_mesh_up: str = "+z"
@@ -83,6 +85,8 @@ class ImplicitSDF(BaseImplicitGeometry):
             self.deformation_network = get_mlp(
                 self.encoding.n_output_dims, 3, self.cfg.mlp_network_config
             )
+
+        self.finite_difference_normal_eps: Optional[float] = None
 
     def initialize_shape(self) -> None:
         if self.cfg.shape_init is None and not self.cfg.force_shape_init:
@@ -231,6 +235,12 @@ class ImplicitSDF(BaseImplicitGeometry):
     def forward(
         self, points: Float[Tensor, "*N Di"], output_normal: bool = False
     ) -> Dict[str, Float[Tensor, "..."]]:
+        grad_enabled = torch.is_grad_enabled()
+
+        if output_normal and self.cfg.normal_type == "analytic":
+            torch.set_grad_enabled(True)
+            points.requires_grad_(True)
+
         points_unscaled = points  # points in the original scale
         points = contract_to_unisphere(
             points, self.bbox, self.unbounded
@@ -249,7 +259,8 @@ class ImplicitSDF(BaseImplicitGeometry):
 
         if output_normal:
             if self.cfg.normal_type == "finite_difference":
-                eps = self.cfg.finite_difference_normal_eps
+                assert self.finite_difference_normal_eps is not None
+                eps: float = self.finite_difference_normal_eps
                 offsets: Float[Tensor, "6 3"] = torch.as_tensor(
                     [
                         [eps, 0.0, 0.0],
@@ -264,16 +275,30 @@ class ImplicitSDF(BaseImplicitGeometry):
                     points_unscaled[..., None, :] + offsets
                 ).clamp(-self.cfg.radius, self.cfg.radius)
                 sdf_offset: Float[Tensor, "... 6 1"] = self.forward_sdf(points_offset)
-                normal = (
+                sdf_grad = (
                     0.5 * (sdf_offset[..., 0::2, 0] - sdf_offset[..., 1::2, 0]) / eps
                 )
-                normal = F.normalize(normal, dim=-1)
+                normal = F.normalize(sdf_grad, dim=-1)
             elif self.cfg.normal_type == "pred":
                 normal = self.normal_network(enc).view(*points.shape[:-1], 3)
                 normal = F.normalize(normal, dim=-1)
+                sdf_grad = normal
+            elif self.cfg.normal_type == "analytic":
+                sdf_grad = -torch.autograd.grad(
+                    sdf,
+                    points_unscaled,
+                    grad_outputs=torch.ones_like(sdf),
+                    create_graph=True,
+                )[0]
+                normal = F.normalize(sdf_grad, dim=-1)
+                if not grad_enabled:
+                    sdf_grad = sdf_grad.detach()
+                    normal = normal.detach()
             else:
                 raise AttributeError(f"Unknown normal type {self.cfg.normal_type}")
-            output.update({"normal": normal, "shading_normal": normal})
+            output.update(
+                {"normal": normal, "shading_normal": normal, "sdf_grad": sdf_grad}
+            )
         return output
 
     def forward_sdf(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
@@ -320,3 +345,35 @@ class ImplicitSDF(BaseImplicitGeometry):
             }
         )
         return out
+
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        if self.cfg.normal_type == "finite_difference":
+            if isinstance(self.cfg.finite_difference_normal_eps, float):
+                self.finite_difference_normal_eps = (
+                    self.cfg.finite_difference_normal_eps
+                )
+            elif self.cfg.finite_difference_normal_eps == "progressive":
+                # progressive finite difference eps from Neuralangelo
+                # https://arxiv.org/abs/2306.03092
+                hg_conf: Any = self.cfg.pos_encoding_config
+                assert (
+                    hg_conf.otype == "ProgressiveBandHashGrid"
+                ), "finite_difference_normal_eps=progressive only works with ProgressiveBandHashGrid"
+                current_level = min(
+                    hg_conf.start_level
+                    + max(global_step - hg_conf.start_step, 0) // hg_conf.update_steps,
+                    hg_conf.n_levels,
+                )
+                grid_res = hg_conf.base_resolution * hg_conf.per_level_scale ** (
+                    current_level - 1
+                )
+                grid_size = 2 * self.cfg.radius / grid_res
+                if grid_size != self.finite_difference_normal_eps:
+                    threestudio.info(
+                        f"Update finite_difference_normal_eps to {grid_size}"
+                    )
+                self.finite_difference_normal_eps = grid_size
+            else:
+                raise ValueError(
+                    f"Unknown finite_difference_normal_eps={self.cfg.finite_difference_normal_eps}"
+                )

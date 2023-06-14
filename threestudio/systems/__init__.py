@@ -6,5 +6,6 @@ from . import (
     magic3d,
     prolificdreamer,
     sjc,
+    textmesh,
     zero123,
 )
