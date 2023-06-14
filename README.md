@@ -30,8 +30,9 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
-- 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
-- 05/26/2023: Implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
+- 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
+- 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
+- 05/26/2023: Implementation of [ProlificDreamer](https://ml.cs.tsinghua.edu.cn/prolificdreamer/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
