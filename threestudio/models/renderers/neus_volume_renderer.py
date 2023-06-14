@@ -104,7 +104,9 @@ class NeuSVolumeRenderer(VolumeRenderer):
         n_rays = rays_o_flatten.shape[0]
 
         def alpha_fn(t_starts, t_ends, ray_indices):
-            ray_indices, t_starts, t_ends = validate_empty_rays(ray_indices, t_starts, t_ends)
+            ray_indices, t_starts, t_ends = validate_empty_rays(
+                ray_indices, t_starts, t_ends
+            )
             t_starts, t_ends = t_starts[..., None], t_ends[..., None]
             t_origins = rays_o_flatten[ray_indices]
             t_positions = (t_starts + t_ends) / 2.0
@@ -153,7 +155,9 @@ class NeuSVolumeRenderer(VolumeRenderer):
                     cone_angle=0.0,
                 )
 
-        ray_indices, t_starts_, t_ends_ = validate_empty_rays(ray_indices, t_starts_, t_ends_)
+        ray_indices, t_starts_, t_ends_ = validate_empty_rays(
+            ray_indices, t_starts_, t_ends_
+        )
         ray_indices = ray_indices.long()
         t_starts, t_ends = t_starts_[..., None], t_ends_[..., None]
         t_origins = rays_o_flatten[ray_indices]
@@ -162,7 +166,6 @@ class NeuSVolumeRenderer(VolumeRenderer):
         t_positions = (t_starts + t_ends) / 2.0
         positions = t_origins + t_dirs * t_positions
         t_intervals = t_ends - t_starts
-
 
         if self.training:
             geo_out = self.geometry(positions, output_normal=True)
