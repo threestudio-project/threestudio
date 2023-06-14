@@ -70,14 +70,13 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_orient: [0, 10., 1000., 5000]
+    lambda_orient: 0.0
     lambda_sparsity: 0.0
     lambda_opaque: 0.0
-    lambda_eikonal: 0.1
+    lambda_eikonal: 1000.
   optimizer:
     name: Adam
     args:
-      lr: 0.01
       betas: [0.9, 0.99]
       eps: 1.e-15
     params:
