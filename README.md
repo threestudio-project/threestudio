@@ -9,13 +9,13 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/de81cb0c-2fdb-4241-817a-0439f28747e8.gif" width="100%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2c83fd3f-7542-45c2-8856-9202c2871028.png" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/f48eca9f-45a7-4092-a519-6bb99f4939e4.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
 </p>
 
 <p align="center"><b>
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
-| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> |
+| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> |
 </b></p>
 
 <p align="center">
@@ -30,8 +30,10 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 - 06/11/2023: An experimental implementation of using Control4D for high-fidelity 3D editing! Follow the instructions [here](https://github.com/threestudio-project/threestudio#control4d-) to give it a try.
-- 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
-- 05/26/2023: Implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
+- 05/29/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
+- 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
+- 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
+- 05/26/2023: Implementation of [ProlificDreamer](https://ml.cs.tsinghua.edu.cn/prolificdreamer/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
 - 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
 - 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
@@ -150,6 +152,47 @@ See [here](https://github.com/threestudio-project/threestudio#supported-models) 
 For feature requests, bug reports, or discussions about technical problems, please [file an issue](https://github.com/threestudio-project/threestudio/issues/new). In case you want to discuss the generation quality or showcase your generation results, please feel free to participate in the [discussion panel](https://github.com/threestudio-project/threestudio/discussions).
 
 ## Supported Models
+
+### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
+
+**This is an unofficial experimental implementation! Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
+
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/27b42d8f-4aa4-4b47-8ea0-0f77db90fd1e
+
+https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817-4663-a2bf-5e21a076bc3d
+
+**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1, 512x512 Stage2+3)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
+
+Notable differences from the paper:
+
+- ProlificDreamer adopts a two-stage sampling strategy with 64 coarse samples and 32 fine samples, while we only use 512 coarse samples.
+- In the first stage, we only render 64x64 images at the first 5000 iterations. After that, as the empty space has been effectively pruned, rendering 512x512 images wouldn't cost too much VRAM.
+- We currently don't support multiple particles.
+
+```sh
+# --------- Stage 1 (NeRF) --------- #
+# object generation with 512x512 NeRF rendering, ~30GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
+# if you don't have enough VRAM, try training with 64x64 NeRF rendering, ~15GB VRAM
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
+# using the same model for pretrained and LoRA enables 64x64 training with <10GB VRAM
+# but the quality is worse due to the use of an epsilon prediction model for LoRA training
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1"
+# scene generation with 512x512 NeRF rendering, ~30GB VRAM
+python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
+
+# --------- Stage 2 (Geometry Refinement) --------- #
+# refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance
+python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/ckpts/last.ckpt
+
+# --------- Stage 3 (Texturing) --------- #
+# texturing with 512x512 rasterization, Stable Difusion VSD guidance
+python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
+```
 
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
@@ -310,41 +353,29 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
 
-### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
+### TextMesh [![arXiv](https://img.shields.io/badge/arXiv-2304.12439-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2304.12439)
 
-**This is an unofficial experimental implementation! Please refer to [https://github.com/thu-ml/prolificdreamer](https://github.com/thu-ml/prolificdreamer) for official code release.**
+**Results obtained by threestudio (DeepFloyd IF, batch size 4)**
 
-**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1)**
+https://github.com/threestudio-project/threestudio/assets/19284678/72217cdd-765a-475b-92d0-4ab62bf0f57a
 
-https://github.com/threestudio-project/threestudio/assets/19284678/27b42d8f-4aa4-4b47-8ea0-0f77db90fd1e
+**Notable differences from the paper**
 
-https://github.com/threestudio-project/threestudio/assets/19284678/ffcbbb01-3817-4663-a2bf-5e21a076bc3d
+- Most of the settings are the same as the DreamFusion model. Please refer to the notable differences of the DreamFusion model.
+- We use NeuS as the geometry representation while the original paper uses VolSDF.
+- We adopt techniques from [Neuralangelo](https://arxiv.org/abs/2306.03092) to stablize normal computation when using hash grids.
+- We currently only implemented the coarse stage of TextMesh.
 
-**Results obtained by threestudio (Stable Diffusion, 256x256 Stage1, 512x512 Stage2/3)**
-
-https://github.com/threestudio-project/threestudio/assets/19284678/cfab881e-18dc-45fc-8384-7476f835b36e
-
-Notable differences from the paper: N/A.
-
-We currently don't support multiple particles.
+**Example running commands**
 
 ```sh
-# --------- Stage 1 (NeRF) --------- #
-# object generation with 64x64 NeRF rendering, ~14GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
-# object generation with 512x512 NeRF rendering (original paper), >24GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=512 data.height=512
-# scene generation
-python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k" data.width=64 data.height=64
-
-# --------- Stage 2 (Geometry Refinement) --------- #
-# refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance
-python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/ckpts/last.ckpt
-
-# --------- Stage 3 (Texturing) --------- #
-# texturing with 512x512 rasterization, Stable Difusion VSD guidance
-python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
+# uses DeepFloyd IF, requires ~15GB VRAM
+python launch.py --config configs/textmesh-if.yaml --train --gpu 0 system.prompt_processor.prompt="lib:cowboy_boots"
 ```
+
+**Tips**
+
+- TextMesh uses a surface-based geometry representation, so you don't need to manually tune the isosurface threshold when exporting meshes!
 
 
 ### Control4D [![arXiv](https://img.shields.io/badge/arXiv-2305.20082-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.20082)
@@ -412,7 +443,8 @@ It's important to note that existing techniques that lift 2D T2I models to 3D ca
 - **Train longer.** This helps if you can already obtain reasonable results and would like to enhance the details. If the result is still a mess after several thousand steps, training for a longer time often won't help. You can set the total training iterations by `trainer.max_steps=N`.
 - **Try different seeds.** This is a simple solution if your results have correct overall geometry but suffer from the multi-face Janus problem. You can change the seed by setting `seed=N`. Good luck!
 - **Tuning regularization weights.** Some methods have regularizaion terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/threestudio-project/threestudio#supported-models) for more detailed instructions.
-- **Try debiasing methods.** When conventional SDS techniques like DreamFusion, Magic3D, SJC, and others fail to produce the desired 3D results, Debiased Score Distillation Sampling (D-SDS) can be a solution. D-SDS is devised to tackle challenges such as artifacts or the Janus problem, employing two strategies: score debiasing and prompt debiasing. You can activate score debiasing by just setting `system.guidance.grad_clip=[0,0.5,2.0,10000]`, where the order is `start_step, start_value, end_value, end_step`. Prompt debiasing is currently under development. For a detailed explanation of these techniques, refer to [the D-SDS paper](https://arxiv.org/abs/2303.15413) or check [the project page](https://susunghong.github.io/Debiased-Score-Distillation-Sampling/).
+- **Try debiasing methods.** When conventional SDS techniques like DreamFusion, Magic3D, SJC, and others fail to produce the desired 3D results, Debiased Score Distillation Sampling (D-SDS) can be a solution. D-SDS is devised to tackle challenges such as artifacts or the Janus problem, employing two strategies: score debiasing and prompt debiasing. You can activate score debiasing by just setting `system.guidance.grad_clip=[0,0.5,2.0,10000]`, where the order is `start_step, start_value, end_value, end_step`. You can enable prompt debiasing by setting `system.prompt_processor.enable_prompt_debiasing=true`. When using prompt debiasing, it's recommended to set a list of indices for words that should potentially be removed by `system.prompt_processor.prompt_debiasing_mask_ids=[i1,i2,...]`. For example, if the prompt is `a smiling dog` and you only want to remove the word `smiling` for certain views, you should set it to `[1]`. You could also manually specify the prompt for each view by setting `system.prompt_processor.prompt_side`, `system.prompt_processor.prompt_back` and `system.prompt_processor.prompt_overhead`. For a detailed explanation of these techniques, refer to [the D-SDS paper](https://arxiv.org/abs/2303.15413) or check out [the project page](https://susunghong.github.io/Debiased-Score-Distillation-Sampling/).
+- **Try Perp-Neg.** The [Perp-Neg algorithm](https://perp-neg.github.io/) can potentially alleviate the multi-face Janus problem. We now support Perp-Neg for `stable-diffusion-guidance` and `deep-floyd-guidance` by setting `system.prompt_processor.use_perp_neg=true`.
 
 ## VRAM Optimization
 

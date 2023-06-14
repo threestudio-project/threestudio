@@ -10,6 +10,7 @@ import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
+from threestudio.utils.ops import perpendicular_component
 from threestudio.utils.typing import *
 
 
@@ -134,10 +135,6 @@ class DeepFloydGuidance(BaseObject):
             rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
         )
 
-        text_embeddings = prompt_utils.get_text_embeddings(
-            elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
-        )
-
         # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
         t = torch.randint(
             self.min_step,
@@ -147,26 +144,65 @@ class DeepFloydGuidance(BaseObject):
             device=self.device,
         )
 
-        # predict the noise residual with unet, NO grad!
-        with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
-            latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
-            latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
-            noise_pred = self.forward_unet(
-                latent_model_input,
-                torch.cat([t] * 2),
-                encoder_hidden_states=text_embeddings,
-            )  # (B, 6, 64, 64)
+        if prompt_utils.use_perp_neg:
+            (
+                text_embeddings,
+                neg_guidance_weights,
+            ) = prompt_utils.get_text_embeddings_perp_neg(
+                elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+            )
+            with torch.no_grad():
+                noise = torch.randn_like(latents)
+                latents_noisy = self.scheduler.add_noise(latents, noise, t)
+                latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
+                noise_pred = self.forward_unet(
+                    latent_model_input,
+                    torch.cat([t] * 4),
+                    encoder_hidden_states=text_embeddings,
+                )  # (4B, 6, 64, 64)
 
-        # perform guidance (high scale from paper!)
-        noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-        noise_pred_text, predicted_variance = noise_pred_text.split(3, dim=1)
-        noise_pred_uncond, _ = noise_pred_uncond.split(3, dim=1)
-        noise_pred = noise_pred_text + self.cfg.guidance_scale * (
-            noise_pred_text - noise_pred_uncond
-        )
+            noise_pred_text, _ = noise_pred[:batch_size].split(3, dim=1)
+            noise_pred_uncond, _ = noise_pred[batch_size : batch_size * 2].split(
+                3, dim=1
+            )
+            noise_pred_neg, _ = noise_pred[batch_size * 2 :].split(3, dim=1)
+
+            e_pos = noise_pred_text - noise_pred_uncond
+            accum_grad = 0
+            n_negative_prompts = neg_guidance_weights.shape[-1]
+            for i in range(n_negative_prompts):
+                e_i_neg = noise_pred_neg[i::n_negative_prompts] - noise_pred_uncond
+                accum_grad += neg_guidance_weights[:, i].view(
+                    -1, 1, 1, 1
+                ) * perpendicular_component(e_i_neg, e_pos)
+
+            noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+                e_pos + accum_grad
+            )
+        else:
+            text_embeddings = prompt_utils.get_text_embeddings(
+                elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+            )
+            # predict the noise residual with unet, NO grad!
+            with torch.no_grad():
+                # add noise
+                noise = torch.randn_like(latents)  # TODO: use torch generator
+                latents_noisy = self.scheduler.add_noise(latents, noise, t)
+                # pred noise
+                latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
+                noise_pred = self.forward_unet(
+                    latent_model_input,
+                    torch.cat([t] * 2),
+                    encoder_hidden_states=text_embeddings,
+                )  # (2B, 6, 64, 64)
+
+            # perform guidance (high scale from paper!)
+            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred_text, predicted_variance = noise_pred_text.split(3, dim=1)
+            noise_pred_uncond, _ = noise_pred_uncond.split(3, dim=1)
+            noise_pred = noise_pred_text + self.cfg.guidance_scale * (
+                noise_pred_text - noise_pred_uncond
+            )
 
         """
         # thresholding, experimental

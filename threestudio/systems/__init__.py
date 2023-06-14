@@ -8,5 +8,6 @@ from . import (
     control4d_multiview,
     prolificdreamer,
     sjc,
+    textmesh,
     zero123,
 )
