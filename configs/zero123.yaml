@@ -102,7 +102,9 @@ system:
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     min_step_percent: 0.02
+    # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: 0.98
+    # max_step_percent: [0, 0.98, 0.66, 2000]
 
   freq:
     n_ref: 2
