@@ -9,8 +9,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b></p>
 
 <p align="center">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/de81cb0c-2fdb-4241-817a-0439f28747e8.gif" width="100%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2c83fd3f-7542-45c2-8856-9202c2871028.png" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/f48eca9f-45a7-4092-a519-6bb99f4939e4.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
 </p>
 
 <p align="center"><b>
@@ -30,6 +30,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
+- 05/29/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
 - 05/29/2023: An experimental implementation of using Zero-1-to-3 for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
 - 05/26/2023: Implementation of ProlificDreamer! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
 - 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
@@ -350,6 +351,30 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 **Tips**
 
 - If you find the shape easily diverge in early training stages, you may use a lower guidance scale by setting `system.guidance.guidance_scale=30.`.
+
+### TextMesh [![arXiv](https://img.shields.io/badge/arXiv-2304.12439-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2304.12439)
+
+**Results obtained by threestudio (DeepFloyd IF, batch size 4)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/72217cdd-765a-475b-92d0-4ab62bf0f57a
+
+**Notable differences from the paper**
+
+- Most of the settings are the same as the DreamFusion model. Please refer to the notable differences of the DreamFusion model.
+- We use NeuS as the geometry representation while the original paper uses VolSDF.
+- We adopt techniques from [Neuralangelo](https://arxiv.org/abs/2306.03092) to stablize normal computation when using hash grids.
+- We currently only implemented the coarse stage of TextMesh.
+
+**Example running commands**
+
+```sh
+# uses DeepFloyd IF, requires ~15GB VRAM
+python launch.py --config configs/textmesh-if.yaml --train --gpu 0 system.prompt_processor.prompt="lib:cowboy_boots"
+```
+
+**Tips**
+
+- TextMesh uses a surface-based geometry representation, so you don't need to manually tune the isosurface threshold when exporting meshes!
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
 
