@@ -5,6 +5,9 @@ from tqdm import tqdm
 import json
 import os
 import cv2
+import numpy as np
+from scipy.spatial.transform import Rotation as Rot
+from scipy.spatial.transform import Slerp
 
 import pytorch_lightning as pl
 import torch
@@ -29,6 +32,32 @@ def convert_pose(C2W):
     C2W = torch.matmul(C2W, flip_yz)
     return C2W
 
+def convert_proj(K, H, W, near, far):
+    return [
+        [2*K[0, 0]/W,  -2*K[0, 1]/W, (W - 2*K[0, 2])/W, 0],
+        [0, -2*K[1, 1]/H, (H - 2*K[1, 2])/H,            0],
+        [0, 0, (-far - near)/(far - near), -2*far*near/(far - near)],
+        [0, 0, -1, 0],
+    ]
+
+def inter_pose(pose_0, pose_1, ratio):
+    pose_0 = pose_0.detach().cpu().numpy()
+    pose_1 = pose_1.detach().cpu().numpy()
+    pose_0 = np.linalg.inv(pose_0)
+    pose_1 = np.linalg.inv(pose_1)
+    rot_0 = pose_0[:3, :3]
+    rot_1 = pose_1[:3, :3]
+    rots = Rot.from_matrix(np.stack([rot_0, rot_1]))
+    key_times = [0, 1]
+    slerp = Slerp(key_times, rots)
+    rot = slerp(ratio)
+    pose = np.diag([1.0, 1.0, 1.0, 1.0])
+    pose = pose.astype(np.float32)
+    pose[:3, :3] = rot.as_matrix()
+    pose[:3, 3] = ((1.0 - ratio) * pose_0 + ratio * pose_1)[:3, 3]
+    pose = np.linalg.inv(pose)
+    return pose
+
 @dataclass
 class MultiviewsDataModuleConfig:
     dataroot: str = "dataset/face"
@@ -38,6 +67,9 @@ class MultiviewsDataModuleConfig:
     eval_data_interval: int = 1
     batch_size: int = 1
     eval_batch_size: int = 1
+    camera_layout: str = "around" 
+    camera_distance: float = -1
+    eval_interpolation: Optional[Tuple[int, int, int]] = None # (0, 1, 30)
     light_position_perturb: float = 1.0
     light_distance_range: Tuple[float, float] = (0.8, 1.5)
     light_sample_strategy: str = "dreamfusion"
@@ -66,14 +98,34 @@ class MultiviewIterableDataset(IterableDataset):
         self.frame_h = frames[0]["h"] // scale
         print("Loading frames...")
         self.n_frames = len(frames)
+
+        c2w_list = []
         for frame in tqdm(frames):
+            extrinsic: Float[Tensor, "4 4"] = torch.as_tensor(frame["transform_matrix"], dtype=torch.float32)
+            c2w = extrinsic
+            c2w_list.append(c2w)
+        c2w_list = torch.stack(c2w_list, dim=0)
+
+        if self.cfg.camera_layout == "around":
+            c2w_list[:, :3, 3] -= torch.mean(c2w_list[:, :3, 3], dim=0).unsqueeze(0)
+        elif self.cfg.camera_layout == "front":
+            assert self.cfg.camera_distance > 0
+            z_vector = torch.zeros(c2w_list.shape[0], 3, 1)
+            z_vector[:, 2, :] = -1
+            rot_z_vector = c2w_list[:, :3, :3] @ z_vector
+            rot_z_vector = torch.mean(rot_z_vector, dim=0).unsqueeze(0)
+            c2w_list[:, :3, 3] -= rot_z_vector[:, :, 0] * self.cfg.camera_distance
+        else:
+            raise ValueError(f"Unknown camera layout {self.cfg.camera_layout}. Now support only around and front.") 
+        
+
+        for idx, frame in tqdm(enumerate(frames)):
             intrinsic: Float[Tensor, "4 4"] = torch.eye(4)
             intrinsic[0, 0] = frame["fl_x"] / scale
             intrinsic[1, 1] = frame["fl_y"] / scale
             intrinsic[0, 2] = frame["cx"] / scale
             intrinsic[1, 2] = frame["cy"] / scale
-            extrinsic: Float[Tensor, "4 4"] = torch.as_tensor(frame["transform_matrix"], dtype=torch.float32)
-
+            
             frame_path = os.path.join(self.cfg.dataroot, frame["file_path"])
             img = cv2.imread(frame_path)[:, :, ::-1].copy()
             img = cv2.resize(img, (self.frame_w, self.frame_h))
@@ -87,26 +139,12 @@ class MultiviewIterableDataset(IterableDataset):
                 use_pixel_centers=False
             )
 
-            extr_rot: Float[Tensor, "3 3"] = extrinsic[:3, :3]
-            extr_trans: Float[Tensor, "3 1"] = extrinsic[:3, 3:]
-            c2w_rot: Float[Tensor, "3 3"] = extr_rot.T
-            c2w_trans: Float[Tensor, "3 1"] = - extr_rot.T @ extr_trans
-            c2w: Float[Tensor, "4 4"] = torch.eye(4)
-            c2w[:3, :3] = c2w_rot
-            c2w[:3, 3:] = c2w_trans
-            c2w = convert_pose(c2w)
-
+            c2w = c2w_list[idx]
             camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
             near = 0.1
             far = 1000.0
-            K = intrinsic
-            proj = [
-                [2*K[0, 0]/self.frame_w,  -2*K[0, 1]/self.frame_w, (self.frame_w - 2*K[0, 2])/self.frame_w, 0],
-                [0, -2*K[1, 1]/self.frame_h, (self.frame_h - 2*K[1, 2])/self.frame_h,                       0],
-                [0, 0, (-far - near)/(far - near), -2*far*near/(far - near)],
-                [0, 0, -1, 0],
-            ]
+            proj = convert_proj(intrinsic, self.frame_h, self.frame_w, near, far)
             proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
             frames_proj.append(proj)
             frames_c2w.append(c2w)
@@ -168,52 +206,96 @@ class MultiviewDataset(Dataset):
         self.frame_h = frames[0]["h"] // scale
         print("Loading frames...")
         self.n_frames = len(frames)
+        
+        c2w_list = []
         for frame in tqdm(frames):
+            extrinsic: Float[Tensor, "4 4"] = torch.as_tensor(frame["transform_matrix"], dtype=torch.float32)
+            c2w = extrinsic
+            c2w_list.append(c2w)
+        c2w_list = torch.stack(c2w_list, dim=0)
+
+        if self.cfg.camera_layout == "around":
+            c2w_list[:, :3, 3] -= torch.mean(c2w_list[:, :3, 3], dim=0).unsqueeze(0)
+        elif self.cfg.camera_layout == "front":
+            assert self.cfg.camera_distance > 0
+            z_vector = torch.zeros(c2w_list.shape[0], 3, 1)
+            z_vector[:, 2, :] = -1
+            rot_z_vector = c2w_list[:, :3, :3] @ z_vector
+            rot_z_vector = torch.mean(rot_z_vector, dim=0).unsqueeze(0)
+            c2w_list[:, :3, 3] -= rot_z_vector[:, :, 0] * self.cfg.camera_distance
+        else:
+            raise ValueError(f"Unknown camera layout {self.cfg.camera_layout}. Now support only around and front.") 
+        
+        
+        if not (self.cfg.eval_interpolation is None):
+            idx0 = self.cfg.eval_interpolation[0]
+            idx1 = self.cfg.eval_interpolation[1]
+            eval_nums = self.cfg.eval_interpolation[2]
+            frame = frames[idx0]
             intrinsic: Float[Tensor, "4 4"] = torch.eye(4)
             intrinsic[0, 0] = frame["fl_x"] / scale
             intrinsic[1, 1] = frame["fl_y"] / scale
             intrinsic[0, 2] = frame["cx"] / scale
             intrinsic[1, 2] = frame["cy"] / scale
-            extrinsic: Float[Tensor, "4 4"] = torch.as_tensor(frame["transform_matrix"], dtype=torch.float32)
+            for ratio in np.linspace(0, 1, eval_nums):
+                img: Float[Tensor, "H W 3"] = torch.zeros((self.frame_h, self.frame_w, 3))
+                frames_img.append(img)
+                direction: Float[Tensor, "H W 3"] = get_ray_directions(
+                    self.frame_h, self.frame_w,
+                    (intrinsic[0, 0], intrinsic[1, 1]),
+                    (intrinsic[0, 2], intrinsic[1, 2]),
+                    use_pixel_centers=False
+                )
 
-            frame_path = os.path.join(self.cfg.dataroot, frame["file_path"])
-            img = cv2.imread(frame_path)[:, :, ::-1].copy()
-            img = cv2.resize(img, (self.frame_w, self.frame_h))
-            img: Float[Tensor, "H W 3"] = torch.FloatTensor(img) / 255
-            frames_img.append(img)
+                c2w = torch.FloatTensor(inter_pose(c2w_list[idx0], c2w_list[idx1], ratio))
+                camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
-            direction: Float[Tensor, "H W 3"] = get_ray_directions(
-                self.frame_h, self.frame_w,
-                (intrinsic[0, 0], intrinsic[1, 1]),
-                (intrinsic[0, 2], intrinsic[1, 2]),
-                use_pixel_centers=False
-            )
+                near = 0.1
+                far = 1000.0
+                proj = convert_proj(intrinsic, self.frame_h, self.frame_w, near, far)
+                proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
+                frames_proj.append(proj)
+                frames_c2w.append(c2w)
+                frames_position.append(camera_position)
+                frames_direction.append(direction)
+        else:
+            for idx, frame in tqdm(enumerate(frames)):
+                intrinsic: Float[Tensor, "4 4"] = torch.eye(4)
+                intrinsic[0, 0] = frame["fl_x"] / scale
+                intrinsic[1, 1] = frame["fl_y"] / scale
+                intrinsic[0, 2] = frame["cx"] / scale
+                intrinsic[1, 2] = frame["cy"] / scale
+                
+                frame_path = os.path.join(self.cfg.dataroot, frame["file_path"])
+                img = cv2.imread(frame_path)[:, :, ::-1].copy()
+                img = cv2.resize(img, (self.frame_w, self.frame_h))
+                img: Float[Tensor, "H W 3"] = torch.FloatTensor(img) / 255
+                frames_img.append(img)
 
-            extr_rot: Float[Tensor, "3 3"] = extrinsic[:3, :3]
-            extr_trans: Float[Tensor, "3 1"] = extrinsic[:3, 3:]
-            c2w_rot: Float[Tensor, "3 3"] = extr_rot.T
-            c2w_trans: Float[Tensor, "3 1"] = - extr_rot.T @ extr_trans
-            c2w: Float[Tensor, "4 4"] = torch.eye(4)
-            c2w[:3, :3] = c2w_rot
-            c2w[:3, 3:] = c2w_trans
-            c2w = convert_pose(c2w)
+                direction: Float[Tensor, "H W 3"] = get_ray_directions(
+                    self.frame_h, self.frame_w,
+                    (intrinsic[0, 0], intrinsic[1, 1]),
+                    (intrinsic[0, 2], intrinsic[1, 2]),
+                    use_pixel_centers=False
+                )
 
-            camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
+                c2w = c2w_list[idx]
+                camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
-            near = 0.1
-            far = 1000.0
-            K = intrinsic
-            proj = [
-                [2*K[0, 0]/self.frame_w,  -2*K[0, 1]/self.frame_w, (self.frame_w - 2*K[0, 2])/self.frame_w, 0],
-                [0, -2*K[1, 1]/self.frame_h, (self.frame_h - 2*K[1, 2])/self.frame_h,                       0],
-                [0, 0, (-far - near)/(far - near), -2*far*near/(far - near)],
-                [0, 0, -1, 0],
-            ]
-            proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
-            frames_proj.append(proj)
-            frames_c2w.append(c2w)
-            frames_position.append(camera_position)
-            frames_direction.append(direction)
+                near = 0.1
+                far = 1000.0
+                K = intrinsic
+                proj = [
+                    [2*K[0, 0]/self.frame_w,  -2*K[0, 1]/self.frame_w, (self.frame_w - 2*K[0, 2])/self.frame_w, 0],
+                    [0, -2*K[1, 1]/self.frame_h, (self.frame_h - 2*K[1, 2])/self.frame_h,                       0],
+                    [0, 0, (-far - near)/(far - near), -2*far*near/(far - near)],
+                    [0, 0, -1, 0],
+                ]
+                proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
+                frames_proj.append(proj)
+                frames_c2w.append(c2w)
+                frames_position.append(camera_position)
+                frames_direction.append(direction)
         print("Loaded frames.")
 
         self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
@@ -227,7 +309,7 @@ class MultiviewDataset(Dataset):
         self.light_positions: Float[Tensor, "B 3"] = torch.zeros_like(self.frames_position)
             
     def __len__(self):
-        return self.n_frames
+        return self.frames_proj.shape[0]
 
     def __getitem__(self, index):
         return {
