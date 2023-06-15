@@ -1,3 +1,4 @@
+import math
 import random
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -53,6 +54,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         max_step_percent: float = 0.98
         max_step_percent_annealed: float = 0.5
         anneal_start_step: Optional[int] = 5000
+        anneal_end_step: Optional[int] = 25000
+        random_timestep: bool = True
+        anneal_strategy: str = "milestone"
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
@@ -452,13 +456,16 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         with torch.no_grad():
             # random timestamp
-            t = torch.randint(
-                self.min_step,
-                self.max_step + 1,
-                [B],
-                dtype=torch.long,
-                device=self.device,
-            )
+            if self.cfg.random_timestep:
+                t = torch.randint(
+                    self.min_step,
+                    self.max_step + 1,
+                    [B],
+                    dtype=torch.long,
+                    device=self.device,
+                )
+            else:
+                t = torch.full([B], self.max_step, dtype=torch.long, device=self.device)
             # add noise
             noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
@@ -651,6 +658,17 @@ class StableDiffusionVSDGuidance(BaseModule):
             self.cfg.anneal_start_step is not None
             and global_step > self.cfg.anneal_start_step
         ):
-            self.max_step = int(
-                self.num_train_timesteps * self.cfg.max_step_percent_annealed
-            )
+            if self.cfg.anneal_strategy == "milestone":
+                self.max_step = int(
+                    self.num_train_timesteps * self.cfg.max_step_percent_annealed
+                )
+            elif self.cfg.anneal_strategy == "sqrt":
+                max_step_percent_annealed = self.cfg.max_step_percent - (
+                    self.cfg.max_step_percent - self.cfg.min_step_percent
+                ) * math.sqrt(
+                    (global_step - self.cfg.anneal_start_step)
+                    / (self.cfg.anneal_end_step - self.cfg.anneal_start_step)
+                )
+                self.max_step = int(
+                    self.num_train_timesteps * max_step_percent_annealed
+                )

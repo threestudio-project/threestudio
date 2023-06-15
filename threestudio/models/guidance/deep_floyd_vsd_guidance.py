@@ -1,3 +1,4 @@
+import math
 import random
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -56,6 +57,9 @@ class DeepFloydVSDGuidance(BaseModule):
         max_step_percent: float = 0.98
         max_step_percent_annealed: float = 0.5
         anneal_start_step: Optional[int] = 5000
+        anneal_end_step: Optional[int] = 25000
+        random_timestep: bool = True
+        force_lora_v_prediction: bool = False
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
@@ -212,16 +216,33 @@ class DeepFloydVSDGuidance(BaseModule):
             subfolder="scheduler",
             torch_dtype=self.weights_dtype,
         )
-        self.scheduler_lora = self.scheduler_lora.__class__.from_config(
-            self.scheduler_lora.config, variance_type="fixed_small"
-        )
 
         self.scheduler_sample = DPMSolverMultistepScheduler.from_config(
             self.pipe.scheduler.config
         )
-        self.scheduler_lora_sample = DPMSolverMultistepScheduler.from_config(
-            self.pipe_lora.scheduler.config, variance_type="fixed_small"
-        )
+        if self.cfg.force_lora_v_prediction:
+            self.scheduler_lora = self.scheduler_lora.__class__.from_config(
+                self.scheduler_lora.config,
+                variance_type="fixed_small",
+                prediction_type="v_prediction",
+            )
+
+            self.scheduler_lora_sample = DPMSolverMultistepScheduler.from_config(
+                self.pipe_lora.scheduler.config,
+                variance_type="fixed_small",
+                prediction_type="v_prediction",
+            )
+        else:
+            self.scheduler_lora = self.scheduler_lora.__class__.from_config(
+                self.scheduler_lora.config,
+                variance_type="fixed_small",
+            )
+            self.scheduler_lora_sample = DPMSolverMultistepScheduler.from_config(
+                self.pipe_lora.scheduler.config,
+                variance_type="fixed_small",
+            )
+        print(self.scheduler_lora.config.prediction_type)
+        print(self.scheduler_lora_sample.config.prediction_type)
 
         self.pipe.scheduler = self.scheduler
         self.pipe_lora.scheduler = self.scheduler_lora
@@ -441,13 +462,16 @@ class DeepFloydVSDGuidance(BaseModule):
 
         with torch.no_grad():
             # random timestamp
-            t = torch.randint(
-                self.min_step,
-                self.max_step + 1,
-                [B],
-                dtype=torch.long,
-                device=self.device,
-            )
+            if self.cfg.random_timestep:
+                t = torch.randint(
+                    self.min_step,
+                    self.max_step + 1,
+                    [B],
+                    dtype=torch.long,
+                    device=self.device,
+                )
+            else:
+                t = torch.full([B], self.max_step, dtype=torch.long, device=self.device)
             # add noise
             noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
@@ -494,16 +518,6 @@ class DeepFloydVSDGuidance(BaseModule):
 
         # TODO: more general cases
         assert self.scheduler.config.prediction_type == "epsilon"
-        if self.scheduler_lora.config.prediction_type == "v_prediction":
-            alphas_cumprod = self.scheduler_lora.alphas_cumprod.to(
-                device=latents_noisy.device, dtype=latents_noisy.dtype
-            )
-            alpha_t = alphas_cumprod[t] ** 0.5
-            sigma_t = (1 - alphas_cumprod[t]) ** 0.5
-
-            noise_pred_est = latent_model_input * torch.cat([sigma_t] * 2, dim=0).view(
-                -1, 1, 1, 1
-            ) + noise_pred_est * torch.cat([alpha_t] * 2, dim=0).view(-1, 1, 1, 1)
 
         (
             noise_pred_est_text,
@@ -517,6 +531,15 @@ class DeepFloydVSDGuidance(BaseModule):
         noise_pred_est = noise_pred_est_uncond + self.cfg.guidance_scale_lora * (
             noise_pred_est_text - noise_pred_est_uncond
         )
+
+        if self.scheduler_lora.config.prediction_type == "v_prediction":
+            alphas_cumprod = self.scheduler_lora.alphas_cumprod.to(
+                device=latents_noisy.device, dtype=latents_noisy.dtype
+            )
+            alpha_t = alphas_cumprod[t] ** 0.5
+            sigma_t = (1 - alphas_cumprod[t]) ** 0.5
+
+            noise_pred_est = latents * sigma_t + noise_pred_est * alpha_t
 
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
 
@@ -636,6 +659,15 @@ class DeepFloydVSDGuidance(BaseModule):
             self.cfg.anneal_start_step is not None
             and global_step > self.cfg.anneal_start_step
         ):
-            self.max_step = int(
-                self.num_train_timesteps * self.cfg.max_step_percent_annealed
+            # self.max_step = int(
+            #     self.num_train_timesteps * self.cfg.max_step_percent_annealed
+            # )
+            # self.max_step =
+
+            max_step_percent_annealed = self.cfg.max_step_percent - (
+                self.cfg.max_step_percent - self.cfg.min_step_percent
+            ) * math.sqrt(
+                (global_step - self.cfg.anneal_start_step)
+                / (self.cfg.anneal_end_step - self.cfg.anneal_start_step)
             )
+            self.max_step = int(self.num_train_timesteps * max_step_percent_annealed)
