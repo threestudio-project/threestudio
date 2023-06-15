@@ -119,8 +119,8 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
                 self.deformation = None
         if self.init_sdf is not None:
             self.sdf = torch.nn.Parameter(self.init_sdf(self.isosurface_helper.grid_vertices)[0])
-            self.export_sdf_shape()
-            exit()
+            # self.export_sdf_shape()
+            # exit()
         if not self.cfg.geometry_only:
             self.encoding = get_encoding(
                 self.cfg.n_input_dims, self.cfg.pos_encoding_config

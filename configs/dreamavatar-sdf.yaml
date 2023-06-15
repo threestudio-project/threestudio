@@ -6,8 +6,8 @@ seed: 0
 data_type: "random-camera-datamodule"
 data:
   batch_size: 1
-  width: 64
-  height: 64
+  width: 512
+  height: 512
   camera_distance_range: [1.5, 2.0]
   fovy_range: [40, 70]
   elevation_range: [-10, 90]
@@ -20,7 +20,7 @@ system:
   geometry_type: "tetrahedra-sdf-grid"
   geometry:
     radius: 1.0 # consistent with coarse
-    isosurface_resolution: 128
+    isosurface_resolution: 256
     isosurface_deformable_grid: true
     pos_encoding_config: # consistent with coarse, no progressive band
       otype: HashGrid
@@ -34,8 +34,8 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 2001
-    albedo_activation: sigmoid
+    ambient_only_steps: 0
+    soft_shading: true
 
   # material_type: "no-material" # unused
   # material:
@@ -59,7 +59,7 @@ system:
   guidance_type: "stable-diffusion-guidance"
   guidance:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    guidance_scale: 10.
+    guidance_scale: 100.
     weighting_strategy: sds
     min_step_percent: 0.02
     max_step_percent: 0.98
@@ -71,9 +71,11 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_orient: [0, 10., 1000., 5000]
-    lambda_sparsity: 1.
-    lambda_opaque: 0.
+    # lambda_orient: [0, 10., 1000., 5000]
+    # lambda_sparsity: 1.
+    # lambda_opaque: 0.
+    lambda_normal_consistency: 10000
+
   optimizer:
     name: Adam
     args:
