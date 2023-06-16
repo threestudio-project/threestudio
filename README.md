@@ -181,7 +181,7 @@ python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.pr
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
 # using the same model for pretrained and LoRA enables 64x64 training with <10GB VRAM
 # but the quality is worse due to the use of an epsilon prediction model for LoRA training
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1"
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1-base"
 # scene generation with 512x512 NeRF rendering, ~30GB VRAM
 python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
 
