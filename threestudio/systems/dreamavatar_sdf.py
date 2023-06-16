@@ -30,7 +30,12 @@ class DreamAvatarSDF(BaseLift3DSystem):
     def configure(self):
         # create geometry, material, background, renderer
         super().configure()
-    
+        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
+            self.cfg.prompt_processor
+        )
+        self.prompt_utils = self.prompt_processor()
+
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
         return {
@@ -40,10 +45,10 @@ class DreamAvatarSDF(BaseLift3DSystem):
     def on_fit_start(self) -> None:
         super().on_fit_start()
         # only used in training
-        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
-        )
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        # self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
+        #     self.cfg.prompt_processor
+        # )
+        # self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
@@ -51,7 +56,7 @@ class DreamAvatarSDF(BaseLift3DSystem):
         guidance_out = self.guidance(
             out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
         )
-
+        print("guidance_out?")
         loss = 0.0
 
         for name, value in guidance_out.items():

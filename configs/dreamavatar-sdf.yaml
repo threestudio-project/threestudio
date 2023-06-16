@@ -1,4 +1,4 @@
-name: "dreamavatar-sdf"
+name: "dreamavatar-sdf-vsd"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -8,11 +8,11 @@ data:
   batch_size: 1
   width: 512
   height: 512
-  camera_distance_range: [1.5, 2.0]
+  camera_distance_range: [1.0, 1.5]
   fovy_range: [40, 70]
   elevation_range: [-10, 90]
   light_sample_strategy: "dreamfusion"
-  eval_camera_distance: 2.0
+  eval_camera_distance: 1.5
   eval_fovy_deg: 70.
 
 system_type: "dreamavatar-sdf-system"
@@ -32,20 +32,22 @@ system:
     fix_geometry: false # optimize grid sdf and deformation
     shape_init: smpl
 
-  material_type: "diffuse-with-point-light-material"
-  material:
-    ambient_only_steps: 0
-    soft_shading: true
-
-  # material_type: "no-material" # unused
+  # material_type: "diffuse-with-point-light-material"
   # material:
-  #   n_output_dims: 0
+  #   ambient_only_steps: 0
+  #   soft_shading: true
 
-  # background_type: "neural-environment-map-background"
-  # background:
-  #   color_activation: sigmoid
+  material_type: "no-material"
+  material:
+    n_output_dims: 3
+    color_activation: sigmoid
 
-  background_type: "solid-color-background" # unused
+  background_type: "neural-environment-map-background"
+  background:
+    color_activation: sigmoid
+    random_aug: true
+
+  # background_type: "solid-color-background" # unused
 
   renderer_type: "nvdiff-rasterizer"
   renderer:
@@ -53,16 +55,21 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
+    front_threshold: 30.
+    back_threshold: 30.
 
-  guidance_type: "stable-diffusion-guidance"
+  guidance_type: "stable-diffusion-vsd-guidance"
   guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    guidance_scale: 100.
-    weighting_strategy: sds
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1"
+    guidance_scale: 10.
+    # weighting_strategy: sds
     min_step_percent: 0.02
     max_step_percent: 0.98
+    max_step_percent_annealed: 0.5
+    anneal_start_step: 5000
 
   loggers:
     wandb:
@@ -70,14 +77,16 @@ system:
       project: 'threestudio'
 
   loss:
-    lambda_sds: 1.
-    # lambda_orient: [0, 10., 1000., 5000]
-    # lambda_sparsity: 1.
-    # lambda_opaque: 0.
-    lambda_normal_consistency: 10000
+    lambda_vsd: 1.
+    lambda_lora: 1.
+    # lambda_orient: 0.
+    # lambda_sparsity: 10.
+    # lambda_opaque: [10000, 0.0, 1000.0, 10001]
+    lambda_z_variance: 0.
+    lambda_normal_consistency: 20000
 
   optimizer:
-    name: Adam
+    name: AdamW
     args:
       lr: 0.01
       betas: [0.9, 0.99]
@@ -87,14 +96,16 @@ system:
         lr: 0.01
       background:
         lr: 0.001
+      guidance:
+        lr: 0.0001
 
 trainer:
-  max_steps: 10000
+  max_steps: 20000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 200
   enable_progress_bar: true
-  precision: 16-mixed
+  precision: 32
 
 checkpoint:
   save_last: true # save at each validation time
