@@ -54,7 +54,9 @@ class SaverMixin:
 
     def create_loggers(self, cfg_loggers: DictConfig) -> None:
         if "wandb" in cfg_loggers.keys() and cfg_loggers.wandb.enable:
-            self._wandb_logger = WandbLogger(project=cfg_loggers.wandb.project)
+            self._wandb_logger = WandbLogger(
+                project=cfg_loggers.wandb.project, name=cfg_loggers.wandb.name
+            )
 
     def get_loggers(self) -> List:
         if self._wandb_logger:

@@ -181,7 +181,7 @@ python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.pr
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
 # using the same model for pretrained and LoRA enables 64x64 training with <10GB VRAM
 # but the quality is worse due to the use of an epsilon prediction model for LoRA training
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1"
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1-base"
 # scene generation with 512x512 NeRF rendering, ~30GB VRAM
 python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 system.prompt_processor.prompt="Inside of a smart home, realistic detailed photo, 4k"
 
@@ -431,7 +431,7 @@ It's important to note that existing techniques that lift 2D T2I models to 3D ca
 - **Train longer.** This helps if you can already obtain reasonable results and would like to enhance the details. If the result is still a mess after several thousand steps, training for a longer time often won't help. You can set the total training iterations by `trainer.max_steps=N`.
 - **Try different seeds.** This is a simple solution if your results have correct overall geometry but suffer from the multi-face Janus problem. You can change the seed by setting `seed=N`. Good luck!
 - **Tuning regularization weights.** Some methods have regularizaion terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/threestudio-project/threestudio#supported-models) for more detailed instructions.
-- **Try debiasing methods.** When conventional SDS techniques like DreamFusion, Magic3D, SJC, and others fail to produce the desired 3D results, Debiased Score Distillation Sampling (D-SDS) can be a solution. D-SDS is devised to tackle challenges such as artifacts or the Janus problem, employing two strategies: score debiasing and prompt debiasing. You can activate score debiasing by just setting `system.guidance.grad_clip=[0,0.5,2.0,10000]`, where the order is `start_step, start_value, end_value, end_step`. You can enable prompt debiasing by setting `system.prompt_processor.enable_prompt_debiasing=true`. When using prompt debiasing, it's recommended to set a list of indices for words that should potentially be removed by `system.prompt_processor.prompt_debiasing_mask_ids=[i1,i2,...]`. For example, if the prompt is `a smiling dog` and you only want to remove the word `smiling` for certain views, you should set it to `[1]`. You could also manually specify the prompt for each view by setting `system.prompt_processor.prompt_side`, `system.prompt_processor.prompt_back` and `system.prompt_processor.prompt_overhead`. For a detailed explanation of these techniques, refer to [the D-SDS paper](https://arxiv.org/abs/2303.15413) or check out [the project page](https://susunghong.github.io/Debiased-Score-Distillation-Sampling/).
+- **Try debiasing methods.** When conventional SDS techniques like DreamFusion, Magic3D, SJC, and others fail to produce the desired 3D results, Debiased Score Distillation Sampling (D-SDS) can be a solution. D-SDS is devised to tackle challenges such as artifacts or the Janus problem, employing two strategies: score debiasing and prompt debiasing. You can activate score debiasing by just setting `system.guidance.grad_clip=[0,0.5,2.0,10000]`, where the order is `start_step, start_value, end_value, end_step`. You can enable prompt debiasing by setting `system.prompt_processor.use_prompt_debiasing=true`. When using prompt debiasing, it's recommended to set a list of indices for words that should potentially be removed by `system.prompt_processor.prompt_debiasing_mask_ids=[i1,i2,...]`. For example, if the prompt is `a smiling dog` and you only want to remove the word `smiling` for certain views, you should set it to `[1]`. You could also manually specify the prompt for each view by setting `system.prompt_processor.prompt_side`, `system.prompt_processor.prompt_back` and `system.prompt_processor.prompt_overhead`. For a detailed explanation of these techniques, refer to [the D-SDS paper](https://arxiv.org/abs/2303.15413) or check out [the project page](https://susunghong.github.io/Debiased-Score-Distillation-Sampling/).
 - **Try Perp-Neg.** The [Perp-Neg algorithm](https://perp-neg.github.io/) can potentially alleviate the multi-face Janus problem. We now support Perp-Neg for `stable-diffusion-guidance` and `deep-floyd-guidance` by setting `system.prompt_processor.use_perp_neg=true`.
 
 ## VRAM Optimization
@@ -459,6 +459,10 @@ python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wa
 
 If you're using a corporate wandb server, you may first need to login to your wandb instance, e.g.:
 `wandb login --host=https://COMPANY_XYZ.wandb.io --relogin`
+
+By default the runs will have a random name, recorded in the `threestudio` project. You can override them to give a more descriptive name, e.g.:
+
+`python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wandb.enable=true system.loggers.wandb.name="zero123xl_accum;bs=4;lr=0.05"`
 
 ## Contributing to threestudio
 

@@ -176,6 +176,13 @@ class NeRFVolumeRenderer(VolumeRenderer):
         if bg_color is None:
             bg_color = comp_rgb_bg
         else:
+            if bg_color.shape == (batch_size, 3):
+                # e.g. constant random color used for Zero123
+                # [bs,3] -> [bs, 1, 1, 3]):
+                bg_color = bg_color.unsqueeze(1).unsqueeze(1)
+                #        -> [bs, height, width, 3]):
+                bg_color = bg_color.expand(-1, height, width, -1)
+
             if bg_color.shape == (batch_size, height, width, 3):
                 bg_color = bg_color.reshape(-1, 3)
 

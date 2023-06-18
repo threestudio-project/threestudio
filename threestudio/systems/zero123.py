@@ -61,10 +61,21 @@ class Zero123(BaseLift3DSystem):
             bg_color = None
         elif guidance == "zero123":
             batch = batch["random_camera"]
-            if random.random() > 0.5:
-                bg_color = None
-            else:
-                bg_color = torch.rand(3).to(self.device)
+            # claforte: surely there's a cleaner way to get batch size
+            bs = batch["rays_o"].shape[0]
+
+            bg_color = torch.rand(bs, 3).to(self.device)  # claforte: use dtype
+
+            # Override 50% of the bgcolors with white.
+            # This results in better predictions with Zero123,
+            # since it was trained with a constant white background.
+            white = torch.ones(bs, 3).to(self.device)
+
+            # is the batch item white? shaped [bs, 1]
+            is_white = (torch.rand(bs) > 0.5).to(self.device).float().unsqueeze(-1)
+
+            bg_color = bg_color * (1.0 - is_white) + white * is_white
+
             ambient_ratio = 0.1 + 0.9 * random.random()
 
         batch["bg_color"] = bg_color
