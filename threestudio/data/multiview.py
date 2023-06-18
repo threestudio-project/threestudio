@@ -110,6 +110,7 @@ class MultiviewIterableDataset(IterableDataset):
             c2w_list[:, :3, 3] -= torch.mean(c2w_list[:, :3, 3], dim=0).unsqueeze(0)
         elif self.cfg.camera_layout == "front":
             assert self.cfg.camera_distance > 0
+            c2w_list[:, :3, 3] -= torch.mean(c2w_list[:, :3, 3], dim=0).unsqueeze(0)
             z_vector = torch.zeros(c2w_list.shape[0], 3, 1)
             z_vector[:, 2, :] = -1
             rot_z_vector = c2w_list[:, :3, :3] @ z_vector
@@ -218,6 +219,7 @@ class MultiviewDataset(Dataset):
             c2w_list[:, :3, 3] -= torch.mean(c2w_list[:, :3, 3], dim=0).unsqueeze(0)
         elif self.cfg.camera_layout == "front":
             assert self.cfg.camera_distance > 0
+            c2w_list[:, :3, 3] -= torch.mean(c2w_list[:, :3, 3], dim=0).unsqueeze(0)
             z_vector = torch.zeros(c2w_list.shape[0], 3, 1)
             z_vector[:, 2, :] = -1
             rot_z_vector = c2w_list[:, :3, :3] @ z_vector

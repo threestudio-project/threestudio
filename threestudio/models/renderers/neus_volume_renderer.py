@@ -25,7 +25,7 @@ class LearnedVariance(nn.Module):
         return val
 
     def forward(self, x):
-        return torch.ones_like(x) * self.inv_std.clamp(1.0e-6, 1.0e6)
+        return torch.ones_like(x) * self.inv_std.clamp(1.0e-6, 1.0e3)
 
 
 @threestudio.register("neus-volume-renderer")
@@ -191,7 +191,8 @@ class NeuSVolumeRenderer(VolumeRenderer):
             comp_rgb_bg = chunk_batch(
                 self.background, self.cfg.eval_chunk_size, dirs=rays_d_flatten
             )
-
+        
+        # grad or normal?
         alpha: Float[Tensor, "Nr 1"] = self.get_alpha(
             geo_out["sdf"], geo_out["normal"], t_dirs, t_intervals
         )

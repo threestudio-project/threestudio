@@ -52,7 +52,7 @@ class PatchRenderer(VolumeRenderer):
     ) -> Dict[str, Float[Tensor, "..."]]:
         B, H, W, _ = rays_o.shape
         
-        if train:
+        if self.training or train:
             scale_ratio = 4
             global_rays_o = torch.nn.functional.interpolate(
                 rays_o.permute(0, 3, 1, 2), (H // scale_ratio, W // scale_ratio), mode='bilinear'

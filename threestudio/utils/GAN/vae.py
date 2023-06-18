@@ -35,12 +35,12 @@ def nonlinearity(x):
     return x*torch.sigmoid(x)
 
 
-# def Normalize(in_channels, num_groups=32):
+def Normalize(in_channels, num_groups=32):
     # return torch.nn.Identity()
-    # return torch.nn.BatchNorm2d(num_features=in_channels)
+    return torch.nn.BatchNorm2d(num_features=in_channels)
 
-def Normalize(in_channels, num_groups=8):
-    return torch.nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-6, affine=False)
+# def Normalize(in_channels, num_groups=8):
+#     return torch.nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-6, affine=False)
 
 
 class Upsample(nn.Module):
@@ -565,8 +565,8 @@ class Decoder(nn.Module):
             h = self.conv_in(z)
 
         # middle
-        h = self.mid.block_1(h, temb)
-        h = self.mid.block_2(h, temb)
+        # h = self.mid.block_1(h, temb)
+        # h = self.mid.block_2(h, temb)
 
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):

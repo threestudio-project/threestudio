@@ -43,7 +43,7 @@ class GANVolumeRenderer(VolumeRenderer):
         cfg_copy = self.cfg.copy()
         self.base_renderer = NeRFVolumeRenderer(cfg_copy, geometry, material, background)
         self.ch_mult = [1, 2, 4]
-        self.generator = Generator(ch=32, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=1,
+        self.generator = Generator(ch=64, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=1,
                  attn_resolutions=[], dropout=0.0, resamp_with_conv=True, in_channels=7,
                  resolution=512, z_channels=4)
         self.local_encoder = LocalEncoder(ch=32, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=1,
@@ -111,6 +111,7 @@ class GANVolumeRenderer(VolumeRenderer):
 
         
         comp_rgb = F.interpolate(comp_rgb.permute(0, 3, 1, 2), (H, W), mode='bilinear')
+        comp_gan_rgb = F.interpolate(comp_gan_rgb, (H, W), mode='bilinear')
         out.update({
             "posterior": posterior,
             "comp_gan_rgb": comp_gan_rgb.permute(0, 2, 3, 1),
