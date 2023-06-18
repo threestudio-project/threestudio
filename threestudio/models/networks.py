@@ -129,10 +129,50 @@ class CompositeEncoding(nn.Module, Updateable):
         )
 
 
+class IntegratedDirectionalEncoding(nn.Module):
+    def __init__(self, n_input_dims, config):
+        super().__init__()
+
+        assert (
+            n_input_dims == 3
+        ), f"IntegratedDirectionalEncoding only support n_input_dims = 3, but get {n_input_dims}"
+
+        self.degree = config["degree"]
+        self.sh_encoder = TCNNEncoding(
+            n_input_dims, {"otype": "SphericalHarmonics", "degree": self.degree}
+        )
+
+        sigma = []
+        for l in range(self.degree):
+            sigma.extend([0.5 * l * (l + 1)] * (2 * l + 1))
+        self.sigma = torch.tensor(
+            sigma, dtype=torch.float32, device="cuda"
+        )  # [output_dim,]
+
+        self.n_output_dims = self.sh_encoder.n_output_dims
+
+    def forward(self, x, r=None):
+        # x: [..., 3], normalized directions in [-1, 1]
+        # r: [..., 1], roughness
+
+        if r is None:
+            r = torch.ones_like(x[..., :1])
+
+        att = torch.exp(-self.sigma * r)
+        enc = self.sh_encoder((x + 1) / 2)  # [..., C]
+
+        return att * enc
+
+
 def get_encoding(n_input_dims: int, config) -> nn.Module:
     # input suppose to be range [0, 1]
     encoding: nn.Module
-    if config.otype == "ProgressiveBandFrequency":
+    if config.otype == "IntegratedDirectionalEncoding":
+        encoding = IntegratedDirectionalEncoding(
+            n_input_dims, config_to_primitive(config)
+        )
+        return encoding
+    elif config.otype == "ProgressiveBandFrequency":
         encoding = ProgressiveBandFrequency(n_input_dims, config_to_primitive(config))
     elif config.otype == "ProgressiveBandHashGrid":
         encoding = ProgressiveBandHashGrid(n_input_dims, config_to_primitive(config))

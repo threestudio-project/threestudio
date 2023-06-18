@@ -121,6 +121,7 @@ This system has all the common configurations, along with the following unique c
 | name         | type | description                                                                                                                                                                                                                                                                                                                    |
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | latent_steps | int  | Number of steps for geometry optimization in latent space. In the first `latent_steps` steps, low resolution normal and mask are concatenated and fed to the latent diffusion model. After this high resolution normal is used to perform RGB space optimziation. Details are described in the Fantasia3D paper. Default: 2500 |
+| texture | bool  | Whether to perform texture training. Default: False |
 
 ### prolificdreamer-system
 
@@ -232,6 +233,21 @@ A material with view dependent effects, parameterized with a network(MLP), simil
 | color_activation    | str  | The activation mapping the network output to the color. Default: "sigmoid"                                                    |
 | dir_encoding_config | dict | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3}     |
 | mlp_network_config  | dict | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
+
+### pbr-material
+
+A simplified physically-based rendering (PBR) material inspired by [NeRO](https://github.com/liuyuan-pal/NeRO).
+Currently we support learning albedo, metallic, and roughness. (normal is not supported currently.)
+
+| name                | type | description                                                                                                                   |
+| ------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------- |
+| input_feature_dims  | int  | The dimensions of the input feature. Default: 32                                                                               |
+| material_activation    | str  | The activation mapping the material network output to the materials (albedo, metallic, and roughness). Default: "sigmoid"                                                    |
+| light_activation    | str  | The activation mapping the light network output to the lighting. Default: "exp"                                                    |
+| material_mlp_network_config  | dict | The config of the material MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 64, "n_hidden_layers": 2} |
+| diffuse_mlp_network_config  | dict | The config of the diffuse light MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 64, "n_hidden_layers": 2} |
+| specular_mlp_network_config  | dict | The config of the specular light MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 64, "n_hidden_layers": 2} |
+| dir_encoding_config | dict | The config of the positional encoding applied on the ray direction. Default: {"otype": "IntegratedDirectionalEncoding", "degree": 5}     |
 
 ### no-material
 
