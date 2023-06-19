@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import nerfacc
 import torch
 import torch.nn.functional as F
 
@@ -9,11 +8,6 @@ from threestudio.models.background.base import BaseBackground
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.models.renderers.nerf_volume_renderer import NeRFVolumeRenderer
-from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import get_device
-from threestudio.utils.ops import chunk_batch
-from threestudio.utils.rasterize import NVDiffRasterizerContext
 from threestudio.utils.typing import *
 
 
@@ -25,6 +19,7 @@ class PatchRenderer(VolumeRenderer):
         base_renderer_type: str = ""
         base_renderer: Optional[VolumeRenderer.Config] = None
         global_detach: bool = False
+        global_downsample: int = 4
     
     cfg: Config
     def configure(
@@ -53,39 +48,36 @@ class PatchRenderer(VolumeRenderer):
         B, H, W, _ = rays_o.shape
         
         if self.base_renderer.training:
-            scale_ratio = 4
+            downsample = self.cfg.global_downsample
             global_rays_o = torch.nn.functional.interpolate(
-                rays_o.permute(0, 3, 1, 2), (H // scale_ratio, W // scale_ratio), mode='bilinear'
+                rays_o.permute(0, 3, 1, 2), (H // downsample, W // downsample), mode='bilinear'
             ).permute(0, 2, 3, 1)
             global_rays_d = torch.nn.functional.interpolate(
-                rays_d.permute(0, 3, 1, 2), (H // scale_ratio, W // scale_ratio), mode='bilinear'
+                rays_d.permute(0, 3, 1, 2), (H // downsample, W // downsample), mode='bilinear'
             ).permute(0, 2, 3, 1)
-
-            out_base = self.base_renderer(global_rays_o, global_rays_d, light_positions, bg_color, **kwargs)
-            if self.cfg.global_detach:
-                comp_rgb = out_base["comp_rgb"].detach()
-            else:
-                comp_rgb = out_base["comp_rgb"]
-            comp_rgb = F.interpolate(comp_rgb.permute(0, 3, 1, 2), (H, W), mode='bilinear').permute(0, 2, 3, 1)
-
-            patch_x = torch.randint(0, W-self.cfg.patch_size, (1,)).item()
-            patch_y = torch.randint(0, H-self.cfg.patch_size, (1,)).item()
-            patch_rays_o = rays_o[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size]
-            patch_rays_d = rays_d[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size]
+            out_global = self.base_renderer(global_rays_o, global_rays_d, light_positions, bg_color, **kwargs)
+            
+            PS = self.cfg.patch_size
+            patch_x = torch.randint(0, W-PS, (1,)).item()
+            patch_y = torch.randint(0, H-PS, (1,)).item()
+            patch_rays_o = rays_o[:, patch_y:patch_y+PS, patch_x:patch_x+PS]
+            patch_rays_d = rays_d[:, patch_y:patch_y+PS, patch_x:patch_x+PS]
             out = self.base_renderer(patch_rays_o, patch_rays_d, light_positions, bg_color, **kwargs)
-            patch_comp_rgb = out["comp_rgb"]
-            comp_rgb[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size] = patch_comp_rgb
 
-            rt_out_base = torch.randint(0, 2, (1,)).item()
-            if rt_out_base:
-                out_base.update({
-                    "comp_rgb": comp_rgb
-                })
-                out = out_base
-            else:
-                out.update({
-                    "comp_rgb": comp_rgb
-                })
+            valid_patch_key = []
+            for key in out:
+                if torch.is_tensor(out[key]):
+                    if len(out[key].shape) == len(out["comp_rgb"].shape):
+                        if out[key][..., 0].shape == out["comp_rgb"][..., 0].shape:
+                            valid_patch_key.append(key)
+            for key in valid_patch_key:
+                out_global[key] = F.interpolate(
+                    out_global[key].permute(0, 3, 1, 2), (H, W), mode='bilinear'
+                ).permute(0, 2, 3, 1)
+                if self.cfg.global_detach:
+                    out_global[key] = out_global[key].detach()
+                out_global[key][:, patch_y:patch_y+PS, patch_x:patch_x+PS] = out[key]
+            out = out_global
         else:
             out = self.base_renderer(rays_o, rays_d, light_positions, bg_color, **kwargs)
 
