@@ -1,23 +1,22 @@
-import cv2
 import importlib
-import numpy as np
 import os
 from dataclasses import dataclass
-from omegaconf import OmegaConf
-from tqdm import tqdm
 
+import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers import DDIMScheduler
+from omegaconf import OmegaConf
+from tqdm import tqdm
 
 import threestudio
+from extern.ldm_zero123.modules.attention import BasicTransformerBlock, CrossAttention
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup
 from threestudio.utils.typing import *
-
-from extern.ldm_zero123.modules.attention import BasicTransformerBlock, CrossAttention
 
 
 def get_obj_from_str(string, reload=False):
@@ -199,6 +198,15 @@ class Zero123VSDGuidance(BaseModule):
         threestudio.info(f"Loaded ProlificZero123!")
 
     @torch.cuda.amp.autocast(enabled=False)
+    def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
+        self.min_step = int(
+            self.scheduler.config.num_train_timesteps * min_step_percent
+        )
+        self.max_step = int(
+            self.scheduler.config.num_train_timesteps * max_step_percent
+        )
+
+    @torch.cuda.amp.autocast(enabled=False)
     def prepare_embeddings(self, image_path: str) -> Float[Tensor, "B 3 256 256"]:
         # load cond image for zero123
         assert os.path.exists(image_path)
@@ -310,7 +318,9 @@ class Zero123VSDGuidance(BaseModule):
     def extract_from_cond(self, cond, n_samples=1) -> dict:
         only_cond = {}
         for key in cond:
-            only_cond[key] = [torch.cat(n_samples * [cond[key][0][-len(cond[key][0])//2:]])]
+            only_cond[key] = [
+                torch.cat(n_samples * [cond[key][0][-len(cond[key][0]) // 2 :]])
+            ]
         return only_cond
 
     def compute_grad_vsd(

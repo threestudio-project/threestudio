@@ -10,16 +10,16 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   width: 192
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
-  default_camera_distance: 1.5
-  default_fovy_deg: 70.0
+  default_camera_distance: 3.2
+  default_fovy_deg: 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    batch_size: 1
+    batch_size: 4
     width: [128, 512]
     height: [128, 512]
     resolution_milestones: [5000]
-    camera_distance_range: [1.0, 1.5]
-    fovy_range: [70.0, 70.0]  # Zero123 has fixed fovy
-    elevation_range: [-10, 45]
+    camera_distance_range: [3.2, 3.3]
+    fovy_range: [20.0, 20.0]  # Zero123 has fixed fovy
+    elevation_range: [-10, 60]
     camera_perturb: 0.
     center_perturb: 0.
     up_perturb: 0.
@@ -79,32 +79,39 @@ system:
     pretrained_model_name_or_path: "./load/zero123/105000.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     # pretrained_model_name_or_path_lora: "./load/zero123/105000.ckpt"
+    # claforte: this should be from "./load/zero123/105000.ckpt" or something like that:
     pretrained_model_name_or_path_lora: "/admin/home-vikram/zero123xl/20230605_last.ckpt"
     pretrained_config_lora: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
-    vram_O: ${not:${gt0:${system.guidance_eval_freq}}}
+    vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
     cond_image_path: ${data.image_path}
     cond_elevation_deg: ${data.default_elevation_deg}
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
-    guidance_scale: 3.0
-    min_step_percent: 0.02
-    max_step_percent: 0.98
+    guidance_scale: 7.5
+    min_step_percent: 0.85
+    max_step_percent: 0.99
     max_step_percent_annealed: 0.5
     anneal_start_step: 5000
-  guidance_eval_freq: 13
+
+  freq:
+    n_ref: 2
+    ref_only_steps: 0
+    guidance_eval: 0  # must not be a multiple of system.freq.n_ref
+    ref_or_zero123: "accumulate" # can be "accumulate" or "alternate"
 
   loggers:
     wandb:
       enable: false
       project: "threestudio"
+      name: None
 
   loss:
-    lambda_rgb: 0. # was 200
-    # lambda_mask: 50.
-    # lambda_depth: 1.
+    lambda_rgb: 1. # was 200
+    lambda_mask: 50.
+    lambda_depth: 1.
     lambda_vsd: 1.
     lambda_lora: 1.
-    lambda_orient: 0.
+    lambda_orient: 0. # claforte: would require normals, which is costly in VRAM and needs more changes in code/yaml
     lambda_sparsity: 10. # 2.0 was 10.
     lambda_opaque: [10000, 0.0, 1000.0, 10001] # [0, 1., 20., 5000] # was [10000, 0.0, 1000.0, 10001]
     lambda_z_variance: 0.

@@ -1,4 +1,5 @@
 import os
+import random
 import shutil
 from dataclasses import dataclass, field
 
@@ -20,7 +21,7 @@ class ProlificZero123(BaseLift3DSystem):
         # in ['coarse', 'geometry', 'texture']
         stage: str = "coarse"
         visualize_samples: bool = False
-        guidance_eval_freq: int = 1
+        freq: dict = field(default_factory=dict)
 
     cfg: Config
 
@@ -63,26 +64,65 @@ class ProlificZero123(BaseLift3DSystem):
             step=self.true_global_step,
         )
 
-    def training_step(self, batch, batch_idx):
-        loss = 0.0
+    def training_substep(self, batch, batch_idx, guidance: str):
+        """
+        Args:
+            guidance: one of "ref" (reference image supervision), "zero123"
+        """
+        if guidance == "ref":
+            ambient_ratio = 1.0
+            shading = "diffuse"
+            batch["shading"] = shading
+            bg_color = None
+        elif guidance == "zero123":
+            batch = batch["random_camera"]
+            # claforte: surely there's a cleaner way to get batch size
+            bs = batch["rays_o"].shape[0]
 
-        # REF
-        if self.C(self.cfg.loss.lambda_rgb) > 0:
-            out = self(batch)
+            bg_color = torch.rand(bs, 3).to(self.device)  # claforte: use dtype
 
+            # Override 50% of the bgcolors with white.
+            # This results in better predictions with Zero123,
+            # since it was trained with a constant white background.
+            white = torch.ones(bs, 3).to(self.device)
+
+            # is the batch item white? shaped [bs, 1]
+            is_white = (torch.rand(bs) > 0.5).to(self.device).float().unsqueeze(-1)
+
+            bg_color = bg_color * (1.0 - is_white) + white * is_white
+
+            ambient_ratio = 0.1 + 0.9 * random.random()  # TODO: vary per batch item
+
+        batch["bg_color"] = bg_color
+        batch["ambient_ratio"] = ambient_ratio
+
+        out = self(batch)
+        loss_prefix = f"loss_{guidance}_"
+
+        loss_terms = {}
+
+        def set_loss(name, value):
+            loss_terms[f"{loss_prefix}{name}"] = value
+
+        guidance_eval = (
+            guidance == "zero123"
+            and self.cfg.freq.guidance_eval > 0
+            and self.true_global_step % self.cfg.freq.guidance_eval == 0
+        )
+
+        if guidance == "ref":
             gt_mask = batch["mask"]
             gt_rgb = batch["rgb"]
             gt_depth = batch["depth"]
-            ref_out = {}
 
             # color loss
             gt_rgb = gt_rgb * gt_mask.float() + out["comp_rgb_bg"] * (
                 1 - gt_mask.float()
             )
-            ref_out["loss_rgb"] = F.mse_loss(gt_rgb, out["comp_rgb"])
+            set_loss("rgb", F.mse_loss(gt_rgb, out["comp_rgb"]))
 
             # mask loss
-            ref_out["loss_mask"] = F.mse_loss(gt_mask.float(), out["opacity"])
+            set_loss("mask", F.mse_loss(gt_mask.float(), out["opacity"]))
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
@@ -94,37 +134,28 @@ class ProlificZero123(BaseLift3DSystem):
                     )  # [B, 2]
                     X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
                     valid_gt_depth = A @ X  # [B, 1]
-                ref_out["loss_depth"] = F.mse_loss(valid_gt_depth, valid_pred_depth)
+                set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
+        elif guidance == "zero123":
+            self.guidance.set_min_max_steps(
+                self.C(self.guidance.cfg.min_step_percent),
+                self.C(self.guidance.cfg.max_step_percent),
+            )
 
-            for name, value in ref_out.items():
-                self.log(f"train/{name}", value)
-                if name.startswith("loss_"):
-                    loss += value * self.C(
-                        self.cfg.loss[name.replace("loss_", "lambda_")]
-                    )
+            if self.cfg.stage == "geometry":
+                guidance_inp = out["comp_normal"]
+            else:
+                guidance_inp = out["comp_rgb"]
 
-        # GUIDANCE
-        batch = batch["random_camera"]
-        out = self(batch)
-        if self.cfg.stage == "geometry":
-            guidance_inp = out["comp_normal"]
-        else:
-            guidance_inp = out["comp_rgb"]
-        guidance_eval = (
-            self.cfg.guidance_eval_freq > 0
-            and self.true_global_step % self.cfg.guidance_eval_freq == 0
-        )
-        guidance_out, guidance_eval_out = self.guidance(
-            guidance_inp,
-            **batch,
-            rgb_as_latents=False,
-            guidance_eval=guidance_eval,
-        )
-
-        for name, value in guidance_out.items():
-            self.log(f"train/{name}", value)
-            if name.startswith("loss_"):
-                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
+            # zero123
+            guidance_out, guidance_eval_out = self.guidance(
+                guidance_inp,
+                **batch,
+                rgb_as_latents=False,
+                guidance_eval=guidance_eval,
+            )
+            # claforte: TODO: rename the loss_terms keys
+            set_loss("vsd", guidance_out["loss_vsd"])
+            set_loss("lora", guidance_out["loss_lora"])
 
         if self.cfg.stage == "coarse":
             if self.C(self.cfg.loss.lambda_orient) > 0:
@@ -132,54 +163,66 @@ class ProlificZero123(BaseLift3DSystem):
                     raise ValueError(
                         "Normal is required for orientation loss, no normal is found in the output."
                     )
-                loss_orient = (
-                    out["weights"].detach()
-                    * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
-                ).sum() / (out["opacity"] > 0).sum()
-                self.log("train/loss_orient", loss_orient)
-                loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
-
-            loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
-            self.log("train/loss_sparsity", loss_sparsity)
-            loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
+                set_loss(
+                    "orient",
+                    (
+                        out["weights"].detach()
+                        * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
+                    ).sum()
+                    / (out["opacity"] > 0).sum(),
+                )
+            if guidance != "ref":
+                set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
 
             opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
-            loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
-            self.log("train/loss_opaque", loss_opaque)
-            loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+            set_loss("opaque", binary_cross_entropy(opacity_clamped, opacity_clamped))
 
             # z variance loss proposed in HiFA: http://arxiv.org/abs/2305.18766
             # helps reduce floaters and produce solid geometry
             loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
-            self.log("train/loss_z_variance", loss_z_variance)
-            loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
+            set_loss("z_variance", loss_z_variance)
         elif self.cfg.stage == "geometry":
-            loss_normal_consistency = out["mesh"].normal_consistency()
-            self.log("train/loss_normal_consistency", loss_normal_consistency)
-            loss += loss_normal_consistency * self.C(
-                self.cfg.loss.lambda_normal_consistency
-            )
+            set_loss("normal_consistency", out["mesh"].normal_consistency())
 
             if self.C(self.cfg.loss.lambda_laplacian_smoothness) > 0:
                 loss_laplacian_smoothness = out["mesh"].laplacian()
-                self.log("train/loss_laplacian_smoothness", loss_laplacian_smoothness)
-                loss += loss_laplacian_smoothness * self.C(
-                    self.cfg.loss.lambda_laplacian_smoothness
-                )
+                set_loss("laplacian_smoothness", loss_laplacian_smoothness)
         elif self.cfg.stage == "texture":
             pass
         else:
             raise ValueError(f"Unknown stage {self.cfg.stage}")
 
+        loss = 0.0
+        for name, value in loss_terms.items():
+            self.log(f"train/{name}", value)
+            if name.startswith(loss_prefix):
+                loss_weighted = value * self.C(
+                    self.cfg.loss[name.replace(loss_prefix, "lambda_")]
+                )
+                self.log(f"train/{name}_w", loss_weighted)
+                loss += loss_weighted
+
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
+        self.log(f"train/loss_{guidance}", loss)
         if guidance_eval:
             self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
 
-        self.log("train/loss", loss, prog_bar=True)
-
         return {"loss": loss}
+
+    def training_step(self, batch, batch_idx):
+        total_loss = 0.0
+
+        out = self.training_substep(batch, batch_idx, guidance="zero123")
+        total_loss += out["loss"]
+
+        out = self.training_substep(batch, batch_idx, guidance="ref")
+        total_loss += out["loss"]
+
+        self.log("train/loss", total_loss, prog_bar=True)
+
+        return {"loss": total_loss}
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
