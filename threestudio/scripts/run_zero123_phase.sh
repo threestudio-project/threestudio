@@ -1,7 +1,7 @@
 
 GPU_ID=$1         # e.g. 0
 IMAGE_PREFIX=$2   # e.g. "anya_front"
-ZERO123_PREFIX=$3 # e.g. "zero123XL_20230604"
+ZERO123_PREFIX=$3 # e.g. "XL_20230604"
 ELEVATION=$4      # e.g. 0
 
 python launch.py --config configs/zero123.yaml --train --gpu $GPU_ID system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-zero123xl_challenges" \
