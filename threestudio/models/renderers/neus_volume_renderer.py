@@ -13,6 +13,10 @@ from threestudio.models.renderers.base import VolumeRenderer
 from threestudio.utils.ops import chunk_batch, check_empty_rays
 from threestudio.utils.typing import *
 
+def volsdf_density(sdf, inv_std):
+    beta = 1 / (inv_std  / 2)
+    alpha = inv_std / 2
+    return alpha * (0.5 + 0.5 * sdf.sign() * torch.expm1(-sdf.abs() / beta))
 
 class LearnedVariance(nn.Module):
     def __init__(self, init_val):
@@ -39,6 +43,7 @@ class NeuSVolumeRenderer(VolumeRenderer):
         prune_alpha_threshold: bool = True
         learned_variance_init: float = 0.3
         cos_anneal_end_steps: int = 0
+        use_volsdf: bool = False
 
     cfg: Config
 
@@ -64,25 +69,28 @@ class NeuSVolumeRenderer(VolumeRenderer):
 
     def get_alpha(self, sdf, normal, dirs, dists):
         inv_std = self.variance(sdf)
-        true_cos = (dirs * normal).sum(-1, keepdim=True)
-        # "cos_anneal_ratio" grows from 0 to 1 in the beginning training iterations. The anneal strategy below makes
-        # the cos value "not dead" at the beginning training iterations, for better convergence.
-        iter_cos = -(
-            F.relu(-true_cos * 0.5 + 0.5) * (1.0 - self.cos_anneal_ratio)
-            + F.relu(-true_cos) * self.cos_anneal_ratio
-        )  # always non-positive
+        if self.cfg.use_volsdf:
+            alpha = torch.abs(dists.detach()) * volsdf_density(sdf, inv_std)
+        else:
+            true_cos = (dirs * normal).sum(-1, keepdim=True)
+            # "cos_anneal_ratio" grows from 0 to 1 in the beginning training iterations. The anneal strategy below makes
+            # the cos value "not dead" at the beginning training iterations, for better convergence.
+            iter_cos = -(
+                F.relu(-true_cos * 0.5 + 0.5) * (1.0 - self.cos_anneal_ratio)
+                + F.relu(-true_cos) * self.cos_anneal_ratio
+            )  # always non-positive
 
-        # Estimate signed distances at section points
-        estimated_next_sdf = sdf + iter_cos * dists * 0.5
-        estimated_prev_sdf = sdf - iter_cos * dists * 0.5
+            # Estimate signed distances at section points
+            estimated_next_sdf = sdf + iter_cos * dists * 0.5
+            estimated_prev_sdf = sdf - iter_cos * dists * 0.5
 
-        prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
-        next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
+            prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
+            next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
 
-        p = prev_cdf - next_cdf
-        c = prev_cdf
+            p = prev_cdf - next_cdf
+            c = prev_cdf
 
-        alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
+            alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
         return alpha
 
     def forward(
@@ -120,13 +128,17 @@ class NeuSVolumeRenderer(VolumeRenderer):
                 )[..., 0]
 
             inv_std = self.variance(sdf)
-            estimated_next_sdf = sdf - self.render_step_size * 0.5
-            estimated_prev_sdf = sdf + self.render_step_size * 0.5
-            prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
-            next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
-            p = prev_cdf - next_cdf
-            c = prev_cdf
-            alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
+            if self.cfg.use_volsdf:
+                alpha = self.render_step_size * volsdf_density(sdf, inv_std)
+            else:
+                estimated_next_sdf = sdf - self.render_step_size * 0.5
+                estimated_prev_sdf = sdf + self.render_step_size * 0.5
+                prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
+                next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
+                p = prev_cdf - next_cdf
+                c = prev_cdf
+                alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
+            
             return alpha
 
         if not self.cfg.grid_prune:
@@ -275,13 +287,16 @@ class NeuSVolumeRenderer(VolumeRenderer):
             def occ_eval_fn(x):
                 sdf = self.geometry.forward_sdf(x)
                 inv_std = self.variance(sdf)
-                estimated_next_sdf = sdf - self.render_step_size * 0.5
-                estimated_prev_sdf = sdf + self.render_step_size * 0.5
-                prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
-                next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
-                p = prev_cdf - next_cdf
-                c = prev_cdf
-                alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
+                if self.cfg.use_volsdf:
+                    alpha = self.render_step_size * volsdf_density(sdf, inv_std)
+                else:
+                    estimated_next_sdf = sdf - self.render_step_size * 0.5
+                    estimated_prev_sdf = sdf + self.render_step_size * 0.5
+                    prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
+                    next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
+                    p = prev_cdf - next_cdf
+                    c = prev_cdf
+                    alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
                 return alpha
 
             if self.training and not on_load_weights:
