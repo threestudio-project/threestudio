@@ -437,3 +437,12 @@ def perpendicular_component(x: Float[Tensor, "B C H W"], y: Float[Tensor, "B C H
         ).view(-1, 1, 1, 1)
         * y
     )
+
+
+def check_empty_rays(ray_indices, t_start, t_end, device):
+    if ray_indices.nelement() == 0:
+        print("Empty rays_indices!")
+        ray_indices = torch.LongTensor([0]).to(device)
+        t_start = torch.Tensor([0]).to(device)
+        t_end = torch.Tensor([0]).to(device)
+    return ray_indices, t_start, t_end
