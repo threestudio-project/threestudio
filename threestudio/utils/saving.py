@@ -281,7 +281,7 @@ class SaverMixin:
         align=DEFAULT_GRID_KWARGS["align"],
         name: Optional[str] = None,
         step: Optional[int] = None,
-        noise_levels: Optional[float] = None,
+        noise_levels: Optional[List[float]] = None,
     ):
         img = self.get_image_grid_(imgs, align=align)
 
