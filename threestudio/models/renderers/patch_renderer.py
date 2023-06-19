@@ -24,6 +24,7 @@ class PatchRenderer(VolumeRenderer):
         patch_size: int = 128
         base_renderer_type: str = ""
         base_renderer: Optional[VolumeRenderer.Config] = None
+        global_detach: bool = False
     
     cfg: Config
     def configure(
@@ -47,12 +48,11 @@ class PatchRenderer(VolumeRenderer):
         rays_d: Float[Tensor, "B H W 3"],
         light_positions: Float[Tensor, "B 3"],
         bg_color: Optional[Tensor] = None,
-        train: Bool = False,
         **kwargs
     ) -> Dict[str, Float[Tensor, "..."]]:
         B, H, W, _ = rays_o.shape
         
-        if self.training or train:
+        if self.base_renderer.training:
             scale_ratio = 4
             global_rays_o = torch.nn.functional.interpolate(
                 rays_o.permute(0, 3, 1, 2), (H // scale_ratio, W // scale_ratio), mode='bilinear'
@@ -62,7 +62,10 @@ class PatchRenderer(VolumeRenderer):
             ).permute(0, 2, 3, 1)
 
             out_base = self.base_renderer(global_rays_o, global_rays_d, light_positions, bg_color, **kwargs)
-            comp_rgb = out_base["comp_rgb"]
+            if self.cfg.global_detach:
+                comp_rgb = out_base["comp_rgb"].detach()
+            else:
+                comp_rgb = out_base["comp_rgb"]
             comp_rgb = F.interpolate(comp_rgb.permute(0, 3, 1, 2), (H, W), mode='bilinear').permute(0, 2, 3, 1)
 
             patch_x = torch.randint(0, W-self.cfg.patch_size, (1,)).item()
@@ -73,8 +76,8 @@ class PatchRenderer(VolumeRenderer):
             patch_comp_rgb = out["comp_rgb"]
             comp_rgb[:, patch_y:patch_y+self.cfg.patch_size, patch_x:patch_x+self.cfg.patch_size] = patch_comp_rgb
 
-            
-            if patch_x % 2 == 0:
+            rt_out_base = torch.randint(0, 2, (1,)).item()
+            if rt_out_base:
                 out_base.update({
                     "comp_rgb": comp_rgb
                 })

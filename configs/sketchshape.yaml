@@ -43,6 +43,7 @@ system:
     wandb:
       enable: false
       project: 'threestudio'
+      name: None
 
   loss:
     lambda_sds: 1.0
