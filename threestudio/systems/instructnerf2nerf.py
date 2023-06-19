@@ -24,6 +24,7 @@ class Instructnerf2nerf(BaseLift3DSystem):
         # create geometry, material, background, renderer
         super().configure()
         self.edit_frames = {}
+        self.perceptual_loss = LPIPS().eval().to(get_device())
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
@@ -38,7 +39,6 @@ class Instructnerf2nerf(BaseLift3DSystem):
             self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
-        self.perceptual_loss = LPIPS().eval().to(get_device())
 
     def training_step(self, batch, batch_idx):
         if torch.is_tensor(batch["index"]):
@@ -59,7 +59,10 @@ class Instructnerf2nerf(BaseLift3DSystem):
         if self.cfg.per_editing_step > 0 and self.global_step > self.cfg.start_editing_step:
             prompt_utils = self.prompt_processor()
             if not batch_index in self.edit_frames or self.global_step % self.cfg.per_editing_step == 0:
-                result = self.guidance(out["comp_rgb"], origin_gt_rgb, prompt_utils)
+                self.renderer.eval()
+                full_out = self(batch)
+                self.renderer.train()
+                result = self.guidance(full_out["comp_rgb"], origin_gt_rgb, prompt_utils)
                 self.edit_frames[batch_index] = result["edit_images"].detach().cpu()
         
         loss = 0.0
