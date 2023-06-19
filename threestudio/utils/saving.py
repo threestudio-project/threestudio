@@ -9,11 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import trimesh
-import wandb
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
+from PIL import Image, ImageDraw
 from pytorch_lightning.loggers import WandbLogger
 
+import wandb
 from threestudio.models.mesh import Mesh
 from threestudio.utils.typing import *
 
@@ -280,8 +281,24 @@ class SaverMixin:
         align=DEFAULT_GRID_KWARGS["align"],
         name: Optional[str] = None,
         step: Optional[int] = None,
+        noise_levels: Optional[List[float]] = None,
     ):
         img = self.get_image_grid_(imgs, align=align)
+
+        if noise_levels is not None:
+            img = Image.fromarray(img)
+            draw = ImageDraw.Draw(img)
+            for i, n in enumerate(noise_levels):
+                draw.text(
+                    (1, (img.size[1] // len(noise_levels)) * i + 1),
+                    f"{n:.02f}",
+                    (255, 255, 255),
+                )
+                draw.text(
+                    (0, (img.size[1] // len(noise_levels)) * i), f"{n:.02f}", (0, 0, 0)
+                )
+            img = np.asarray(img)
+
         filepath = self.get_save_path(filename)
         cv2.imwrite(filepath, img)
         if name and self._wandb_logger:
