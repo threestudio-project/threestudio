@@ -225,7 +225,7 @@ class InstructPix2PixGuidance(BaseObject):
         prompt_utils: PromptProcessorOutput,
         **kwargs,
     ):
-        batch_size = rgb.shape[0]
+        batch_size, H, W, _ = rgb.shape
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
@@ -258,9 +258,10 @@ class InstructPix2PixGuidance(BaseObject):
 
         edit_latents = self.edit_latents(text_embeddings, latents, cond_latents, t)
         edit_images = self.decode_latents(edit_latents)
+        edit_images = F.interpolate(edit_images, (H, W), mode='bilinear')
 
         return {
-            "edit_images": edit_images
+            "edit_images": edit_images.permute(0, 2, 3, 1)
         }
 
 
