@@ -8,6 +8,7 @@ from igl import fast_winding_number_for_meshes, point_mesh_squared_distance, rea
 from torch.autograd import Function
 from torch.cuda.amp import custom_bwd, custom_fwd
 
+import threestudio
 from threestudio.utils.typing import *
 
 
@@ -439,10 +440,10 @@ def perpendicular_component(x: Float[Tensor, "B C H W"], y: Float[Tensor, "B C H
     )
 
 
-def check_empty_rays(ray_indices, t_start, t_end, device):
+def validate_empty_rays(ray_indices, t_start, t_end):
     if ray_indices.nelement() == 0:
-        print("Empty rays_indices!")
-        ray_indices = torch.LongTensor([0]).to(device)
-        t_start = torch.Tensor([0]).to(device)
-        t_end = torch.Tensor([0]).to(device)
+        threestudio.warn("Empty rays_indices!")
+        ray_indices = torch.LongTensor([0]).to(ray_indices)
+        t_start = torch.Tensor([0]).to(ray_indices)
+        t_end = torch.Tensor([0]).to(ray_indices)
     return ray_indices, t_start, t_end
