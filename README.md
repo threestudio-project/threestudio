@@ -386,9 +386,11 @@ python launch.py --config configs/textmesh-if.yaml --train --gpu 0 system.prompt
 
 **Results obtained by threestudio (Control4D, 512x512)**
 
+https://github.com/threestudio-project/threestudio/assets/24589363/97d9aadd-32c7-488f-9543-6951b285d588
+
 We currently don't support dynamic editing.
 
-Download the data sample of control4D using this ![link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EcqOaEuNwH1KpR0JTzL4Ur0BO_iJr8RiY2rNAGVC7h3fng?e=Dyr2gu)
+Download the data sample of control4D using this [link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EcqOaEuNwH1KpR0JTzL4Ur0BO_iJr8RiY2rNAGVC7h3fng?e=Dyr2gu)
 
 ```sh
 # --------- Control4D --------- #
@@ -403,12 +405,16 @@ python launch.py --config configs/control4d-static.yaml --train --gpu 0 data.dat
 **Results obtained by threestudio (InstructNeRF2NeRF)**
 
 
-Download the data sample of InstructNeRF2NeRF using this ![link]()
+
+https://github.com/threestudio-project/threestudio/assets/24589363/7aa43a2d-87d7-4ef5-94b6-f778ddb041b5
+
+
+Download the data sample of InstructNeRF2NeRF using this [link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EbNazeNAYsBIvxGeXuCmOXgBiLv8KM-hfRNbNS7DtTvSvA?e=C1k4bM).
 
 ```sh
 # --------- InstructNeRF2NeRF --------- #
 # 3D editing with NeRF patch-based rendering, ~20GB VRAM
-python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 1 data.dataroot="YOUR_DATAROOT/face" data.camera_layout="front" data.camera_distance=1 data.eval_interpolation=[1,3,50] system.prompt_processor.prompt="Turn him into Elon Musk"
+python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 1 data.dataroot="YOUR_DATAROOT/face" data.camera_layout="front" data.camera_distance=1 data.eval_interpolation=[1,3,50] system.prompt_processor.prompt="Turn him into Albert Einstein"
 ```
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
