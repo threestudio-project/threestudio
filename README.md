@@ -11,6 +11,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <p align="center">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/f48eca9f-45a7-4092-a519-6bb99f4939e4.gif" width="100%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/24b0bfcd-a325-4a77-80d0-db0747f2b649.gif" width="100%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/d36a5651-e0d7-4496-97f4-a7945f06ef23.png" width="100%">
 </p>
 
 <p align="center"><b>
