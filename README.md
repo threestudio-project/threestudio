@@ -31,7 +31,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 ## News
-- 06/11/2023: An experimental implementation of using Control4D for high-fidelity 3D editing! Follow the instructions [here](https://github.com/threestudio-project/threestudio#control4d-) to give it a try.
+- 06/20/2023: Implementations of InstructNeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions [control4d](https://github.com/threestudio-project/threestudio#control4d-) [instructnerf2nerf](https://github.com/threestudio-project/threestudio#instructnerf2nerf-)  to give it a try.
 - 05/29/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
 - 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
 - 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
