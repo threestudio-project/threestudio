@@ -49,6 +49,7 @@ class ControlNetGuidance(BaseObject):
 
         diffusion_steps: int = 20
 
+        use_sds: bool = False
         # use_sjc: bool = False
         # var_red: bool = True
         # weighting_strategy: str = "sds"
@@ -295,7 +296,44 @@ class ControlNetGuidance(BaseObject):
         return F.interpolate(
             control, (512, 512), mode="bilinear", align_corners=False
         )
+    
+    def compute_grad_sds(
+        self,
+        text_embeddings: Float[Tensor, "BB 77 768"],
+        latents: Float[Tensor, "B 4 64 64"],
+        image_cond: Float[Tensor, "B 3 512 512"],
+        t: Int[Tensor, "B"]
+    ):
+        with torch.no_grad():
+            # add noise
+            noise = torch.randn_like(latents)  # TODO: use torch generator
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+            # pred noise
+            latent_model_input = torch.cat([latents_noisy] * 2)
+            down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
+                latent_model_input, t, 
+                encoder_hidden_states=text_embeddings,
+                image_cond=image_cond,
+                condition_scale=self.cfg.condition_scale
+            )
 
+            noise_pred = self.forward_control_unet(latent_model_input, t, 
+                encoder_hidden_states=text_embeddings, 
+                cross_attention_kwargs=None, 
+                down_block_additional_residuals=down_block_res_samples, 
+                mid_block_additional_residual=mid_block_res_sample)
+
+        # perform classifier-free guidance
+        noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+        noise_pred = (
+            noise_pred_uncond 
+            + self.cfg.guidance_scale * (noise_pred_text - noise_pred_uncond)
+        )
+
+        w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
+        grad = w * (noise_pred - noise)
+        return grad
+    
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
@@ -303,7 +341,7 @@ class ControlNetGuidance(BaseObject):
         prompt_utils: PromptProcessorOutput,
         **kwargs,
     ):
-        batch_size = rgb.shape[0]
+        batch_size, H, W, _ = rgb.shape
         assert batch_size == 1
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
@@ -329,12 +367,25 @@ class ControlNetGuidance(BaseObject):
             device=self.device,
         )
 
-        edit_latents = self.edit_latents(text_embeddings, latents, image_cond, t)
-        edit_images = self.decode_latents(edit_latents)
+        if self.cfg.use_sds:
+            grad = self.compute_grad_sds(text_embeddings, latents, image_cond, t)
+            grad = torch.nan_to_num(grad)
+            if self.grad_clip_val is not None:
+                grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target = (latents - grad).detach()
+            loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+            return {
+                "loss_sds": loss_sds,
+                "grad_norm": grad.norm(),
+            }
+        else:
+            edit_latents = self.edit_latents(text_embeddings, latents, image_cond, t)
+            edit_images = self.decode_latents(edit_latents)
+            edit_images = F.interpolate(edit_images, (H, W), mode='bilinear')
 
-        return {
-            "edit_images": edit_images.permute(0, 2, 3, 1)
-        }
+            return {
+                "edit_images": edit_images.permute(0, 2, 3, 1)
+            }
 
 
 

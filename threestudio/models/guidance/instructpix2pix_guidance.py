@@ -36,9 +36,9 @@ class InstructPix2PixGuidance(BaseObject):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         condition_scale: float  = 1.5
-        # grad_clip: Optional[
-        #     Any
-        # ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
+        grad_clip: Optional[
+            Any
+        ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
 
         min_step_percent: float = 0.02
@@ -46,6 +46,7 @@ class InstructPix2PixGuidance(BaseObject):
 
         diffusion_steps: int = 20
 
+        use_sds: bool = False
         # use_sjc: bool = False
         # var_red: bool = True
         # weighting_strategy: str = "sds"
@@ -218,6 +219,35 @@ class InstructPix2PixGuidance(BaseObject):
                 latents = self.scheduler.step(noise_pred, t, latents).prev_sample
         return latents
     
+    def compute_grad_sds(
+        self,
+        text_embeddings: Float[Tensor, "BB 77 768"],
+        latents: Float[Tensor, "B 4 64 64"],
+        image_cond_latents: Float[Tensor, "B 4 64 64"],
+        t: Int[Tensor, "B"]
+    ):
+        with torch.no_grad():
+            # add noise
+            noise = torch.randn_like(latents)  # TODO: use torch generator
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+            # pred noise
+            latent_model_input = torch.cat([latents_noisy] * 3)
+            latent_model_input = torch.cat([latent_model_input, image_cond_latents], dim=1)
+
+            noise_pred = self.forward_unet(latent_model_input, t, 
+                encoder_hidden_states=text_embeddings)
+
+        noise_pred_text, noise_pred_image, noise_pred_uncond = noise_pred.chunk(3)
+        noise_pred = (
+            noise_pred_uncond
+            + self.cfg.guidance_scale * (noise_pred_text - noise_pred_image)
+            + self.cfg.condition_scale * (noise_pred_image - noise_pred_uncond)
+        )
+
+        w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
+        grad = w * (noise_pred - noise)
+        return grad
+    
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
@@ -255,14 +285,26 @@ class InstructPix2PixGuidance(BaseObject):
             dtype=torch.long,
             device=self.device,
         )
+        
+        if self.cfg.use_sds:
+            grad = self.compute_grad_sds(text_embeddings, latents, cond_latents, t)
+            grad = torch.nan_to_num(grad)
+            if self.grad_clip_val is not None:
+                grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target = (latents - grad).detach()
+            loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+            return {
+                "loss_sds": loss_sds,
+                "grad_norm": grad.norm(),
+            }
+        else:
+            edit_latents = self.edit_latents(text_embeddings, latents, cond_latents, t)
+            edit_images = self.decode_latents(edit_latents)
+            edit_images = F.interpolate(edit_images, (H, W), mode='bilinear')
 
-        edit_latents = self.edit_latents(text_embeddings, latents, cond_latents, t)
-        edit_images = self.decode_latents(edit_latents)
-        edit_images = F.interpolate(edit_images, (H, W), mode='bilinear')
-
-        return {
-            "edit_images": edit_images.permute(0, 2, 3, 1)
-        }
+            return {
+                "edit_images": edit_images.permute(0, 2, 3, 1)
+            }
 
 
 if __name__ == '__main__':
