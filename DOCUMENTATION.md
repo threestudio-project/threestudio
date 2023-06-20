@@ -328,6 +328,15 @@ Renderers takes geometry, material, and background to produce images given camer
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | context_type | str  | Rasterization context type used by nvdiffrast, in ["gl", "cuda"]. See the [nvdiffrast documentation](https://nvlabs.github.io/nvdiffrast/#rasterizing-with-cuda-vs-opengl-new) for more details. |
 
+### patch-renderer
+| name                  | type  | description                                                                                               |
+| --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
+| patch_size            | int   | The size of the local patch. Default: 128                                                                 |
+| global_downsample     | int   | Downsample scale of the original rendering size. Default: 4                                               |
+| global_detach         | bool  | Whether to detach the gradient of the downsampled image. Default: False                                   |
+| base_renderer_type    | str   | The type of base renderer.                                                                                |
+| base_renderer         | VolumeRenderer.Config  | The configuration of the base renderer.                                                  |
+
 ## Guidance
 
 Given an image or its latent input, the guide should provide its gradient conditioned on a text input so that the image can be optimized with gradient descent to better match the text.
