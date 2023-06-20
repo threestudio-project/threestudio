@@ -185,6 +185,3 @@ outputs/
 
 # wandb
 wandb/
-
-# dataset
-dataset/
