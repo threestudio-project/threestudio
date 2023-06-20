@@ -1,7 +1,6 @@
 system:
   guidance_type: "instructpix2pix-guidance"
   guidance:
-    cache_dir: "/root/autodl-tmp/cache"
     min_step_percent: 0.8
     max_step_percent: 0.98
   

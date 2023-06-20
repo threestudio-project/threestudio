@@ -1,4 +1,4 @@
-name: "prolificdreamer"
+name: "prolificdreamer-patch"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -51,8 +51,9 @@ system:
   renderer_type: "patch-renderer"
   renderer:
     base_renderer_type: "nerf-volume-renderer"
-    radius: ${system.geometry.radius}
-    num_samples_per_ray: 512
+    base_renderer:
+      radius: ${system.geometry.radius}
+      num_samples_per_ray: 512
     patch_size: 128
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
