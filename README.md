@@ -392,6 +392,8 @@ We currently don't support dynamic editing.
 
 Download the data sample of control4D using this [link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EcqOaEuNwH1KpR0JTzL4Ur0BO_iJr8RiY2rNAGVC7h3fng?e=Dyr2gu)
 
+**Example running commands**
+
 ```sh
 # --------- Control4D --------- #
 # static editing with 128x128 NeRF + 512x512 GAN rendering, ~20GB VRAM
@@ -410,6 +412,9 @@ https://github.com/threestudio-project/threestudio/assets/24589363/7aa43a2d-87d7
 
 
 Download the data sample of InstructNeRF2NeRF using this [link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EbNazeNAYsBIvxGeXuCmOXgBiLv8KM-hfRNbNS7DtTvSvA?e=C1k4bM).
+
+
+**Example running commands**
 
 ```sh
 # --------- InstructNeRF2NeRF --------- #
