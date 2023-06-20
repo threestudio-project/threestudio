@@ -14,7 +14,7 @@ data:
 system_type: "control4d-multiview-system"
 system:
   start_editing_step: 2000
-  patch_size: 128
+
   geometry_type: "implicit-volume"
   geometry:
     radius: 2.
@@ -48,8 +48,10 @@ system:
 
   renderer_type: "gan-volume-renderer"
   renderer:
-    radius: ${system.geometry.radius}
-    num_samples_per_ray: 512
+    base_renderer_type: "nerf-volume-renderer"
+    base_renderer:
+      radius: ${system.geometry.radius}
+      num_samples_per_ray: 512
 
   guidance_type: "controlnet-guidance"
   guidance:
@@ -61,10 +63,7 @@ system:
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    prompt: "Elon Musk wearing white shirt, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
-    # prompt: "Handsome Thor wearing white shirt, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
-    # negative_prompt: "(overexposed, underexposed, out of focus, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck"
-
+  
   loggers:
     wandb:
       enable: false
@@ -73,7 +72,6 @@ system:
   loss:
     lambda_sds: 0.
     lambda_orient: [0, 10.0, 1000., 5000.0]
-    # lambda_orient: [0, 0.0001, 1000, 0.00001]
     lambda_sparsity: 1.0
     lambda_opaque: 1.0
     lambda_l1: 10.
