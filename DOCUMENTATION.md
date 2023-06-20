@@ -329,6 +329,7 @@ Renderers takes geometry, material, and background to produce images given camer
 | context_type | str  | Rasterization context type used by nvdiffrast, in ["gl", "cuda"]. See the [nvdiffrast documentation](https://nvlabs.github.io/nvdiffrast/#rasterizing-with-cuda-vs-opengl-new) for more details. |
 
 ### patch-renderer
+The patch-renderer first renders a full low-resolution downsampled image and then randomly renders a local patch at the original resolution level, which can significantly reduce memory usage during high-resolution training. 
 | name                  | type  | description                                                                                               |
 | --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
 | patch_size            | int   | The size of the local patch. Default: 128                                                                 |
