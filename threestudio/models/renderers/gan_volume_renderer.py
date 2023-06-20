@@ -9,12 +9,8 @@ from threestudio.models.background.base import BaseBackground
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.models.renderers.nerf_volume_renderer import NeRFVolumeRenderer
-from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import get_device
-from threestudio.utils.ops import chunk_batch
-from threestudio.utils.rasterize import NVDiffRasterizerContext
 from threestudio.utils.typing import *
+
 from threestudio.utils.GAN.mobilenet import MobileNetV3 as GlobalEncoder
 from threestudio.utils.GAN.vae import Decoder as Generator
 from threestudio.utils.GAN.vae import Encoder as LocalEncoder
@@ -26,12 +22,8 @@ from threestudio.utils.GAN.discriminator import NLayerDiscriminator, weights_ini
 class GANVolumeRenderer(VolumeRenderer):
     @dataclass
     class Config(VolumeRenderer.Config):
-        num_samples_per_ray: int = 512
-        randomized: bool = True
-        eval_chunk_size: int = 160000
-        grid_prune: bool = True
-        return_comp_normal: bool = False
-        return_normal_perturb: bool = False
+        base_renderer_type: str = ""
+        base_renderer: Optional[VolumeRenderer.Config] = None
     
     cfg: Config
     def configure(
@@ -40,8 +32,11 @@ class GANVolumeRenderer(VolumeRenderer):
         material: BaseMaterial,
         background: BaseBackground,
     ) -> None:
-        cfg_copy = self.cfg.copy()
-        self.base_renderer = NeRFVolumeRenderer(cfg_copy, geometry, material, background)
+        self.base_renderer = threestudio.find(self.cfg.base_renderer_type)(self.cfg.base_renderer, 
+            geometry=geometry,
+            material=material,
+            background=background
+        )
         self.ch_mult = [1, 2, 4]
         self.generator = Generator(ch=64, out_ch=3, ch_mult=self.ch_mult, num_res_blocks=1,
                  attn_resolutions=[], dropout=0.0, resamp_with_conv=True, in_channels=7,
@@ -50,7 +45,7 @@ class GANVolumeRenderer(VolumeRenderer):
                  attn_resolutions=[], dropout=0.0, resamp_with_conv=True, in_channels=3,
                  resolution=512, z_channels=4)
         self.global_encoder = GlobalEncoder(n_class=64)
-        self.discriminator = NLayerDiscriminator(input_nc=6,
+        self.discriminator = NLayerDiscriminator(input_nc=3,
             n_layers=3, use_actnorm=False, ndf=64
         ).apply(weights_init)
 
