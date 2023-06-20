@@ -15,7 +15,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 <p align="center"><b>
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
-| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> |
+| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> | <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
 </b></p>
 
 <p align="center">
@@ -390,8 +390,23 @@ Download the data sample of control4D using this ![link](https://mailstsinghuaed
 
 ```sh
 # --------- Control4D --------- #
-# static editing with 128x128 NeRF + GAN rendering, ~20GB VRAM
-python launch.py --config configs/experimental/control4d-multiviews.yaml --train --gpu 0
+# static editing with 128x128 NeRF + 512x512 GAN rendering, ~20GB VRAM
+python launch.py --config configs/control4d-static.yaml --train --gpu 0 data.dataroot="YOUR_DATAROOT/twindom" system.prompt_processor.prompt="Elon Musk wearing red shirt, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
+```
+
+### InstructNeRF2NeRF [![arXiv](https://img.shields.io/badge/arXiv-2303.12789-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.12789)
+
+**This is an unofficial experimental implementation of InstructNeRF2NeRF using threestudio! Please refer to [https://instruct-nerf2nerf.github.io/](https://github.com/thu-ml/prolificdreamer) for official code release.**
+
+**Results obtained by threestudio (InstructNeRF2NeRF)**
+
+
+Download the data sample of InstructNeRF2NeRF using this ![link]()
+
+```sh
+# --------- InstructNeRF2NeRF --------- #
+# 3D editing with NeRF patch-based rendering, ~20GB VRAM
+python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 1 data.dataroot="YOUR_DATAROOT/face" data.camera_layout="front" data.camera_distance=1 data.eval_interpolation=[1,3,50] system.prompt_processor.prompt="Turn him into Elon Musk"
 ```
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
