@@ -1,23 +1,22 @@
-import cv2
 import importlib
-import numpy as np
 import os
 from dataclasses import dataclass
-from omegaconf import OmegaConf
-from tqdm import tqdm
 
+import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers import DDIMScheduler
+from omegaconf import OmegaConf
+from tqdm import tqdm
 
 import threestudio
+from extern.ldm_zero123.modules.attention import BasicTransformerBlock, CrossAttention
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup
 from threestudio.utils.typing import *
-
-from extern.ldm_zero123.modules.attention import BasicTransformerBlock, CrossAttention
 
 
 def get_obj_from_str(string, reload=False):
@@ -310,7 +309,9 @@ class Zero123VSDGuidance(BaseModule):
     def extract_from_cond(self, cond, n_samples=1) -> dict:
         only_cond = {}
         for key in cond:
-            only_cond[key] = [torch.cat(n_samples * [cond[key][0][-len(cond[key][0])//2:]])]
+            only_cond[key] = [
+                torch.cat(n_samples * [cond[key][0][-len(cond[key][0]) // 2 :]])
+            ]
         return only_cond
 
     def compute_grad_vsd(
@@ -496,8 +497,8 @@ class Zero123VSDGuidance(BaseModule):
         for b, i in enumerate(idxs):
             latents = latents_1step[b : b + 1]
             c = {
-                "c_crossattn": [cond["c_crossattn"][0][b * 2 : b * 2 + 2]],
-                "c_concat": [cond["c_concat"][0][b * 2 : b * 2 + 2]],
+                "c_crossattn": [cond["c_crossattn"][0][[b, b + len(idxs)], ...]],
+                "c_concat": [cond["c_concat"][0][[b, b + len(idxs)], ...]],
             }
             for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
                 # pred noise

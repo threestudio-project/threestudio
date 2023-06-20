@@ -1,27 +1,27 @@
-import cv2
 import importlib
-import numpy as np
 import os
 import random
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from omegaconf import OmegaConf
-from tqdm import tqdm
 
+import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers import (
+    DDIMScheduler,
     DDPMScheduler,
     DPMSolverMultistepScheduler,
     StableDiffusionPipeline,
     UNet2DConditionModel,
-    DDIMScheduler,
 )
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.models.embeddings import TimestepEmbedding
 from diffusers.utils.import_utils import is_xformers_available
+from omegaconf import OmegaConf
+from tqdm import tqdm
 
 import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
@@ -663,8 +663,8 @@ class Zero123SDVSDGuidance(BaseModule):
         for b, i in enumerate(idxs):
             latents = latents_1step[b : b + 1]
             c = {
-                "c_crossattn": [cond["c_crossattn"][0][b * 2 : b * 2 + 2]],
-                "c_concat": [cond["c_concat"][0][b * 2 : b * 2 + 2]],
+                "c_crossattn": [cond["c_crossattn"][0][[b, b + len(idxs)], ...]],
+                "c_concat": [cond["c_concat"][0][[b, b + len(idxs)], ...]],
             }
             for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
                 # pred noise
