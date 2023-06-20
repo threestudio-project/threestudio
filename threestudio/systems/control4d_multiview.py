@@ -32,8 +32,6 @@ class Control4D(BaseLift3DSystem):
         inherit_coarse_texture: bool = True
         per_editing_step: int = 20
         start_editing_step: int = 1000
-        patch_size: int = 128
-        low_resolution_step: int = 1000
 
     cfg: Config
 
@@ -54,7 +52,6 @@ class Control4D(BaseLift3DSystem):
 
         self.perceptual_loss = LPIPS().eval().to(get_device())
         self.edit_frames = {}
-        self.cache_frames = {}
         self.per_editing_step = self.cfg.per_editing_step
         self.start_editing_step = self.cfg.start_editing_step
 
@@ -108,8 +105,7 @@ class Control4D(BaseLift3DSystem):
         loss_kl = out["posterior"].kl().mean()
         loss_G = generator_loss(self.renderer.discriminator, 
             gt_rgb.permute(0, 3, 1, 2), 
-            out["comp_gan_rgb"].permute(0, 3, 1, 2), 
-            out["comp_rgb"].permute(0, 3, 1, 2).detach()
+            out["comp_gan_rgb"].permute(0, 3, 1, 2)
         )
 
         generator_level = out["generator_level"]
@@ -170,8 +166,7 @@ class Control4D(BaseLift3DSystem):
         self.toggle_optimizer(optimizer_d)
         loss_D = discriminator_loss(self.renderer.discriminator, 
             gt_rgb.permute(0, 3, 1, 2), 
-            out["comp_gan_rgb"].permute(0, 3, 1, 2), 
-            out["comp_rgb"].permute(0, 3, 1, 2).detach()
+            out["comp_gan_rgb"].permute(0, 3, 1, 2)
         )
         loss_D *= self.C(self.cfg.loss["lambda_D"])
         self.log("train/loss_D", loss_D)
