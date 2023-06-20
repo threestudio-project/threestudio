@@ -125,9 +125,9 @@ class Zero123Guidance(BaseObject):
             steps_offset=1,
         )
 
-        # # self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        # self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        # self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        self.num_train_timesteps = self.scheduler.config.num_train_timesteps
+        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
+        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
@@ -141,12 +141,8 @@ class Zero123Guidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
-        self.min_step = int(
-            self.scheduler.config.num_train_timesteps * min_step_percent
-        )
-        self.max_step = int(
-            self.scheduler.config.num_train_timesteps * max_step_percent
-        )
+        self.min_step = int(self.num_train_timesteps * min_step_percent)
+        self.max_step = int(self.num_train_timesteps * max_step_percent)
 
     @torch.cuda.amp.autocast(enabled=False)
     def prepare_embeddings(self, image_path: str) -> Float[Tensor, "B 3 256 256"]:
@@ -329,17 +325,17 @@ class Zero123Guidance(BaseObject):
 
         if guidance_eval:
             guidance_eval_out = self.guidance_eval(cond, t, latents_noisy, noise_pred)
+            return guidance_out, guidance_eval_out
         else:
-            guidance_eval_out = {}
-        return guidance_out, guidance_eval_out
+            return guidance_out
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
-    def guidance_eval(self, cond, t_orig, latents, noise_pred):
+    def guidance_eval(self, cond, t_orig, latents_noisy, noise_pred):
         # use only 50 timesteps, and find nearest of those to t
         self.scheduler.set_timesteps(50)
         self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
-        bs = latents.shape[0]  # batch size
+        bs = latents_noisy.shape[0]  # batch size
         large_enough_idxs = self.scheduler.timesteps_gpu.expand(
             [bs, -1]
         ) > t_orig.unsqueeze(
@@ -349,14 +345,14 @@ class Zero123Guidance(BaseObject):
         t = self.scheduler.timesteps_gpu[idxs]
 
         fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
-        imgs_noisy = self.decode_latents(latents).permute(0, 2, 3, 1)
+        imgs_noisy = self.decode_latents(latents_noisy).permute(0, 2, 3, 1)
 
         # get prev latent
         latents_1step = []
         pred_1orig = []
         for b in range(len(t)):
             step_output = self.scheduler.step(
-                noise_pred[b : b + 1], t[b], latents[b : b + 1], eta=1
+                noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
             )
             latents_1step.append(step_output["prev_sample"])
             pred_1orig.append(step_output["pred_original_sample"])

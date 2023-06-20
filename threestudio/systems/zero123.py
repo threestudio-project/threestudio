@@ -126,12 +126,14 @@ class Zero123(BaseLift3DSystem):
                 self.C(self.guidance.cfg.max_step_percent),
             )
             # zero123
-            guidance_out, guidance_eval_out = self.guidance(
+            guidance_out = self.guidance(
                 out["comp_rgb"],
                 **batch,
                 rgb_as_latents=False,
                 guidance_eval=guidance_eval,
             )
+            if guidance_eval:
+                guidance_out, guidance_eval_out = guidance_out
             # claforte: TODO: rename the loss_terms keys
             set_loss("sds", guidance_out["loss_sds"])
 
@@ -227,21 +229,22 @@ class Zero123(BaseLift3DSystem):
 
         return {"loss": total_loss}
 
-    def merge12(self, x):
-        return x.reshape(-1, *x.shape[2:])
-
     def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
         B, size = comp_rgb.shape[:2]
         resize = lambda x: F.interpolate(
             x.permute(0, 3, 1, 2), (size, size), mode="bilinear", align_corners=False
         ).permute(0, 2, 3, 1)
         filename = f"it{self.true_global_step}-train.png"
+
+        def merge12(x):
+            return x.reshape(-1, *x.shape[2:])
+
         self.save_image_grid(
             filename,
             [
                 {
                     "type": "rgb",
-                    "img": self.merge12(comp_rgb),
+                    "img": merge12(comp_rgb),
                     "kwargs": {"data_format": "HWC"},
                 },
             ]
@@ -249,7 +252,7 @@ class Zero123(BaseLift3DSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_noisy"])),
+                        "img": merge12(resize(guidance_eval_out["imgs_noisy"])),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
@@ -258,7 +261,7 @@ class Zero123(BaseLift3DSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_1step"])),
+                        "img": merge12(resize(guidance_eval_out["imgs_1step"])),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
@@ -267,7 +270,7 @@ class Zero123(BaseLift3DSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_1orig"])),
+                        "img": merge12(resize(guidance_eval_out["imgs_1orig"])),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
@@ -276,7 +279,7 @@ class Zero123(BaseLift3DSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_final"])),
+                        "img": merge12(resize(guidance_eval_out["imgs_final"])),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
