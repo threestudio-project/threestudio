@@ -21,16 +21,18 @@ ENV TCNN_CUDA_ARCHITECTURES=90;89;86;80;75;70;61;60
 # ENV TCNN_CUDA_ARCHITECTURES=89
 
 ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV PATH=${CUDA_HOME}/bin:/home/${USER_NAME}/.local/bin:${PATH}
 ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 ENV LIBRARY_PATH=${CUDA_HOME}/lib64/stubs:${LIBRARY_PATH}
 
 # apt install by root user
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     git \
-    libgl1-mesa-glx \
+    libegl1-mesa-dev \
+    libgl1-mesa-dev \
+    libgles2-mesa-dev \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
