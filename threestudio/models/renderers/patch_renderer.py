@@ -28,10 +28,7 @@ class PatchRenderer(VolumeRenderer):
         material: BaseMaterial,
         background: BaseBackground,
     ) -> None:
-        cfg_copy = self.cfg.copy()
-        del cfg_copy.patch_size
-        del cfg_copy.base_renderer_type
-        self.base_renderer = threestudio.find(self.cfg.base_renderer_type)(cfg_copy.base_renderer, 
+        self.base_renderer = threestudio.find(self.cfg.base_renderer_type)(self.cfg.base_renderer, 
             geometry=geometry,
             material=material,
             background=background
