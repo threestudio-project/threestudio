@@ -19,19 +19,8 @@ from threestudio.utils.GAN.loss import generator_loss, discriminator_loss
 class Control4D(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        # only used when refinement=True and from_coarse=True
-        geometry_coarse_type: str = "implicit-volume"
-        geometry_coarse: dict = field(default_factory=dict)
-
-        refinement: bool = False
-        # path to the coarse stage weights
-        from_coarse: Optional[str] = None
-        # used to override configurations of the coarse geometry when initialize from coarse
-        # for example isosurface_threshold
-        coarse_geometry_override: dict = field(default_factory=dict)
-        inherit_coarse_texture: bool = True
         per_editing_step: int = 20
-        start_editing_step: int = 1000
+        start_editing_step: int = 2000
 
     cfg: Config
 

@@ -16,10 +16,8 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 from threestudio import register
 from threestudio.utils.config import parse_structured
-from threestudio.utils.misc import get_device
 from threestudio.utils.ops import (
     get_mvp_matrix,
-    get_projection_matrix,
     get_ray_directions,
     get_rays,
 )
@@ -70,9 +68,6 @@ class MultiviewsDataModuleConfig:
     camera_layout: str = "around" 
     camera_distance: float = -1
     eval_interpolation: Optional[Tuple[int, int, int]] = None # (0, 1, 30)
-    light_position_perturb: float = 1.0
-    light_distance_range: Tuple[float, float] = (0.8, 1.5)
-    light_sample_strategy: str = "dreamfusion"
 
 
 class MultiviewIterableDataset(IterableDataset):

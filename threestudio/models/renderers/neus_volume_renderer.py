@@ -14,8 +14,8 @@ from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
 
 def volsdf_density(sdf, inv_std):
-    beta = 1 / (inv_std  / 2)
-    alpha = inv_std / 2
+    beta = 1 / inv_std
+    alpha = inv_std
     return alpha * (0.5 + 0.5 * sdf.sign() * torch.expm1(-sdf.abs() / beta))
 
 class LearnedVariance(nn.Module):
@@ -29,7 +29,7 @@ class LearnedVariance(nn.Module):
         return val
 
     def forward(self, x):
-        return torch.ones_like(x) * self.inv_std.clamp(1.0e-6, 1.0e3)
+        return torch.ones_like(x) * self.inv_std.clamp(1.0e-6, 1.0e6)
 
 
 @threestudio.register("neus-volume-renderer")

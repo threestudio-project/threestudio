@@ -1,27 +1,22 @@
-import sys
 import os
-
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import torch
 import cv2
 import numpy as np
-from torch import nn
 import torch.nn.functional as F
-from torchtyping import TensorType
 from tqdm import tqdm
 from diffusers import (
     StableDiffusionControlNetPipeline,
     ControlNetModel,
-    UniPCMultistepScheduler,
     DDIMScheduler
 )
+from controlnet_aux import NormalBaeDetector, CannyDetector
 
 import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import C, parse_version
+from threestudio.utils.misc import parse_version
 from threestudio.utils.typing import *
-from controlnet_aux import NormalBaeDetector, CannyDetector
 
 
 @threestudio.register("controlnet-guidance")
@@ -39,9 +34,9 @@ class ControlNetGuidance(BaseObject):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         condition_scale: float  = 1.5
-        # grad_clip: Optional[
-        #     Any
-        # ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
+        grad_clip: Optional[
+            Any
+        ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
 
         min_step_percent: float = 0.02
@@ -50,14 +45,6 @@ class ControlNetGuidance(BaseObject):
         diffusion_steps: int = 20
 
         use_sds: bool = False
-        # use_sjc: bool = False
-        # var_red: bool = True
-        # weighting_strategy: str = "sds"
-
-        token_merging: bool = False
-        token_merging_params: Optional[dict] = field(default_factory=dict)
-
-        # view_dependent_prompting: bool = True
 
         # Canny threshold
         canny_lower_bound: int = 50
@@ -137,11 +124,6 @@ class ControlNetGuidance(BaseObject):
         for p in self.unet.parameters():
             p.requires_grad_(False)
 
-        if self.cfg.token_merging:
-            import tomesd
-
-            tomesd.apply_patch(self.unet, **self.cfg.token_merging_params)
-
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
         self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
@@ -163,7 +145,6 @@ class ControlNetGuidance(BaseObject):
         condition_scale: float,
         encoder_hidden_states: Float[Tensor, "..."],
     ) -> Float[Tensor, "..."]:
-        input_dtype = latents.dtype
         return self.controlnet(
             latents.to(self.weights_dtype),
             t.to(self.weights_dtype),

@@ -36,12 +36,7 @@ def nonlinearity(x):
 
 
 def Normalize(in_channels, num_groups=32):
-    # return torch.nn.Identity()
     return torch.nn.BatchNorm2d(num_features=in_channels)
-
-# def Normalize(in_channels, num_groups=8):
-#     return torch.nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-6, affine=False)
-
 
 class Upsample(nn.Module):
     def __init__(self, in_channels, with_conv):
@@ -576,10 +571,6 @@ class Decoder(nn.Module):
                     h = self.up[i_level].attn[i_block](h)
             if i_level != 0:
                 h = self.up[i_level].upsample(h)
-                # rgb = torch.nn.functional.interpolate(rgb, scale_factor=2.0, mode="bilinear")
-                # rgb_residual = self.up[i_level].rgb_conv(torch.cat([h, rgb], dim=1))
-                # rgb = rgb + torch.tanh(rgb_residual)
-                # h = self.up[i_level].rgb_cat_conv(torch.cat([h, rgb], dim=1))
 
         # end
         if self.give_pre_end:
@@ -592,8 +583,6 @@ class Decoder(nn.Module):
         rgb = torch.nn.functional.interpolate(rgb, scale_factor=4.0, mode="bilinear")
         rgb = torch.sigmoid(torch.logit(rgb, eps=1e-3) + h)
         return rgb
-    
-        return torch.sigmoid(h)
 
 
 class SimpleDecoder(nn.Module):

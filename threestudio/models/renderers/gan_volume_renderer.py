@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-
-import nerfacc
 import torch
 import torch.nn.functional as F
 
