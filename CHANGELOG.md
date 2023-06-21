@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Easy-to-use geometry conversion by `system.geometry_convert_from`. This is used in the Magic3D and ProlificDreamer system and may inspire applications connecting multiple systems/algorithms (#105).
 - Support prompt debiasing and manually assignment of view-dependent prompts (#98).
 - The implementation of Perp-Neg (#98).
+- Support patch-based renderer (#154).
 
 ### Changed
 
