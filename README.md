@@ -333,8 +333,8 @@ https://github.com/threestudio-project/threestudio/assets/19284678/762903c1-665b
 
 Notable differences from the paper:
 
-- The normal map of PBR materials is not implemented (only supports albedo, metallic, and roughness).
-- Instead of using an off-the-shelf environment light map, we learn the light with extra MLP networks inspired by [NeRO](https://github.com/liuyuan-pal/NeRO).
+- We enable tangent space normal map training by default, which can be turned off by appending `system.material.train_normal_map=false`.
+
 
 **Example running commands**
 

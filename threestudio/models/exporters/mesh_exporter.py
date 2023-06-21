@@ -116,8 +116,6 @@ class MeshExporter(Exporter):
             threestudio.info(
                 "Perform UV padding on texture maps to avoid seams, may take a while ..."
             )
-            if "normal" in geo_out:
-                params["map_Bump"] = uv_padding(geo_out["normal"])
 
             if "albedo" in mat_out:
                 params["map_Kd"] = uv_padding(mat_out["albedo"])
@@ -129,6 +127,8 @@ class MeshExporter(Exporter):
                 params["map_Pm"] = uv_padding(mat_out["metallic"])
             if "roughness" in mat_out:
                 params["map_Pr"] = uv_padding(mat_out["roughness"])
+            if "bump" in mat_out:
+                params["map_Bump"] = uv_padding(mat_out["bump"])
             # TODO: map_Ks
         return [
             ExporterOutput(

@@ -44,32 +44,23 @@ system:
   material:
     input_feature_dims: 32
     material_activation: sigmoid
-    light_activation: exp
+    environment_texture: "load/lights/mud_road_puresky_1k.hdr"
+    environment_scale: 2.0
+    min_metallic: 0.0
+    max_metallic: 0.9
+    min_roughness: 0.08
+    max_roughness: 0.9
+    train_normal_map: true
     material_mlp_network_config:
       otype: "VanillaMLP"
       activation: "ReLU"
       output_activation: "none"
       n_neurons: 64
       n_hidden_layers: 2
-    diffuse_mlp_network_config:
-      otype: "VanillaMLP"
-      activation: "ReLU"
-      output_activation: "none"
-      n_neurons: 64
-      n_hidden_layers: 2
-    specular_mlp_network_config:
-      otype: "VanillaMLP"
-      activation: "ReLU"
-      output_activation: "none"
-      n_neurons: 64
-      n_hidden_layers: 2
-    dir_encoding_config:
-      otype: "IntegratedDirectionalEncoding"
-      degree: 5
 
-  background_type: "solid-color-background"
+  background_type: "neural-environment-map-background"
   background:
-    color: [0, 0, 0] # black
+    color_activation: sigmoid
 
   renderer_type: "nvdiff-rasterizer"
 
@@ -81,9 +72,10 @@ system:
   guidance_type: "stable-diffusion-guidance"
   guidance:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-    guidance_scale: 50.
+    guidance_scale: 100
     weighting_strategy: sds
-    max_step_percent: 0.5
+    min_step_percent: 0.02
+    max_step_percent: 0.50
 
   loggers:
     wandb:
@@ -102,7 +94,7 @@ system:
       eps: 1.e-15
 
 trainer:
-  max_steps: 10000
+  max_steps: 5000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
   val_check_interval: 500

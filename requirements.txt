@@ -19,6 +19,7 @@ xatlas
 trimesh[easy]
 networkx
 pysdf
+git+https://github.com/ashawkey/envlight.git
 
 # deepfloyd
 xformers

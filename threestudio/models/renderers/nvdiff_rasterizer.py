@@ -75,6 +75,8 @@ class NVDiffRasterizer(Rasterizer):
             gb_light_positions = light_positions[:, None, None, :].expand(
                 -1, height, width, -1
             )
+            gb_tangent, _ = self.ctx.interpolate_one(mesh.v_tng, rast, mesh.t_pos_idx)
+            gb_tangent = F.normalize(gb_tangent, dim=-1)
 
             positions = gb_pos[selector]
             geo_out = self.geometry(positions, output_normal=False)
@@ -83,6 +85,7 @@ class NVDiffRasterizer(Rasterizer):
                 positions=positions,
                 light_positions=gb_light_positions[selector],
                 shading_normal=gb_normal[selector],
+                tangent=gb_tangent[selector],
                 **geo_out
             )
             gb_rgb_fg = torch.zeros(batch_size, height, width, 3).to(rgb_fg)

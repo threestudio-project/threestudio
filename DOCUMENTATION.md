@@ -236,18 +236,17 @@ A material with view dependent effects, parameterized with a network(MLP), simil
 
 ### pbr-material
 
-A simplified physically-based rendering (PBR) material inspired by [NeRO](https://github.com/liuyuan-pal/NeRO).
+A physically-based rendering (PBR) material.
 Currently we support learning albedo, metallic, and roughness. (normal is not supported currently.)
 
 | name                | type | description                                                                                                                   |
 | ------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------- |
 | input_feature_dims  | int  | The dimensions of the input feature. Default: 32                                                                               |
 | material_activation    | str  | The activation mapping the material network output to the materials (albedo, metallic, and roughness). Default: "sigmoid"                                                    |
-| light_activation    | str  | The activation mapping the light network output to the lighting. Default: "exp"                                                    |
+| environment_texture    | str  | Path to the environment light map file (`*.hdr`). Default: "load/lights/aerodynamics_workshop_2k.hdr"                                                    |
+| environment_scale    | float  | Scale of the environment light pixel values. Default: 2.0                                                    |
+| train_normal_map    | bool  | Whether to train a tangent space normal variation map. Default: true                                                    |
 | material_mlp_network_config  | dict | The config of the material MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 64, "n_hidden_layers": 2} |
-| diffuse_mlp_network_config  | dict | The config of the diffuse light MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 64, "n_hidden_layers": 2} |
-| specular_mlp_network_config  | dict | The config of the specular light MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 64, "n_hidden_layers": 2} |
-| dir_encoding_config | dict | The config of the positional encoding applied on the ray direction. Default: {"otype": "IntegratedDirectionalEncoding", "degree": 5}     |
 
 ### no-material
 

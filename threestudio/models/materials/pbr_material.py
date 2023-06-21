@@ -1,6 +1,7 @@
 import random
 from dataclasses import dataclass, field
 
+import envlight
 import numpy as np
 import nvdiffrast.torch as dr
 import torch
@@ -20,7 +21,13 @@ class PBRMaterial(BaseMaterial):
     class Config(BaseMaterial.Config):
         input_feature_dims: int = 32
         material_activation: str = "sigmoid"
-        light_activation: str = "exp"
+        environment_texture: str = "load/lights/mud_road_puresky_1k.hdr"
+        environment_scale: float = 2.0
+        min_metallic: float = 0.0
+        max_metallic: float = 0.9
+        min_roughness: float = 0.08
+        max_roughness: float = 0.9
+        train_normal_map: bool = True
         material_mlp_network_config: dict = field(
             default_factory=lambda: {
                 "otype": "VanillaMLP",
@@ -30,47 +37,26 @@ class PBRMaterial(BaseMaterial):
                 "n_hidden_layers": 2,
             }
         )
-        diffuse_mlp_network_config: dict = field(
-            default_factory=lambda: {
-                "otype": "VanillaMLP",
-                "activation": "ReLU",
-                "output_activation": "none",
-                "n_neurons": 64,
-                "n_hidden_layers": 2,
-            }
-        )
-        specular_mlp_network_config: dict = field(
-            default_factory=lambda: {
-                "otype": "VanillaMLP",
-                "activation": "ReLU",
-                "output_activation": "none",
-                "n_neurons": 64,
-                "n_hidden_layers": 2,
-            }
-        )
-        dir_encoding_config: dict = field(
-            default_factory=lambda: {
-                "otype": "IntegratedDirectionalEncoding",
-                "degree": 5,
-            }
-        )
 
     cfg: Config
 
     def configure(self) -> None:
+        self.material_dim = 3 + 1 + 1  # albedo + roughness + metallic
+        if self.cfg.train_normal_map:
+            self.material_dim += 3
+
         self.material_network = get_mlp(
-            self.cfg.input_feature_dims, 3 + 1 + 1, self.cfg.material_mlp_network_config
+            self.cfg.input_feature_dims,
+            self.material_dim,
+            self.cfg.material_mlp_network_config,
         )
-        self.encoding = get_encoding(3, self.cfg.dir_encoding_config)
-        self.diffuse_light_network = get_mlp(
-            self.encoding.n_output_dims, 3, self.cfg.diffuse_mlp_network_config
-        )
-        self.specular_light_network = get_mlp(
-            self.encoding.n_output_dims, 3, self.cfg.specular_mlp_network_config
+
+        self.light = envlight.EnvLight(
+            self.cfg.environment_texture, scale=self.cfg.environment_scale
         )
 
         FG_LUT = torch.from_numpy(
-            np.fromfile("load/bsdf/bsdf_256_256.bin", dtype=np.float32).reshape(
+            np.fromfile("load/lights/bsdf_256_256.bin", dtype=np.float32).reshape(
                 1, 256, 256, 2
             )
         )
@@ -81,49 +67,59 @@ class PBRMaterial(BaseMaterial):
         features: Float[Tensor, "*B Nf"],
         viewdirs: Float[Tensor, "*B 3"],
         shading_normal: Float[Tensor, "B ... 3"],
+        tangent: Float[Tensor, "B ... 3"],
         **kwargs,
     ) -> Float[Tensor, "*B 3"]:
         prefix_shape = features.shape[:-1]
-
-        # viewdirs and normals must be normalized before passing to this function
-        wo = -viewdirs
-        normal_dot_wo = (shading_normal * wo).sum(-1, keepdim=True)
-        reflective = normal_dot_wo * shading_normal * 2 - wo
 
         material = self.material_network(features.view(-1, features.shape[-1])).view(
             *prefix_shape, -1
         )
         material = get_activation(self.cfg.material_activation)(material)
         albedo = material[..., :3]
-        metallic = material[..., 3:4]
-        roughness = material[..., 4:5]
+        metallic = (
+            material[..., 3:4] * (self.cfg.max_metallic - self.cfg.min_metallic)
+            + self.cfg.min_metallic
+        )
+        roughness = (
+            material[..., 4:5] * (self.cfg.max_roughness - self.cfg.min_roughness)
+            + self.cfg.min_roughness
+        )
+
+        if self.cfg.train_normal_map:
+            # perturb_normal is a delta to the initialization [0, 0, 1]
+            perturb_normal = (material[..., 5:8] * 2 - 1) + torch.tensor(
+                [0, 0, 1], dtype=material.dtype, device=material.device
+            )
+            perturb_normal = F.normalize(perturb_normal.clamp(-1, 1), dim=-1)
+
+            # apply normal perturbation in tangent space
+            bitangent = F.normalize(torch.cross(tangent, shading_normal), dim=-1)
+            shading_normal = (
+                tangent * perturb_normal[..., 0:1]
+                - bitangent * perturb_normal[..., 1:2]
+                + shading_normal * perturb_normal[..., 2:3]
+            )
+            shading_normal = F.normalize(shading_normal, dim=-1)
+
+        v = -viewdirs
+        n_dot_v = (shading_normal * v).sum(-1, keepdim=True)
+        reflective = n_dot_v * shading_normal * 2 - v
 
         diffuse_albedo = (1 - metallic) * albedo
 
-        fg_uv = torch.cat([normal_dot_wo, roughness], -1).clamp(
-            0, 1
-        )  # [*prefix_shape, 2]
+        fg_uv = torch.cat([n_dot_v, roughness], -1).clamp(0, 1)
         fg = dr.texture(
             self.FG_LUT,
             fg_uv.reshape(1, -1, 1, 2).contiguous(),
             filter_mode="linear",
             boundary_mode="clamp",
         ).reshape(*prefix_shape, 2)
-        specular_albedo = (0.04 * (1 - metallic) + metallic * albedo) * fg[:, 0:1] + fg[
-            :, 1:2
-        ]
+        F0 = (1 - metallic) * 0.04 + metallic * albedo
+        specular_albedo = F0 * fg[:, 0:1] + fg[:, 1:2]
 
-        diffuse_light = self.diffuse_light_network(self.encoding(shading_normal))
-        diffuse_light = get_activation(self.cfg.light_activation)(
-            diffuse_light.clamp(max=5)
-        )
-
-        specular_light = self.specular_light_network(
-            self.encoding(reflective, roughness)
-        )
-        specular_light = get_activation(self.cfg.light_activation)(
-            specular_light.clamp(max=5)
-        )
+        diffuse_light = self.light(shading_normal)
+        specular_light = self.light(reflective, roughness)
 
         color = diffuse_albedo * diffuse_light + specular_albedo * specular_light
         color = color.clamp(0.0, 1.0)
@@ -138,11 +134,31 @@ class PBRMaterial(BaseMaterial):
         )
         material = get_activation(self.cfg.material_activation)(material)
         albedo = material[..., :3]
-        metallic = material[..., 3:4]
-        roughness = material[..., 4:5]
+        metallic = (
+            material[..., 3:4] * (self.cfg.max_metallic - self.cfg.min_metallic)
+            + self.cfg.min_metallic
+        )
+        roughness = (
+            material[..., 4:5] * (self.cfg.max_roughness - self.cfg.min_roughness)
+            + self.cfg.min_roughness
+        )
 
-        return {
+        out = {
             "albedo": albedo,
             "metallic": metallic,
             "roughness": roughness,
         }
+
+        if self.cfg.train_normal_map:
+            perturb_normal = (material[..., 5:8] * 2 - 1) + torch.tensor(
+                [0, 0, 1], dtype=material.dtype, device=material.device
+            )
+            perturb_normal = F.normalize(perturb_normal.clamp(-1, 1), dim=-1)
+            perturb_normal = (perturb_normal + 1) / 2
+            out.update(
+                {
+                    "bump": perturb_normal,
+                }
+            )
+
+        return out
