@@ -15,7 +15,7 @@ from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import parse_version
 from threestudio.utils.typing import *
 
-@threestudio.register("instructpix2pix-guidance")
+@threestudio.register("stable-diffusion-instructpix2pix-guidance")
 class InstructPix2PixGuidance(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
@@ -175,9 +175,9 @@ class InstructPix2PixGuidance(BaseObject):
             # add noise
             noise = torch.randn_like(latents)
             latents = self.scheduler.add_noise(latents, noise, t)  # type: ignore
-
+            threestudio.debug("Start editing...")
             # sections of code used from https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion_instruct_pix2pix.py
-            for i, t in tqdm(enumerate(self.scheduler.timesteps)):
+            for i, t in enumerate(self.scheduler.timesteps):
 
                 # predict the noise residual with unet, NO grad!
                 with torch.no_grad():
@@ -197,6 +197,7 @@ class InstructPix2PixGuidance(BaseObject):
 
                 # get previous sample, continue loop
                 latents = self.scheduler.step(noise_pred, t, latents).prev_sample
+            threestudio.debug("Editing finished.")
         return latents
     
     def compute_grad_sds(

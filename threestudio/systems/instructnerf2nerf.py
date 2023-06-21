@@ -8,7 +8,7 @@ from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-from threestudio.utils.lpips import LPIPS 
+from threestudio.utils.perceptual import PerceptualLoss 
 
 
 @threestudio.register("instructnerf2nerf-system")
@@ -24,7 +24,7 @@ class Instructnerf2nerf(BaseLift3DSystem):
         # create geometry, material, background, renderer
         super().configure()
         self.edit_frames = {}
-        self.perceptual_loss = LPIPS().eval().to(get_device())
+        self.perceptual_loss = PerceptualLoss().eval().to(get_device())
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)

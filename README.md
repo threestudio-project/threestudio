@@ -419,7 +419,7 @@ Download the data sample of InstructNeRF2NeRF using this [link](https://mailstsi
 ```sh
 # --------- InstructNeRF2NeRF --------- #
 # 3D editing with NeRF patch-based rendering, ~20GB VRAM
-python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 1 data.dataroot="YOUR_DATAROOT/face" data.camera_layout="front" data.camera_distance=1 data.eval_interpolation=[1,3,50] system.prompt_processor.prompt="Turn him into Albert Einstein"
+python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 0 data.dataroot="YOUR_DATAROOT/face" data.camera_layout="front" data.camera_distance=1 data.eval_interpolation=[1,3,50] system.prompt_processor.prompt="Turn him into Albert Einstein"
 ```
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)

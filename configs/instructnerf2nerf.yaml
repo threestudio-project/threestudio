@@ -1,5 +1,5 @@
 name: "instructnerf2nerf"
-tag: "${rmspace:${system.prompt_processor.prompt},_}"
+tag: "${basename:${data.dataroot}}_${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -7,8 +7,7 @@ data_type: "multiview-camera-datamodule"
 data:
   train_downsample_resolution: 1
   eval_downsample_resolution: 1
-  train_data_interval: 1
-  eval_data_interval: 3
+  dataroot: ???
 
 system_type: "instructnerf2nerf-system"
 system:
@@ -52,7 +51,7 @@ system:
       num_samples_per_ray: 384
     patch_size: 128
 
-  guidance_type: "instructpix2pix-guidance"
+  guidance_type: "stable-diffusion-instructpix2pix-guidance"
   guidance:
     min_step_percent: 0.02
     max_step_percent: 0.98
@@ -71,7 +70,7 @@ system:
     lambda_sds: 0.
     lambda_orient: [0, 10.0, 1000., 5000.0]
     lambda_sparsity: 1.0
-    lambda_opaque: 0.0
+    lambda_opaque: 1.0
     lambda_l1: 10.
     lambda_p: 10.
   optimizer:

@@ -19,7 +19,7 @@ from threestudio.utils.misc import parse_version
 from threestudio.utils.typing import *
 
 
-@threestudio.register("controlnet-guidance")
+@threestudio.register("stable-diffusion-controlnet-guidance")
 class ControlNetGuidance(BaseObject):
     @dataclass
     class Config(BaseObject.Config):
@@ -227,7 +227,8 @@ class ControlNetGuidance(BaseObject):
             latents = self.scheduler.add_noise(latents, noise, t)  # type: ignore
 
             # sections of code used from https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion_instruct_pix2pix.py
-            for i, t in tqdm(enumerate(self.scheduler.timesteps)):
+            threestudio.debug("Start editing...")
+            for i, t in enumerate(self.scheduler.timesteps):
 
                 # predict the noise residual with unet, NO grad!
                 with torch.no_grad():
@@ -253,6 +254,7 @@ class ControlNetGuidance(BaseObject):
                 )
                 # get previous sample, continue loop
                 latents = self.scheduler.step(noise_pred, t, latents).prev_sample
+            threestudio.debug("Editing finished.")
         return latents
     
     def prepare_image_cond(

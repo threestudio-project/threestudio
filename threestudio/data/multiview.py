@@ -14,6 +14,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, IterableDataset
 
+import threestudio
 from threestudio import register
 from threestudio.utils.config import parse_structured
 from threestudio.utils.ops import (
@@ -91,7 +92,7 @@ class MultiviewIterableDataset(IterableDataset):
 
         self.frame_w = frames[0]["w"] // scale
         self.frame_h = frames[0]["h"] // scale
-        print("Loading frames...")
+        threestudio.info("Loading frames...")
         self.n_frames = len(frames)
 
         c2w_list = []
@@ -146,7 +147,7 @@ class MultiviewIterableDataset(IterableDataset):
             frames_c2w.append(c2w)
             frames_position.append(camera_position)
             frames_direction.append(direction)
-        print("Loaded frames.")
+        threestudio.info("Loaded frames.")
 
         self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
         self.frames_c2w: Float[Tensor, "B 4 4"] = torch.stack(frames_c2w, dim=0)
@@ -200,7 +201,7 @@ class MultiviewDataset(Dataset):
 
         self.frame_w = frames[0]["w"] // scale
         self.frame_h = frames[0]["h"] // scale
-        print("Loading frames...")
+        threestudio.info("Loading frames...")
         self.n_frames = len(frames)
         
         c2w_list = []
@@ -293,7 +294,7 @@ class MultiviewDataset(Dataset):
                 frames_c2w.append(c2w)
                 frames_position.append(camera_position)
                 frames_direction.append(direction)
-        print("Loaded frames.")
+        threestudio.info("Loaded frames.")
 
         self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
         self.frames_c2w: Float[Tensor, "B 4 4"] = torch.stack(frames_c2w, dim=0)

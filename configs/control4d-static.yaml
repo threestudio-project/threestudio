@@ -1,5 +1,5 @@
 name: "control4d-static"
-tag: "${rmspace:${system.prompt_processor.prompt},_}"
+tag: "${basename:${data.dataroot}}_${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -7,9 +7,7 @@ data_type: "multiview-camera-datamodule"
 data:
   train_downsample_resolution: 1
   eval_downsample_resolution: 1
-  train_data_interval: 1
-  dataroot: dataset/twindom
-  camera_layout: around
+  dataroot: ???
 
 system_type: "control4d-multiview-system"
 system:
@@ -40,11 +38,10 @@ system:
     n_output_dims: 11
     requires_normal: true
 
-  background_type: "solid-rgb-feature-background"
+  background_type: "solid-color-background"
   background:
     n_output_dims: 11
-    color: 0.0
-    feature: 0.0
+    color: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
   renderer_type: "gan-volume-renderer"
   renderer:
@@ -53,7 +50,7 @@ system:
       radius: ${system.geometry.radius}
       num_samples_per_ray: 512
 
-  guidance_type: "controlnet-guidance"
+  guidance_type: "stable-diffusion-controlnet-guidance"
   guidance:
     control_type: "normal"
     min_step_percent: 0.05

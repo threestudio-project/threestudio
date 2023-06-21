@@ -5,10 +5,10 @@ import torch.nn as nn
 from torchvision import models
 from collections import namedtuple
 
-from threestudio.utils.lpips.utils import get_ckpt_path
+from threestudio.utils.perceptual.utils import get_ckpt_path
 
 
-class LPIPS(nn.Module):
+class PerceptualLoss(nn.Module):
     # Learned perceptual metric
     def __init__(self, use_dropout=True):
         super().__init__()

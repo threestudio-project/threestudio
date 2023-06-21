@@ -10,7 +10,7 @@ from threestudio.systems.utils import parse_optimizer
 from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-from threestudio.utils.lpips import LPIPS 
+from threestudio.utils.perceptual import PerceptualLoss
 from threestudio.utils.GAN.loss import generator_loss, discriminator_loss
 
 
@@ -39,7 +39,7 @@ class Control4D(BaseLift3DSystem):
             background=self.background,
         )
 
-        self.perceptual_loss = LPIPS().eval().to(get_device())
+        self.perceptual_loss = PerceptualLoss().eval().to(get_device())
         self.edit_frames = {}
         self.per_editing_step = self.cfg.per_editing_step
         self.start_editing_step = self.cfg.start_editing_step
