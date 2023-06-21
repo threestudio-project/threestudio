@@ -1,4 +1,6 @@
+import os
 import random
+import shutil
 from dataclasses import dataclass, field
 
 import torch
@@ -225,7 +227,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}.png",
+            f"it{self.true_global_step}-val/{batch['index'][0]}.png",
             (
                 [
                     {
@@ -263,12 +265,26 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
-            name="validation_step",
+            name=f"validation_step_batchidx_{batch_idx}"
+            if batch_idx in [0, 7, 15, 23, 29]
+            else None,
             step=self.true_global_step,
         )
 
     def on_validation_epoch_end(self):
-        pass
+        filestem = f"it{self.true_global_step}-val"
+        self.save_img_sequence(
+            filestem,
+            filestem,
+            "(\d+)\.png",
+            save_format="mp4",
+            fps=30,
+            name="validation_epoch_end",
+            step=self.true_global_step,
+        )
+        shutil.rmtree(
+            os.path.join(self.get_save_dir(), f"it{self.true_global_step}-val")
+        )
 
     def test_step(self, batch, batch_idx):
         out = self(batch)
