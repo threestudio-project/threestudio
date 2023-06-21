@@ -324,10 +324,16 @@ class Zero123Guidance(BaseObject):
         }
 
         if guidance_eval:
-            guidance_eval_out = self.guidance_eval(cond, t, latents_noisy, noise_pred)
-            return guidance_out, guidance_eval_out
-        else:
-            return guidance_out
+            guidance_eval_utils = {
+                "cond": cond,
+                "t_orig": t,
+                "latents_noisy": latents_noisy,
+                "noise_pred": noise_pred,
+            }
+            guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
+            guidance_out.update({"eval": guidance_eval_out})
+
+        return guidance_out
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()

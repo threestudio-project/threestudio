@@ -13,6 +13,8 @@ data:
     eval_elevation_deg: 0.
     eval_camera_distance: 1.2
     eval_fovy_deg: 60.
+    n_val_views: 30
+    n_test_views: 120
 
 system_type: "image-condition-dreamfusion-system"
 system:

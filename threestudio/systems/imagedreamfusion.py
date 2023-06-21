@@ -122,7 +122,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
                     valid_gt_depth = A @ X  # [B, 1]
                 set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
-
         elif guidance == "guidance":
             self.guidance.set_min_max_steps(
                 self.C(self.guidance.cfg.min_step_percent),
@@ -136,8 +135,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                 rgb_as_latents=False,
                 guidance_eval=guidance_eval,
             )
-            if guidance_eval:
-                guidance_out, guidance_eval_out = guidance_out
             set_loss("sds", guidance_out["loss_sds"])
 
         if self.C(self.cfg.loss.lambda_orient) > 0:
@@ -201,7 +198,9 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
         self.log(f"train/loss_{guidance}", loss)
 
         if guidance_eval:
-            self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
+            self.guidance_evaluation_save(
+                out["comp_rgb"].detach(), guidance_out["eval"]
+            )
 
         return {"loss": loss}
 
@@ -340,64 +339,4 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             fps=30,
             name="test",
             step=self.true_global_step,
-        )
-
-    def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
-        B, size = comp_rgb.shape[:2]
-        resize = lambda x: F.interpolate(
-            x.permute(0, 3, 1, 2), (size, size), mode="bilinear", align_corners=False
-        ).permute(0, 2, 3, 1)
-        filename = f"it{self.true_global_step}-train.png"
-
-        def merge12(x):
-            return x.reshape(-1, *x.shape[2:])
-
-        self.save_image_grid(
-            filename,
-            [
-                {
-                    "type": "rgb",
-                    "img": merge12(comp_rgb),
-                    "kwargs": {"data_format": "HWC"},
-                },
-            ]
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_noisy"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_1step"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_1orig"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_final"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            ),
-            name="train_step",
-            step=self.true_global_step,
-            noise_levels=guidance_eval_out["noise_levels"],
         )

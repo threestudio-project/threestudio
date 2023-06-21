@@ -261,9 +261,9 @@ class DeepFloydGuidance(BaseObject):
                 "noise_pred": torch.cat([noise_pred, predicted_variance], dim=1),
             }
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
-            return guidance_out, guidance_eval_out
-        else:
-            return guidance_out
+            guidance_out.update({"eval": guidance_eval_out})
+
+        return guidance_out
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
