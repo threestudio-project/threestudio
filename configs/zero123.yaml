@@ -10,8 +10,8 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   width: 192
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
-  default_camera_distance: 3.2
-  default_fovy_deg: 20.0
+  default_camera_distance: 1.7
+  default_fovy_deg: 55.0 # was 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
     height: 128
     width: 128
@@ -19,15 +19,15 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     eval_width: 256
     batch_size: 2
     eval_batch_size: 1
-    elevation_range: [-10, 60]
+    elevation_range: [10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.2, 3.3]
-    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
+    camera_distance_range: [1.7, 1.7] # claforte: try to keep constant
+    fovy_range: [55.0, 55.0] # Zero123 has fixed fovy
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
     light_position_perturb: 1.0
-    light_distance_range: [7.5, 10.0]
+    light_distance_range: [4.5, 5.0] #  [7.5, 10.0]
     eval_elevation_deg: ${data.default_elevation_deg}
     eval_camera_distance: ${data.default_camera_distance}
     eval_fovy_deg: ${data.default_fovy_deg}
@@ -102,9 +102,10 @@ system:
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     min_step_percent: 0.02
-    # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
+    #min_step_percent: [0, 0.5, 0.3, 10000]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: 0.98
-    # max_step_percent: [0, 0.98, 0.66, 2000]
+    #max_step_percent: [0, 0.9, 0.8, 10000]
+    noise_attenuation: 1.0
 
   freq:
     n_ref: 2
@@ -125,14 +126,15 @@ system:
     lambda_depth: 1.
     lambda_normal_smooth: 0.0
     lambda_3d_normal_smooth: 0.5
-    lambda_orient: [0, 1., 20., 5000]
+    lambda_orient: 1 # [0, 1., 20., 5000]
     lambda_sparsity: 2.0 # should be tweaked for every model
     lambda_opaque: 0.5
 
   optimizer:
     name: Adan
     args:
-      lr: 0.01
+      # lr: 0.01
+      lr: [0, 0.1, 0.01, 10000]
       max_grad_norm: 5.0
       eps: 1.e-8
       weight_decay: 1e-5
