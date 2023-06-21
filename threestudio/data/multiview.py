@@ -60,8 +60,8 @@ def inter_pose(pose_0, pose_1, ratio):
 @dataclass
 class MultiviewsDataModuleConfig:
     dataroot: str = ""
-    train_downsample_resolution: int = 3 # 2^3
-    eval_downsample_resolution: int = 3 # 2^3
+    train_downsample_resolution: int = 4 
+    eval_downsample_resolution: int = 4
     train_data_interval: int = 1
     eval_data_interval: int = 1
     batch_size: int = 1
