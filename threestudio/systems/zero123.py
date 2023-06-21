@@ -283,14 +283,8 @@ class Zero123(BaseLift3DSystem):
             ),
             name="train_step",
             step=self.true_global_step,
+            noise_levels=guidance_eval_out["noise_levels"],
         )
-
-        img = Image.open(self.get_save_path(filename))
-        draw = ImageDraw.Draw(img)
-        for i, n in enumerate(guidance_eval_out["noise_levels"]):
-            draw.text((1, (img.size[1] // B) * i + 1), f"{n:.02f}", (255, 255, 255))
-            draw.text((0, (img.size[1] // B) * i), f"{n:.02f}", (0, 0, 0))
-        img.save(self.get_save_path(filename))
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)

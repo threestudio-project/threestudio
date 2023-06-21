@@ -141,8 +141,12 @@ class Zero123Guidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
-        self.min_step = int(self.scheduler.config.num_train_timesteps * min_step_percent)
-        self.max_step = int(self.scheduler.config.num_train_timesteps * max_step_percent)
+        self.min_step = int(
+            self.scheduler.config.num_train_timesteps * min_step_percent
+        )
+        self.max_step = int(
+            self.scheduler.config.num_train_timesteps * max_step_percent
+        )
 
     @torch.cuda.amp.autocast(enabled=False)
     def prepare_embeddings(self, image_path: str) -> Float[Tensor, "B 3 256 256"]:
@@ -365,8 +369,8 @@ class Zero123Guidance(BaseObject):
         for b, i in enumerate(idxs):
             latents = latents_1step[b : b + 1]
             c = {
-                "c_crossattn": [cond["c_crossattn"][0][b * 2 : b * 2 + 2]],
-                "c_concat": [cond["c_concat"][0][b * 2 : b * 2 + 2]],
+                "c_crossattn": [cond["c_crossattn"][0][[b, b + len(idxs)], ...]],
+                "c_concat": [cond["c_concat"][0][[b, b + len(idxs)], ...]],
             }
             for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
                 # pred noise
