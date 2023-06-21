@@ -52,6 +52,7 @@ class RandomCameraDataModuleConfig:
     eval_fovy_deg: float = 70.0
     light_sample_strategy: str = "dreamfusion"
     batch_uniform_azimuth: bool = True
+    progressive_until: int = 0  # progressive ranges for elevation, azimuth, r, fovy
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
@@ -83,6 +84,10 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.height: int = self.heights[0]
         self.width: int = self.widths[0]
         self.directions_unit_focal = self.directions_unit_focals[0]
+        self.elevation_range = self.cfg.elevation_range
+        self.azimuth_range = self.cfg.azimuth_range
+        self.camera_distance_range = self.cfg.camera_distance_range
+        self.fovy_range = self.cfg.fovy_range
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
@@ -90,6 +95,25 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.width = self.widths[size_ind]
         self.directions_unit_focal = self.directions_unit_focals[size_ind]
         threestudio.debug(f"Training height: {self.height}, width: {self.width}")
+        r = min(1.0, global_step / (self.cfg.progressive_until + 1))
+        self.elevation_range = [
+            (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[0],
+            (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[1],
+        ]
+        self.azimuth_range = [
+            (1 - r) * 0.0 + r * self.cfg.azimuth_range[0],
+            (1 - r) * 0.0 + r * self.cfg.azimuth_range[1],
+        ]
+        self.camera_distance_range = [
+            (1 - r) * self.cfg.eval_camera_distance
+            + r * self.cfg.camera_distance_range[0],
+            (1 - r) * self.cfg.eval_camera_distance
+            + r * self.cfg.camera_distance_range[1],
+        ]
+        self.fovy_range = [
+            (1 - r) * self.cfg.eval_fovy_deg + r * self.cfg.fovy_range[0],
+            (1 - r) * self.cfg.eval_fovy_deg + r * self.cfg.fovy_range[1],
+        ]
 
     def __iter__(self):
         while True:
@@ -103,15 +127,15 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             # sample elevation angles uniformly with a probability 0.5 (biased towards poles)
             elevation_deg = (
                 torch.rand(self.cfg.batch_size)
-                * (self.cfg.elevation_range[1] - self.cfg.elevation_range[0])
-                + self.cfg.elevation_range[0]
+                * (self.elevation_range[1] - self.elevation_range[0])
+                + self.elevation_range[0]
             )
             elevation = elevation_deg * math.pi / 180
         else:
             # otherwise sample uniformly on sphere
             elevation_range_percent = [
-                (self.cfg.elevation_range[0] + 90.0) / 180.0,
-                (self.cfg.elevation_range[1] + 90.0) / 180.0,
+                (self.elevation_range[0] + 90.0) / 180.0,
+                (self.elevation_range[1] + 90.0) / 180.0,
             ]
             # inverse transform sampling
             elevation = torch.asin(
@@ -132,24 +156,24 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             azimuth_deg = (
                 torch.rand(self.cfg.batch_size) + torch.arange(self.cfg.batch_size)
             ) / self.cfg.batch_size * (
-                self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0]
-            ) + self.cfg.azimuth_range[
+                self.azimuth_range[1] - self.azimuth_range[0]
+            ) + self.azimuth_range[
                 0
             ]
         else:
             # simple random sampling
             azimuth_deg = (
                 torch.rand(self.cfg.batch_size)
-                * (self.cfg.azimuth_range[1] - self.cfg.azimuth_range[0])
-                + self.cfg.azimuth_range[0]
+                * (self.azimuth_range[1] - self.azimuth_range[0])
+                + self.azimuth_range[0]
             )
         azimuth = azimuth_deg * math.pi / 180
 
         # sample distances from a uniform distribution bounded by distance_range
         camera_distances: Float[Tensor, "B"] = (
             torch.rand(self.cfg.batch_size)
-            * (self.cfg.camera_distance_range[1] - self.cfg.camera_distance_range[0])
-            + self.cfg.camera_distance_range[0]
+            * (self.camera_distance_range[1] - self.camera_distance_range[0])
+            + self.camera_distance_range[0]
         )
 
         # convert spherical coordinates to cartesian coordinates
@@ -190,9 +214,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
 
         # sample fovs from a uniform distribution bounded by fov_range
         fovy_deg: Float[Tensor, "B"] = (
-            torch.rand(self.cfg.batch_size)
-            * (self.cfg.fovy_range[1] - self.cfg.fovy_range[0])
-            + self.cfg.fovy_range[0]
+            torch.rand(self.cfg.batch_size) * (self.fovy_range[1] - self.fovy_range[0])
+            + self.fovy_range[0]
         )
         fovy = fovy_deg * math.pi / 180
 
