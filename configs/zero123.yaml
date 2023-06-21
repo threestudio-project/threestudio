@@ -22,7 +22,8 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
     camera_distance_range: [3.8, 3.8]
-    fovy_range: [20.0, 20.0]
+    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
+    progressive_until: 0
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
