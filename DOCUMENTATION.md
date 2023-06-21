@@ -3,7 +3,7 @@
 | name          | type          | description                                                                                                                                                                                                                                                           |
 | ------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | name          | str           | Name of the experiment. Default: "default"                                                                                                                                                                                                                            |
-| description   | str           | Descrption of the experiment. Default: ""                                                                                                                                                                                                                             |
+| description   | str           | Description of the experiment. Default: ""                                                                                                                                                                                                                             |
 | tag           | str           | Tag of the experiment. Default: ""                                                                                                                                                                                                                                    |
 | seed          | str           | Global seed of the experiment. Used by `seed_everything` of PyTorch-Lightning. Default: 0                                                                                                                                                                             |
 | use_timestamp | bool          | Whether to use the current timestamp as the suffix of the tag. Default: True                                                                                                                                                                                          |
@@ -338,11 +338,34 @@ Renderers takes geometry, material, and background to produce images given camer
 | grid_prune            | bool  | Whether to maintain an occupancy grid and prune sample points in empty space using NeRFAcc. Default: True |
 | prune_alpha_threshold | bool  | Whether to prune sample points with lower density, only effective when `grid_prune=true`. Default: True   |
 
+### neus-volume-renderer
+
+| name                  | type  | description                                                                                               |
+| --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
+| num_samples_per_ray   | float | Number of sample points along each ray. Default: 1.0                                                      |
+| randomized            | bool  | Whether to randomly perturb the sample points in training. Default: True                                  |
+| eval_chunk_size       | int   | Number of sample points per chunk in validation/testing, to prevent OOM. Default: 160000                  |
+| grid_prune            | bool  | Whether to maintain an occupancy grid and prune sample points in empty space using NeRFAcc. Default: True |
+| prune_alpha_threshold | bool  | Whether to prune sample points with lower density, only effective when `grid_prune=true`. Default: True   |
+| learned_variance_init | float | Initialized value for the learned surface variance. Default: 0.3                                          |
+| cos_anneal_end_steps  | int   | End steps for the linear cosine annealing technique proposed in the NeuS paper. Default: 0                |
+| use_volsdf            | bool  | Whether to use the VolSDF formulation for SDF-to-alpha conversion. Default: False                         |
+
 ### nvdiff-rasterizer
 
 | name         | type | description                                                                                                                                                                                      |
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | context_type | str  | Rasterization context type used by nvdiffrast, in ["gl", "cuda"]. See the [nvdiffrast documentation](https://nvlabs.github.io/nvdiffrast/#rasterizing-with-cuda-vs-opengl-new) for more details. |
+
+### patch-renderer
+The patch-renderer first renders a full low-resolution downsampled image and then randomly renders a local patch at the original resolution level, which can significantly reduce memory usage during high-resolution training. 
+| name                  | type  | description                                                                                               |
+| --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
+| patch_size            | int   | The size of the local patch. Default: 128                                                                 |
+| global_downsample     | int   | Downsample scale of the original rendering size. Default: 4                                               |
+| global_detach         | bool  | Whether to detach the gradient of the downsampled image. Default: False                                   |
+| base_renderer_type    | str   | The type of base renderer.                                                                                |
+| base_renderer         | VolumeRenderer.Config  | The configuration of the base renderer.                                                  |
 
 ## Guidance
 
