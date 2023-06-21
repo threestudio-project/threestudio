@@ -5,8 +5,8 @@ seed: 0
 
 data_type: "multiview-camera-datamodule"
 data:
-  train_downsample_resolution: 1
-  eval_downsample_resolution: 1
+  train_downsample_resolution: 2
+  eval_downsample_resolution: 2
   dataroot: ???
 
 system_type: "control4d-multiview-system"

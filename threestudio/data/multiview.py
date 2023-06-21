@@ -59,7 +59,7 @@ def inter_pose(pose_0, pose_1, ratio):
 
 @dataclass
 class MultiviewsDataModuleConfig:
-    dataroot: str = "dataset/face"
+    dataroot: str = ""
     train_downsample_resolution: int = 3 # 2^3
     eval_downsample_resolution: int = 3 # 2^3
     train_data_interval: int = 1
@@ -77,7 +77,7 @@ class MultiviewIterableDataset(IterableDataset):
         self.cfg: MultiviewsDataModuleConfig = cfg
         
         assert self.cfg.batch_size == 1
-        scale = 2 ** self.cfg.train_downsample_resolution
+        scale = self.cfg.train_downsample_resolution
         
         camera_dict = json.load(open(os.path.join(self.cfg.dataroot, "transforms.json"), "r"))
         assert camera_dict["camera_model"] == "OPENCV"
