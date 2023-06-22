@@ -245,6 +245,10 @@ Currently we support learning albedo, metallic, and roughness. (normal is not su
 | material_activation    | str  | The activation mapping the material network output to the materials (albedo, metallic, and roughness). Default: "sigmoid"                                                    |
 | environment_texture    | str  | Path to the environment light map file (`*.hdr`). Default: "load/lights/aerodynamics_workshop_2k.hdr"                                                    |
 | environment_scale    | float  | Scale of the environment light pixel values. Default: 2.0                                                    |
+| min_metallic    | float  | Minimum value for metallic. Default: 0.0                                                    |
+| max_metallic    | float  | Maximum value for metallic. Default: 0.9                                                    |
+| min_roughness    | float  | Minimum value for roughness. Default: 0.08                                                    |
+| max_roughness    | float  | Maximum value for roughness. Default: 0.9                                                    |
 | train_normal_map    | bool  | Whether to train a tangent space normal variation map. Default: true                                                    |
 | material_mlp_network_config  | dict | The config of the material MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 64, "n_hidden_layers": 2} |
 
@@ -357,7 +361,7 @@ Renderers takes geometry, material, and background to produce images given camer
 | context_type | str  | Rasterization context type used by nvdiffrast, in ["gl", "cuda"]. See the [nvdiffrast documentation](https://nvlabs.github.io/nvdiffrast/#rasterizing-with-cuda-vs-opengl-new) for more details. |
 
 ### patch-renderer
-The patch-renderer first renders a full low-resolution downsampled image and then randomly renders a local patch at the original resolution level, which can significantly reduce memory usage during high-resolution training. 
+The patch-renderer first renders a full low-resolution downsampled image and then randomly renders a local patch at the original resolution level, which can significantly reduce memory usage during high-resolution training.
 | name                  | type  | description                                                                                               |
 | --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
 | patch_size            | int   | The size of the local patch. Default: 128                                                                 |
