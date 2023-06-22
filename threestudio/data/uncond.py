@@ -88,6 +88,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.azimuth_range = self.cfg.azimuth_range
         self.camera_distance_range = self.cfg.camera_distance_range
         self.fovy_range = self.cfg.fovy_range
+        self.step = -1
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
@@ -95,7 +96,13 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.width = self.widths[size_ind]
         self.directions_unit_focal = self.directions_unit_focals[size_ind]
         threestudio.debug(f"Training height: {self.height}, width: {self.width}")
-        r = min(1.0, global_step / (self.cfg.progressive_until + 1))
+
+    def __iter__(self):
+        while True:
+            yield {}
+
+    def progressive_view(self):
+        r = self.r = min(1.0, self.step / (self.cfg.progressive_until + 1))
         self.elevation_range = [
             (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[0],
             (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[1],
@@ -115,11 +122,11 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             (1 - r) * self.cfg.eval_fovy_deg + r * self.cfg.fovy_range[1],
         ]
 
-    def __iter__(self):
-        while True:
-            yield {}
-
     def collate(self, batch) -> Dict[str, Any]:
+        self.step += 1
+        # progressive view
+        self.progressive_view()
+        print("\n", self.step, self.r)
         # sample elevation angles
         elevation_deg: Float[Tensor, "B"]
         elevation: Float[Tensor, "B"]
