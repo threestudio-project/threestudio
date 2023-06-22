@@ -1,6 +1,6 @@
 import importlib
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -12,7 +12,9 @@ from omegaconf import OmegaConf
 from tqdm import tqdm
 
 import threestudio
-from threestudio.utils.base import BaseObject
+from extern.ldm_zero123.modules.attention import BasicTransformerBlock, CrossAttention
+from threestudio.models.prompt_processors.base import PromptProcessorOutput
+from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup
 from threestudio.utils.typing import *
 
@@ -70,12 +72,27 @@ def load_model_from_config(config, ckpt, device, vram_O=True, verbose=False):
     return model
 
 
-@threestudio.register("zero123-guidance")
-class Zero123Guidance(BaseObject):
+class ToWeightsDType(nn.Module):
+    def __init__(self, module: nn.Module, dtype: torch.dtype):
+        super().__init__()
+        self.module = module
+        self.dtype = dtype
+
+    def forward(self, x: Float[Tensor, "..."]) -> Float[Tensor, "..."]:
+        return self.module(x).to(self.dtype)
+
+
+@threestudio.register("zero123-vsd-guidance")
+class Zero123VSDGuidance(BaseModule):
     @dataclass
-    class Config(BaseObject.Config):
+    class Config(BaseModule.Config):
         pretrained_model_name_or_path: str = "load/zero123/105000.ckpt"
         pretrained_config: str = "load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
+        pretrained_model_name_or_path_lora: str = "load/zero123/105000.ckpt"
+        pretrained_config_lora: str = (
+            "load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
+        )
+
         vram_O: bool = True
 
         cond_image_path: str = "load/images/hamburger_rgba.png"
@@ -84,21 +101,21 @@ class Zero123Guidance(BaseObject):
         cond_camera_distance: float = 1.2
 
         guidance_scale: float = 3.0
+        guidance_scale_lora: float = 1.0
 
-        grad_clip: Optional[
-            Any
-        ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = False
+        lora_cfg_training: bool = True
+        lora_n_timestamp_samples: int = 1
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
         max_step_percent_annealed: float = 0.5
-        anneal_start_step: Optional[int] = None
+        anneal_start_step: Optional[int] = 5000
 
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading Zero123 ...")
+        threestudio.info(f"Loading ProlificZero123...")
 
         self.config = OmegaConf.load(self.cfg.pretrained_config)
         # TODO: seems it cannot load into fp16...
@@ -110,14 +127,44 @@ class Zero123Guidance(BaseObject):
             vram_O=self.cfg.vram_O,
         )
 
+        if (
+            self.cfg.pretrained_model_name_or_path
+            == self.cfg.pretrained_model_name_or_path_lora
+        ):
+            self.single_model = True
+            self.model_lora = self.model
+        else:
+            self.single_model = False
+            self.config_lora = OmegaConf.load(self.cfg.pretrained_config_lora)
+            self.model_lora = load_model_from_config(
+                self.config_lora,
+                self.cfg.pretrained_model_name_or_path_lora,
+                device=self.device,
+                vram_O=self.cfg.vram_O,
+            )
+
         cleanup()
 
         for p in self.model.parameters():
             p.requires_grad_(False)
+        for p in self.model_lora.parameters():
+            p.requires_grad_(False)
+
+        # set up LoRA layers
+        print("LoRA-training only unet attention layers")
+        self.lora_layers = nn.ModuleList()
+        for n, m in self.model_lora.named_modules():
+            if isinstance(m, BasicTransformerBlock) and n.endswith(
+                "transformer_blocks.0"
+            ):
+                tx = m
+            if isinstance(m, CrossAttention) and n.endswith("attn2"):
+                tx.checkpoint = False
+                m.setup_lora()
+                self.lora_layers.append(m.lora_layers)
 
         # timesteps: use diffuser for convenience... hope it's alright.
         self.num_train_timesteps = self.config.model.params.timesteps
-
         self.scheduler = DDIMScheduler(
             self.num_train_timesteps,
             self.config.model.params.linear_start,
@@ -128,7 +175,17 @@ class Zero123Guidance(BaseObject):
             steps_offset=1,
         )
 
-        self.num_train_timesteps = self.scheduler.config.num_train_timesteps
+        self.scheduler_lora = DDIMScheduler(
+            self.num_train_timesteps,
+            self.config.model.params.linear_start,
+            self.config.model.params.linear_end,
+            beta_schedule="scaled_linear",
+            clip_sample=False,
+            set_alpha_to_one=False,
+            steps_offset=1,
+        )
+
+        # self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
         self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
 
@@ -136,16 +193,9 @@ class Zero123Guidance(BaseObject):
             self.device
         )
 
-        self.grad_clip_val: Optional[float] = None
-
         self.prepare_embeddings(self.cfg.cond_image_path)
 
-        threestudio.info(f"Loaded Zero123!")
-
-    @torch.cuda.amp.autocast(enabled=False)
-    def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
-        self.min_step = int(self.num_train_timesteps * min_step_percent)
-        self.max_step = int(self.num_train_timesteps * max_step_percent)
+        threestudio.info(f"Loaded ProlificZero123!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def prepare_embeddings(self, image_path: str) -> Float[Tensor, "B 3 256 256"]:
@@ -254,7 +304,119 @@ class Zero123Guidance(BaseObject):
         ]
         return cond
 
-    def __call__(
+    @torch.cuda.amp.autocast(enabled=False)
+    @torch.no_grad()
+    def extract_from_cond(self, cond, n_samples=1) -> dict:
+        only_cond = {}
+        for key in cond:
+            only_cond[key] = [
+                torch.cat(n_samples * [cond[key][0][-len(cond[key][0]) // 2 :]])
+            ]
+        return only_cond
+
+    def compute_grad_vsd(
+        self,
+        latents: Float[Tensor, "B 4 64 64"],
+        cond: dict,
+        guidance_eval: bool,
+    ):
+        B = latents.shape[0]
+
+        # predict the noise residual with unet, NO grad!
+        with torch.no_grad():
+            # random timestamp
+            t = torch.randint(
+                self.min_step,
+                self.max_step + 1,
+                [B],
+                dtype=torch.long,
+                device=self.device,
+            )
+            # add noise
+            noise = torch.randn_like(latents)
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+
+            # pred noise
+            x_in = torch.cat([latents_noisy] * 2)
+            t_in = torch.cat([t] * 2)
+            noise_pred_pretrain = self.model.apply_model(x_in, t_in, cond)
+
+            # lora pred noise
+            noise_pred_est = self.model_lora.apply_model(x_in, t_in, cond)
+
+        (
+            noise_pred_pretrain_text,
+            noise_pred_pretrain_uncond,
+        ) = noise_pred_pretrain.chunk(2)
+
+        # NOTE: guidance scale definition here is aligned with diffusers, but different from other guidance
+        noise_pred_pretrain = noise_pred_pretrain_uncond + self.cfg.guidance_scale * (
+            noise_pred_pretrain_text - noise_pred_pretrain_uncond
+        )
+
+        (
+            noise_pred_est_text,
+            noise_pred_est_uncond,
+        ) = noise_pred_est.chunk(2)
+
+        # NOTE: guidance scale definition here is aligned with diffusers, but different from other guidance
+        noise_pred_est = noise_pred_est_uncond + self.cfg.guidance_scale_lora * (
+            noise_pred_est_text - noise_pred_est_uncond
+        )
+
+        w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
+
+        grad = w * (noise_pred_pretrain - noise_pred_est)
+
+        if guidance_eval:
+            guidance_eval_out = self.evaluate_guidance(
+                cond, t, latents_noisy, noise_pred_pretrain
+            )
+        else:
+            guidance_eval_out = {}
+
+        return grad, guidance_eval_out
+
+    def train_lora(
+        self,
+        latents: Float[Tensor, "B 4 64 64"],
+        cond: dict,
+    ):
+        B = latents.shape[0]
+        latents = latents.detach().repeat(self.cfg.lora_n_timestamp_samples, 1, 1, 1)
+
+        t = torch.randint(
+            int(self.num_train_timesteps * 0.0),
+            int(self.num_train_timesteps * 1.0),
+            [B * self.cfg.lora_n_timestamp_samples],
+            dtype=torch.long,
+            device=self.device,
+        )
+
+        noise = torch.randn_like(latents)
+        noisy_latents = self.scheduler_lora.add_noise(latents, noise, t)
+
+        only_cond = self.extract_from_cond(cond, self.cfg.lora_n_timestamp_samples)
+        noise_pred = self.model_lora.apply_model(noisy_latents, t, only_cond)
+
+        return F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+
+    def get_latents(
+        self, rgb_BCHW: Float[Tensor, "B C H W"], rgb_as_latents=False
+    ) -> Float[Tensor, "B 4 32 32"]:
+        if rgb_as_latents:
+            latents = F.interpolate(
+                rgb_BCHW, (32, 32), mode="bilinear", align_corners=False
+            )
+        else:
+            rgb_BCHW_256 = F.interpolate(
+                rgb_BCHW, (256, 256), mode="bilinear", align_corners=False
+            )
+            # encode image into latents with vae
+            latents = self.encode_images(rgb_BCHW_256)
+        return latents
+
+    def forward(
         self,
         rgb: Float[Tensor, "B H W C"],
         elevation: Float[Tensor, "B"],
@@ -267,84 +429,45 @@ class Zero123Guidance(BaseObject):
         batch_size = rgb.shape[0]
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 64 64"]
-        if rgb_as_latents:
-            latents = (
-                F.interpolate(rgb_BCHW, (32, 32), mode="bilinear", align_corners=False)
-                * 2
-                - 1
-            )
-        else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (256, 256), mode="bilinear", align_corners=False
-            )
-            # encode image into latents with vae
-            latents = self.encode_images(rgb_BCHW_512)
+        latents = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
 
         cond = self.get_cond(elevation, azimuth, camera_distances)
 
-        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
-        t = torch.randint(
-            self.min_step,
-            self.max_step + 1,
-            [batch_size],
-            dtype=torch.long,
-            device=self.device,
-        )
+        grad, guidance_eval_out = self.compute_grad_vsd(latents, cond, guidance_eval)
 
-        # predict the noise residual with unet, NO grad!
-        with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)  # TODO: use torch generator
-            latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
-            x_in = torch.cat([latents_noisy] * 2)
-            t_in = torch.cat([t] * 2)
-            noise_pred = self.model.apply_model(x_in, t_in, cond)
-
-        # perform guidance
-        noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
-        noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-            noise_pred_cond - noise_pred_uncond
-        )
-
-        w = (1 - self.alphas[t]).reshape(-1, 1, 1, 1)
-        grad = w * (noise_pred - noise)
         grad = torch.nan_to_num(grad)
-        # clip grad for stable training?
-        if self.grad_clip_val is not None:
-            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
-        # loss = SpecifyGradient.apply(latents, grad)
-        # SpecifyGradient is not straghtforward, use a reparameterization trick instead
-        target = (latents - grad).detach()
+        # reparameterization trick
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        target = (latents - grad).detach()
+        loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+
+        loss_lora = self.train_lora(latents, cond)
 
         guidance_out = {
-            "loss_sds": loss_sds,
+            "loss_vsd": loss_vsd,
+            "loss_lora": loss_lora,
             "grad_norm": grad.norm(),
         }
 
-        if guidance_eval:
-            guidance_eval_utils = {
-                "cond": cond,
-                "t_orig": t,
-                "latents_noisy": latents_noisy,
-                "noise_pred": noise_pred,
-            }
-            guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
-            guidance_out.update({"eval": guidance_eval_out})
+        return guidance_out, guidance_eval_out
 
-        return guidance_out
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        if (
+            self.cfg.anneal_start_step is not None
+            and global_step > self.cfg.anneal_start_step
+        ):
+            self.max_step = int(
+                self.num_train_timesteps * self.cfg.max_step_percent_annealed
+            )
 
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
-    def guidance_eval(self, cond, t_orig, latents_noisy, noise_pred):
+    def evaluate_guidance(self, cond, t_orig, latents, noise_pred):
         # use only 50 timesteps, and find nearest of those to t
         self.scheduler.set_timesteps(50)
         self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
-        bs = latents_noisy.shape[0]  # batch size
+        bs = latents.shape[0]  # batch size
         large_enough_idxs = self.scheduler.timesteps_gpu.expand(
             [bs, -1]
         ) > t_orig.unsqueeze(
@@ -354,14 +477,14 @@ class Zero123Guidance(BaseObject):
         t = self.scheduler.timesteps_gpu[idxs]
 
         fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
-        imgs_noisy = self.decode_latents(latents_noisy).permute(0, 2, 3, 1)
+        imgs_noisy = self.decode_latents(latents).permute(0, 2, 3, 1)
 
         # get prev latent
         latents_1step = []
         pred_1orig = []
         for b in range(len(t)):
             step_output = self.scheduler.step(
-                noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
+                noise_pred[b : b + 1], t[b], latents[b : b + 1], eta=1
             )
             latents_1step.append(step_output["prev_sample"])
             pred_1orig.append(step_output["pred_original_sample"])
@@ -404,25 +527,9 @@ class Zero123Guidance(BaseObject):
             "imgs_final": imgs_final,
         }
 
-    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        # clip grad for stable training as demonstrated in
-        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
-        # http://arxiv.org/abs/2303.15413
-        if self.cfg.grad_clip is not None:
-            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
-
-        # t annealing from ProlificDreamer
-        if (
-            self.cfg.anneal_start_step is not None
-            and global_step > self.cfg.anneal_start_step
-        ):
-            self.max_step = int(
-                self.num_train_timesteps * self.cfg.max_step_percent_annealed
-            )
-
     # verification - requires `vram_O = False` in load_model_from_config
     @torch.no_grad()
-    def generate(
+    def sample(
         self,
         image,  # image tensor [1, 3, H, W] in [0, 1]
         elevation=0,

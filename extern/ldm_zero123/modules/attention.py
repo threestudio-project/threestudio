@@ -147,6 +147,36 @@ class SpatialSelfAttention(nn.Module):
         return x + h_
 
 
+class LoRALinearLayer(nn.Module):
+    def __init__(self, in_features, out_features, rank=4, network_alpha=None):
+        super().__init__()
+
+        if rank > min(in_features, out_features):
+            raise ValueError(f"LoRA rank {rank} must be less or equal than {min(in_features, out_features)}")
+
+        self.down = nn.Linear(in_features, rank, bias=False)
+        self.up = nn.Linear(rank, out_features, bias=False)
+        # This value has the same meaning as the `--network_alpha` option in the kohya-ss trainer script.
+        # See https://github.com/darkstorm2150/sd-scripts/blob/main/docs/train_network_README-en.md#execute-learning
+        self.network_alpha = network_alpha
+        self.rank = rank
+
+        nn.init.normal_(self.down.weight, std=1 / rank)
+        nn.init.zeros_(self.up.weight)
+
+    def forward(self, hidden_states):
+        orig_dtype = hidden_states.dtype
+        dtype = self.down.weight.dtype
+
+        down_hidden_states = self.down(hidden_states.to(dtype))
+        up_hidden_states = self.up(down_hidden_states)
+
+        if self.network_alpha is not None:
+            up_hidden_states *= self.network_alpha / self.rank
+
+        return up_hidden_states.to(orig_dtype)
+
+
 class CrossAttention(nn.Module):
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.0):
         super().__init__()
@@ -164,6 +194,24 @@ class CrossAttention(nn.Module):
             nn.Linear(inner_dim, query_dim), nn.Dropout(dropout)
         )
 
+        self.lora = False
+        self.query_dim = query_dim
+        self.inner_dim = inner_dim
+        self.context_dim = context_dim
+
+    def setup_lora(self, rank=4, network_alpha=None):
+        self.lora = True
+        self.rank = rank
+        self.to_q_lora = LoRALinearLayer(self.query_dim, self.inner_dim, rank, network_alpha)
+        self.to_k_lora = LoRALinearLayer(self.context_dim, self.inner_dim, rank, network_alpha)
+        self.to_v_lora = LoRALinearLayer(self.context_dim, self.inner_dim, rank, network_alpha)
+        self.to_out_lora = LoRALinearLayer(self.inner_dim, self.query_dim, rank, network_alpha)
+        self.lora_layers = nn.ModuleList()
+        self.lora_layers.append(self.to_q_lora)
+        self.lora_layers.append(self.to_k_lora)
+        self.lora_layers.append(self.to_v_lora)
+        self.lora_layers.append(self.to_out_lora)
+
     def forward(self, x, context=None, mask=None):
         h = self.heads
 
@@ -172,22 +220,35 @@ class CrossAttention(nn.Module):
         k = self.to_k(context)
         v = self.to_v(context)
 
-        q, k, v = map(lambda t: rearrange(t, "b n (h d) -> (b h) n d", h=h), (q, k, v))
+        if self.lora:
+            q += self.to_q_lora(x)
+            k += self.to_k_lora(context)
+            v += self.to_v_lora(context)
 
-        sim = einsum("b i d, b j d -> b i j", q, k) * self.scale
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
+
+        sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
 
         if exists(mask):
-            mask = rearrange(mask, "b ... -> b (...)")
+            mask = rearrange(mask, 'b ... -> b (...)')
             max_neg_value = -torch.finfo(sim.dtype).max
-            mask = repeat(mask, "b j -> (b h) () j", h=h)
+            mask = repeat(mask, 'b j -> (b h) () j', h=h)
             sim.masked_fill_(~mask, max_neg_value)
 
         # attention, what we cannot get enough of
         attn = sim.softmax(dim=-1)
 
-        out = einsum("b i j, b j d -> b i d", attn, v)
-        out = rearrange(out, "(b h) n d -> b n (h d)", h=h)
-        return self.to_out(out)
+        out = einsum('b i j, b j d -> b i d', attn, v)
+        out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
+
+        # linear proj
+        o = self.to_out[0](out)
+        if self.lora:
+            o += self.to_out_lora(out)
+        # dropout
+        out = self.to_out[1](o)
+
+        return out
 
 
 class BasicTransformerBlock(nn.Module):
@@ -225,9 +286,10 @@ class BasicTransformerBlock(nn.Module):
         self.checkpoint = checkpoint
 
     def forward(self, x, context=None):
-        return checkpoint(
-            self._forward, (x, context), self.parameters(), self.checkpoint
-        )
+        # return checkpoint(
+        #     self._forward, (x, context), self.parameters(), self.checkpoint
+        # )
+        return self._forward(x, context)
 
     def _forward(self, x, context=None):
         x = (
@@ -293,9 +355,9 @@ class SpatialTransformer(nn.Module):
         x_in = x
         x = self.norm(x)
         x = self.proj_in(x)
-        x = rearrange(x, "b c h w -> b (h w) c").contiguous()
+        x = rearrange(x, 'b c h w -> b (h w) c').contiguous()
         for block in self.transformer_blocks:
             x = block(x, context=context)
-        x = rearrange(x, "b (h w) c -> b c h w", h=h, w=w).contiguous()
+        x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w).contiguous()
         x = self.proj_out(x)
         return x + x_in

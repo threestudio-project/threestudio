@@ -8,8 +8,8 @@ data:
   batch_size: 1
   # 0-4999: 64x64, >=5000: 512x512
   # this drastically reduces VRAM usage as empty space is pruned in early training
-  width: [64, 512]
-  height: [64, 512]
+  width: [128, 512]
+  height: [128, 512]
   resolution_milestones: [5000]
   camera_distance_range: [1.0, 1.5]
   fovy_range: [40, 70]
@@ -19,6 +19,7 @@ data:
   up_perturb: 0.
   eval_camera_distance: 1.5
   eval_fovy_deg: 70.
+  n_val_views: 30
 
 system_type: "prolificdreamer-system"
 system:
@@ -107,7 +108,7 @@ trainer:
   max_steps: 25000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 200
+  val_check_interval: 100
   enable_progress_bar: true
   precision: 32
 
