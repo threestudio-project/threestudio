@@ -126,7 +126,7 @@ class Zero123(BaseLift3DSystem):
                 self.C(self.guidance.cfg.max_step_percent),
             )
             # zero123
-            guidance_out, guidance_eval_out = self.guidance(
+            guidance_out = self.guidance(
                 out["comp_rgb"],
                 **batch,
                 rgb_as_latents=False,
@@ -196,7 +196,9 @@ class Zero123(BaseLift3DSystem):
         self.log(f"train/loss_{guidance}", loss)
 
         if guidance_eval:
-            self.guidance_evaluation_save(out["comp_rgb"].detach(), guidance_eval_out)
+            self.guidance_evaluation_save(
+                out["comp_rgb"].detach(), guidance_out["eval"]
+            )
 
         return {"loss": loss}
 
@@ -226,65 +228,6 @@ class Zero123(BaseLift3DSystem):
         # sch.step()
 
         return {"loss": total_loss}
-
-    def merge12(self, x):
-        return x.reshape(-1, *x.shape[2:])
-
-    def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
-        B, size = comp_rgb.shape[:2]
-        resize = lambda x: F.interpolate(
-            x.permute(0, 3, 1, 2), (size, size), mode="bilinear", align_corners=False
-        ).permute(0, 2, 3, 1)
-        filename = f"it{self.true_global_step}-train.png"
-        self.save_image_grid(
-            filename,
-            [
-                {
-                    "type": "rgb",
-                    "img": self.merge12(comp_rgb),
-                    "kwargs": {"data_format": "HWC"},
-                },
-            ]
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_noisy"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_1step"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_1orig"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            )
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": self.merge12(resize(guidance_eval_out["imgs_final"])),
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-            ),
-            name="train_step",
-            step=self.true_global_step,
-            noise_levels=guidance_eval_out["noise_levels"],
-        )
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
