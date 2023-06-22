@@ -2,7 +2,7 @@ services:
   threestudio:
     build:
       context: ../
-      dockerfile: environments/Dockerfile
+      dockerfile: docker/Dockerfile
       args:
         # you can set environment variables, otherwise default values will be used
         USER_NAME: ${HOST_USER_NAME:-dreamer}  # export HOST_USER_NAME=$USER
