@@ -212,6 +212,11 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         threestudio.info(f"Loaded Stable Diffusion!")
 
+    @torch.cuda.amp.autocast(enabled=False)
+    def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
+        self.min_step = int(self.num_train_timesteps * min_step_percent)
+        self.max_step = int(self.num_train_timesteps * max_step_percent)
+
     @property
     def pipe(self):
         return self.submodules.pipe
