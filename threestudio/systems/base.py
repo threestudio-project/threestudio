@@ -364,5 +364,5 @@ class BaseLift3DSystem(BaseSystem):
             ),
             name="train_step",
             step=self.true_global_step,
-            noise_levels=guidance_eval_out["noise_levels"],
+            texts=guidance_eval_out["texts"],
         )

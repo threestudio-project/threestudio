@@ -281,22 +281,20 @@ class SaverMixin:
         align=DEFAULT_GRID_KWARGS["align"],
         name: Optional[str] = None,
         step: Optional[int] = None,
-        noise_levels: Optional[List[float]] = None,
+        texts: Optional[List[float]] = None,
     ):
         img = self.get_image_grid_(imgs, align=align)
 
-        if noise_levels is not None:
+        if texts is not None:
             img = Image.fromarray(img)
             draw = ImageDraw.Draw(img)
-            for i, n in enumerate(noise_levels):
-                draw.text(
-                    (1, (img.size[1] // len(noise_levels)) * i + 1),
-                    f"{n:.02f}",
-                    (255, 255, 255),
-                )
-                draw.text(
-                    (0, (img.size[1] // len(noise_levels)) * i), f"{n:.02f}", (0, 0, 0)
-                )
+            black, white = (0, 0, 0), (255, 255, 255)
+            for i, text in enumerate(texts):
+                draw.text((2, (img.size[1] // len(texts)) * i + 1), f"{text}", white)
+                draw.text((0, (img.size[1] // len(texts)) * i + 1), f"{text}", white)
+                draw.text((2, (img.size[1] // len(texts)) * i - 1), f"{text}", white)
+                draw.text((0, (img.size[1] // len(texts)) * i - 1), f"{text}", white)
+                draw.text((1, (img.size[1] // len(texts)) * i), f"{text}", black)
             img = np.asarray(img)
 
         filepath = self.get_save_path(filename)
