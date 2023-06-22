@@ -23,7 +23,7 @@ class VolumeGrid(BaseImplicitGeometry):
         density_blob_std: float = 0.5
         normal_type: Optional[
             str
-        ] = "finite_difference"  # in ['pred', 'finite_difference']
+        ] = "finite_difference"  # in ['pred', 'finite_difference', 'finite_difference_laplacian']
 
         # automatically determine the threshold
         isosurface_threshold: Union[float, str] = "auto"
@@ -98,29 +98,45 @@ class VolumeGrid(BaseImplicitGeometry):
         }
 
         if output_normal:
-            if self.cfg.normal_type == "finite_difference":
+            if self.cfg.normal_type == "finite_difference" or self.cfg.normal_type == "finite_difference_laplacian":
                 eps = 1.0e-3
-                offsets: Float[Tensor, "6 3"] = torch.as_tensor(
-                    [
-                        [eps, 0.0, 0.0],
-                        [-eps, 0.0, 0.0],
-                        [0.0, eps, 0.0],
-                        [0.0, -eps, 0.0],
-                        [0.0, 0.0, eps],
-                        [0.0, 0.0, -eps],
-                    ]
-                ).to(points_unscaled)
-                points_offset: Float[Tensor, "... 6 3"] = (
-                    points_unscaled[..., None, :] + offsets
-                ).clamp(-self.cfg.radius, self.cfg.radius)
-                density_offset: Float[Tensor, "... 6 1"] = self.forward_density(
-                    points_offset
-                )
-                normal = (
-                    -0.5
-                    * (density_offset[..., 0::2, 0] - density_offset[..., 1::2, 0])
-                    / eps
-                )
+                if self.cfg.normal_type == "finite_difference_laplacian":
+                    offsets: Float[Tensor, "6 3"] = torch.as_tensor(
+                        [
+                            [eps, 0.0, 0.0],
+                            [-eps, 0.0, 0.0],
+                            [0.0, eps, 0.0],
+                            [0.0, -eps, 0.0],
+                            [0.0, 0.0, eps],
+                            [0.0, 0.0, -eps],
+                        ]
+                    ).to(points_unscaled)
+                    points_offset: Float[Tensor, "... 6 3"] = (
+                        points_unscaled[..., None, :] + offsets
+                    ).clamp(-self.cfg.radius, self.cfg.radius)
+                    density_offset: Float[Tensor, "... 6 1"] = self.forward_density(
+                        points_offset
+                    )
+                    normal = (
+                        -0.5
+                        * (density_offset[..., 0::2, 0] - density_offset[..., 1::2, 0])
+                        / eps
+                    )
+                else:
+                    offsets: Float[Tensor, "3 3"] = torch.as_tensor(
+                        [
+                            [eps, 0.0, 0.0],
+                            [0.0, eps, 0.0],
+                            [0.0, 0.0, eps]
+                        ]
+                    ).to(points_unscaled)
+                    points_offset: Float[Tensor, "... 3 3"] = (
+                        points_unscaled[..., None, :] + offsets
+                    ).clamp(-self.cfg.radius, self.cfg.radius)
+                    density_offset: Float[Tensor, "... 3 1"] = self.forward_density(points_offset)
+                    normal = (
+                        (density_offset[..., 0::1, 0] - density) / eps
+                    )
                 normal = F.normalize(normal, dim=-1)
             elif self.cfg.normal_type == "pred":
                 normal = self.get_trilinear_feature(points, self.normal_grid)
