@@ -126,7 +126,6 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.step += 1
         # progressive view
         self.progressive_view()
-        print("\n", self.step, self.r)
         # sample elevation angles
         elevation_deg: Float[Tensor, "B"]
         elevation: Float[Tensor, "B"]
