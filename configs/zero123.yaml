@@ -10,8 +10,8 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   width: 192
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
-  default_camera_distance: 1.7
-  default_fovy_deg: 55.0 # was 20.0
+  default_camera_distance: 3.8
+  default_fovy_deg: 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
     height: 128
     width: 128
@@ -21,13 +21,13 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     eval_batch_size: 1
     elevation_range: [10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [1.7, 1.7] # claforte: try to keep constant
-    fovy_range: [55.0, 55.0] # Zero123 has fixed fovy
+    camera_distance_range: [3.8, 3.8]
+    fovy_range: [20.0, 20.0]
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
     light_position_perturb: 1.0
-    light_distance_range: [4.5, 5.0] #  [7.5, 10.0]
+    light_distance_range: [7.5, 10.0]
     eval_elevation_deg: ${data.default_elevation_deg}
     eval_camera_distance: ${data.default_camera_distance}
     eval_fovy_deg: ${data.default_fovy_deg}
@@ -65,9 +65,15 @@ system:
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.447269237440378 # max resolution 4096
-      start_level: 8 # resolution ~200
-      start_step: 2000
-      update_steps: 500
+      #start_level: 8 # resolution ~200
+      #start_step: 2000
+      #update_steps: 500
+    mlp_network_config:
+      otype: "VanillaMLP"
+      activation: "ReLU"
+      output_activation: "none"
+      n_neurons: 64
+      n_hidden_layers: 2 # instead of 1 used by default
 
   material_type: "diffuse-with-point-light-material"
   material:
@@ -101,11 +107,10 @@ system:
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
-    min_step_percent: 0.02
-    #min_step_percent: [0, 0.5, 0.3, 10000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.98
-    #max_step_percent: [0, 0.9, 0.8, 10000]
-    noise_attenuation: 1.0
+    #min_step_percent: 0.02
+    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    #max_step_percent: 0.98
+    max_step_percent: [0, 0.85, 0.85, 2000]
 
   freq:
     n_ref: 2

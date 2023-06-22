@@ -253,3 +253,310 @@ threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 data.hei
 # reduce: system.loss.lambda_3d_normal_smooth=0.02
 # 256_beach_house_2_rgba.png@20230621-022807
 threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 data.height=384 data.random_camera.batch_size=2 data.width=384 data.random_camera.height=256 data.random_camera.width=256 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+
+
+# NEW EXPERIMENTS
+# revert angles - use 20 deg FOV. Use 3.6 distances
+# use smaller res to fit in VRAM (19GB)
+threestudio/scripts/run_zero123_phase.sh 0 beach_house_2 XL_20230604 30 data.height=128 data.random_camera.batch_size=2 data.width=128 data.random_camera.height=128 data.random_camera.width=128 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# slightly higher res (33GB)
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 data.height=192 data.random_camera.batch_size=2 data.width=192 data.random_camera.height=192 data.random_camera.width=192 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# higher res still
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 data.height=228 data.random_camera.batch_size=2 data.width=228 data.random_camera.height=228 data.random_camera.width=228 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# system.guidance.max_step_percent=0.85
+# camera distance=3.8
+# res=128
+threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 system.guidance.max_step_percent=0.85 data.height=128 data.random_camera.batch_size=2 data.width=128 data.random_camera.height=128 data.random_camera.width=128 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# res=192
+# DIVERGES TO WHITE - CANCELED
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.guidance.max_step_percent=0.85 data.height=192 data.random_camera.batch_size=2 data.width=192 data.random_camera.height=192 data.random_camera.width=192 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# res=228
+# DIVERGES TO WHITE - CANCELED
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_2 XL_20230604 30 system.guidance.max_step_percent=0.85 data.height=228 data.random_camera.batch_size=2 data.width=228 data.random_camera.height=228 data.random_camera.width=228 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# system.guidance.min_step_percent=0.3
+# res=128
+threestudio/scripts/run_zero123_phase.sh 6 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.85 data.height=128 data.random_camera.batch_size=2 data.width=128 data.random_camera.height=128 data.random_camera.width=128 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# res=228
+threestudio/scripts/run_zero123_phase.sh 7 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.85 data.height=228 data.random_camera.batch_size=2 data.width=228 data.random_camera.height=228 data.random_camera.width=228 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# res=96
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.85 data.height=96 data.random_camera.batch_size=2 data.width=96 data.random_camera.height=96 data.random_camera.width=96 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# res=96, batch_size=4
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.85 data.height=96 data.random_camera.batch_size=4 data.width=96 data.random_camera.height=96 data.random_camera.width=96 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=9999
+
+# res=96, batch_size=8, 1999 steps, lr=0.03
+threestudio/scripts/run_zero123_phase.sh 0 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.85 data.height=96 data.random_camera.batch_size=8 data.width=96 data.random_camera.height=96 data.random_camera.width=96 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.03 trainer.max_steps=1999
+
+# res=96, batch_size=8, 1999 steps, lr=0.1
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.85 data.height=96 data.random_camera.batch_size=8 data.width=96 data.random_camera.height=96 data.random_camera.width=96 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.1 trainer.max_steps=1999
+
+# res=96, batch_size=8, 1999 steps, lr=0.1, wider range of noise
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.05 system.guidance.max_step_percent=0.95 data.height=96 data.random_camera.batch_size=8 data.width=96 data.random_camera.height=96 data.random_camera.width=96 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.1 trainer.max_steps=1999
+
+# res=96(ref),64(3D), batch_size=8, 1999 steps, lr=0.1, wider range of noise
+threestudio/scripts/run_zero123_phase.sh 0 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.05 system.guidance.max_step_percent=0.95 data.height=96 data.random_camera.batch_size=8 data.width=96 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.1 trainer.max_steps=1999
+
+# res=96(ref),64(3D), batch_size=8, 1999 steps, lr=0.1, NOT wider range of noise
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.85 data.height=96 data.random_camera.batch_size=8 data.width=96 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.1 trainer.max_steps=1999
+
+# res=96(ref),64(3D), batch_size=8, 1999 steps, lr=0.1, wider range of max noise
+# OVERSATURATES!
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.5 system.guidance.max_step_percent=0.99 data.height=96 data.random_camera.batch_size=8 data.width=96 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.1 trainer.max_steps=1999
+
+# DIVERGES with BLUE blobs
+# res=96(ref),64(3D), batch_size=12, 1999 steps, lr=0.1, wider range of max noise, lr=0.3
+threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.2 system.guidance.max_step_percent=0.9 data.height=96 data.random_camera.batch_size=12 data.width=96 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.3 trainer.max_steps=1999
+
+# DIVERGES!
+# res=96(ref),64(3D), batch_size=12, 1999 steps, lr=0.1, wider range of max noise, lr=0.6
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.2 system.guidance.max_step_percent=0.9 data.height=96 data.random_camera.batch_size=12 data.width=96 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.6 trainer.max_steps=1999
+
+# DIVERGES!
+# res=96(ref),64(3D), batch_size=12, 1999 steps, lr=0.1, wider range of max noise, lr=1.0
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.2 system.guidance.max_step_percent=0.9 data.height=96 data.random_camera.batch_size=12 data.width=96 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=1.0 trainer.max_steps=1999
+
+#--------------------------
+# New tentative baseline
+# res=96(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, somewhat wider range of noise
+threestudio/scripts/run_zero123_phase.sh 0 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.95 data.height=96 data.random_camera.batch_size=12 data.width=96 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# res=192(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, somewhat wider range of noise
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.95 data.height=192 data.random_camera.batch_size=12 data.width=192 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, somewhat wider range of noise
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.95 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise
+threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.8 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.8 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.8 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 6 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.8 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# higher min noise... GETS SPOTTY! CANCELED
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 7 beach_house_2 XL_20230604 30 system.guidance.min_step_percent=0.6 system.guidance.max_step_percent=0.8 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# 2 above + higher 5X sds
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 0 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.015 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.8 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# higher 10X sds + higher max noise
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.95 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# higher 10X sds
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.85 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# higher 10X sds, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 system.guidance.min_step_percent=0.05 system.guidance.max_step_percent=0.95 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# CHANGED CODE so white background happens 90% of the time!
+
+# same as above except
+# higher 10X sds, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 system.guidance.min_step_percent=0.05 system.guidance.max_step_percent=0.95 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=100.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# same as above except
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 system.guidance.min_step_percent=0.05 system.guidance.max_step_percent=0.95 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# same as above except min/max noise range=0.3,0.9
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 6 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 system.guidance.min_step_percent=0.3 system.guidance.max_step_percent=0.9 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# same as above except min/max noise range=0.4,0.9
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 7 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 system.guidance.min_step_percent=0.4 system.guidance.max_step_percent=0.9 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+
+# BLA1
+# same as above except min/max noise range:
+#    min_step_percent: [0, 0.5, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.98, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 0 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA2
+# same as above except min/max noise range:
+#    min_step_percent: [0, 0.5, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.9, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA3
+# same as above except min/max noise range:
+#    min_step_percent: [0, 0.45, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.9, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 system.loss.lambda_sds=0.03 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# not sure which is BLA1-4 anymore... sigh
+
+# BLA5
+# same as above except system.geometry.pos_encoding_config.start_level=10:
+#    min_step_percent: [0, 0.45, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.95, 0.95, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.start_level=12 system.loss.lambda_sds=0.03 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA6
+# same as above except system.geometry.pos_encoding_config.start_level=12:
+#    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.85, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.start_level=12 system.loss.lambda_sds=0.03 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA7
+# same as above except system.geometry.pos_encoding_config.start_level=16 (i.e. max right away):
+#    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.85, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=256(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.start_level=16 system.loss.lambda_sds=0.03 data.height=256 data.random_camera.batch_size=12 data.width=256 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+
+# MORNING OF 2023-06-22
+
+# BLA8
+# same as above except system.geometry.pos_encoding_config.otype=HashGrid
+# and reduce ref image res to 128 to free up VRAM
+#    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.85, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=128(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 0 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA9
+# same as above except system.geometry.pos_encoding_config.otype=HashGrid, USE 2 MLP hidden layers
+# and reduce ref image res to 128 to free up VRAM
+#    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.85, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=128(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA10
+# same as above except:
+#  lambda_normal_smooth=1.0
+# system.geometry.pos_encoding_config.otype=HashGrid, USE 2 MLP hidden layers
+# and reduce ref image res to 128 to free up VRAM
+#    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+#    max_step_percent: [0, 0.9, 0.85, 2000]
+# higher 10X sds, 5X higher RGB, restored old wide noise range
+# res=128(ref),64(3D), batch_size=12, 1999 steps, lr=0.15, narrowed range of noise, system.loss.lambda_opaque=0.05 (10X smaller) AND system.loss.lambda_orient=0.1 (10X smaller)
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=1.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA11
+# same as above except:
+#  lambda_normal_smooth=10.0
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=10.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA12 - DIVERGED TO WHITE!
+# same as above except:
+#  lambda_normal_smooth=0.1
+#  system.loss.lambda_3d_normal_smooth=0.02 was unchanged
+threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=0.1 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_3d_normal_smooth=0.02 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA13
+# same as above except:
+#  system.loss.lambda_3d_normal_smooth=0.2 (10X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.loss.lambda_3d_normal_smooth=0.2 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA14
+# same as above except:
+#  system.loss.lambda_3d_normal_smooth=2.0 (100X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+#  system.loss.lambda_sparsity=0.1 (unchanged)
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_2 XL_20230604 30 system.loss.lambda_3d_normal_smooth=2.0 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+
+# CONCLUSION: sparsity doesn't help
+
+# BLA15: DIVERGES (lots of floaters!)
+# same as BLA13 except:
+#  system.loss.lambda_sparsity=1.0 (10X previous)
+#  system.loss.lambda_3d_normal_smooth=0.2 (10X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+threestudio/scripts/run_zero123_phase.sh 6 beach_house_2 XL_20230604 30 system.loss.lambda_sparsity=1.0 system.loss.lambda_3d_normal_smooth=0.2 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA16
+# same as BLA13 except:
+#  system.loss.lambda_sparsity=10.0 (100X previous)
+#  system.loss.lambda_3d_normal_smooth=0.2 (10X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+threestudio/scripts/run_zero123_phase.sh 7 beach_house_2 XL_20230604 30 system.loss.lambda_sparsity=10.0 system.loss.lambda_3d_normal_smooth=0.2 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA17
+# same as BLA13 except:
+#  system.optimizer.args.weight_decay=0.0
+#  system.loss.lambda_3d_normal_smooth=0.2 (10X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.optimizer.args.weight_decay=0.0 system.loss.lambda_3d_normal_smooth=0.2 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA18
+# same as BLA17 except:
+#  system.optimizer.args.weight_decay=1.0 (i.e. excessive? - sanity check)
+#  system.loss.lambda_3d_normal_smooth=0.2 (10X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+threestudio/scripts/run_zero123_phase.sh 2 beach_house_2 XL_20230604 30 system.optimizer.args.weight_decay=1.0 system.loss.lambda_3d_normal_smooth=0.2 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA19
+# same as BLA18 except:
+#  system.optimizer.args.weight_decay=10.0 (CONCLUSION: EXCESSIVE, doesn't learn anything)
+#  system.loss.lambda_3d_normal_smooth=0.2 (10X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+threestudio/scripts/run_zero123_phase.sh 3 beach_house_2 XL_20230604 30 system.optimizer.args.weight_decay=10.0 system.loss.lambda_3d_normal_smooth=0.2 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA20
+# same as BLA17 except:
+#  system.optimizer.args.weight_decay=0.1
+#  system.loss.lambda_3d_normal_smooth=0.2 (10X previous)
+#  lambda_normal_smooth=5.0 (so it's roughly on the same order as the loss_rgb_w)
+threestudio/scripts/run_zero123_phase.sh 4 beach_house_2 XL_20230604 30 system.optimizer.args.weight_decay=0.1 system.loss.lambda_3d_normal_smooth=0.2 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.15 trainer.max_steps=1999
+
+# BLA22
+# like BLA14 except system.optimizer.args.lr=0.05 (3X smaller)
+threestudio/scripts/run_zero123_phase.sh 1 beach_house_2 XL_20230604 30 system.loss.lambda_3d_normal_smooth=2.0 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.05 trainer.max_steps=1999
+
+# BLA22 for Anya
+threestudio/scripts/run_zero123_phase.sh 2 anya_front XL_20230604 0 system.loss.lambda_3d_normal_smooth=2.0 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=0.1 system.optimizer.args.lr=0.05 trainer.max_steps=1999
+
+# BLA23 for Anya
+# same as BLA22 except: system.loss.lambda_orient=1.0 (10X bigger than before)
+threestudio/scripts/run_zero123_phase.sh 3 anya_front XL_20230604 0 system.loss.lambda_3d_normal_smooth=2.0 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=1.0 system.optimizer.args.lr=0.05 trainer.max_steps=1999
+
+# BLA23 for phoenix
+threestudio/scripts/run_zero123_phase.sh 4 baby_phoenix_on_ice XL_20230604 20 system.loss.lambda_3d_normal_smooth=2.0 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=1.0 system.optimizer.args.lr=0.05 trainer.max_steps=1999
+
+# BLA23 for beach house 1
+threestudio/scripts/run_zero123_phase.sh 5 beach_house_1 XL_20230604 50 system.loss.lambda_3d_normal_smooth=2.0 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=1.0 system.optimizer.args.lr=0.05 trainer.max_steps=1999
+
+# BLA23 for Bollywood actress
+threestudio/scripts/run_zero123_phase.sh 6 bollywood_actress XL_20230604 0 system.loss.lambda_3d_normal_smooth=2.0 system.geometry.pos_encoding_config.otype=HashGrid system.loss.lambda_normal_smooth=5.0 system.loss.lambda_sds=0.03 data.height=128 data.width=128 data.random_camera.batch_size=12 data.random_camera.height=64 data.random_camera.width=64 system.loss.lambda_depth=0.05 system.loss.lambda_sparsity=0.1 system.loss.lambda_rgb=500.0 system.loss.lambda_opaque=0.05 system.loss.lambda_orient=1.0 system.optimizer.args.lr=0.05 trainer.max_steps=1999

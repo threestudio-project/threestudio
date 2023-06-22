@@ -72,7 +72,9 @@ class Zero123(BaseLift3DSystem):
             white = torch.ones(bs, 3).to(self.device)
 
             # is the batch item white? shaped [bs, 1]
-            is_white = (torch.rand(bs) > 0.5).to(self.device).float().unsqueeze(-1)
+            is_white = (
+                (torch.rand(bs) > 0.1).to(self.device).float().unsqueeze(-1)
+            )  # claforte: HACK
 
             bg_color = bg_color * (1.0 - is_white) + white * is_white
 
