@@ -8,9 +8,9 @@ data:
   batch_size: 1
   # 0-4999: 64x64, >=5000: 512x512
   # this drastically reduces VRAM usage as empty space is pruned in early training
-  width: [64, 512]
-  height: [64, 512]
-  resolution_milestones: [5000]
+  width: 512
+  height: 512
+  # resolution_milestones: [5000]
   camera_distance_range: [1.0, 1.5]
   fovy_range: [40, 70]
   elevation_range: [-10, 45]
@@ -46,15 +46,25 @@ system:
     n_output_dims: 3
     color_activation: sigmoid
 
-  background_type: "neural-environment-map-background"
+  # background_type: "neural-environment-map-background"
+  # background:
+  #   color_activation: sigmoid
+  #   random_aug: true
+  background_type: "solid-color-background"
   background:
-    color_activation: sigmoid
-    random_aug: true
+    n_output_dims: 3
+    color: [0.0, 0.0, 0.0]
 
-  renderer_type: "nerf-volume-renderer"
+  renderer_type: "patch-renderer"
   renderer:
-    radius: ${system.geometry.radius}
-    num_samples_per_ray: 512
+    base_renderer_type: "nerf-volume-renderer"
+    base_renderer:
+      radius: ${system.geometry.radius}
+      num_samples_per_ray: 512
+  # renderer_type: "nerf-volume-renderer"
+  # renderer:
+  #   radius: ${system.geometry.radius}
+  #   num_samples_per_ray: 512
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
