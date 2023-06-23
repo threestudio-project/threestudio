@@ -4,5 +4,6 @@ from . import (
     nerf_volume_renderer,
     neus_volume_renderer,
     nvdiff_rasterizer,
-    patch_renderer
+    gan_volume_renderer,
+    patch_renderer,
 )

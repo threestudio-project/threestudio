@@ -4,4 +4,5 @@ from . import (
     neural_radiance_material,
     no_material,
     sd_latent_adapter_material,
+    hybrid_rgb_latent_material,
 )

@@ -4,6 +4,8 @@ from . import (
     imagedreamfusion,
     latentnerf,
     magic3d,
+    instructnerf2nerf,
+    control4d_multiview,
     prolificdreamer,
     sjc,
     textmesh,

@@ -14,8 +14,8 @@ from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
 
 def volsdf_density(sdf, inv_std):
-    beta = 1 / (inv_std  / 2)
-    alpha = inv_std / 2
+    beta = 1 / inv_std
+    alpha = inv_std
     return alpha * (0.5 + 0.5 * sdf.sign() * torch.expm1(-sdf.abs() / beta))
 
 class LearnedVariance(nn.Module):
@@ -203,7 +203,8 @@ class NeuSVolumeRenderer(VolumeRenderer):
             comp_rgb_bg = chunk_batch(
                 self.background, self.cfg.eval_chunk_size, dirs=rays_d_flatten
             )
-
+        
+        # grad or normal?
         alpha: Float[Tensor, "Nr 1"] = self.get_alpha(
             geo_out["sdf"], geo_out["normal"], t_dirs, t_intervals
         )
