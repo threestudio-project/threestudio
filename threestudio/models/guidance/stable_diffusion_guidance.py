@@ -431,6 +431,14 @@ class StableDiffusionGuidance(BaseObject):
 
         if guidance_eval:
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
+            texts = []
+            for n, e, a, c in zip(
+                guidance_eval_out["noise_levels"], elevation, azimuth, camera_distances
+            ):
+                texts.append(
+                    f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+                )
+            guidance_eval_out.update({"texts": texts})
             guidance_out.update({"eval": guidance_eval_out})
 
         return guidance_out

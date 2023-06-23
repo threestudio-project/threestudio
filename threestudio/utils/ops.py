@@ -122,7 +122,8 @@ def chunk_batch(func: Callable, chunk_size: int, *args, **kwargs) -> Any:
     ), "No tensor found in args or kwargs, cannot determine batch size."
     out = defaultdict(list)
     out_type = None
-    for i in range(0, B, chunk_size):
+    # max(1, B) to support B == 0
+    for i in range(0, max(1, B), chunk_size):
         out_chunk = func(
             *[
                 arg[i : i + chunk_size] if isinstance(arg, torch.Tensor) else arg

@@ -1,0 +1,23 @@
+services:
+  threestudio:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+      args:
+        # you can set environment variables, otherwise default values will be used
+        USER_NAME: ${HOST_USER_NAME:-dreamer}  # export HOST_USER_NAME=$USER
+        GROUP_NAME: ${HOST_GROUP_NAME:-dreamers}
+        UID: ${HOST_UID:-1000}  # export HOST_UID=$(id -u)
+        GID: ${HOST_GID:-1000}  # export HOST_GID=$(id -g)
+      shm_size: '4gb'
+    environment:
+      NVIDIA_DISABLE_REQUIRE: 1  # avoid wrong `nvidia-container-cli: requirement error`
+    tty: true
+    volumes:
+        - ../:/home/${HOST_USER_NAME:-dreamer}/threestudio
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [gpu]

@@ -66,7 +66,6 @@ class NeRFVolumeRenderer(VolumeRenderer):
         n_rays = rays_o_flatten.shape[0]
 
         def sigma_fn(t_starts, t_ends, ray_indices):
-            ray_indices, t_starts, t_ends = validate_empty_rays(ray_indices, t_starts, t_ends)
             t_starts, t_ends = t_starts[..., None], t_ends[..., None]
             t_origins = rays_o_flatten[ray_indices]
             t_positions = (t_starts + t_ends) / 2.0
