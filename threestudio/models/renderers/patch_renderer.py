@@ -20,6 +20,7 @@ class PatchRenderer(VolumeRenderer):
         base_renderer: Optional[VolumeRenderer.Config] = None
         global_detach: bool = False
         global_downsample: int = 4
+        global_prune: bool = True
     
     cfg: Config
     def configure(
@@ -44,7 +45,35 @@ class PatchRenderer(VolumeRenderer):
     ) -> Dict[str, Float[Tensor, "..."]]:
         B, H, W, _ = rays_o.shape
         
+        valid_patch_key = []
+        out_global = {}
         if self.base_renderer.training:
+            # K = 2
+            # for i in range(K):
+            #     for j in range(K):
+            #         int_rays_o = rays_o[:, i::K, j::K]
+            #         int_rays_d = rays_d[:, i::K, j::K]
+            #         out = self.base_renderer(int_rays_o, int_rays_d, light_positions, bg_color, **kwargs)
+            #         if len(valid_patch_key) == 0:
+            #             for key in out:
+            #                 if torch.is_tensor(out[key]):
+            #                     if len(out[key].shape) == len(out["comp_rgb"].shape):
+            #                         if out[key][..., 0].shape == out["comp_rgb"][..., 0].shape:
+            #                             valid_patch_key.append(key)
+            #                             out_global[key] = torch.zeros(B, H, W, out[key].shape[-1], dtype=out[key].dtype, device=out[key].device)
+            #                     if len(out[key].shape) == len(out["weights"].shape):
+            #                         if out[key][..., 0].shape == out["weights"][..., 0].shape:
+            #                             valid_patch_key.append(key)
+            #                             out_global[key] = []
+            #         for key in valid_patch_key:
+            #             if torch.is_tensor(out_global[key]):
+            #                 out_global[key][:, i::K, j::K] = out[key]
+            #             else:
+            #                 out_global[key].append(out[key])
+            # for key in valid_patch_key:    
+            #     if not torch.is_tensor(out_global[key]):
+            #         out_global[key] = torch.cat(out_global[key], dim=0)
+            # out = out_global
             downsample = self.cfg.global_downsample
             global_rays_o = torch.nn.functional.interpolate(
                 rays_o.permute(0, 3, 1, 2), (H // downsample, W // downsample), mode='bilinear'
@@ -52,11 +81,16 @@ class PatchRenderer(VolumeRenderer):
             global_rays_d = torch.nn.functional.interpolate(
                 rays_d.permute(0, 3, 1, 2), (H // downsample, W // downsample), mode='bilinear'
             ).permute(0, 2, 3, 1)
+            if not self.cfg.global_prune:
+                grid_prune = self.base_renderer.cfg.grid_prune
+                self.base_renderer.cfg.grid_prune = False
             out_global = self.base_renderer(global_rays_o, global_rays_d, light_positions, bg_color, **kwargs)
+            if not self.cfg.global_prune:
+                self.base_renderer.cfg.grid_prune = grid_prune
             
-            PS = self.cfg.patch_size
-            patch_x = torch.randint(0, W-PS, (1,)).item()
-            patch_y = torch.randint(0, H-PS, (1,)).item()
+            PS = min(self.cfg.patch_size, min(H, W))
+            patch_x = torch.randint(0, W-PS+1, (1,)).item()
+            patch_y = torch.randint(0, H-PS+1, (1,)).item()
             patch_rays_o = rays_o[:, patch_y:patch_y+PS, patch_x:patch_x+PS]
             patch_rays_d = rays_d[:, patch_y:patch_y+PS, patch_x:patch_x+PS]
             out = self.base_renderer(patch_rays_o, patch_rays_d, light_positions, bg_color, **kwargs)
