@@ -10,14 +10,19 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 <p align="center">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/f48eca9f-45a7-4092-a519-6bb99f4939e4.gif" width="100%">
+<br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/24b0bfcd-a325-4a77-80d0-db0747f2b649.gif" width="100%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/d36a5651-e0d7-4496-97f4-a7945f06ef23.png" width="100%">
+<br/>
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/e27cb946-ed34-4b8f-87aa-86b689337b0e.gif" width="68%">
+<br/>
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/22aba281-e9f2-43d8-ab27-74c0210cff90.png" width="68%">
 </p>
 
 <p align="center"><b>
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
-| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> | <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
+| <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> |
+<br/>
+| <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
 </b></p>
 
 <p align="center">
@@ -32,7 +37,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 - 06/20/2023: Implementations of InstructNeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions [control4d](https://github.com/threestudio-project/threestudio#control4d-) [instructnerf2nerf](https://github.com/threestudio-project/threestudio#instructnerf2nerf-)  to give it a try.
-- 05/29/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
+- 06/14/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
 - 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
 - 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
 - 05/26/2023: Implementation of [ProlificDreamer](https://ml.cs.tsinghua.edu.cn/prolificdreamer/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
@@ -384,15 +389,15 @@ python launch.py --config configs/textmesh-if.yaml --train --gpu 0 system.prompt
 
 ### Control4D [![arXiv](https://img.shields.io/badge/arXiv-2305.20082-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.20082)
 
-**This is an experimental implementation of Control4D using threestudio! Control4D will release full code including static and dynamic editing after paper acceptance**
+**This is an experimental implementation of Control4D using threestudio! Control4D will release the full code including static and dynamic editing after paper acceptance.**
 
-**Results obtained by threestudio (Control4D, 512x512)**
+**Results obtained by threestudio (512x512)**
 
 https://github.com/threestudio-project/threestudio/assets/24589363/97d9aadd-32c7-488f-9543-6951b285d588
 
 We currently don't support dynamic editing.
 
-Download the data sample of control4D using this [link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EcqOaEuNwH1KpR0JTzL4Ur0BO_iJr8RiY2rNAGVC7h3fng?e=Dyr2gu)
+Download the data sample of control4D using this [link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EcqOaEuNwH1KpR0JTzL4Ur0BO_iJr8RiY2rNAGVC7h3fng?e=Dyr2gu).
 
 **Example running commands**
 
@@ -404,17 +409,11 @@ python launch.py --config configs/control4d-static.yaml --train --gpu 0 data.dat
 
 ### InstructNeRF2NeRF [![arXiv](https://img.shields.io/badge/arXiv-2303.12789-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.12789)
 
-**This is an unofficial experimental implementation of InstructNeRF2NeRF using threestudio! Please refer to [https://instruct-nerf2nerf.github.io/](https://github.com/thu-ml/prolificdreamer) for official code release.**
-
-**Results obtained by threestudio (InstructNeRF2NeRF)**
-
-
+**Results obtained by threestudio**
 
 https://github.com/threestudio-project/threestudio/assets/24589363/7aa43a2d-87d7-4ef5-94b6-f778ddb041b5
 
-
 Download the data sample of InstructNeRF2NeRF using this [link](https://mailstsinghuaeducn-my.sharepoint.com/:u:/g/personal/shaorz20_mails_tsinghua_edu_cn/EbNazeNAYsBIvxGeXuCmOXgBiLv8KM-hfRNbNS7DtTvSvA?e=C1k4bM).
-
 
 **Example running commands**
 
