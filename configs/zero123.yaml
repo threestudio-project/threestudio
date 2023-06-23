@@ -6,23 +6,23 @@ seed: 0
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: 192
-  width: 192
+  height: 128
+  width: 128
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
-  default_camera_distance: 3.2
+  default_camera_distance: 3.8
   default_fovy_deg: 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: 128
-    width: 128
+    height: 64
+    width: 64
     eval_height: 256
     eval_width: 256
-    batch_size: 2
+    batch_size: 12
     eval_batch_size: 1
-    elevation_range: [-10, 60]
+    elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.2, 3.3]
-    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
+    camera_distance_range: [3.8, 3.8]
+    fovy_range: [20.0, 20.0]
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
@@ -59,15 +59,18 @@ system:
     # coarse to fine hash grid encoding
     # to ensure smooth analytic normals
     pos_encoding_config:
-      otype: ProgressiveBandHashGrid
+      otype: HashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.447269237440378 # max resolution 4096
-      start_level: 8 # resolution ~200
-      start_step: 2000
-      update_steps: 500
+    mlp_network_config:
+      otype: "VanillaMLP"
+      activation: "ReLU"
+      output_activation: "none"
+      n_neurons: 64
+      n_hidden_layers: 1
 
   material_type: "diffuse-with-point-light-material"
   material:
@@ -101,16 +104,16 @@ system:
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
-    min_step_percent: 0.02
-    # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.98
-    # max_step_percent: [0, 0.98, 0.66, 2000]
+    #min_step_percent: 0.02
+    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    #max_step_percent: 0.98
+    max_step_percent: [0, 0.85, 0.85, 2000]
 
   freq:
     n_ref: 2
     ref_only_steps: 0
-    guidance_eval: 0  # must not be a multiple of system.freq.n_ref
-    ref_or_zero123: "alternate" # can be "accumulate" or "alternate"
+    guidance_eval: 0  # if "alternate", this must not be a multiple of system.freq.n_ref
+    ref_or_zero123: "accumulate" # can be "accumulate" or "alternate"
 
   loggers:
     wandb:
@@ -119,20 +122,20 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.003
-    lambda_rgb: 200.
+    lambda_sds: 0.03
+    lambda_rgb: 500.
     lambda_mask: 50.
-    lambda_depth: 1.
-    lambda_normal_smooth: 0.0
-    lambda_3d_normal_smooth: 0.5
-    lambda_orient: [0, 1., 20., 5000]
-    lambda_sparsity: 2.0 # should be tweaked for every model
-    lambda_opaque: 0.5
+    lambda_depth: 0.05
+    lambda_normal_smooth: 5.0
+    lambda_3d_normal_smooth: 2.0
+    lambda_orient: 1.0
+    lambda_sparsity: 0.1 # should be tweaked for every model
+    lambda_opaque: 0.05
 
   optimizer:
     name: Adan
     args:
-      lr: 0.01
+      lr: 0.05
       max_grad_norm: 5.0
       eps: 1.e-8
       weight_decay: 1e-5
@@ -143,7 +146,7 @@ system:
         lr: ${system.optimizer.args.lr}
 
 trainer:
-  max_steps: 10000
+  max_steps: 1999
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100
