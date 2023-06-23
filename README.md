@@ -42,6 +42,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## Installation
 
+See [installation.md](docs/installation.md) for additional information, including installation via Docker.
+
 The following steps have been tested on Ubuntu20.04.
 
 - You must have a NVIDIA graphics card with at least 6GB VRAM and have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
