@@ -21,10 +21,10 @@ data:
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.4, 4.0]
-    fovy_range: [20.0, 35.0] # Zero123 has fixed fovy
+    camera_distance_range: [3.0, 3.5]
+    fovy_range: [20.0, 45.0] # Zero123 has fixed fovy
     progressive_until: 0
-    camera_perturb: 0.1
+    camera_perturb: 0.2
     center_perturb: 0.1
     up_perturb: 0.05
     light_position_perturb: 1.0
