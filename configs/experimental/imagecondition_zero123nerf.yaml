@@ -137,7 +137,7 @@ system:
     lambda_normal_smooth: 20.0 # was 2.0
     lambda_3d_normal_smooth: 0.7 # was 5.0
     lambda_orient: 0.2 # was 0.01
-    lambda_sparsity: 0.02 # 0.01 # was 0.01
+    lambda_sparsity: 0.001 # 0.01 # was 0.01
     lambda_opaque: 0.05
 
   optimizer:
