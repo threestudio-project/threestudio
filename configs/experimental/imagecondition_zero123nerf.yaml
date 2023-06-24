@@ -143,10 +143,10 @@ system:
   optimizer:
     name: Adan
     args:
-      lr: 0.04 # was 0.005
+      lr: 0.2 # was 0.005
       max_grad_norm: 5.0
       eps: 1.e-8
-      weight_decay: 1e-3 # was 1e-5
+      weight_decay: 1e-2 # was 1e-5
     params:
       geometry:
         lr: ${system.optimizer.args.lr}
