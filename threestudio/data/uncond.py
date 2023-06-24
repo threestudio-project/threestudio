@@ -111,17 +111,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             (1 - r) * 0.0 + r * self.cfg.azimuth_range[0],
             (1 - r) * 0.0 + r * self.cfg.azimuth_range[1],
         ]
-        if False:
-            self.camera_distance_range = [
-                (1 - r) * self.cfg.eval_camera_distance
-                + r * self.cfg.camera_distance_range[0],
-                (1 - r) * self.cfg.eval_camera_distance
-                + r * self.cfg.camera_distance_range[1],
-            ]
-            self.fovy_range = [
-                (1 - r) * self.cfg.eval_fovy_deg + r * self.cfg.fovy_range[0],
-                (1 - r) * self.cfg.eval_fovy_deg + r * self.cfg.fovy_range[1],
-            ]
+        self.camera_distance_range = self.cfg.camera_distance_range
+        self.fovy_range = self.cfg.fovy_range
 
     def collate(self, batch) -> Dict[str, Any]:
         self.step += 1
