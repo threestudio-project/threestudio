@@ -146,7 +146,7 @@ system:
       lr: 0.04 # was 0.005
       max_grad_norm: 5.0
       eps: 1.e-8
-      weight_decay: 1e-5 # claforte: try playing with that
+      weight_decay: 1e-3 # was 1e-5
     params:
       geometry:
         lr: ${system.optimizer.args.lr}
