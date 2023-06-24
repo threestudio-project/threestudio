@@ -121,8 +121,8 @@ class StableDiffusionGuidance(BaseObject):
             )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        # self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
+        # self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device

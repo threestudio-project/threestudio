@@ -53,6 +53,10 @@ class Fantasia3D(BaseLift3DSystem):
 
         out = self(batch)
         prompt_utils = self.prompt_processor()
+        self.guidance.set_min_max_steps(
+            self.C(self.guidance.cfg.min_step_percent),
+            self.C(self.guidance.cfg.max_step_percent),
+        )
 
         if self.true_global_step < self.cfg.latent_steps:
             guidance_inp = torch.cat(

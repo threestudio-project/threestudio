@@ -7,12 +7,11 @@ import torch.nn.functional as F
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.systems.utils import parse_optimizer
+from threestudio.utils.GAN.loss import discriminator_loss, generator_loss
 from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.ops import binary_cross_entropy, dot
-from threestudio.utils.typing import *
 from threestudio.utils.perceptual import PerceptualLoss
-from threestudio.utils.GAN.loss import generator_loss, discriminator_loss
-
+from threestudio.utils.typing import *
 
 
 @threestudio.register("control4d-multiview-system")
@@ -69,13 +68,13 @@ class Control4D(BaseLift3DSystem):
         else:
             batch_index = batch["index"]
         batch["multi_level_guidance"] = True
-        
+
         origin_gt_rgb = batch["gt_rgb"]
         B, H, W, C = origin_gt_rgb.shape
         if batch_index in self.edit_frames:
             gt_rgb = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
             gt_rgb = torch.nn.functional.interpolate(
-                gt_rgb.permute(0, 3, 1, 2), (H, W), mode='bilinear', align_corners=False
+                gt_rgb.permute(0, 3, 1, 2), (H, W), mode="bilinear", align_corners=False
             ).permute(0, 2, 3, 1)
             batch["gt_rgb"] = gt_rgb
         else:
@@ -83,39 +82,54 @@ class Control4D(BaseLift3DSystem):
         out = self(batch)
         if self.per_editing_step > 0 and self.global_step > self.start_editing_step:
             prompt_utils = self.prompt_processor()
-            if not batch_index in self.edit_frames or self.global_step % self.per_editing_step == 0:
+            self.guidance.set_min_max_steps(
+                self.C(self.guidance.cfg.min_step_percent),
+                self.C(self.guidance.cfg.max_step_percent),
+            )
+            if (
+                not batch_index in self.edit_frames
+                or self.global_step % self.per_editing_step == 0
+            ):
                 result = self.guidance(out["comp_gan_rgb"], origin_gt_rgb, prompt_utils)
                 self.edit_frames[batch_index] = result["edit_images"].detach().cpu()
-        
+
         loss = 0.0
         # loss of generator level 0
         loss_l1 = F.l1_loss(out["comp_int_rgb"], out["comp_gt_rgb"])
         loss_p = 0.0
         loss_kl = out["posterior"].kl().mean()
-        loss_G = generator_loss(self.renderer.discriminator, 
-            gt_rgb.permute(0, 3, 1, 2), 
-            out["comp_gan_rgb"].permute(0, 3, 1, 2)
+        loss_G = generator_loss(
+            self.renderer.discriminator,
+            gt_rgb.permute(0, 3, 1, 2),
+            out["comp_gan_rgb"].permute(0, 3, 1, 2),
         )
 
         generator_level = out["generator_level"]
 
         level_ratio = 1.0 if generator_level == 2 else 0.1
         loss_l1 += F.l1_loss(out["comp_gan_rgb"], gt_rgb) * level_ratio
-        lr_gan_rgb = F.interpolate(out["comp_gan_rgb"].permute(0, 3, 1, 2), (H // 4, W // 4), mode='area')
-        lr_rgb = F.interpolate(out["comp_rgb"].permute(0, 3, 1, 2), (H // 4, W // 4), mode='area').detach()
+        lr_gan_rgb = F.interpolate(
+            out["comp_gan_rgb"].permute(0, 3, 1, 2), (H // 4, W // 4), mode="area"
+        )
+        lr_rgb = F.interpolate(
+            out["comp_rgb"].permute(0, 3, 1, 2), (H // 4, W // 4), mode="area"
+        ).detach()
         loss_l1 += F.l1_loss(lr_gan_rgb, lr_rgb).sum() * level_ratio * 0.25
 
         level_ratio = 1.0 if generator_level >= 1 else 0.1
-        loss_p += self.perceptual_loss(
-            out["comp_gan_rgb"].permute(0, 3, 1, 2).contiguous(), 
-            gt_rgb.permute(0, 3, 1, 2).contiguous()
-        ).sum() * level_ratio
+        loss_p += (
+            self.perceptual_loss(
+                out["comp_gan_rgb"].permute(0, 3, 1, 2).contiguous(),
+                gt_rgb.permute(0, 3, 1, 2).contiguous(),
+            ).sum()
+            * level_ratio
+        )
 
         guidance_out = {
             "loss_l1": loss_l1,
             "loss_p": loss_p,
             "loss_G": loss_G,
-            "loss_kl": loss_kl
+            "loss_kl": loss_kl,
         }
 
         for name, value in guidance_out.items():
@@ -153,9 +167,10 @@ class Control4D(BaseLift3DSystem):
         self.untoggle_optimizer(optimizer_g)
 
         self.toggle_optimizer(optimizer_d)
-        loss_D = discriminator_loss(self.renderer.discriminator, 
-            gt_rgb.permute(0, 3, 1, 2), 
-            out["comp_gan_rgb"].permute(0, 3, 1, 2)
+        loss_D = discriminator_loss(
+            self.renderer.discriminator,
+            gt_rgb.permute(0, 3, 1, 2),
+            out["comp_gan_rgb"].permute(0, 3, 1, 2),
         )
         loss_D *= self.C(self.cfg.loss["lambda_D"])
         self.log("train/loss_D", loss_D)
@@ -268,7 +283,6 @@ class Control4D(BaseLift3DSystem):
             name="test",
             step=self.true_global_step,
         )
-
 
     def configure_optimizers(self):
         optimizer_g = parse_optimizer(self.cfg.optimizer, self)

@@ -123,11 +123,11 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                     valid_gt_depth = A @ X  # [B, 1]
                 set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
         elif guidance == "guidance":
+            prompt_utils = self.prompt_processor()
             self.guidance.set_min_max_steps(
                 self.C(self.guidance.cfg.min_step_percent),
                 self.C(self.guidance.cfg.max_step_percent),
             )
-            prompt_utils = self.prompt_processor()
             guidance_out = self.guidance(
                 out["comp_rgb"],
                 prompt_utils,

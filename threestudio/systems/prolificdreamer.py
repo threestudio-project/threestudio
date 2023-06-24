@@ -45,6 +45,11 @@ class ProlificDreamer(BaseLift3DSystem):
     def training_step(self, batch, batch_idx):
         out = self(batch)
 
+        self.guidance.set_min_max_steps(
+            self.C(self.guidance.cfg.min_step_percent),
+            self.C(self.guidance.cfg.max_step_percent),
+        )
+
         if self.cfg.stage == "geometry":
             guidance_inp = out["comp_normal"]
             guidance_out = self.guidance(
