@@ -13,7 +13,7 @@ data:
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
   random_camera:
-    batch_size: 4
+    batch_size: 12
     height: 256
     width: 256
     eval_height: 512
@@ -22,7 +22,7 @@ data:
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
     camera_distance_range: [3.4, 4.0]
-    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
+    fovy_range: [20.0, 25.0] # Zero123 has fixed fovy
     progressive_until: 0
     camera_perturb: 0.1
     center_perturb: 0.1
@@ -129,7 +129,7 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.1
+    lambda_sds: 0.02
     lambda_rgb: 400.0
     lambda_mask: 50.0
     lambda_depth: 0 # was 0.05... try some amount if floaters emerge.
@@ -142,10 +142,10 @@ system:
   optimizer:
     name: Adan
     args:
-      lr: 0.005
+      lr: 0.005 # was 0.005
       max_grad_norm: 5.0
       eps: 1.e-8
-      weight_decay: 1e-5
+      weight_decay: 1e-5 # claforte: try playing with that
     params:
       geometry:
         lr: ${system.optimizer.args.lr}
