@@ -99,9 +99,9 @@ system:
   guidance:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 7.5 # claforte: try 10, like in stable-dreamfusion
-    min_step_percent: 0.05
+    min_step_percent: 0.02
     # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.3
+    max_step_percent: 0.25
     # max_step_percent: [0, 0.98, 0.66, 2000]
     max_items_to_save: 4
 
