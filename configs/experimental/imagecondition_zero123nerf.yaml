@@ -13,7 +13,7 @@ data:
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
   random_camera:
-    batch_size: 12
+    batch_size: 10
     height: 256
     width: 256
     eval_height: 512
@@ -21,8 +21,8 @@ data:
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [1.6, 2.0]
-    fovy_range: [20.0, 40.0] # Zero123 has fixed fovy
+    camera_distance_range: [1.8, 2.0]
+    fovy_range: [20.0, 35.0] # Zero123 has fixed fovy
     progressive_until: 0
     camera_perturb: 0.2
     center_perturb: 0.1
