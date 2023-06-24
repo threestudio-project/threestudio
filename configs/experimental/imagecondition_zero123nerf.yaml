@@ -154,7 +154,7 @@ system:
         lr: 0.0
 
 trainer:
-  max_steps: 2000
+  max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 20

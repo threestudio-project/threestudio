@@ -52,7 +52,7 @@ class RandomCameraDataModuleConfig:
     eval_fovy_deg: float = 70.0
     light_sample_strategy: str = "dreamfusion"
     batch_uniform_azimuth: bool = True
-    progressive_until: int = 0  # progressive ranges for elevation, azimuth, r, fovy
+    progressive_until: int = 0  # progressive ranges for elevation, azimuth
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
