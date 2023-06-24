@@ -22,7 +22,7 @@ data:
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
     camera_distance_range: [3.4, 4.0]
-    fovy_range: [20.0, 25.0] # Zero123 has fixed fovy
+    fovy_range: [20.0, 35.0] # Zero123 has fixed fovy
     progressive_until: 0
     camera_perturb: 0.1
     center_perturb: 0.1
@@ -75,7 +75,7 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 1000
+    ambient_only_steps: 0
     textureless_prob: 0.0  # later, try higher, e.g. 0.05
     albedo_activation: sigmoid
 
@@ -142,7 +142,7 @@ system:
   optimizer:
     name: Adan
     args:
-      lr: 0.05 # was 0.005
+      lr: 0.01 # was 0.005
       max_grad_norm: 5.0
       eps: 1.e-8
       weight_decay: 1e-5 # claforte: try playing with that
