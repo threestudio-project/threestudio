@@ -101,7 +101,7 @@ system:
     guidance_scale: 7.5 # claforte: try 10, like in stable-dreamfusion
     min_step_percent: 0.05
     # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.4
+    max_step_percent: 0.3
     # max_step_percent: [0, 0.98, 0.66, 2000]
     max_items_to_save: 4
 
@@ -133,7 +133,7 @@ system:
     lambda_sds: 0.02
     lambda_rgb: 400.0
     lambda_mask: 50.0
-    lambda_depth: 0 # was 0.05... try some amount if floaters emerge.
+    lambda_depth: 0.0 # was 0.05... try some amount if floaters emerge.
     lambda_normal_smooth: 20.0 # was 2.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 0.01
