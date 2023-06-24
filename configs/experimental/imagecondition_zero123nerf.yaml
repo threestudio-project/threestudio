@@ -21,12 +21,12 @@ data:
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.8, 3.8]
+    camera_distance_range: [3.4, 4.0]
     fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
     progressive_until: 0
-    camera_perturb: 0.0
-    center_perturb: 0.0
-    up_perturb: 0.0
+    camera_perturb: 0.1
+    center_perturb: 0.1
+    up_perturb: 0.05
     light_position_perturb: 1.0
     light_distance_range: [7.5, 10.0]
     eval_elevation_deg: ${data.default_elevation_deg}
@@ -71,12 +71,12 @@ system:
       activation: "ReLU"
       output_activation: "none"
       n_neurons: 64
-      n_hidden_layers: 2
+      n_hidden_layers: 1 # claforte: try 2 again
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 100000
-    textureless_prob: 0.05
+    ambient_only_steps: 1000
+    textureless_prob: 0.0  # later, try higher, e.g. 0.05
     albedo_activation: sigmoid
 
   background_type: "neural-environment-map-background"
@@ -98,7 +98,7 @@ system:
   guidance_type: "stable-diffusion-guidance"
   guidance:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    guidance_scale: 7.5
+    guidance_scale: 7.5 # claforte: try 10, like in stable-dreamfusion
     min_step_percent: 0.2
     # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: 0.6
@@ -132,7 +132,7 @@ system:
     lambda_sds: 0.1
     lambda_rgb: 400.0
     lambda_mask: 50.0
-    lambda_depth: 0.05
+    lambda_depth: 0 # was 0.05... try some amount if floaters emerge.
     lambda_normal_smooth: 2.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 0.01
