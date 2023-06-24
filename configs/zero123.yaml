@@ -6,18 +6,18 @@ seed: 0
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: 128
-  width: 128
+  height: 256
+  width: 256
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: 64
-    width: 64
+    height: 128
+    width: 128
     eval_height: 256
     eval_width: 256
-    batch_size: 12
+    batch_size: 4
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
@@ -70,7 +70,7 @@ system:
       activation: "ReLU"
       output_activation: "none"
       n_neurons: 64
-      n_hidden_layers: 1
+      n_hidden_layers: 2
 
   material_type: "diffuse-with-point-light-material"
   material:
@@ -105,9 +105,9 @@ system:
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     #min_step_percent: 0.02
-    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    min_step_percent: [0, 0.6, 0.1, 1000]  # (start_iter, start_val, end_val, end_iter)
     #max_step_percent: 0.98
-    max_step_percent: [0, 0.85, 0.85, 2000]
+    max_step_percent: [0, 0.85, 0.6, 1000]
 
   freq:
     n_ref: 2
@@ -122,12 +122,12 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.03
-    lambda_rgb: 500.
+    lambda_sds: 0.05
+    lambda_rgb: 400.
     lambda_mask: 50.
-    lambda_depth: 0.05
-    lambda_normal_smooth: 5.0
-    lambda_3d_normal_smooth: 2.0
+    lambda_depth: [0.0, 1.0, 0.05, 500]
+    lambda_normal_smooth: 2.0
+    lambda_3d_normal_smooth: 10.0
     lambda_orient: 1.0
     lambda_sparsity: 0.1 # should be tweaked for every model
     lambda_opaque: 0.05
@@ -146,10 +146,10 @@ system:
         lr: ${system.optimizer.args.lr}
 
 trainer:
-  max_steps: 1999
+  max_steps: 2000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 100
+  val_check_interval: 20
   enable_progress_bar: true
   precision: 16-mixed
 

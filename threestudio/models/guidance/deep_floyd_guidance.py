@@ -273,22 +273,211 @@ class DeepFloydGuidance(BaseObject):
 
         return guidance_out
 
+    # def __call__(
+    #     self,
+    #     rgb: Float[Tensor, "B H W C"],
+    #     prompt_utils: PromptProcessorOutput,
+    #     elevation: Float[Tensor, "B"],
+    #     azimuth: Float[Tensor, "B"],
+    #     camera_distances: Float[Tensor, "B"],
+    #     rgb_as_latents=False,
+    #     guidance_eval=False,
+    #     **kwargs,
+    # ):
+    #     batch_size = rgb.shape[0]
+
+    #     rgb_BCHW = rgb.permute(0, 3, 1, 2)
+
+    #     assert rgb_as_latents == False, f"No latent space in {self.__class__.__name__}"
+    #     rgb_BCHW = rgb_BCHW * 2.0 - 1.0  # scale to [-1, 1] to match the diffusion range
+    #     latents = F.interpolate(
+    #         rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
+    #     )
+
+    #     # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
+    #     t = torch.randint(
+    #         self.min_step,
+    #         self.max_step + 1,
+    #         [batch_size],
+    #         dtype=torch.long,
+    #         device=self.device,
+    #     )
+
+    #     noise = torch.randn_like(latents)  # TODO: use torch generator
+    #     latents_noisy = self.scheduler.add_noise(latents, noise, t)
+
+    #     if prompt_utils.use_perp_neg:
+    #         (
+    #             text_embeddings,
+    #             neg_guidance_weights,
+    #         ) = prompt_utils.get_text_embeddings_perp_neg(
+    #             elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+    #         )
+    #         with torch.no_grad():
+    #             noise = torch.randn_like(latents)
+    #             latents_noisy = self.scheduler.add_noise(latents, noise, t)
+    #             latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
+    #             noise_pred = self.forward_unet(
+    #                 latent_model_input,
+    #                 torch.cat([t] * 4),
+    #                 encoder_hidden_states=text_embeddings,
+    #             )  # (4B, 6, 64, 64)
+
+    #         noise_pred_text, _ = noise_pred[:batch_size].split(3, dim=1)
+    #         noise_pred_uncond, _ = noise_pred[batch_size : batch_size * 2].split(
+    #             3, dim=1
+    #         )
+    #         noise_pred_neg, _ = noise_pred[batch_size * 2 :].split(3, dim=1)
+
+    #         e_pos = noise_pred_text - noise_pred_uncond
+    #         accum_grad = 0
+    #         n_negative_prompts = neg_guidance_weights.shape[-1]
+    #         for i in range(n_negative_prompts):
+    #             e_i_neg = noise_pred_neg[i::n_negative_prompts] - noise_pred_uncond
+    #             accum_grad += neg_guidance_weights[:, i].view(
+    #                 -1, 1, 1, 1
+    #             ) * perpendicular_component(e_i_neg, e_pos)
+
+    #         noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+    #             e_pos + accum_grad
+    #         )
+    #     else:
+    #         neg_guidance_weights = None
+    #         text_embeddings = prompt_utils.get_text_embeddings(
+    #             elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+    #         )
+    #         # predict the noise residual with unet, NO grad!
+    #         with torch.no_grad():
+    #             # add noise
+    #             noise = torch.randn_like(latents)  # TODO: use torch generator
+    #             latents_noisy = self.scheduler.add_noise(latents, noise, t)
+    #             # pred noise
+    #             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
+    #             noise_pred = self.forward_unet(
+    #                 latent_model_input,
+    #                 torch.cat([t] * 2),
+    #                 encoder_hidden_states=text_embeddings,
+    #             )  # (2B, 6, 64, 64)
+
+    #         # perform guidance (high scale from paper!)
+    #         noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+    #         noise_pred_text, predicted_variance = noise_pred_text.split(3, dim=1)
+    #         noise_pred_uncond, _ = noise_pred_uncond.split(3, dim=1)
+    #         noise_pred = noise_pred_text + self.cfg.guidance_scale * (
+    #             noise_pred_text - noise_pred_uncond
+    #         )
+
+    #     guidance_eval_inputs = {
+    #         "t_orig": t,
+    #         "latents_noisy": latents_noisy,
+    #         "use_perp_neg": prompt_utils.use_perp_neg,
+    #         "neg_guidance_weights": neg_guidance_weights,
+    #         "text_embeddings": text_embeddings,
+    #         "noise_pred": torch.cat([noise_pred, predicted_variance], dim=1),
+    #     }
+    #     # noise_pred = self.get_noise_pred(**guidance_eval_inputs)
+    #     guidance_eval_out = self.guidance_eval(**guidance_eval_inputs)
+    #     noise = self.estimate_noise(
+    #         guidance_eval_out["imgs_final"].permute(0, 3, 1, 2), latents_noisy, t
+    #     )
+
+    #     if self.cfg.weighting_strategy == "sds":
+    #         # w(t), sigma_t^2
+    #         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
+    #     elif self.cfg.weighting_strategy == "uniform":
+    #         w = 1
+    #     elif self.cfg.weighting_strategy == "fantasia3d":
+    #         w = (self.alphas[t] ** 0.5 * (1 - self.alphas[t])).view(-1, 1, 1, 1)
+    #     else:
+    #         raise ValueError(
+    #             f"Unknown weighting strategy: {self.cfg.weighting_strategy}"
+    #         )
+
+    #     grad = w * (noise_pred - noise)
+    #     grad = torch.nan_to_num(grad)
+    #     # clip grad for stable training?
+    #     if self.grad_clip_val is not None:
+    #         grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
+
+    #     # loss = SpecifyGradient.apply(latents, grad)
+    #     # SpecifyGradient is not straghtforward, use a reparameterization trick instead
+    #     target = (latents - grad).detach()
+    #     # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
+    #     loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+
+    #     guidance_out = {
+    #         "loss_sds": loss_sds,
+    #         "grad_norm": grad.norm(),
+    #     }
+
+    #     if guidance_eval:
+    #         # guidance_eval_utils = {
+    #         #     "use_perp_neg": prompt_utils.use_perp_neg,
+    #         #     "neg_guidance_weights": neg_guidance_weights,
+    #         #     "text_embeddings": text_embeddings,
+    #         #     "t_orig": t,
+    #         #     "latents_noisy": latents_noisy,
+    #         #     # "noise_pred": torch.cat([noise_pred, predicted_variance], dim=1),
+    #         # }
+    #         # guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
+    #         texts = []
+    #         for n, e, a, c in zip(
+    #             guidance_eval_out["noise_levels"], elevation, azimuth, camera_distances
+    #         ):
+    #             texts.append(
+    #                 f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+    #             )
+    #         guidance_eval_out.update({"texts": texts})
+    #         guidance_out.update({"eval": guidance_eval_out})
+
+    #     return guidance_out
+
+    # Adapted from diffusers.schedulers.scheduling_ddpm.DDPMScheduler.add_noise
+    def estimate_noise(
+        self,
+        original_samples: torch.FloatTensor,
+        noisy_samples: torch.FloatTensor,
+        timesteps: torch.IntTensor,
+    ) -> torch.FloatTensor:
+        # Make sure alphas_cumprod and timestep have same device and dtype as original_samples
+        alphas_cumprod = self.scheduler.alphas_cumprod.to(
+            device=original_samples.device, dtype=original_samples.dtype
+        )
+        timesteps = timesteps.to(original_samples.device)
+
+        sqrt_alpha_prod = alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = sqrt_alpha_prod.flatten()
+        while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
+            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+
+        sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
+        while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
+            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+
+        noise = (
+            noisy_samples - sqrt_alpha_prod * original_samples
+        ) / sqrt_one_minus_alpha_prod
+        return noise
+
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
     def get_noise_pred(
         self,
         latents_noisy,
-        t,
+        t_orig,
         text_embeddings,
         use_perp_neg=False,
         neg_guidance_weights=None,
+        **kwargs,
     ):
+        t = t_orig
         batch_size = latents_noisy.shape[0]
         if use_perp_neg:
             latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
             noise_pred = self.forward_unet(
                 latent_model_input,
-                torch.cat([t.reshape(1)] * 4).to(self.device),
+                torch.cat([t.reshape(1) if t.ndim == 0 else t] * 4).to(self.device),
                 encoder_hidden_states=text_embeddings,
             )  # (4B, 6, 64, 64)
 
@@ -314,7 +503,7 @@ class DeepFloydGuidance(BaseObject):
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
             noise_pred = self.forward_unet(
                 latent_model_input,
-                torch.cat([t.reshape(1)] * 2).to(self.device),
+                torch.cat([t.reshape(1) if t.ndim == 0 else t] * 2).to(self.device),
                 encoder_hidden_states=text_embeddings,
             )  # (2B, 6, 64, 64)
 
@@ -332,10 +521,10 @@ class DeepFloydGuidance(BaseObject):
     @torch.no_grad()
     def guidance_eval(
         self,
+        latents_noisy,
         t_orig,
         text_embeddings,
-        latents_noisy,
-        noise_pred,
+        noise_pred=None,
         use_perp_neg=False,
         neg_guidance_weights=None,
     ):
@@ -354,23 +543,30 @@ class DeepFloydGuidance(BaseObject):
         fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
         imgs_noisy = latents_noisy.permute(0, 2, 3, 1)
 
-        # get prev latent
-        latents_1step = []
-        pred_1orig = []
-        for b in range(len(t)):
-            step_output = self.scheduler.step(
-                noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1]
-            )
-            latents_1step.append(step_output["prev_sample"])
-            pred_1orig.append(step_output["pred_original_sample"])
-        latents_1step = torch.cat(latents_1step)
-        pred_1orig = torch.cat(pred_1orig)
-        imgs_1step = latents_1step.permute(0, 2, 3, 1)
-        imgs_1orig = pred_1orig.permute(0, 2, 3, 1)
+        if noise_pred is not None:
+            # get prev latent
+            latents_1step = []
+            pred_1orig = []
+            for b in range(len(t)):
+                step_output = self.scheduler.step(
+                    noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1]
+                )
+                latents_1step.append(step_output["prev_sample"])
+                pred_1orig.append(step_output["pred_original_sample"])
+            latents_1step = torch.cat(latents_1step)
+            pred_1orig = torch.cat(pred_1orig)
+            imgs_1step = latents_1step.permute(0, 2, 3, 1)
+            imgs_1orig = pred_1orig.permute(0, 2, 3, 1)
+        else:
+            imgs_1step = imgs_1orig = None
 
         latents_final = []
         for b, i in enumerate(idxs):
-            latents = latents_1step[b : b + 1]
+            latents = (
+                latents_1step[b : b + 1]
+                if noise_pred is not None
+                else latents_noisy[b : b + 1]
+            )
             text_emb = (
                 text_embeddings[
                     [b, b + len(idxs), b + 2 * len(idxs), b + 3 * len(idxs)], ...
@@ -379,13 +575,16 @@ class DeepFloydGuidance(BaseObject):
                 else text_embeddings[[b, b + len(idxs)], ...]
             )
             neg_guid = neg_guidance_weights[b : b + 1] if use_perp_neg else None
-            for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
+            for t in tqdm(
+                self.scheduler.timesteps[(i + 1) if noise_pred is not None else i :],
+                leave=False,
+            ):
                 # pred noise
-                noise_pred = self.get_noise_pred(
+                noise_ = self.get_noise_pred(
                     latents, t, text_emb, use_perp_neg, neg_guid
                 )
                 # get prev latent
-                latents = self.scheduler.step(noise_pred, t, latents)["prev_sample"]
+                latents = self.scheduler.step(noise_, t, latents)["prev_sample"]
             latents_final.append(latents)
 
         latents_final = torch.cat(latents_final)
