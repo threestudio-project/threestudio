@@ -21,8 +21,8 @@ data:
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.0, 3.5]
-    fovy_range: [20.0, 45.0] # Zero123 has fixed fovy
+    camera_distance_range: [2.8, 3.2]
+    fovy_range: [30.0, 50.0] # Zero123 has fixed fovy
     progressive_until: 0
     camera_perturb: 0.2
     center_perturb: 0.1
@@ -99,9 +99,9 @@ system:
   guidance:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 7.5 # claforte: try 10, like in stable-dreamfusion
-    min_step_percent: 0.2
+    min_step_percent: 0.05
     # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.6
+    max_step_percent: 0.4
     # max_step_percent: [0, 0.98, 0.66, 2000]
 
   # prompt_processor_type: "deep-floyd-prompt-processor"
@@ -133,7 +133,7 @@ system:
     lambda_rgb: 400.0
     lambda_mask: 50.0
     lambda_depth: 0 # was 0.05... try some amount if floaters emerge.
-    lambda_normal_smooth: 2.0
+    lambda_normal_smooth: 20.0 # was 2.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 0.01
     lambda_sparsity: 1.0 # 0.01 # was 0.01
