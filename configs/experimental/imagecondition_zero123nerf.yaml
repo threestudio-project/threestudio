@@ -75,7 +75,7 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 0
+    ambient_only_steps: 5000
     textureless_prob: 0.0  # later, try higher, e.g. 0.05
     albedo_activation: sigmoid
 
