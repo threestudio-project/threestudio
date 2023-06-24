@@ -71,7 +71,7 @@ system:
       activation: "ReLU"
       output_activation: "none"
       n_neurons: 64
-      n_hidden_layers: 1
+      n_hidden_layers: 2
 
   material_type: "diffuse-with-point-light-material"
   material:
@@ -98,7 +98,7 @@ system:
   guidance_type: "stable-diffusion-guidance"
   guidance:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    guidance_scale: 10
+    guidance_scale: 7.5
     min_step_percent: 0.2
     # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: 0.6
@@ -112,7 +112,7 @@ system:
   # guidance_type: "deep-floyd-guidance"
   # guidance:
   #   pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
-  #   guidance_scale: 3.
+  #   guidance_scale: 7.5
   #   min_step_percent: 0.2
   #   # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
   #   max_step_percent: 0.6
@@ -120,7 +120,7 @@ system:
 
   freq:
     ref_only_steps: 0
-    guidance_eval: 0
+    guidance_eval: 13
 
   loggers:
     wandb:
@@ -129,14 +129,14 @@ system:
       name: None
 
   loss:
-    lambda_sds: 1.0
-    lambda_rgb: 5.0
-    lambda_mask: 5.0
-    lambda_depth: 0.01
-    lambda_normal_smooth: 5.0
-    lambda_3d_normal_smooth: 2.0
-    lambda_orient: 1.0
-    lambda_sparsity: 0.1
+    lambda_sds: 0.1
+    lambda_rgb: 400.0
+    lambda_mask: 50.0
+    lambda_depth: 0.05
+    lambda_normal_smooth: 2.0
+    lambda_3d_normal_smooth: 5.0
+    lambda_orient: 0.01
+    lambda_sparsity: 0.01
     lambda_opaque: 0.05
 
   optimizer:
