@@ -335,9 +335,7 @@ https://github.com/threestudio-project/threestudio/assets/19284678/762903c1-665b
 
 Notable differences from the paper:
 
-- We enable tangent space normal map training by default, which can be turned off by appending `system.material.train_normal_map=false`.
-- We use a leanable background model instead of a solid-color background model during texture training.
-
+- We enable tangent-space normal perturbation by default, which can be turned off by appending `system.material.use_bump=false`.
 
 **Example running commands**
 

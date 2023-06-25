@@ -10,8 +10,7 @@ import torch.nn.functional as F
 
 import threestudio
 from threestudio.models.materials.base import BaseMaterial
-from threestudio.models.networks import get_encoding, get_mlp
-from threestudio.utils.ops import dot, get_activation
+from threestudio.utils.ops import get_activation
 from threestudio.utils.typing import *
 
 
@@ -19,7 +18,6 @@ from threestudio.utils.typing import *
 class PBRMaterial(BaseMaterial):
     @dataclass
     class Config(BaseMaterial.Config):
-        input_feature_dims: int = 32
         material_activation: str = "sigmoid"
         environment_texture: str = "load/lights/mud_road_puresky_1k.hdr"
         environment_scale: float = 2.0
@@ -27,29 +25,13 @@ class PBRMaterial(BaseMaterial):
         max_metallic: float = 0.9
         min_roughness: float = 0.08
         max_roughness: float = 0.9
-        train_normal_map: bool = True
-        material_mlp_network_config: dict = field(
-            default_factory=lambda: {
-                "otype": "VanillaMLP",
-                "activation": "ReLU",
-                "output_activation": "none",
-                "n_neurons": 64,
-                "n_hidden_layers": 2,
-            }
-        )
+        use_bump: bool = True
 
     cfg: Config
 
     def configure(self) -> None:
-        self.material_dim = 3 + 1 + 1  # albedo + roughness + metallic
-        if self.cfg.train_normal_map:
-            self.material_dim += 3
-
-        self.material_network = get_mlp(
-            self.cfg.input_feature_dims,
-            self.material_dim,
-            self.cfg.material_mlp_network_config,
-        )
+        self.requires_normal = True
+        self.requires_tangent = self.cfg.use_bump
 
         self.light = envlight.EnvLight(
             self.cfg.environment_texture, scale=self.cfg.environment_scale
@@ -67,15 +49,14 @@ class PBRMaterial(BaseMaterial):
         features: Float[Tensor, "*B Nf"],
         viewdirs: Float[Tensor, "*B 3"],
         shading_normal: Float[Tensor, "B ... 3"],
-        tangent: Float[Tensor, "B ... 3"],
+        tangent: Optional[Float[Tensor, "B ... 3"]] = None,
         **kwargs,
     ) -> Float[Tensor, "*B 3"]:
         prefix_shape = features.shape[:-1]
 
-        material = self.material_network(features.view(-1, features.shape[-1])).view(
-            *prefix_shape, -1
+        material: Float[Tensor, "*B Nf"] = get_activation(self.cfg.material_activation)(
+            features
         )
-        material = get_activation(self.cfg.material_activation)(material)
         albedo = material[..., :3]
         metallic = (
             material[..., 3:4] * (self.cfg.max_metallic - self.cfg.min_metallic)
@@ -86,7 +67,8 @@ class PBRMaterial(BaseMaterial):
             + self.cfg.min_roughness
         )
 
-        if self.cfg.train_normal_map:
+        if self.cfg.use_bump:
+            assert tangent is not None
             # perturb_normal is a delta to the initialization [0, 0, 1]
             perturb_normal = (material[..., 5:8] * 2 - 1) + torch.tensor(
                 [0, 0, 1], dtype=material.dtype, device=material.device
@@ -127,12 +109,9 @@ class PBRMaterial(BaseMaterial):
         return color
 
     def export(self, features: Float[Tensor, "*N Nf"], **kwargs) -> Dict[str, Any]:
-        prefix_shape = features.shape[:-1]
-
-        material = self.material_network(features.view(-1, features.shape[-1])).view(
-            *prefix_shape, -1
+        material: Float[Tensor, "*N Nf"] = get_activation(self.cfg.material_activation)(
+            features
         )
-        material = get_activation(self.cfg.material_activation)(material)
         albedo = material[..., :3]
         metallic = (
             material[..., 3:4] * (self.cfg.max_metallic - self.cfg.min_metallic)
@@ -149,7 +128,7 @@ class PBRMaterial(BaseMaterial):
             "roughness": roughness,
         }
 
-        if self.cfg.train_normal_map:
+        if self.cfg.use_bump:
             perturb_normal = (material[..., 5:8] * 2 - 1) + torch.tensor(
                 [0, 0, 1], dtype=material.dtype, device=material.device
             )

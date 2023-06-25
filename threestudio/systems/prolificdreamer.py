@@ -32,7 +32,7 @@ class ProlificDreamer(BaseLift3DSystem):
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         if self.cfg.stage == "geometry":
-            render_out = self.renderer(**batch, render_normal=True, render_rgb=False)
+            render_out = self.renderer(**batch, render_rgb=False)
         else:
             render_out = self.renderer(**batch)
         return {

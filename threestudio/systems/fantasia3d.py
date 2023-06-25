@@ -23,9 +23,7 @@ class Fantasia3D(BaseLift3DSystem):
         super().configure()
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        render_out = self.renderer(
-            **batch, render_normal=True, render_rgb=self.cfg.texture
-        )
+        render_out = self.renderer(**batch, render_rgb=self.cfg.texture)
         return {
             **render_out,
         }

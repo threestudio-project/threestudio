@@ -24,9 +24,10 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         soft_shading: bool = False
 
     cfg: Config
-    requires_normal: bool = True
 
     def configure(self) -> None:
+        self.requires_normal = True
+
         self.ambient_light_color: Float[Tensor, "3"]
         self.register_buffer(
             "ambient_light_color",
