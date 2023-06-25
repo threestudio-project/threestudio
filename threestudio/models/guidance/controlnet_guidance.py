@@ -7,12 +7,13 @@ import torch
 import torch.nn.functional as F
 from controlnet_aux import CannyDetector, NormalBaeDetector
 from diffusers import ControlNetModel, DDIMScheduler, StableDiffusionControlNetPipeline
+from diffusers.utils.import_utils import is_xformers_available
 from tqdm import tqdm
 
 import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import parse_version
+from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
 
 
@@ -52,10 +53,11 @@ class ControlNetGuidance(BaseObject):
     def configure(self) -> None:
         threestudio.info(f"Loading ControlNet ...")
 
+        controlnet_name_or_path: str
         if self.cfg.control_type == "normal":
-            controlnet_name_or_path: str = "lllyasviel/control_v11p_sd15_normalbae"
+            controlnet_name_or_path = "lllyasviel/control_v11p_sd15_normalbae"
         elif self.cfg.control_type == "canny":
-            controlnet_name_or_path: str = "lllyasviel/control_v11p_sd15_canny"
+            controlnet_name_or_path = "lllyasviel/control_v11p_sd15_canny"
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
@@ -125,8 +127,7 @@ class ControlNetGuidance(BaseObject):
             p.requires_grad_(False)
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        self.set_min_max_steps()  # set to default value
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
@@ -135,6 +136,11 @@ class ControlNetGuidance(BaseObject):
         self.grad_clip_val: Optional[float] = None
 
         threestudio.info(f"Loaded ControlNet!")
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
+        self.min_step = int(self.num_train_timesteps * min_step_percent)
+        self.max_step = int(self.num_train_timesteps * max_step_percent)
 
     @torch.cuda.amp.autocast(enabled=False)
     def forward_controlnet(
@@ -371,6 +377,8 @@ class ControlNetGuidance(BaseObject):
             return {
                 "loss_sds": loss_sds,
                 "grad_norm": grad.norm(),
+                "min_step": self.min_step,
+                "max_step": self.max_step,
             }
         else:
             edit_latents = self.edit_latents(text_embeddings, latents, image_cond, t)
@@ -378,6 +386,18 @@ class ControlNetGuidance(BaseObject):
             edit_images = F.interpolate(edit_images, (H, W), mode="bilinear")
 
             return {"edit_images": edit_images.permute(0, 2, 3, 1)}
+
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        # clip grad for stable training as demonstrated in
+        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
+        # http://arxiv.org/abs/2303.15413
+        if self.cfg.grad_clip is not None:
+            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )
 
 
 if __name__ == "__main__":

@@ -91,8 +91,7 @@ class DeepFloydGuidance(BaseObject):
         self.scheduler = self.pipe.scheduler
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        self.set_min_max_steps()  # set to default value
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
@@ -249,6 +248,8 @@ class DeepFloydGuidance(BaseObject):
         guidance_out = {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
+            "min_step": self.min_step,
+            "max_step": self.max_step,
         }
 
         if guidance_eval:
@@ -405,6 +406,11 @@ class DeepFloydGuidance(BaseObject):
         # http://arxiv.org/abs/2303.15413
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )
 
 
 """

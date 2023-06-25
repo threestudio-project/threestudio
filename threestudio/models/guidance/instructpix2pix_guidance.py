@@ -5,12 +5,13 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from diffusers import DDIMScheduler, StableDiffusionInstructPix2PixPipeline
+from diffusers.utils.import_utils import is_xformers_available
 from tqdm import tqdm
 
 import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import parse_version
+from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
 
 
@@ -99,8 +100,7 @@ class InstructPix2PixGuidance(BaseObject):
             p.requires_grad_(False)
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        self.set_min_max_steps()  # set to default value
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
@@ -109,6 +109,11 @@ class InstructPix2PixGuidance(BaseObject):
         self.grad_clip_val: Optional[float] = None
 
         threestudio.info(f"Loaded InstructPix2Pix!")
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
+        self.min_step = int(self.num_train_timesteps * min_step_percent)
+        self.max_step = int(self.num_train_timesteps * max_step_percent)
 
     @torch.cuda.amp.autocast(enabled=False)
     def forward_unet(
@@ -254,7 +259,6 @@ class InstructPix2PixGuidance(BaseObject):
         latents = self.encode_images(rgb_BCHW_512)
 
         cond_rgb_BCHW = cond_rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 64 64"]
         cond_rgb_BCHW_512 = F.interpolate(
             cond_rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
         )
@@ -285,6 +289,8 @@ class InstructPix2PixGuidance(BaseObject):
             return {
                 "loss_sds": loss_sds,
                 "grad_norm": grad.norm(),
+                "min_step": self.min_step,
+                "max_step": self.max_step,
             }
         else:
             edit_latents = self.edit_latents(text_embeddings, latents, cond_latents, t)
@@ -292,6 +298,18 @@ class InstructPix2PixGuidance(BaseObject):
             edit_images = F.interpolate(edit_images, (H, W), mode="bilinear")
 
             return {"edit_images": edit_images.permute(0, 2, 3, 1)}
+
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        # clip grad for stable training as demonstrated in
+        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
+        # http://arxiv.org/abs/2303.15413
+        if self.cfg.grad_clip is not None:
+            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )
 
 
 if __name__ == "__main__":
