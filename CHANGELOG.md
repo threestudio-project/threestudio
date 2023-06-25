@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support prompt debiasing and manually assignment of view-dependent prompts (#98).
 - The implementation of Perp-Neg (#98).
 - Support patch-based renderer (#154).
-- Support 3D reconstruction from multi-view images and 3D editing based on InstructNeRF2NeRF/ControlNet (#119). 
+- Support 3D reconstruction from multi-view images and 3D editing based on InstructNeRF2NeRF/ControlNet (#119).
 - Support NeuS/VolSDF volume renderer and the coarse stage of TextMesh (#162,#121).
 
 ### Changed

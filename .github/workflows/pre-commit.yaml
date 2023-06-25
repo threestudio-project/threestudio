@@ -1,0 +1,22 @@
+name: pre-commit
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - name: Install pre-commit
+        run: |
+          pip install pre-commit
+          pre-commit install
+      - name: Run pre-commit
+        run: pre-commit run --all-files

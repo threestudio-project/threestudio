@@ -21,7 +21,7 @@ class HybridRGBLatentMaterial(BaseMaterial):
         requires_normal: bool = True
 
     cfg: Config
-    
+
     def configure(self) -> None:
         self.requires_normal = self.cfg.requires_normal
 

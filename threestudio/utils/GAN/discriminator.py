@@ -1,14 +1,18 @@
+import functools
+
 import torch
 import torch.nn as nn
-import functools
+
 
 def count_params(model):
     total_params = sum(p.numel() for p in model.parameters())
     return total_params
 
+
 class ActNorm(nn.Module):
-    def __init__(self, num_features, logdet=False, affine=True,
-                 allow_reverse_init=False):
+    def __init__(
+        self, num_features, logdet=False, affine=True, allow_reverse_init=False
+    ):
         assert affine
         super().__init__()
         self.logdet = logdet
@@ -16,7 +20,7 @@ class ActNorm(nn.Module):
         self.scale = nn.Parameter(torch.ones(1, num_features, 1, 1))
         self.allow_reverse_init = allow_reverse_init
 
-        self.register_buffer('initialized', torch.tensor(0, dtype=torch.uint8))
+        self.register_buffer("initialized", torch.tensor(0, dtype=torch.uint8))
 
     def initialize(self, input):
         with torch.no_grad():
@@ -43,7 +47,7 @@ class ActNorm(nn.Module):
         if reverse:
             return self.reverse(input)
         if len(input.shape) == 2:
-            input = input[:,:,None,None]
+            input = input[:, :, None, None]
             squeeze = True
         else:
             squeeze = False
@@ -61,7 +65,7 @@ class ActNorm(nn.Module):
 
         if self.logdet:
             log_abs = torch.log(torch.abs(self.scale))
-            logdet = height*width*torch.sum(log_abs)
+            logdet = height * width * torch.sum(log_abs)
             logdet = logdet * torch.ones(input.shape[0]).to(input)
             return h, logdet
 
@@ -79,7 +83,7 @@ class ActNorm(nn.Module):
                 self.initialized.fill_(1)
 
         if len(output.shape) == 2:
-            output = output[:,:,None,None]
+            output = output[:, :, None, None]
             squeeze = True
         else:
             squeeze = False
@@ -101,13 +105,14 @@ class AbstractEncoder(nn.Module):
 
 class Labelator(AbstractEncoder):
     """Net2Net Interface for Class-Conditional Model"""
+
     def __init__(self, n_classes, quantize_interface=True):
         super().__init__()
         self.n_classes = n_classes
         self.quantize_interface = quantize_interface
 
     def encode(self, c):
-        c = c[:,None]
+        c = c[:, None]
         if self.quantize_interface:
             return c, None, [None, None, c.long()]
         return c
@@ -122,27 +127,27 @@ class SOSProvider(AbstractEncoder):
 
     def encode(self, x):
         # get batch size from data and replicate sos_token
-        c = torch.ones(x.shape[0], 1)*self.sos_token
+        c = torch.ones(x.shape[0], 1) * self.sos_token
         c = c.long().to(x.device)
         if self.quantize_interface:
             return c, None, [None, None, c]
         return c
 
 
-
 def weights_init(m):
     classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
+    if classname.find("Conv") != -1:
         nn.init.normal_(m.weight.data, 0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
+    elif classname.find("BatchNorm") != -1:
         nn.init.normal_(m.weight.data, 1.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
 
 
 class NLayerDiscriminator(nn.Module):
     """Defines a PatchGAN discriminator as in Pix2Pix
-        --> see https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
+    --> see https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix/blob/master/models/networks.py
     """
+
     def __init__(self, input_nc=3, ndf=64, n_layers=3, use_actnorm=False):
         """Construct a PatchGAN discriminator
         Parameters:
@@ -156,35 +161,55 @@ class NLayerDiscriminator(nn.Module):
             norm_layer = nn.BatchNorm2d
         else:
             norm_layer = ActNorm
-        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
+        if (
+            type(norm_layer) == functools.partial
+        ):  # no need to use bias as BatchNorm2d has affine parameters
             use_bias = norm_layer.func != nn.BatchNorm2d
         else:
             use_bias = norm_layer != nn.BatchNorm2d
 
         kw = 4
         padw = 1
-        sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
+        sequence = [
+            nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),
+            nn.LeakyReLU(0.2, True),
+        ]
         nf_mult = 1
         nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
-            nf_mult = min(2 ** n, 8)
+            nf_mult = min(2**n, 8)
             sequence += [
-                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
+                nn.Conv2d(
+                    ndf * nf_mult_prev,
+                    ndf * nf_mult,
+                    kernel_size=kw,
+                    stride=2,
+                    padding=padw,
+                    bias=use_bias,
+                ),
                 norm_layer(ndf * nf_mult),
-                nn.LeakyReLU(0.2, True)
+                nn.LeakyReLU(0.2, True),
             ]
 
         nf_mult_prev = nf_mult
-        nf_mult = min(2 ** n_layers, 8)
+        nf_mult = min(2**n_layers, 8)
         sequence += [
-            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+            nn.Conv2d(
+                ndf * nf_mult_prev,
+                ndf * nf_mult,
+                kernel_size=kw,
+                stride=1,
+                padding=padw,
+                bias=use_bias,
+            ),
             norm_layer(ndf * nf_mult),
-            nn.LeakyReLU(0.2, True)
+            nn.LeakyReLU(0.2, True),
         ]
 
         sequence += [
-            nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
+            nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)
+        ]  # output 1 channel prediction map
         self.main = nn.Sequential(*sequence)
 
     def forward(self, input):

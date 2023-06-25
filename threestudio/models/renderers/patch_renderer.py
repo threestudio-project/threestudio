@@ -20,18 +20,20 @@ class PatchRenderer(VolumeRenderer):
         base_renderer: Optional[VolumeRenderer.Config] = None
         global_detach: bool = False
         global_downsample: int = 4
-    
+
     cfg: Config
+
     def configure(
         self,
         geometry: BaseImplicitGeometry,
         material: BaseMaterial,
         background: BaseBackground,
     ) -> None:
-        self.base_renderer = threestudio.find(self.cfg.base_renderer_type)(self.cfg.base_renderer, 
+        self.base_renderer = threestudio.find(self.cfg.base_renderer_type)(
+            self.cfg.base_renderer,
             geometry=geometry,
             material=material,
-            background=background
+            background=background,
         )
 
     def forward(
@@ -43,23 +45,31 @@ class PatchRenderer(VolumeRenderer):
         **kwargs
     ) -> Dict[str, Float[Tensor, "..."]]:
         B, H, W, _ = rays_o.shape
-        
+
         if self.base_renderer.training:
             downsample = self.cfg.global_downsample
             global_rays_o = torch.nn.functional.interpolate(
-                rays_o.permute(0, 3, 1, 2), (H // downsample, W // downsample), mode='bilinear'
+                rays_o.permute(0, 3, 1, 2),
+                (H // downsample, W // downsample),
+                mode="bilinear",
             ).permute(0, 2, 3, 1)
             global_rays_d = torch.nn.functional.interpolate(
-                rays_d.permute(0, 3, 1, 2), (H // downsample, W // downsample), mode='bilinear'
+                rays_d.permute(0, 3, 1, 2),
+                (H // downsample, W // downsample),
+                mode="bilinear",
             ).permute(0, 2, 3, 1)
-            out_global = self.base_renderer(global_rays_o, global_rays_d, light_positions, bg_color, **kwargs)
-            
+            out_global = self.base_renderer(
+                global_rays_o, global_rays_d, light_positions, bg_color, **kwargs
+            )
+
             PS = self.cfg.patch_size
-            patch_x = torch.randint(0, W-PS, (1,)).item()
-            patch_y = torch.randint(0, H-PS, (1,)).item()
-            patch_rays_o = rays_o[:, patch_y:patch_y+PS, patch_x:patch_x+PS]
-            patch_rays_d = rays_d[:, patch_y:patch_y+PS, patch_x:patch_x+PS]
-            out = self.base_renderer(patch_rays_o, patch_rays_d, light_positions, bg_color, **kwargs)
+            patch_x = torch.randint(0, W - PS, (1,)).item()
+            patch_y = torch.randint(0, H - PS, (1,)).item()
+            patch_rays_o = rays_o[:, patch_y : patch_y + PS, patch_x : patch_x + PS]
+            patch_rays_d = rays_d[:, patch_y : patch_y + PS, patch_x : patch_x + PS]
+            out = self.base_renderer(
+                patch_rays_o, patch_rays_d, light_positions, bg_color, **kwargs
+            )
 
             valid_patch_key = []
             for key in out:
@@ -69,14 +79,18 @@ class PatchRenderer(VolumeRenderer):
                             valid_patch_key.append(key)
             for key in valid_patch_key:
                 out_global[key] = F.interpolate(
-                    out_global[key].permute(0, 3, 1, 2), (H, W), mode='bilinear'
+                    out_global[key].permute(0, 3, 1, 2), (H, W), mode="bilinear"
                 ).permute(0, 2, 3, 1)
                 if self.cfg.global_detach:
                     out_global[key] = out_global[key].detach()
-                out_global[key][:, patch_y:patch_y+PS, patch_x:patch_x+PS] = out[key]
+                out_global[key][
+                    :, patch_y : patch_y + PS, patch_x : patch_x + PS
+                ] = out[key]
             out = out_global
         else:
-            out = self.base_renderer(rays_o, rays_d, light_positions, bg_color, **kwargs)
+            out = self.base_renderer(
+                rays_o, rays_d, light_positions, bg_color, **kwargs
+            )
 
         return out
 
