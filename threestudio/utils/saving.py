@@ -9,12 +9,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import trimesh
+import wandb
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 from PIL import Image, ImageDraw
 from pytorch_lightning.loggers import WandbLogger
 
-import wandb
 from threestudio.models.mesh import Mesh
 from threestudio.utils.typing import *
 

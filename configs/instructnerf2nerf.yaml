@@ -1,0 +1,99 @@
+name: "instructnerf2nerf"
+tag: "${basename:${data.dataroot}}_${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "multiview-camera-datamodule"
+data:
+  train_downsample_resolution: 2
+  eval_downsample_resolution: 2
+  dataroot: ???
+
+system_type: "instructnerf2nerf-system"
+system:
+  start_editing_step: 600
+  per_editing_step: 10
+
+  geometry_type: "implicit-volume"
+  geometry:
+    radius: 1.
+    normal_type: analytic
+
+    pos_encoding_config:
+      otype: HashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.4472692374403782 # max resolution 4096
+
+    density_bias: "blob_magic3d"
+    density_activation: softplus
+    density_blob_scale: 10.
+    density_blob_std: 0.5
+
+
+  material_type: "diffuse-with-point-light-material"
+  material:
+    ambient_only_steps: 9999999
+    albedo_activation: sigmoid
+
+  background_type: "neural-environment-map-background"
+  background:
+    color_activation: sigmoid
+    random_aug: false
+
+  renderer_type: "patch-renderer"
+  renderer:
+    base_renderer_type: "nerf-volume-renderer"
+    base_renderer:
+      radius: ${system.geometry.radius}
+      num_samples_per_ray: 384
+    patch_size: 128
+
+  guidance_type: "stable-diffusion-instructpix2pix-guidance"
+  guidance:
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: "Turn him into Elon Musk"
+
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+
+  loss:
+    lambda_sds: 0.
+    lambda_orient: [0, 10.0, 1000., 5000.0]
+    lambda_sparsity: 1.0
+    lambda_opaque: 1.0
+    lambda_l1: 10.
+    lambda_p: 10.
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+    params:
+      geometry:
+        lr: 0.01
+      background:
+        lr: 0.001
+
+trainer:
+  max_steps: 20000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 600
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

@@ -1,0 +1,116 @@
+name: "prolificdreamer-patch"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "random-camera-datamodule"
+data:
+  batch_size: 1
+  width: 512
+  height: 512
+  camera_distance_range: [1.0, 1.5]
+  fovy_range: [40, 70]
+  elevation_range: [-10, 45]
+  camera_perturb: 0.
+  center_perturb: 0.
+  up_perturb: 0.
+  eval_camera_distance: 1.5
+  eval_fovy_deg: 70.
+
+system_type: "prolificdreamer-system"
+system:
+  stage: coarse
+  geometry_type: "implicit-volume"
+  geometry:
+    radius: 1.0
+    normal_type: null
+
+    density_bias: "blob_magic3d"
+    density_activation: softplus
+    density_blob_scale: 10.
+    density_blob_std: 0.5
+
+    pos_encoding_config:
+      otype: HashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.447269237440378 # max resolution 4096
+
+  material_type: "no-material"
+  material:
+    n_output_dims: 3
+    color_activation: sigmoid
+
+  background_type: "neural-environment-map-background"
+  background:
+    color_activation: sigmoid
+    random_aug: true
+
+  renderer_type: "patch-renderer"
+  renderer:
+    base_renderer_type: "nerf-volume-renderer"
+    base_renderer:
+      radius: ${system.geometry.radius}
+      num_samples_per_ray: 512
+    patch_size: 128
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: ???
+    front_threshold: 30.
+    back_threshold: 30.
+
+  guidance_type: "stable-diffusion-vsd-guidance"
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1"
+    guidance_scale: 7.5
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+    max_step_percent_annealed: 0.5
+    anneal_start_step: 5000
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+
+  loss:
+    lambda_vsd: 1.
+    lambda_lora: 1.
+    lambda_orient: 0.
+    lambda_sparsity: 10.
+    lambda_opaque: [10000, 0.0, 1000.0, 10001]
+    lambda_z_variance: 0.
+  optimizer:
+    name: AdamW
+    args:
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+    params:
+      geometry.encoding:
+        lr: 0.01
+      geometry.density_network:
+        lr: 0.001
+      geometry.feature_network:
+        lr: 0.001
+      background:
+        lr: 0.001
+      guidance:
+        lr: 0.0001
+
+trainer:
+  max_steps: 25000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 32
+
+checkpoint:
+  save_last: true
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

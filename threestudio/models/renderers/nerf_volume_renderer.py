@@ -103,7 +103,9 @@ class NeRFVolumeRenderer(VolumeRenderer):
                     cone_angle=0.0,
                 )
 
-        ray_indices, t_starts_, t_ends_ = validate_empty_rays(ray_indices, t_starts_, t_ends_)
+        ray_indices, t_starts_, t_ends_ = validate_empty_rays(
+            ray_indices, t_starts_, t_ends_
+        )
         ray_indices = ray_indices.long()
         t_starts, t_ends = t_starts_[..., None], t_ends_[..., None]
         t_origins = rays_o_flatten[ray_indices]

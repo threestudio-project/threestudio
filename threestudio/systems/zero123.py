@@ -71,8 +71,9 @@ class Zero123(BaseLift3DSystem):
             # since it was trained with a constant white background.
             white = torch.ones(bs, 3).to(self.device)
 
-            # is the batch item white? shaped [bs, 1]
-            is_white = (torch.rand(bs) > 0.5).to(self.device).float().unsqueeze(-1)
+            # is the batch item white? shaped [bs, 1], happens 80% of the time
+            # to prevent white floaters and improve silhouettes on white objects.
+            is_white = (torch.rand(bs) > 0.2).to(self.device).float().unsqueeze(-1)
 
             bg_color = bg_color * (1.0 - is_white) + white * is_white
 
