@@ -4,7 +4,7 @@ system:
     control_type: "normal"
     min_step_percent: 0.05
     max_step_percent: 0.8
-  
+
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "SG161222/Realistic_Vision_V2.0"

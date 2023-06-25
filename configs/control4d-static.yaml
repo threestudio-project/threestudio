@@ -56,11 +56,11 @@ system:
     min_step_percent: 0.05
     max_step_percent: 0.8
     condition_scale: 1.0
-  
+
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-  
+
   loggers:
     wandb:
       enable: false

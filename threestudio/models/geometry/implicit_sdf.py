@@ -258,7 +258,10 @@ class ImplicitSDF(BaseImplicitGeometry):
             output.update({"features": features})
 
         if output_normal:
-            if self.cfg.normal_type == "finite_difference" or self.cfg.normal_type == "finite_difference_laplacian":
+            if (
+                self.cfg.normal_type == "finite_difference"
+                or self.cfg.normal_type == "finite_difference_laplacian"
+            ):
                 assert self.finite_difference_normal_eps is not None
                 eps: float = self.finite_difference_normal_eps
                 if self.cfg.normal_type == "finite_difference_laplacian":
@@ -275,25 +278,25 @@ class ImplicitSDF(BaseImplicitGeometry):
                     points_offset: Float[Tensor, "... 6 3"] = (
                         points_unscaled[..., None, :] + offsets
                     ).clamp(-self.cfg.radius, self.cfg.radius)
-                    sdf_offset: Float[Tensor, "... 6 1"] = self.forward_sdf(points_offset)
+                    sdf_offset: Float[Tensor, "... 6 1"] = self.forward_sdf(
+                        points_offset
+                    )
                     sdf_grad = (
-                        0.5 * (sdf_offset[..., 0::2, 0] - sdf_offset[..., 1::2, 0]) / eps
+                        0.5
+                        * (sdf_offset[..., 0::2, 0] - sdf_offset[..., 1::2, 0])
+                        / eps
                     )
                 else:
                     offsets: Float[Tensor, "3 3"] = torch.as_tensor(
-                        [
-                            [eps, 0.0, 0.0],
-                            [0.0, eps, 0.0],
-                            [0.0, 0.0, eps]
-                        ]
+                        [[eps, 0.0, 0.0], [0.0, eps, 0.0], [0.0, 0.0, eps]]
                     ).to(points_unscaled)
                     points_offset: Float[Tensor, "... 3 3"] = (
                         points_unscaled[..., None, :] + offsets
                     ).clamp(-self.cfg.radius, self.cfg.radius)
-                    sdf_offset: Float[Tensor, "... 3 1"] = self.forward_sdf(points_offset)
-                    sdf_grad = (
-                        (sdf_offset[..., 0::1, 0] - sdf) / eps
+                    sdf_offset: Float[Tensor, "... 3 1"] = self.forward_sdf(
+                        points_offset
                     )
+                    sdf_grad = (sdf_offset[..., 0::1, 0] - sdf) / eps
                 normal = F.normalize(sdf_grad, dim=-1)
             elif self.cfg.normal_type == "pred":
                 normal = self.normal_network(enc).view(*points.shape[:-1], 3)
@@ -363,7 +366,10 @@ class ImplicitSDF(BaseImplicitGeometry):
         return out
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        if self.cfg.normal_type == "finite_difference" or self.cfg.normal_type == "finite_difference_laplacian":
+        if (
+            self.cfg.normal_type == "finite_difference"
+            or self.cfg.normal_type == "finite_difference_laplacian"
+        ):
             if isinstance(self.cfg.finite_difference_normal_eps, float):
                 self.finite_difference_normal_eps = (
                     self.cfg.finite_difference_normal_eps

@@ -31,7 +31,7 @@ system:
     density_activation: softplus
     density_blob_scale: 10.
     density_blob_std: 0.5
-    
+
 
   material_type: "diffuse-with-point-light-material"
   material:
@@ -55,7 +55,7 @@ system:
   guidance:
     min_step_percent: 0.02
     max_step_percent: 0.98
-  
+
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
