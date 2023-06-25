@@ -6,4 +6,4 @@ python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml -
   system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )"\
   system.weights=outputs/zero123/64_anya_front_rgba.png@20230622-203756/ckpts/last.ckpt system.freq.guidance_eval=13 \
   system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-phase2" \
-  data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="anya36_lr=0.2;weight_decay=1e-2" data.random_camera.progressive_until=0
+  data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="anya37_lr=0.1;weight_decay=1e-5" data.random_camera.progressive_until=0
