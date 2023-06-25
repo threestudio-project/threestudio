@@ -122,10 +122,6 @@ class Zero123(BaseLift3DSystem):
                     valid_gt_depth = A @ X  # [B, 1]
                 set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
         elif guidance == "zero123":
-            self.guidance.set_min_max_steps(
-                self.C(self.guidance.cfg.min_step_percent),
-                self.C(self.guidance.cfg.max_step_percent),
-            )
             # zero123
             guidance_out = self.guidance(
                 out["comp_rgb"],

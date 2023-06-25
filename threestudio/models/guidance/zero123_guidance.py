@@ -126,8 +126,7 @@ class Zero123Guidance(BaseObject):
         )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        self.set_min_max_steps()  # set to default value
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
@@ -145,7 +144,7 @@ class Zero123Guidance(BaseObject):
         self.max_step = int(self.num_train_timesteps * max_step_percent)
 
     @torch.cuda.amp.autocast(enabled=False)
-    def prepare_embeddings(self, image_path: str) -> Float[Tensor, "B 3 256 256"]:
+    def prepare_embeddings(self, image_path: str) -> None:
         # load cond image for zero123
         assert os.path.exists(image_path)
         rgba = cv2.cvtColor(
@@ -321,6 +320,8 @@ class Zero123Guidance(BaseObject):
         guidance_out = {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
+            "min_step": self.min_step,
+            "max_step": self.max_step,
         }
 
         if guidance_eval:
@@ -415,6 +416,11 @@ class Zero123Guidance(BaseObject):
         # http://arxiv.org/abs/2303.15413
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )
 
     # verification - requires `vram_O = False` in load_model_from_config
     @torch.no_grad()
