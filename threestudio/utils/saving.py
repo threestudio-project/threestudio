@@ -135,10 +135,10 @@ class SaverMixin:
         data_range=DEFAULT_RGB_KWARGS["data_range"],
         name: Optional[str] = None,
         step: Optional[int] = None,
-    ):
-        self._save_rgb_image(
-            self.get_save_path(filename), img, data_format, data_range, name, step
-        )
+    ) -> str:
+        save_path = self.get_save_path(filename)
+        self._save_rgb_image(save_path, img, data_format, data_range, name, step)
+        return save_path
 
     def get_uv_image_(self, img, data_format, data_range, cmap):
         img = self.convert_data(img)
@@ -170,9 +170,11 @@ class SaverMixin:
         data_format=DEFAULT_UV_KWARGS["data_format"],
         data_range=DEFAULT_UV_KWARGS["data_range"],
         cmap=DEFAULT_UV_KWARGS["cmap"],
-    ):
+    ) -> str:
+        save_path = self.get_save_path(filename)
         img = self.get_uv_image_(img, data_format, data_range, cmap)
-        cv2.imwrite(self.get_save_path(filename), img)
+        cv2.imwrite(save_path, img)
+        return save_path
 
     def get_grayscale_image_(self, img, data_range, cmap):
         img = self.convert_data(img)
@@ -224,9 +226,11 @@ class SaverMixin:
         img,
         data_range=DEFAULT_GRAYSCALE_KWARGS["data_range"],
         cmap=DEFAULT_GRAYSCALE_KWARGS["cmap"],
-    ):
+    ) -> str:
+        save_path = self.get_save_path(filename)
         img = self.get_grayscale_image_(img, data_range, cmap)
-        cv2.imwrite(self.get_save_path(filename), img)
+        cv2.imwrite(save_path, img)
+        return save_path
 
     def get_image_grid_(self, imgs, align):
         if isinstance(imgs[0], list):
@@ -283,6 +287,7 @@ class SaverMixin:
         step: Optional[int] = None,
         texts: Optional[List[float]] = None,
     ):
+        save_path = self.get_save_path(filename)
         img = self.get_image_grid_(imgs, align=align)
 
         if texts is not None:
@@ -297,21 +302,24 @@ class SaverMixin:
                 draw.text((1, (img.size[1] // len(texts)) * i), f"{text}", black)
             img = np.asarray(img)
 
-        filepath = self.get_save_path(filename)
-        cv2.imwrite(filepath, img)
+        cv2.imwrite(save_path, img)
         if name and self._wandb_logger:
-            wandb.log({name: wandb.Image(filepath), "trainer/global_step": step})
+            wandb.log({name: wandb.Image(save_path), "trainer/global_step": step})
+        return save_path
 
-    def save_image(self, filename, img):
+    def save_image(self, filename, img) -> str:
+        save_path = self.get_save_path(filename)
         img = self.convert_data(img)
         assert img.dtype == np.uint8 or img.dtype == np.uint16
         if img.ndim == 3 and img.shape[-1] == 3:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         elif img.ndim == 3 and img.shape[-1] == 4:
             img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA)
-        cv2.imwrite(self.get_save_path(filename), img)
+        cv2.imwrite(save_path, img)
+        return save_path
 
-    def save_cubemap(self, filename, img, data_range=(0, 1), rgba=False):
+    def save_cubemap(self, filename, img, data_range=(0, 1), rgba=False) -> str:
+        save_path = self.get_save_path(filename)
         img = self.convert_data(img)
         assert img.ndim == 4 and img.shape[0] == 6 and img.shape[1] == img.shape[2]
 
@@ -342,21 +350,27 @@ class SaverMixin:
             imgs_full.append(img_full)
 
         imgs_full = np.concatenate(imgs_full, axis=1)
-        cv2.imwrite(self.get_save_path(filename), imgs_full)
+        cv2.imwrite(save_path, imgs_full)
+        return save_path
 
-    def save_data(self, filename, data):
+    def save_data(self, filename, data) -> str:
         data = self.convert_data(data)
         if isinstance(data, dict):
             if not filename.endswith(".npz"):
                 filename += ".npz"
-            np.savez(self.get_save_path(filename), **data)
+            save_path = self.get_save_path(filename)
+            np.savez(save_path, **data)
         else:
             if not filename.endswith(".npy"):
                 filename += ".npy"
-            np.save(self.get_save_path(filename), data)
+            save_path = self.get_save_path(filename)
+            np.save(save_path, data)
+        return save_path
 
-    def save_state_dict(self, filename, data):
-        torch.save(data, self.get_save_path(filename))
+    def save_state_dict(self, filename, data) -> str:
+        save_path = self.get_save_path(filename)
+        torch.save(data, save_path)
+        return save_path
 
     def save_img_sequence(
         self,
@@ -367,10 +381,11 @@ class SaverMixin:
         fps=30,
         name: Optional[str] = None,
         step: Optional[int] = None,
-    ):
+    ) -> str:
         assert save_format in ["gif", "mp4"]
         if not filename.endswith(save_format):
             filename += f".{save_format}"
+        save_path = self.get_save_path(filename)
         matcher = re.compile(matcher)
         img_dir = os.path.join(self.get_save_dir(), img_dir)
         imgs = []
@@ -382,25 +397,26 @@ class SaverMixin:
 
         if save_format == "gif":
             imgs = [cv2.cvtColor(i, cv2.COLOR_BGR2RGB) for i in imgs]
-            imageio.mimsave(
-                self.get_save_path(filename), imgs, fps=fps, palettesize=256
-            )
+            imageio.mimsave(save_path, imgs, fps=fps, palettesize=256)
         elif save_format == "mp4":
             imgs = [cv2.cvtColor(i, cv2.COLOR_BGR2RGB) for i in imgs]
-            imageio.mimsave(self.get_save_path(filename), imgs, fps=fps)
+            imageio.mimsave(save_path, imgs, fps=fps)
         if name and self._wandb_logger:
             wandb.log(
                 {
-                    name: wandb.Video(self.get_save_path(filename), format="mp4"),
+                    name: wandb.Video(save_path, format="mp4"),
                     "trainer/global_step": step,
                 }
             )
+        return save_path
 
-    def save_mesh(self, filename, v_pos, t_pos_idx, v_tex=None, t_tex_idx=None):
+    def save_mesh(self, filename, v_pos, t_pos_idx, v_tex=None, t_tex_idx=None) -> str:
+        save_path = self.get_save_path(filename)
         v_pos = self.convert_data(v_pos)
         t_pos_idx = self.convert_data(t_pos_idx)
         mesh = trimesh.Trimesh(vertices=v_pos, faces=t_pos_idx)
-        mesh.export(self.get_save_path(filename))
+        mesh.export(save_path)
+        return save_path
 
     def save_obj(
         self,
@@ -414,7 +430,8 @@ class SaverMixin:
         map_Ks: Optional[Float[Tensor, "H W 3"]] = None,
         map_Bump: Optional[Float[Tensor, "H W 3"]] = None,
         map_format: str = "jpg",
-    ) -> None:
+    ) -> List[str]:
+        save_paths: List[str] = []
         if not filename.endswith(".obj"):
             filename += ".obj"
         v_pos, t_pos_idx = self.convert_data(mesh.v_pos), self.convert_data(
@@ -434,7 +451,7 @@ class SaverMixin:
             matname = "default"
             mtl_filename = filename.replace(".obj", ".mtl")
             mtllib = os.path.basename(mtl_filename)
-            self._save_mtl(
+            mtl_save_paths = self._save_mtl(
                 mtl_filename,
                 matname,
                 map_Kd=self.convert_data(map_Kd),
@@ -442,7 +459,8 @@ class SaverMixin:
                 map_Bump=self.convert_data(map_Bump),
                 map_format=map_format,
             )
-        self._save_obj(
+            save_paths += mtl_save_paths
+        obj_save_path = self._save_obj(
             filename,
             v_pos,
             t_pos_idx,
@@ -453,6 +471,8 @@ class SaverMixin:
             matname=matname,
             mtllib=mtllib,
         )
+        save_paths.append(obj_save_path)
+        return save_paths
 
     def _save_obj(
         self,
@@ -465,7 +485,7 @@ class SaverMixin:
         v_rgb=None,
         matname=None,
         mtllib=None,
-    ):
+    ) -> str:
         obj_str = ""
         if matname is not None:
             obj_str += f"mtllib {mtllib}\n"
@@ -494,8 +514,10 @@ class SaverMixin:
                     obj_str += f"{t_pos_idx[i][j] + 1}"
             obj_str += "\n"
 
-        with open(self.get_save_path(filename), "w") as f:
+        save_path = self.get_save_path(filename)
+        with open(save_path, "w") as f:
             f.write(obj_str)
+        return save_path
 
     def _save_mtl(
         self,
@@ -509,56 +531,68 @@ class SaverMixin:
         map_Bump=None,
         map_format="jpg",
         step: Optional[int] = None,
-    ):
+    ) -> List[str]:
+        mtl_save_path = self.get_save_path(filename)
+        save_paths = [mtl_save_path]
         mtl_str = f"newmtl {matname}\n"
         mtl_str += f"Ka {Ka[0]} {Ka[1]} {Ka[2]}\n"
-        mtl_save_path = self.get_save_path(filename)
         if map_Kd is not None:
+            map_Kd_save_path = os.path.join(
+                os.path.dirname(mtl_save_path), f"texture_kd.{map_format}"
+            )
             mtl_str += f"map_Kd texture_kd.{map_format}\n"
             self._save_rgb_image(
-                os.path.join(
-                    os.path.dirname(mtl_save_path), f"texture_kd.{map_format}"
-                ),
+                map_Kd_save_path,
                 map_Kd,
                 data_format="HWC",
                 data_range=(0, 1),
                 name=f"{matname}_Kd",
                 step=step,
             )
+            save_paths.append(map_Kd_save_path)
         else:
             mtl_str += f"Kd {Kd[0]} {Kd[1]} {Kd[2]}\n"
         if map_Ks is not None:
+            map_Ks_save_path = os.path.join(
+                os.path.dirname(mtl_save_path), f"texture_ks.{map_format}"
+            )
             mtl_str += f"map_Ks texture_ks.{map_format}\n"
             self._save_rgb_image(
-                os.path.join(
-                    os.path.dirname(mtl_save_path), f"texture_ks.{map_format}"
-                ),
+                map_Ks_save_path,
                 map_Ks,
                 data_format="HWC",
                 data_range=(0, 1),
                 name=f"{matname}_Ks",
                 step=step,
             )
+            save_paths.append(map_Ks_save_path)
         else:
             mtl_str += f"Ks {Ks[0]} {Ks[1]} {Ks[2]}\n"
         if map_Bump is not None:
+            map_Bump_save_path = os.path.join(
+                os.path.dirname(mtl_save_path), f"texture_nrm.{map_format}"
+            )
             mtl_str += f"map_Bump texture_nrm.{map_format}\n"
             self._save_rgb_image(
-                os.path.join(
-                    os.path.dirname(mtl_save_path), f"texture_nrm.{map_format}"
-                ),
+                map_Bump_save_path,
                 map_Bump,
                 data_format="HWC",
                 data_range=(0, 1),
                 name=f"{matname}_Bump",
                 step=step,
             )
+            save_paths.append(map_Bump_save_path)
         with open(self.get_save_path(filename), "w") as f:
             f.write(mtl_str)
+        return save_paths
 
-    def save_file(self, filename, src_path):
-        shutil.copyfile(src_path, self.get_save_path(filename))
+    def save_file(self, filename, src_path) -> str:
+        save_path = self.get_save_path(filename)
+        shutil.copyfile(src_path, save_path)
+        return save_path
 
-    def save_json(self, filename, payload):
-        with open(self.get_save_path(filename), "w") as f:
+    def save_json(self, filename, payload) -> str:
+        save_path = self.get_save_path(filename)
+        with open(save_path, "w") as f:
             f.write(json.dumps(payload))
+        return save_path

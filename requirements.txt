@@ -12,13 +12,15 @@ tensorboard
 matplotlib
 imageio
 imageio[ffmpeg]
-trimesh
 git+https://github.com/NVlabs/nvdiffrast.git
 libigl
 xatlas
 trimesh[easy]
 networkx
 pysdf
+PyMCubes
+wandb
+gradio
 
 # deepfloyd
 xformers
@@ -26,12 +28,6 @@ bitsandbytes
 sentencepiece
 safetensors
 huggingface_hub
-libigl
-xatlas
-trimesh
-networkx
-PyMCubes
-wandb
 
 # for zero123
 einops
