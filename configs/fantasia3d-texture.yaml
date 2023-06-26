@@ -1,0 +1,98 @@
+name: "fantasia3d-texture"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "random-camera-datamodule"
+data:
+  batch_size: 1
+  width: 512
+  height: 512
+  camera_distance_range: [3, 3]
+  fovy_range: [25, 45]
+  camera_perturb: 0.
+  center_perturb: 0.
+  up_perturb: 0.
+  elevation_range: [-10, 45]
+  azimuth_range: [-180, 180]
+  batch_uniform_azimuth: true
+  eval_camera_distance: 3.
+  eval_fovy_deg: 45.
+
+system_type: "fantasia3d-system"
+system:
+  # do texture training
+  texture: true
+  geometry_convert_from: ???
+  geometry_convert_inherit_texture: false
+  geometry_type: "tetrahedra-sdf-grid"
+  geometry:
+    radius: 1.0 # consistent with coarse
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
+    pos_encoding_config:
+      otype: HashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.4472692374403782 # max resolution 4096
+    n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
+    fix_geometry: true
+
+  material_type: "pbr-material"
+  material:
+    material_activation: sigmoid
+    environment_texture: "load/lights/mud_road_puresky_1k.hdr"
+    environment_scale: 2.0
+    min_metallic: 0.0
+    max_metallic: 0.9
+    min_roughness: 0.08
+    max_roughness: 0.9
+    use_bump: true
+
+  background_type: "solid-color-background"
+
+  renderer_type: "nvdiff-rasterizer"
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: ???
+
+  guidance_type: "stable-diffusion-guidance"
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    guidance_scale: 100
+    weighting_strategy: sds
+    min_step_percent: 0.02
+    max_step_percent: 0.50
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+
+  loss:
+    lambda_sds: 1.
+    lambda_normal_consistency: 0.
+
+  optimizer:
+    name: AdamW
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+
+trainer:
+  max_steps: 5000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 1
+  val_check_interval: 500
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true # save at each validation time
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

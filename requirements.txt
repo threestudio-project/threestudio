@@ -10,7 +10,7 @@ accelerate
 opencv-python
 tensorboard
 matplotlib
-imageio
+imageio>=2.28.0
 imageio[ffmpeg]
 trimesh
 git+https://github.com/NVlabs/nvdiffrast.git
@@ -19,6 +19,7 @@ xatlas
 trimesh[easy]
 networkx
 pysdf
+git+https://github.com/ashawkey/envlight.git
 
 # deepfloyd
 xformers

@@ -3,7 +3,7 @@
 | name          | type          | description                                                                                                                                                                                                                                                           |
 | ------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | name          | str           | Name of the experiment. Default: "default"                                                                                                                                                                                                                            |
-| description   | str           | Description of the experiment. Default: ""                                                                                                                                                                                                                             |
+| description   | str           | Description of the experiment. Default: ""                                                                                                                                                                                                                            |
 | tag           | str           | Tag of the experiment. Default: ""                                                                                                                                                                                                                                    |
 | seed          | str           | Global seed of the experiment. Used by `seed_everything` of PyTorch-Lightning. Default: 0                                                                                                                                                                             |
 | use_timestamp | bool          | Whether to use the current timestamp as the suffix of the tag. Default: True                                                                                                                                                                                          |
@@ -121,6 +121,7 @@ This system has all the common configurations, along with the following unique c
 | name         | type | description                                                                                                                                                                                                                                                                                                                    |
 | ------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | latent_steps | int  | Number of steps for geometry optimization in latent space. In the first `latent_steps` steps, low resolution normal and mask are concatenated and fed to the latent diffusion model. After this high resolution normal is used to perform RGB space optimziation. Details are described in the Fantasia3D paper. Default: 2500 |
+| texture      | bool | Whether to perform texture training. Default: False                                                                                                                                                                                                                                                                            |
 
 ### prolificdreamer-system
 
@@ -233,6 +234,22 @@ A material with view dependent effects, parameterized with a network(MLP), simil
 | dir_encoding_config | dict | The config of the positional encoding applied on the ray direction. Default: {"otype": "SphericalHarmonics", "degree": 3}     |
 | mlp_network_config  | dict | The config of the MLP network. Default: { "otype": "VanillaMLP", "activation": "ReLU", "n_neurons": 16, "n_hidden_layers": 2} |
 
+### pbr-material
+
+A physically-based rendering (PBR) material.
+Currently we support learning albedo, metallic, and roughness. (normal is not supported currently.)
+
+| name                | type  | description                                                                                                      |
+| ------------------- | ----- | ---------------------------------------------------------------------------------------------------------------- |
+| material_activation | str   | The activation mapping the network output to the materials (albedo, metallic, and roughness). Default: "sigmoid" |
+| environment_texture | str   | Path to the environment light map file (`*.hdr`). Default: "load/lights/aerodynamics_workshop_2k.hdr"            |
+| environment_scale   | float | Scale of the environment light pixel values. Default: 2.0                                                        |
+| min_metallic        | float | Minimum value for metallic. Default: 0.0                                                                         |
+| max_metallic        | float | Maximum value for metallic. Default: 0.9                                                                         |
+| min_roughness       | float | Minimum value for roughness. Default: 0.08                                                                       |
+| max_roughness       | float | Maximum value for roughness. Default: 0.9                                                                        |
+| use_bump            | bool  | Whether to train with tangent-space normal perturbation. Default: True                                           |
+
 ### no-material
 
 A material without view dependet effects, just map features to colors.
@@ -342,14 +359,15 @@ Renderers takes geometry, material, and background to produce images given camer
 | context_type | str  | Rasterization context type used by nvdiffrast, in ["gl", "cuda"]. See the [nvdiffrast documentation](https://nvlabs.github.io/nvdiffrast/#rasterizing-with-cuda-vs-opengl-new) for more details. |
 
 ### patch-renderer
+
 The patch-renderer first renders a full low-resolution downsampled image and then randomly renders a local patch at the original resolution level, which can significantly reduce memory usage during high-resolution training.
-| name                  | type  | description                                                                                               |
+| name | type | description |
 | --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
-| patch_size            | int   | The size of the local patch. Default: 128                                                                 |
-| global_downsample     | int   | Downsample scale of the original rendering size. Default: 4                                               |
-| global_detach         | bool  | Whether to detach the gradient of the downsampled image. Default: False                                   |
-| base_renderer_type    | str   | The type of base renderer.                                                                                |
-| base_renderer         | VolumeRenderer.Config  | The configuration of the base renderer.                                                  |
+| patch_size | int | The size of the local patch. Default: 128 |
+| global_downsample | int | Downsample scale of the original rendering size. Default: 4 |
+| global_detach | bool | Whether to detach the gradient of the downsampled image. Default: False |
+| base_renderer_type | str | The type of base renderer. |
+| base_renderer | VolumeRenderer.Config | The configuration of the base renderer. |
 
 ## Guidance
 
