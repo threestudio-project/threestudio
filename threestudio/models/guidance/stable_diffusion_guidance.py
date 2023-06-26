@@ -44,6 +44,9 @@ class StableDiffusionGuidance(BaseObject):
 
         view_dependent_prompting: bool = True
 
+        """Maximum number of batch items to evaluate guidance for (for debugging) and save on disk."""
+        max_items_to_save: int = 4
+
     cfg: Config
 
     def configure(self) -> None:
@@ -511,6 +514,10 @@ class StableDiffusionGuidance(BaseObject):
         self.scheduler.set_timesteps(50)
         self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
         bs = latents_noisy.shape[0]  # batch size
+        max_items = self.cfg.max_items_to_save
+        if max_items == 0:
+            max_items = bs
+
         large_enough_idxs = self.scheduler.timesteps_gpu.expand(
             [bs, -1]
         ) > t_orig.unsqueeze(
@@ -525,7 +532,7 @@ class StableDiffusionGuidance(BaseObject):
         # get prev latent
         latents_1step = []
         pred_1orig = []
-        for b in range(len(t)):
+        for b in range(max_items):
             step_output = self.scheduler.step(
                 noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
             )
@@ -537,7 +544,7 @@ class StableDiffusionGuidance(BaseObject):
         imgs_1orig = self.decode_latents(pred_1orig).permute(0, 2, 3, 1)
 
         latents_final = []
-        for b, i in enumerate(idxs):
+        for b, i in enumerate(idxs[:max_items]):
             latents = latents_1step[b : b + 1]
             text_emb = (
                 text_embeddings[
