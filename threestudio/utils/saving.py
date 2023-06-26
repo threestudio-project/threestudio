@@ -220,16 +220,36 @@ class SaverMixin:
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         return img
 
+    def _save_grayscale_image(
+        self,
+        filename,
+        img,
+        data_range,
+        cmap,
+        name: Optional[str] = None,
+        step: Optional[int] = None,
+    ):
+        img = self.get_grayscale_image_(img, data_range, cmap)
+        cv2.imwrite(filename, img)
+        if name and self._wandb_logger:
+            wandb.log(
+                {
+                    name: wandb.Image(self.get_save_path(filename)),
+                    "trainer/global_step": step,
+                }
+            )
+
     def save_grayscale_image(
         self,
         filename,
         img,
         data_range=DEFAULT_GRAYSCALE_KWARGS["data_range"],
         cmap=DEFAULT_GRAYSCALE_KWARGS["cmap"],
+        name: Optional[str] = None,
+        step: Optional[int] = None,
     ) -> str:
         save_path = self.get_save_path(filename)
-        img = self.get_grayscale_image_(img, data_range, cmap)
-        cv2.imwrite(save_path, img)
+        self._save_grayscale_image(save_path, img, data_range, cmap, name, step)
         return save_path
 
     def get_image_grid_(self, imgs, align):
@@ -429,6 +449,8 @@ class SaverMixin:
         map_Kd: Optional[Float[Tensor, "H W 3"]] = None,
         map_Ks: Optional[Float[Tensor, "H W 3"]] = None,
         map_Bump: Optional[Float[Tensor, "H W 3"]] = None,
+        map_Pm: Optional[Float[Tensor, "H W 1"]] = None,
+        map_Pr: Optional[Float[Tensor, "H W 1"]] = None,
         map_format: str = "jpg",
     ) -> List[str]:
         save_paths: List[str] = []
@@ -457,6 +479,8 @@ class SaverMixin:
                 map_Kd=self.convert_data(map_Kd),
                 map_Ks=self.convert_data(map_Ks),
                 map_Bump=self.convert_data(map_Bump),
+                map_Pm=self.convert_data(map_Pm),
+                map_Pr=self.convert_data(map_Pr),
                 map_format=map_format,
             )
             save_paths += mtl_save_paths
@@ -529,6 +553,8 @@ class SaverMixin:
         map_Kd=None,
         map_Ks=None,
         map_Bump=None,
+        map_Pm=None,
+        map_Pr=None,
         map_format="jpg",
         step: Optional[int] = None,
     ) -> List[str]:
@@ -582,6 +608,34 @@ class SaverMixin:
                 step=step,
             )
             save_paths.append(map_Bump_save_path)
+        if map_Pm is not None:
+            map_Pm_save_path = os.path.join(
+                os.path.dirname(mtl_save_path), f"texture_metallic.{map_format}"
+            )
+            mtl_str += f"map_Pm texture_metallic.{map_format}\n"
+            self._save_grayscale_image(
+                map_Pm_save_path,
+                map_Pm,
+                data_range=(0, 1),
+                cmap=None,
+                name=f"{matname}_refl",
+                step=step,
+            )
+            save_paths.append(map_Pm_save_path)
+        if map_Pr is not None:
+            map_Pr_save_path = os.path.join(
+                os.path.dirname(mtl_save_path), f"texture_roughness.{map_format}"
+            )
+            mtl_str += f"map_Pr texture_roughness.{map_format}\n"
+            self._save_grayscale_image(
+                map_Pr_save_path,
+                map_Pr,
+                data_range=(0, 1),
+                cmap=None,
+                name=f"{matname}_Ns",
+                step=step,
+            )
+            save_paths.append(map_Pr_save_path)
         with open(self.get_save_path(filename), "w") as f:
             f.write(mtl_str)
         return save_paths

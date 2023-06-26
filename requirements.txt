@@ -10,7 +10,7 @@ accelerate
 opencv-python
 tensorboard
 matplotlib
-imageio
+imageio>=2.28.0
 imageio[ffmpeg]
 git+https://github.com/NVlabs/nvdiffrast.git
 libigl
@@ -21,6 +21,7 @@ pysdf
 PyMCubes
 wandb
 gradio
+git+https://github.com/ashawkey/envlight.git
 
 # deepfloyd
 xformers

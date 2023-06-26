@@ -342,13 +342,14 @@ https://github.com/threestudio-project/threestudio/assets/19284678/762903c1-665b
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2d22e30f-4a32-454a-a06e-d6e6bd2a1b96.png" width="100%">
 </p>
 
-Notable differences from the paper: N/A.
+Notable differences from the paper:
 
-We currently only implement the geometry stage of Fantasia3D.
+- We enable tangent-space normal perturbation by default, which can be turned off by appending `system.material.use_bump=false`.
 
 **Example running commands**
 
 ```sh
+# --------- Geometry --------- #
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of an ice cream sundae"
 # Fantasia3D highly relies on the initialized SDF shape
 # the default shape is a sphere with radius 0.5
@@ -358,6 +359,9 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 # here shape_init_params is the scale of the shape
 # also make sure to input the correct up and front axis (in +x, +y, +z, -x, -y, -z)
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="hulk" system.geometry.shape_init=mesh:load/shapes/human.obj system.geometry.shape_init_params=0.9 system.geometry.shape_init_mesh_up=+y system.geometry.shape_init_mesh_front=+z
+# --------- Texture --------- #
+# to train PBR texture continued from a geometry checkpoint:
+python launch.py --config configs/fantasia3d-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of an ice cream sundae" system.geometry_convert_from=path/to/geometry/stage/trial/ckpts/last.ckpt
 ```
 
 **Tips**
