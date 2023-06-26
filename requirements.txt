@@ -10,7 +10,7 @@ accelerate
 opencv-python
 tensorboard
 matplotlib
-imageio
+imageio>=2.28.0
 imageio[ffmpeg]
 trimesh
 git+https://github.com/NVlabs/nvdiffrast.git
