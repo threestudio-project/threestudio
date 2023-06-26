@@ -94,8 +94,10 @@ config = {
     "mode": "latent",
     "prompt_processor_type": "stable-diffusion-prompt-processor",
     "prompt_processor": {
-        "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
-        "prompt": "an astronaut is riding a horse",
+        # "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
+        "pretrained_model_name_or_path": "runwayml/stable-diffusion-v1-5",
+        # "prompt": "an astronaut is riding a horse",
+        "prompt": "a photograph of an astronaut riding a horse",
         "spawn": False,
     },
     "guidance_type": "stable-diffusion-vsd-guidance",
@@ -103,8 +105,10 @@ config = {
         "half_precision_weights": True,
         "view_dependent_prompting": False,
         "guidance_scale": 7.5,
-        "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
-        "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1",
+        # "pretrained_model_name_or_path": "stabilityai/stable-diffusion-2-1-base",
+        # "pretrained_model_name_or_path_lora": "stabilityai/stable-diffusion-2-1",
+        "pretrained_model_name_or_path": "runwayml/stable-diffusion-v1-5",
+        "pretrained_model_name_or_path_lora": "runwayml/stable-diffusion-v1-5",
         "min_step_percent": 0.02,
         "max_step_percent": 0.98,
         "anneal_start_step": 2001,  # do not anneal
@@ -122,7 +126,7 @@ config = {
     "clip": False,
     "tanh": False,
     "lr": {
-        "image": 6e-3,
+        "image": 3e-2,
         "guidance": 1e-4,
     },
 }
