@@ -265,7 +265,7 @@ def stop_run(pid):
 
 
 def launch(port, listen=False):
-    with gr.Blocks() as demo:
+    with gr.Blocks(title="threestudio - Web Demo") as demo:
         with gr.Row():
             pid = gr.State()
             with gr.Column(scale=1):
