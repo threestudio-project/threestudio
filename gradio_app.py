@@ -252,11 +252,11 @@ def run(
 
 def stop_run(pid):
     # kill the process
+    print(f"Trying to kill process {pid} ...")
     try:
-        print(f"Trying to kill process {pid} ...")
         os.kill(pid, signal.SIGKILL)
     except:
-        pass
+        print(f"Exception when killing process {pid}.")
     # button status: Stop -> Reset
     return [
         gr.update(value="Reset", variant="secondary", visible=True),
@@ -409,15 +409,14 @@ def watch(
             if not psutil.pid_exists(pid):
                 print(f"Process {pid} not exists, watcher exits.")
                 exit(0)
-            try:
-                alive_timestamp = float(open(alive_path).read())
-                if time.time() - alive_timestamp > alive_timeout:
+            alive_timestamp = float(open(alive_path).read())
+            if time.time() - alive_timestamp > alive_timeout:
+                print(f"Alive timeout for process {pid}, killed.")
+                try:
                     os.kill(pid, signal.SIGKILL)
-                    print(f"Alive timeout for process {pid}, killed.")
-                    exit(0)
-            except:
-                print(f"Exception when checking alive for process {pid}.")
-                pass
+                except:
+                    print(f"Exception when killing process {pid}.")
+                exit(0)
             time.sleep(check_interval)
 
     # loop until alive file is found, or alive_timeout is reached
