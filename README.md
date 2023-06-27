@@ -117,6 +117,12 @@ Multi-GPU training is supported. Note that `data.batch_size` is the batch size *
 python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0,1,2,3 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes" data.batch_size=2 data.n_val_views=4
 ```
 
+If you define the `CUDA_VISIBLE_DEVICES` environment variable before you call `launch.py`, you don't need to specify `--gpu` - this will use all available GPUs from `CUDA_VISIBLE_DEVICES`. For instance, the following command will automatically use GPUs 3 and 4:
+
+`CUDA_VISIBLE_DEVICES=3,4 python launch.py --config configs/dreamfusion-if.yaml --train system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"`
+
+This is particularly useful if you run `launch.py` in a cluster using a command that automatically picks any available GPU.
+
 ### Resume from checkpoints
 
 If you want to resume from a checkpoint, do:
