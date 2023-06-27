@@ -269,20 +269,22 @@ def launch(port, listen=False):
         with gr.Row():
             pid = gr.State()
             with gr.Column(scale=1):
+                header = gr.Markdown(
+                    """
+                    # threestudio
+
+                    - Select a model from the dropdown menu.
+                    - Input a text prompt.
+                    - Hit Run!
+                    """
+                )
+
                 # model selection dropdown
                 model_selector = gr.Dropdown(
                     value=model_choices[0],
                     choices=model_choices,
                     label="Select a model",
                 )
-
-                # full config viewer
-                with gr.Accordion("See full configurations", open=False):
-                    config_editor = gr.Code(
-                        value=load_model_config(model_selector.value),
-                        language="yaml",
-                        interactive=False,
-                    )
 
                 # prompt input
                 prompt_input = gr.Textbox(value=DEFAULT_PROMPT, label="Input prompt")
@@ -310,6 +312,14 @@ def launch(port, listen=False):
                     step=1,
                     label="Number of training steps",
                 )
+
+                # full config viewer
+                with gr.Accordion("See full configurations", open=False):
+                    config_editor = gr.Code(
+                        value=load_model_config(model_selector.value),
+                        language="yaml",
+                        interactive=False,
+                    )
 
                 # load config on model selection change
                 model_selector.change(
