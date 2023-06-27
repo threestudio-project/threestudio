@@ -1,6 +1,6 @@
 name: sjc
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
-exp_root_dir: outputs
+exp_root_dir: "outputs-gradio"
 seed: 0
 
 data_type: random-camera-datamodule
@@ -41,18 +41,21 @@ system:
 
   prompt_processor_type: stable-diffusion-prompt-processor
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
     view_dependent_prompt_front: true
 
   guidance_type: stable-diffusion-guidance
   guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 100.
     use_sjc: true
     var_red: true
     min_step_percent: 0.01
     max_step_percent: 0.97
+    grad_clip: [0, 2.0, 8.0, 5000]
+
+  exporter_type: "dummy-exporter"
 
   loggers:
     wandb:
@@ -78,7 +81,7 @@ system:
         lr: 0.0001 # maybe 0.001/0.01 is better
 
 trainer:
-  max_steps: 10000
+  max_steps: 5000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 200
@@ -86,6 +89,6 @@ trainer:
   precision: 16-mixed
 
 checkpoint:
-  save_last: true # save at each validation tim
+  save_last: false
   save_top_k: -1
   every_n_train_steps: ${trainer.max_steps}

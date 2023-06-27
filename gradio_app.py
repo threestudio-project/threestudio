@@ -13,6 +13,7 @@ from typing import Optional
 import gradio as gr
 import numpy as np
 import psutil
+import trimesh
 
 
 def tail(f, window=20):
@@ -55,17 +56,28 @@ class ExperimentStatus:
     log: str = ""
     output_image: Optional[str] = None
     output_video: Optional[str] = None
+    output_mesh: Optional[str] = None
 
     def tolist(self):
-        return [self.pid, self.progress, self.log, self.output_image, self.output_video]
+        return [
+            self.pid,
+            self.progress,
+            self.log,
+            self.output_image,
+            self.output_video,
+            self.output_mesh,
+        ]
 
 
 EXP_ROOT_DIR = "outputs-gradio"
 DEFAULT_PROMPT = "a delicious hamburger"
 model_config = [
-    ("DreamFusion (DeepFloyd-IF)", "configs/dreamfusion-if.yaml"),
-    ("DreamFusion (Stable Diffusion)", "configs/dreamfusion-sd.yaml"),
-    ("Fantasia3D (Stable Diffusion, Geometry Only)", "configs/fantasia3d.yaml"),
+    ("DreamFusion (DeepFloyd-IF)", "configs/gradio/dreamfusion-if.yaml"),
+    ("DreamFusion (Stable Diffusion)", "configs/gradio/dreamfusion-sd.yaml"),
+    ("TextMesh (DeepFloyd-IF)", "configs/gradio/textmesh-if.yaml"),
+    ("Fantasia3D (Stable Diffusion, Geometry Only)", "configs/gradio/fantasia3d.yaml"),
+    ("SJC (Stable Diffusion)", "configs/gradio/sjc.yaml"),
+    ("Latent-NeRF (Stable Diffusion)", "configs/gradio/latentnerf.yaml"),
 ]
 model_choices = [m[0] for m in model_config]
 model_name_to_config = {m[0]: m[1] for m in model_config}
@@ -75,8 +87,31 @@ def load_model_config(model_name):
     return open(model_name_to_config[model_name]).read()
 
 
+def load_model_config_attrs(model_name):
+    config_str = load_model_config(model_name)
+    from threestudio.utils.config import load_config
+
+    cfg = load_config(
+        config_str,
+        cli_args=[
+            "name=dummy",
+            "tag=dummy",
+            "use_timestamp=false",
+            f"exp_root_dir={EXP_ROOT_DIR}",
+            "system.prompt_processor.prompt=placeholder",
+        ],
+        from_string=True,
+    )
+    return {
+        "source": config_str,
+        "guidance_scale": cfg.system.guidance.guidance_scale,
+        "max_steps": cfg.trainer.max_steps,
+    }
+
+
 def on_model_selector_change(model_name):
-    return load_model_config(model_name)
+    cfg = load_model_config_attrs(model_name)
+    return [cfg["source"], cfg["guidance_scale"]]
 
 
 def get_current_status(process, trial_dir, alive_path):
@@ -129,15 +164,38 @@ def get_current_status(process, trial_dir, alive_path):
         if len(videos) > 0:
             status.output_video = videos[-1][0]
 
+        export_dirs = glob.glob(os.path.join(save_path, "*export"))
+        steps = [
+            int(re.match(r"it(\d+)-export", os.path.basename(f)).group(1))
+            for f in export_dirs
+        ]
+        export_dirs = sorted(list(zip(export_dirs, steps)), key=lambda x: x[1])
+        if len(export_dirs) > 0:
+            obj = glob.glob(os.path.join(export_dirs[-1][0], "*.obj"))
+            if len(obj) > 0:
+                # FIXME
+                # seems the gr.Model3D cannot load our manually saved obj file
+                # here we load the obj and save it to a temporary file using trimesh
+                mesh_path = tempfile.NamedTemporaryFile(suffix=".obj", delete=False)
+                trimesh.load(obj[0]).export(mesh_path.name)
+                status.output_mesh = mesh_path.name
+
     return status
 
 
-def run(model_name: str, config: str, prompt: str, seed: int):
+def run(
+    model_name: str,
+    config: str,
+    prompt: str,
+    guidance_scale: float,
+    seed: int,
+    max_steps: int,
+):
     # update status every 1 second
     status_update_interval = 1
 
     # save the config to a temporary file
-    config_file = tempfile.NamedTemporaryFile(mode="w")
+    config_file = tempfile.NamedTemporaryFile()
 
     with open(config_file.name, "w") as f:
         f.write(config)
@@ -152,13 +210,14 @@ def run(model_name: str, config: str, prompt: str, seed: int):
     process = subprocess.Popen(
         f"python launch.py --config {config_file.name} --train --gpu 0 --gradio trainer.enable_progress_bar=false".split()
         + [
-            f'system.prompt_processor.prompt="{prompt}"',
             f'name="{name}"',
             f'tag="{tag}"',
             f"exp_root_dir={EXP_ROOT_DIR}",
             "use_timestamp=false",
-            "trainer.max_steps=5000",
-            "trainer.val_check_interval=100",
+            f'system.prompt_processor.prompt="{prompt}"',
+            f"system.guidance.guidance_scale={guidance_scale}",
+            f"seed={seed}",
+            f"trainer.max_steps={max_steps}",
         ]
     )
 
@@ -205,7 +264,7 @@ def stop_run(pid):
     ]
 
 
-def launch():
+def launch(port, listen=False):
     with gr.Blocks() as demo:
         with gr.Row():
             pid = gr.State()
@@ -228,44 +287,91 @@ def launch():
                 # prompt input
                 prompt_input = gr.Textbox(value=DEFAULT_PROMPT, label="Input prompt")
 
+                # guidance scale slider
+                guidance_scale_input = gr.Slider(
+                    minimum=0.0,
+                    maximum=100.0,
+                    value=load_model_config_attrs(model_selector.value)[
+                        "guidance_scale"
+                    ],
+                    step=0.5,
+                    label="Guidance scale",
+                )
+
                 # seed slider
                 seed_input = gr.Slider(
-                    minimum=0, maximum=2147483647, value=0, step=1, label="seed"
+                    minimum=0, maximum=2147483647, value=0, step=1, label="Seed"
+                )
+
+                max_steps_input = gr.Slider(
+                    minimum=1,
+                    maximum=5000,
+                    value=5000,
+                    step=1,
+                    label="Number of training steps",
                 )
 
                 # load config on model selection change
                 model_selector.change(
                     fn=on_model_selector_change,
                     inputs=model_selector,
-                    outputs=config_editor,
+                    outputs=[config_editor, guidance_scale_input],
                 )
 
                 run_btn = gr.Button(value="Run", variant="primary")
                 stop_btn = gr.Button(value="Stop", variant="stop", visible=False)
 
-            with gr.Column(scale=1):
                 # generation status
-                status = gr.Textbox(label="Status", lines=1, max_lines=1)
+                status = gr.Textbox(
+                    value="Hit the Run button to start.",
+                    label="Status",
+                    lines=1,
+                    max_lines=1,
+                )
 
-                # logs
-                logs = gr.Textbox(label="Log", lines=10)
+            with gr.Column(scale=1):
+                with gr.Accordion("See terminal logs", open=False):
+                    # logs
+                    logs = gr.Textbox(label="Logs", lines=10)
 
                 # validation image display
-                output_image = gr.Image()
+                output_image = gr.Image(value=None, label="Image")
 
                 # testing video display
-                output_video = gr.Video()
+                output_video = gr.Video(value=None, label="Video")
+
+                # export mesh display
+                output_mesh = gr.Model3D(value=None, label="3D Mesh")
 
         run_event = run_btn.click(
             fn=run,
-            inputs=[model_selector, config_editor, prompt_input, seed_input],
-            outputs=[pid, status, logs, output_image, output_video, run_btn, stop_btn],
+            inputs=[
+                model_selector,
+                config_editor,
+                prompt_input,
+                guidance_scale_input,
+                seed_input,
+                max_steps_input,
+            ],
+            outputs=[
+                pid,
+                status,
+                logs,
+                output_image,
+                output_video,
+                output_mesh,
+                run_btn,
+                stop_btn,
+            ],
         )
         stop_btn.click(
             fn=stop_run, inputs=[pid], outputs=[run_btn, stop_btn], cancels=[run_event]
         )
 
-    demo.queue().launch(server_name="0.0.0.0", server_port=12344)
+    launch_args = {"server_port": port}
+    if listen:
+        launch_args["server_name"] = "0.0.0.0"
+    demo.queue().launch(**launch_args)
 
 
 def watch(
@@ -291,7 +397,7 @@ def watch(
     def loop_check_alive():
         while True:
             if not psutil.pid_exists(pid):
-                print(f"Process {pid} not exists, watcher exit.")
+                print(f"Process {pid} not exists, watcher exits.")
                 exit(0)
             try:
                 alive_timestamp = float(open(alive_path).read())
@@ -299,11 +405,9 @@ def watch(
                     os.kill(pid, signal.SIGKILL)
                     print(f"Alive timeout for process {pid}, killed.")
                     exit(0)
-                else:
-                    print(f"Process {pid} is alive.")
             except:
-                print(f"Exception when checking alive for process {pid}, watcher exit.")
-                exit(1)
+                print(f"Exception when checking alive for process {pid}.")
+                pass
             time.sleep(check_interval)
 
     # loop until alive file is found, or alive_timeout is reached
@@ -317,7 +421,10 @@ if __name__ == "__main__":
     parser.add_argument("operation", type=str, choices=["launch", "watch"])
     args, extra = parser.parse_known_args()
     if args.operation == "launch":
-        launch()
+        parser.add_argument("--listen", action="store_true")
+        parser.add_argument("--port", type=int, default=7860)
+        args = parser.parse_args()
+        launch(args.port, listen=args.listen)
     if args.operation == "watch":
         parser.add_argument("--pid", type=int)
         parser.add_argument("--trial-dir", type=str)

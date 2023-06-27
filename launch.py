@@ -162,6 +162,9 @@ def main(args, extras) -> None:
     if args.train:
         trainer.fit(system, datamodule=dm, ckpt_path=cfg.resume)
         trainer.test(system, datamodule=dm)
+        if args.gradio:
+            # also export assets if in gradio mode
+            trainer.predict(system, datamodule=dm)
     elif args.validate:
         # manually set epoch and global_step as they cannot be automatically resumed
         set_system_status(system, cfg.resume)
