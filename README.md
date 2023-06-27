@@ -60,6 +60,10 @@ The following steps have been tested on Ubuntu20.04.
 ```sh
 python3 -m virtualenv venv
 . venv/bin/activate
+
+# Newer pip versions, e.g. pip-23.x, can be much faster than old versions, e.g. pip-20.x.
+# For instance, it caches the wheels of git packages to avoid unnecessarily rebuilding them later.
+python3 -m pip install --upgrade pip
 ```
 
 - Install `PyTorch >= 1.12`. We have tested on `torch1.12.1+cu113` and `torch2.0.0+cu118`, but other versions should also work fine.
@@ -521,6 +525,7 @@ pip install -r requirements-dev.txt
 ```
 
 - If you are using VSCode as the text editor: (1) Install `editorconfig` extension. (2) Set the default linter to mypy to enable static type checking. (3) Set the default formatter to black. You could either manually format the document or let the editor format the document each time it is saved by setting `"editor.formatOnSave": true`.
+
 
 - Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
 
