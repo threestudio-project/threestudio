@@ -15,6 +15,7 @@ from threestudio.data.uncond import (
     RandomCameraDataset,
     RandomCameraIterableDataset,
 )
+from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_rank
 from threestudio.utils.ops import (
@@ -154,7 +155,7 @@ class SingleImageDataBase:
         return self.rgb
 
 
-class SingleImageIterableDataset(IterableDataset, SingleImageDataBase):
+class SingleImageIterableDataset(IterableDataset, SingleImageDataBase, Updateable):
     def __init__(self, cfg: Any, split: str) -> None:
         super().__init__()
         self.setup(cfg, split)
@@ -177,6 +178,9 @@ class SingleImageIterableDataset(IterableDataset, SingleImageDataBase):
             batch["random_camera"] = self.random_pose_generator.collate(None)
 
         return batch
+
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        self.random_pose_generator.update_step(epoch, global_step, on_load_weights)
 
     def __iter__(self):
         while True:
