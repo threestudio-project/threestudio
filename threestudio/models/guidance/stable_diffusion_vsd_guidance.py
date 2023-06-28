@@ -45,6 +45,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         guidance_scale_lora: float = 1.0
+        grad_clip: Optional[
+            Any
+        ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
         lora_cfg_training: bool = True
         lora_n_timestamp_samples: int = 1
@@ -206,6 +209,8 @@ class StableDiffusionVSDGuidance(BaseModule):
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
         )
+
+        self.grad_clip_val: Optional[float] = None
 
         threestudio.info(f"Loaded Stable Diffusion!")
 
@@ -634,6 +639,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         )
 
         grad = torch.nan_to_num(grad)
+        # clip grad for stable training?
+        if self.grad_clip_val is not None:
+            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # reparameterization trick
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
@@ -651,6 +659,12 @@ class StableDiffusionVSDGuidance(BaseModule):
         }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        # clip grad for stable training as demonstrated in
+        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
+        # http://arxiv.org/abs/2303.15413
+        if self.cfg.grad_clip is not None:
+            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
         self.set_min_max_steps(
             min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
             max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
