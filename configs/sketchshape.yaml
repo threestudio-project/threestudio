@@ -4,6 +4,8 @@ exp_root_dir: "outputs"
 seed: 0
 
 data_type: "random-camera-datamodule"
+data:
+  elevation_range: [-10, 45]
 
 system_type: "latentnerf-system"
 system:
@@ -30,19 +32,19 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 100.
     weighting_strategy: sds
 
   loggers:
     wandb:
       enable: false
-      project: 'threestudio'
+      project: "threestudio"
       name: None
 
   loss:
