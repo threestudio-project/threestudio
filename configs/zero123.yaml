@@ -1,5 +1,5 @@
 name: "zero123"
-tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_PROG0"
+tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_prog${data.random_camera.progressive_until}"
 exp_root_dir: "outputs"
 seed: 0
 
