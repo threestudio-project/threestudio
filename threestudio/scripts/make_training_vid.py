@@ -25,7 +25,8 @@ def draw_text_in_image(img, texts):
 def make_training_vid(exp, frames_per_vid=1, fps=3, max_iters=None, max_vids=None):
     # exp = "/admin/home-vikram/git/threestudio/outputs/zero123/64_teddy_rgba.png@20230627-195615"
     files = glob.glob(os.path.join(exp, "save", "*.mp4"))
-    files.remove(os.path.join(exp, "save", "training_vid.mp4"))
+    if os.path.join(exp, "save", "training_vid.mp4") in files:
+        files.remove(os.path.join(exp, "save", "training_vid.mp4"))
     its = [int(os.path.basename(file).split("-")[0].split("it")[-1]) for file in files]
     it_sort = np.argsort(its)
     files = list(np.array(files)[it_sort])
