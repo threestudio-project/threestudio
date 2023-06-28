@@ -100,7 +100,7 @@ system:
 
   guidance_type: "zero123-guidance"
   guidance:
-    pretrained_model_name_or_path: "./load/zero123/105000.ckpt"
+    pretrained_model_name_or_path: "./load/zero123/XL_20230604.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
     cond_image_path: ${data.image_path}
@@ -118,6 +118,7 @@ system:
     ref_only_steps: 0
     guidance_eval: 0  # if "alternate", this must not be a multiple of system.freq.n_ref
     ref_or_zero123: "accumulate" # can be "accumulate" or "alternate"
+    actual_val: 50
 
   loggers:
     wandb:
