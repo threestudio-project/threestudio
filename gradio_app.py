@@ -127,7 +127,7 @@ def get_current_status(process, trial_dir, alive_path):
         alive_fp.write(str(time.time()))
         alive_fp.flush()
 
-    log_path = os.path.join(trial_dir, "log")
+    log_path = os.path.join(trial_dir, "logs")
     progress_path = os.path.join(trial_dir, "progress")
     save_path = os.path.join(trial_dir, "save")
 

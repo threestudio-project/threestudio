@@ -93,7 +93,7 @@ def main(args, extras) -> None:
     system.set_save_dir(os.path.join(cfg.trial_dir, "save"))
 
     if args.gradio:
-        fh = logging.FileHandler(os.path.join(cfg.trial_dir, "log"))
+        fh = logging.FileHandler(os.path.join(cfg.trial_dir, "logs"))
         fh.setLevel(logging.INFO)
         if args.verbose:
             fh.setLevel(logging.DEBUG)
