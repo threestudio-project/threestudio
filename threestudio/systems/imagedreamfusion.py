@@ -113,7 +113,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
-                # valid_gt_depth = gt_depth[gt_mask.squeeze(-1)].unsqueeze(1)
+                # valid_gt_depth = batch["ref_depth"][gt_mask.squeeze(-1)].unsqueeze(1)
                 # valid_pred_depth = out["depth"][gt_mask].unsqueeze(1)
                 # with torch.no_grad():
                 #     A = torch.cat(
