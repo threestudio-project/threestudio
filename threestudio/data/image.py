@@ -195,8 +195,8 @@ class SingleImageIterableDataset(IterableDataset, SingleImageDataBase, Updateabl
             "azimuth": self.azimuth_deg,
             "camera_distances": self.camera_distance,
             "rgb": self.rgb,
-            "depth": self.depth,
-            "normal": self.normal,
+            "ref_depth": self.depth,
+            "ref_normal": self.normal,
             "mask": self.mask,
         }
         if self.cfg.use_random_camera:
