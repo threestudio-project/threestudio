@@ -107,7 +107,7 @@ The training lasts for 10,000 iterations. You can find visualizations of the cur
 
 ### Multi-GPU training
 
-Multi-GPU training is supported. Note that `data.batch_size` is the batch size **per rank (device)**. Also remember to
+Multi-GPU training is supported, but may still be [buggy](https://github.com/threestudio-project/threestudio/issues/195). Note that `data.batch_size` is the batch size **per rank (device)**. Also remember to
 
 - Set `data.n_val_views` to be a multiple of the number of GPUs.
 - Set a unique `tag` as timestamp is disabled in multi-GPU training and will not be appended after the tag. If you the same tag as previous trials, saved config files, code and visualizations will be overriden.
@@ -121,7 +121,15 @@ If you define the `CUDA_VISIBLE_DEVICES` environment variable before you call `l
 
 `CUDA_VISIBLE_DEVICES=3,4 python launch.py --config configs/dreamfusion-if.yaml --train system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"`
 
-This is particularly useful if you run `launch.py` in a cluster using a command that automatically picks any available GPU.
+
+
+This is particularly useful if you run `launch.py` in a cluster using a command that automatically picks GPU(s) and exports their IDs through CUDA_VISIBLE_DEVICES, e.g. through SLURM:
+
+```bash
+cd git/threestudio
+. venv/bin/activate
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_bunny python launch.py --config configs/dreamfusion-if.yaml --train system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
+```
 
 ### Resume from checkpoints
 

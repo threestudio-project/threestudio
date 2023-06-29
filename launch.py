@@ -44,8 +44,8 @@ def main() -> None:
     parser.add_argument("--config", required=True, help="path to config file")
     parser.add_argument(
         "--gpu",
-        default="-1",
-        help="GPU(s) to be used. -1 defaults to all CUDA_VISIBLE_DEVICES if that env variable is defined, otherwise GPU 0.",
+        default="0",
+        help="GPU(s) to be used. 0 defaults to all CUDA_VISIBLE_DEVICES if that env variable is defined, otherwise GPU 0.",
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
@@ -69,28 +69,17 @@ def main() -> None:
     # set CUDA_VISIBLE_DEVICES (if not already set), then import pytorch-lightning
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     env_gpus_str = os.environ.get("CUDA_VISIBLE_DEVICES", None)
-    env_gpus = set(env_gpus_str.split(",")) if env_gpus_str else set()
+    env_gpus = list(env_gpus_str.split(",")) if env_gpus_str else []
     selected_gpus = {"0"}
-    args_gpus = set(args.gpu.split(","))
     if len(env_gpus) > 0:
-        # CUDA_VISIBLE_DEVICES was set, e.g. within srun or higher-level script.
-        if args.gpu == "-1":
-            # Use all available GPUs by default
-            selected_gpus = env_gpus
-        else:
-            assert args_gpus == env_gpus or args_gpus in env_gpus, (
-                f"Some GPU(s) specified by the --gpu argument ('{args.gpu}') aren't present in CUDA_VISIBLE_DEVICES!\n"
-                f"Aborting this command since it could cause trouble in a cluster environment.\n"
-                f"(CUDA_VISIBLE_DEVICES was set to '{os.environ['CUDA_VISIBLE_DEVICES']}')"
-            )
-            selected_gpus = args_gpus
+        # CUDA_VISIBLE_DEVICES was set already, e.g. within SLURM srun or higher-level script.
+        # Use all available GPUs by default
+        devices = -1
+        selected_gpus = env_gpus
     else:
-        if args.gpu == -1:
-            selected_gpus = {"0"}  # default to first GPU
-        else:
-            selected_gpus = args_gpus
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(selected_gpus)
+        devices = "auto"
+        selected_gpus = list(args.gpu.split(","))
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(selected_gpus)
     n_gpus = len(selected_gpus)
 
     import pytorch_lightning as pl
@@ -177,7 +166,12 @@ def main() -> None:
         )()
 
     trainer = Trainer(
-        callbacks=callbacks, logger=loggers, inference_mode=False, **cfg.trainer
+        callbacks=callbacks,
+        logger=loggers,
+        inference_mode=False,
+        accelerator="gpu",
+        devices=devices,
+        **cfg.trainer,
     )
 
     def set_system_status(system: BaseSystem, ckpt_path: Optional[str]):
