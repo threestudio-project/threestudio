@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import torch
 import torch.nn.functional as F
 from PIL import Image, ImageDraw
+from torchmetrics import PearsonCorrCoef
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
@@ -47,6 +48,8 @@ class Zero123(BaseLift3DSystem):
             name="on_fit_start",
             step=self.true_global_step,
         )
+
+        self.pearson = PearsonCorrCoef().to(self.device)
 
     def training_substep(self, batch, batch_idx, guidance: str):
         """
@@ -99,7 +102,6 @@ class Zero123(BaseLift3DSystem):
         if guidance == "ref":
             gt_mask = batch["mask"]
             gt_rgb = batch["rgb"]
-            gt_depth = batch["depth"]
 
             # color loss
             gt_rgb = gt_rgb * gt_mask.float() + out["comp_rgb_bg"] * (
@@ -112,15 +114,33 @@ class Zero123(BaseLift3DSystem):
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
-                valid_gt_depth = gt_depth[gt_mask.squeeze(-1)].unsqueeze(1)
-                valid_pred_depth = out["depth"][gt_mask].unsqueeze(1)
-                with torch.no_grad():
-                    A = torch.cat(
-                        [valid_gt_depth, torch.ones_like(valid_gt_depth)], dim=-1
-                    )  # [B, 2]
-                    X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
-                    valid_gt_depth = A @ X  # [B, 1]
-                set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
+                gt_depth = batch["depth"]
+                # valid_gt_depth = gt_depth[gt_mask.squeeze(-1)].unsqueeze(1)
+                # valid_pred_depth = out["depth"][gt_mask].unsqueeze(1)
+                # with torch.no_grad():
+                #     A = torch.cat(
+                #         [valid_gt_depth, torch.ones_like(valid_gt_depth)], dim=-1
+                #     )  # [B, 2]
+                #     X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
+                #     valid_gt_depth = A @ X  # [B, 1]
+                # set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
+
+                # relative depth loss
+                valid_gt_depth = gt_depth[gt_mask.squeeze(-1)]  # [B,]
+                valid_pred_depth = out["depth"][gt_mask]  # [B,]
+                set_loss("depth", 1 - self.pearson(valid_pred_depth, valid_gt_depth))
+
+            # normal loss
+            if self.C(self.cfg.loss.lambda_normal) > 0:
+                gt_normal = batch["normal"]
+                valid_gt_normal = 1 - 2 * gt_normal[gt_mask.squeeze(-1)]  # [B, 3]
+                valid_pred_normal = (
+                    2 * out["comp_normal"][gt_mask.squeeze(-1)] - 1
+                )  # [B, 3]
+                set_loss(
+                    "normal",
+                    1 - F.cosine_similarity(valid_pred_normal, valid_gt_normal).mean(),
+                )
         elif guidance == "zero123":
             # zero123
             guidance_out = self.guidance(

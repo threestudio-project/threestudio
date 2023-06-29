@@ -71,6 +71,14 @@ class Renderer(BaseModule):
     def set_background(self, background: BaseBackground) -> None:
         self.sub_modules.background = background
 
+    def remove_key(self, d, key):
+        if key in d:
+            r = dict(d)
+            del r[key]
+            return r
+        else:
+            return d
+
 
 class VolumeRenderer(Renderer):
     pass
