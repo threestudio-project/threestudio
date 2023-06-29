@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 
 import torch
 import torch.nn.functional as F
+from torchmetrics import PearsonCorrCoef
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
@@ -49,6 +50,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             name="on_fit_start",
             step=self.true_global_step,
         )
+
+        self.pearson = PearsonCorrCoef().to(self.device)
 
     def training_substep(self, batch, batch_idx, guidance: str):
         """
