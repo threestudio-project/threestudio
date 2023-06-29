@@ -1,9 +1,5 @@
 name: "zero123"
-<<<<<<< HEAD
 tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_prog${data.random_camera.progressive_until}"
-=======
-tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}"
->>>>>>> Updates
 exp_root_dir: "outputs"
 seed: 0
 
@@ -160,11 +156,7 @@ trainer:
   max_steps: 300
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-<<<<<<< HEAD
-  val_check_interval: 50
-=======
   val_check_interval: 20
->>>>>>> Updates
   enable_progress_bar: true
   precision: 16-mixed
 
