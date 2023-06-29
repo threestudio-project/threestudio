@@ -180,7 +180,6 @@ class NeuSVolumeRenderer(VolumeRenderer):
 
         if self.training:
             geo_out = self.geometry(positions, output_normal=True)
-            kwargs = self.remove_key(kwargs, "normal")
             rgb_fg_all = self.material(
                 viewdirs=t_dirs,
                 positions=positions,

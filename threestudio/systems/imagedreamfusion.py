@@ -113,15 +113,33 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
-                valid_gt_depth = gt_depth[gt_mask.squeeze(-1)].unsqueeze(1)
-                valid_pred_depth = out["depth"][gt_mask].unsqueeze(1)
-                with torch.no_grad():
-                    A = torch.cat(
-                        [valid_gt_depth, torch.ones_like(valid_gt_depth)], dim=-1
-                    )  # [B, 2]
-                    X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
-                    valid_gt_depth = A @ X  # [B, 1]
-                set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
+                # valid_gt_depth = gt_depth[gt_mask.squeeze(-1)].unsqueeze(1)
+                # valid_pred_depth = out["depth"][gt_mask].unsqueeze(1)
+                # with torch.no_grad():
+                #     A = torch.cat(
+                #         [valid_gt_depth, torch.ones_like(valid_gt_depth)], dim=-1
+                #     )  # [B, 2]
+                #     X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
+                #     valid_gt_depth = A @ X  # [B, 1]
+                # set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
+
+                # relative depth loss
+                valid_gt_depth = batch["ref_depth"][gt_mask.squeeze(-1)]  # [B,]
+                valid_pred_depth = out["depth"][gt_mask]  # [B,]
+                set_loss("depth", 1 - self.pearson(valid_pred_depth, valid_gt_depth))
+
+            # normal loss
+            if self.C(self.cfg.loss.lambda_normal) > 0:
+                valid_gt_normal = (
+                    1 - 2 * batch["ref_normal"][gt_mask.squeeze(-1)]
+                )  # [B, 3]
+                valid_pred_normal = (
+                    2 * out["comp_normal"][gt_mask.squeeze(-1)] - 1
+                )  # [B, 3]
+                set_loss(
+                    "normal",
+                    1 - F.cosine_similarity(valid_pred_normal, valid_gt_normal).mean(),
+                )
         elif guidance == "guidance":
             self.guidance.set_min_max_steps(
                 self.C(self.guidance.cfg.min_step_percent),

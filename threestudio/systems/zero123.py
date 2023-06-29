@@ -114,7 +114,6 @@ class Zero123(BaseLift3DSystem):
 
             # depth loss
             if self.C(self.cfg.loss.lambda_depth) > 0:
-                gt_depth = batch["depth"]
                 # valid_gt_depth = gt_depth[gt_mask.squeeze(-1)].unsqueeze(1)
                 # valid_pred_depth = out["depth"][gt_mask].unsqueeze(1)
                 # with torch.no_grad():
@@ -126,14 +125,15 @@ class Zero123(BaseLift3DSystem):
                 # set_loss("depth", F.mse_loss(valid_gt_depth, valid_pred_depth))
 
                 # relative depth loss
-                valid_gt_depth = gt_depth[gt_mask.squeeze(-1)]  # [B,]
+                valid_gt_depth = batch["ref_depth"][gt_mask.squeeze(-1)]  # [B,]
                 valid_pred_depth = out["depth"][gt_mask]  # [B,]
                 set_loss("depth", 1 - self.pearson(valid_pred_depth, valid_gt_depth))
 
             # normal loss
             if self.C(self.cfg.loss.lambda_normal) > 0:
-                gt_normal = batch["normal"]
-                valid_gt_normal = 1 - 2 * gt_normal[gt_mask.squeeze(-1)]  # [B, 3]
+                valid_gt_normal = (
+                    1 - 2 * batch["ref_normal"][gt_mask.squeeze(-1)]
+                )  # [B, 3]
                 valid_pred_normal = (
                     2 * out["comp_normal"][gt_mask.squeeze(-1)] - 1
                 )  # [B, 3]

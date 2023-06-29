@@ -119,8 +119,6 @@ class NeRFVolumeRenderer(VolumeRenderer):
             geo_out = self.geometry(
                 positions, output_normal=self.material.requires_normal
             )
-            if self.material.requires_normal:
-                kwargs = self.remove_key(kwargs, "normal")
             rgb_fg_all = self.material(
                 viewdirs=t_dirs,
                 positions=positions,
