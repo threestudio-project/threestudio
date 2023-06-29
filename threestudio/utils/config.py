@@ -20,8 +20,51 @@ OmegaConf.register_new_resolver("basename", lambda p: os.path.basename(p))
 OmegaConf.register_new_resolver("rmspace", lambda s, sub: s.replace(" ", sub))
 OmegaConf.register_new_resolver("tuple2", lambda s: [float(s), float(s)])
 OmegaConf.register_new_resolver("gt0", lambda s: s > 0)
+OmegaConf.register_new_resolver("cmaxgt0", lambda s: C_max(s) > 0)
 OmegaConf.register_new_resolver("not", lambda s: not s)
+OmegaConf.register_new_resolver(
+    "cmaxgt0orcmaxgt0", lambda a, b: C_max(a) > 0 or C_max(b) > 0
+)
 # ======================================================= #
+
+
+def C_max(value: Any) -> float:
+    if isinstance(value, int) or isinstance(value, float):
+        pass
+    else:
+        value = config_to_primitive(value)
+        if not isinstance(value, list):
+            raise TypeError("Scalar specification only supports list, got", type(value))
+        if len(value) == 3:
+            value = [0] + value
+        assert len(value) == 4
+        start_step, start_value, end_value, end_step = value
+        value = max(start_value, end_value)
+    return value
+
+
+def C(value: Any, epoch: int, global_step: int) -> float:
+    if isinstance(value, int) or isinstance(value, float):
+        pass
+    else:
+        value = config_to_primitive(value)
+        if not isinstance(value, list):
+            raise TypeError("Scalar specification only supports list, got", type(value))
+        if len(value) == 3:
+            value = [0] + value
+        assert len(value) == 4
+        start_step, start_value, end_value, end_step = value
+        if isinstance(end_step, int):
+            current_step = global_step
+            value = start_value + (end_value - start_value) * max(
+                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
+            )
+        elif isinstance(end_step, float):
+            current_step = epoch
+            value = start_value + (end_value - start_value) * max(
+                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
+            )
+    return value
 
 
 @dataclass

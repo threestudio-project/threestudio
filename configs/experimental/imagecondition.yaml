@@ -6,6 +6,8 @@ seed: 0
 data_type: "single-image-datamodule"
 data:
   image_path: ./load/images/hamburger_rgba.png
+  requires_depth: ${gt0orgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${gt0:${system.loss.lambda_normal}}
   random_camera:
     batch_size: 4
     eval_height: 256
@@ -93,6 +95,8 @@ system:
     lambda_rgb: 10.
     lambda_mask: 1.
     lambda_depth: [0.0, 0.0, 1.0, 10000]
+    lambda_depth_rel: [0.0, 0.0, 1.0, 10000]
+    lambda_normal: 0. # [0, 0, 0.05, 100]
     lambda_normal_smooth: 0.0
     lambda_3d_normal_smooth: 0.0
     lambda_orient: 0.0

@@ -12,6 +12,8 @@ data:
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
+  requires_depth: ${gt0orgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${gt0:${system.loss.lambda_normal}}
   random_camera:
     batch_size: 4
     height: 256
@@ -133,6 +135,8 @@ system:
     lambda_rgb: 400.0
     lambda_mask: 50.0
     lambda_depth: 0.05
+    lambda_depth_rel: [0.0, 0.0, 1.0, 10000]
+    lambda_normal: 0. # [0, 0, 0.05, 100]
     lambda_normal_smooth: 2.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 0.01
