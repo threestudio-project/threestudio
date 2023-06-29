@@ -47,6 +47,7 @@
 | eval_fovy_deg          | float                 | Camera field of view (FoV) along the y direction (vertical direction) in validation/testing, in degrees. Default: 70                                                                                                                                                                |
 | light_sample_strategy  | str                   | Strategy to sample point light positions in training, in ["dreamfusion", "magic3d"]. "dreamfusion" uses strategy described in the DreamFusion paper; "magic3d" uses strategy decribed in the Magic3D paper. Default: "dreamfusion"                                                  |
 | batch_uniform_azimuth  | bool                  | Whether to ensure the uniformity of sampled azimuth angles in training as described in the Fantasia3D paper. If True, the `azimuth_range` is equally divided into `batch_size` bins and the azimuth angles are sampled from every bins. Default: True                               |
+| progressive_until  | int                  | Number of iterations until which to progressively (linearly) increase elevation_range and azimuth_range from [`eval_elevation_deg`, `eval_elevation_deg`] and `[0.0, 0.0]`, to those values specified in `elevation_range` and `azimuth_range`. 0 means the range does not linearly increase. Default: 0                               |
 
 ## Systems
 
