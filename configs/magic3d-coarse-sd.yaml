@@ -8,6 +8,7 @@ data:
   width: 64
   height: 64
   camera_distance_range: [1.5, 2.0]
+  elevation_range: [-10, 45]
   light_sample_strategy: "magic3d"
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
@@ -47,12 +48,12 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
 
   guidance_type: "stable-diffusion-guidance"
   guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     weighting_strategy: uniform
     guidance_scale: 100.
     min_step_percent: 0.02
@@ -61,7 +62,7 @@ system:
   loggers:
     wandb:
       enable: false
-      project: 'threestudio'
+      project: "threestudio"
       name: None
 
   loss:

@@ -1,7 +1,7 @@
 import argparse
+import contextlib
 import logging
 import os
-import shutil
 import sys
 
 
@@ -39,34 +39,8 @@ class ColoredFilter(logging.Filter):
         return True
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, help="path to config file")
-    parser.add_argument(
-        "--gpu",
-        default="0",
-        help="GPU(s) to be used. 0 defaults to all CUDA_VISIBLE_DEVICES if that env variable is defined, otherwise GPU 0.",
-    )
-
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--train", action="store_true")
-    group.add_argument("--validate", action="store_true")
-    group.add_argument("--test", action="store_true")
-    group.add_argument("--export", action="store_true")
-
-    parser.add_argument(
-        "--verbose", action="store_true", help="if true, set logging level to DEBUG"
-    )
-
-    parser.add_argument(
-        "--typecheck",
-        action="store_true",
-        help="whether to enable dynamic type checking",
-    )
-
-    args, extras = parser.parse_known_args()
-
-    # set CUDA_VISIBLE_DEVICES (if not already set), then import pytorch-lightning
+def main(args, extras) -> None:
+    # set CUDA_VISIBLE_DEVICES if needed, then import pytorch-lightning
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     env_gpus_str = os.environ.get("CUDA_VISIBLE_DEVICES", None)
     env_gpus = list(env_gpus_str.split(",")) if env_gpus_str else []
@@ -100,6 +74,7 @@ def main() -> None:
         CodeSnapshotCallback,
         ConfigSnapshotCallback,
         CustomProgressBar,
+        ProgressCallback,
     )
     from threestudio.utils.config import ExperimentConfig, load_config
     from threestudio.utils.typing import Optional
@@ -110,8 +85,11 @@ def main() -> None:
 
     for handler in logger.handlers:
         if handler.stream == sys.stderr:  # type: ignore
-            handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
-            handler.addFilter(ColoredFilter())
+            if not args.gradio:
+                handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+                handler.addFilter(ColoredFilter())
+            else:
+                handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
 
     # parse YAML config to OmegaConf
     cfg: ExperimentConfig
@@ -124,6 +102,15 @@ def main() -> None:
         cfg.system, resumed=cfg.resume is not None
     )
     system.set_save_dir(os.path.join(cfg.trial_dir, "save"))
+
+    if args.gradio:
+        fh = logging.FileHandler(os.path.join(cfg.trial_dir, "logs"))
+        fh.setLevel(logging.INFO)
+        if args.verbose:
+            fh.setLevel(logging.DEBUG)
+        fh.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+        logger.addHandler(fh)
+
     callbacks = []
     if args.train:
         callbacks += [
@@ -131,7 +118,6 @@ def main() -> None:
                 dirpath=os.path.join(cfg.trial_dir, "ckpts"), **cfg.checkpoint
             ),
             LearningRateMonitor(logging_interval="step"),
-            CustomProgressBar(refresh_rate=1),
             CodeSnapshotCallback(
                 os.path.join(cfg.trial_dir, "code"), use_version=False
             ),
@@ -142,6 +128,12 @@ def main() -> None:
                 use_version=False,
             ),
         ]
+        if args.gradio:
+            callbacks += [
+                ProgressCallback(save_path=os.path.join(cfg.trial_dir, "progress"))
+            ]
+        else:
+            callbacks += [CustomProgressBar(refresh_rate=1)]
 
     def write_to_text(file, lines):
         with open(file, "w") as f:
@@ -160,7 +152,7 @@ def main() -> None:
         ] + system.get_loggers()
         rank_zero_only(
             lambda: write_to_text(
-                os.path.join(cfg.trial_dir, "log.txt"),
+                os.path.join(cfg.trial_dir, "cmd.txt"),
                 ["python " + " ".join(sys.argv), str(args)],
             )
         )()
@@ -183,6 +175,9 @@ def main() -> None:
     if args.train:
         trainer.fit(system, datamodule=dm, ckpt_path=cfg.resume)
         trainer.test(system, datamodule=dm)
+        if args.gradio:
+            # also export assets if in gradio mode
+            trainer.predict(system, datamodule=dm)
     elif args.validate:
         # manually set epoch and global_step as they cannot be automatically resumed
         set_system_status(system, cfg.resume)
@@ -197,4 +192,39 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", required=True, help="path to config file")
+    parser.add_argument(
+        "--gpu",
+        default="0",
+        help="GPU(s) to be used. 0 defaults to all CUDA_VISIBLE_DEVICES if that env variable is defined, otherwise GPU 0.",
+    )
+
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--train", action="store_true")
+    group.add_argument("--validate", action="store_true")
+    group.add_argument("--test", action="store_true")
+    group.add_argument("--export", action="store_true")
+
+    parser.add_argument(
+        "--gradio", action="store_true", help="if true, run in gradio mode"
+    )
+
+    parser.add_argument(
+        "--verbose", action="store_true", help="if true, set logging level to DEBUG"
+    )
+
+    parser.add_argument(
+        "--typecheck",
+        action="store_true",
+        help="whether to enable dynamic type checking",
+    )
+
+    args, extras = parser.parse_known_args()
+
+    if args.gradio:
+        # FIXME: no effect, stdout is not captured
+        with contextlib.redirect_stdout(sys.stderr):
+            main(args, extras)
+    else:
+        main(args, extras)
