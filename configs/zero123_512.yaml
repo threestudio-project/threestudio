@@ -6,8 +6,8 @@ seed: 0
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: 128
-  width: 128
+  height: 512
+  width: 512
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
@@ -15,12 +15,12 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: [64, 128]
-    width: [64, 128]
-    batch_size: [12, 6]
-    resolution_milestones: [200]
-    eval_height: 256
-    eval_width: 256
+    height: 512
+    width: 512
+    batch_size: 1
+    resolution_milestones: []
+    eval_height: 512
+    eval_width: 512
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
@@ -130,9 +130,9 @@ system:
     lambda_sds: 0.05
     lambda_rgb: 500.
     lambda_mask: 50.
-    lambda_depth: 0.05
-    lambda_depth_rel: [0, 0, 0.05, 100]
-    lambda_normal: 0. # [0, 0, 0.05, 100]
+    lambda_depth: 0.
+    lambda_depth_rel: 0.1
+    lambda_normal: 0.1 # [0, 0, 0.05, 100]
     lambda_normal_smooth: 5.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 1.0

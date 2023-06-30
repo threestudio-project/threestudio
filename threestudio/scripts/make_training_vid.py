@@ -45,9 +45,9 @@ def make_training_vid(exp, frames_per_vid=1, fps=3, max_iters=None, max_vids=Non
     imageio.mimwrite(os.path.join(exp, "save", "training_vid.mp4"), frames, fps=fps)
 
 
-def join():
-    file1 = "/admin/home-vikram/git/threestudio/outputs/zero123/OLD_64_dragon2_rgba.png@20230629-023028/save/it200-val.mp4"
-    file2 = "/admin/home-vikram/git/threestudio/outputs/zero123/64_dragon2_rgba.png@20230628-152734/save/it200-val.mp4"
+def join(file1, file2, name):
+    # file1 = "/admin/home-vikram/git/threestudio/outputs/zero123/OLD_64_dragon2_rgba.png@20230629-023028/save/it200-val.mp4"
+    # file2 = "/admin/home-vikram/git/threestudio/outputs/zero123/64_dragon2_rgba.png@20230628-152734/save/it200-val.mp4"
     vid1 = imageio.mimread(file1)
     vid2 = imageio.mimread(file2)
     frames = []
@@ -55,7 +55,7 @@ def join():
         frames.append(
             np.concatenate([f1[:, : f1.shape[0]], f2[:, : f2.shape[0]]], axis=1)
         )
-    imageio.mimwrite("dragon.mp4", frames)
+    imageio.mimwrite(name, frames)
 
 
 if __name__ == "__main__":
