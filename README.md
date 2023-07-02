@@ -191,10 +191,10 @@ Notable differences from the paper:
 # object generation with 512x512 NeRF rendering, ~30GB VRAM
 python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
 # if you don't have enough VRAM, try training with 64x64 NeRF rendering, ~15GB VRAM
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 data.batch_size=1
 # using the same model for pretrained and LoRA enables 64x64 training with <10GB VRAM
 # but the quality is worse due to the use of an epsilon prediction model for LoRA training
-python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1-base"
+python launch.py --config configs/prolificdreamer.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" data.width=64 data.height=64 data.batch_size=1 system.guidance.pretrained_model_name_or_path_lora="stabilityai/stable-diffusion-2-1-base"
 # Using patch-based renderer to reduce memory consume, 512x512 resolution, ~20GB VRAM
 python launch.py --config configs/prolificdreamer-patch.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple"
 # scene generation with 512x512 NeRF rendering, ~30GB VRAM
