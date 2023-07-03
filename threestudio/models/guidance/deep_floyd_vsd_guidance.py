@@ -55,11 +55,12 @@ class DeepFloydVSDGuidance(BaseModule):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        max_step_percent_annealed: float = 0.5
         anneal_start_step: Optional[int] = 5000
         anneal_end_step: Optional[int] = 25000
         random_timestep: bool = True
         force_lora_v_prediction: bool = False
+        anneal_strategy: str = "milestone"
+        max_step_percent_annealed: float = 0.5
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
@@ -659,15 +660,23 @@ class DeepFloydVSDGuidance(BaseModule):
             self.cfg.anneal_start_step is not None
             and global_step > self.cfg.anneal_start_step
         ):
-            # self.max_step = int(
-            #     self.num_train_timesteps * self.cfg.max_step_percent_annealed
-            # )
-            # self.max_step =
-
-            max_step_percent_annealed = self.cfg.max_step_percent - (
-                self.cfg.max_step_percent - self.cfg.min_step_percent
-            ) * math.sqrt(
-                (global_step - self.cfg.anneal_start_step)
-                / (self.cfg.anneal_end_step - self.cfg.anneal_start_step)
-            )
-            self.max_step = int(self.num_train_timesteps * max_step_percent_annealed)
+            if self.cfg.anneal_strategy == "milestone":
+                self.max_step = int(
+                    self.num_train_timesteps * self.cfg.max_step_percent_annealed
+                )
+            elif self.cfg.anneal_strategy == "sqrt":
+                max_step_percent_annealed = self.cfg.max_step_percent - (
+                    self.cfg.max_step_percent - self.cfg.min_step_percent
+                ) * math.sqrt(
+                    (global_step - self.cfg.anneal_start_step)
+                    / (self.cfg.anneal_end_step - self.cfg.anneal_start_step)
+                )
+                self.max_step = int(
+                    self.num_train_timesteps * max_step_percent_annealed
+                )
+            elif self.cfg.anneal_strategy == "none":
+                pass
+            else:
+                raise ValueError(
+                    f"Unknown anneal strategy {self.cfg.anneal_strategy}, should be one of 'milestone', 'sqrt', 'none'"
+                )

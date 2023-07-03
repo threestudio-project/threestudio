@@ -70,7 +70,7 @@ system:
     max_step_percent: 0.98
     max_step_percent_annealed: 0.5
     anneal_start_step: 5000
-    anneal_end_step: ${trainer.max_steps}
+    anneal_strategy: "milestone"
 
   loggers:
     wandb:
