@@ -25,11 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An experimental implementation of using Zero-1-to-3 for 3D generation from a single image (#71).
 - Support mesh initialization for `implicit-sdf` (#90).
 - Easy-to-use geometry conversion by `system.geometry_convert_from`. This is used in the Magic3D and ProlificDreamer system and may inspire applications connecting multiple systems/algorithms (#105).
-- Support prompt debiasing and manually assignment of view-dependent prompts (#98).
+- Support prompt debiasing and manual assignment of view-dependent prompts (#98).
 - The implementation of Perp-Neg (#98).
 - Support patch-based renderer (#154).
 - Support 3D reconstruction from multi-view images and 3D editing based on InstructNeRF2NeRF/ControlNet (#119).
 - Support NeuS/VolSDF volume renderer and the coarse stage of TextMesh (#162,#121).
+- Gradio web interface (#183).
 
 ### Changed
 
@@ -41,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix errors caused by emptry rays (#152).
+- Fix errors caused by empty rays (#152).
 
 ## [v0.1.0]
 
