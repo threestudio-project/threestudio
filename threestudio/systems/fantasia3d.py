@@ -53,12 +53,20 @@ class Fantasia3D(BaseLift3DSystem):
                     [out["comp_normal"] * 2.0 - 1.0, out["opacity"]], dim=-1
                 )
                 guidance_out = self.guidance(
-                    guidance_inp, prompt_utils, **batch, rgb_as_latents=True
+                    guidance_inp,
+                    prompt_utils,
+                    **batch,
+                    rgb_as_latents=True,
+                    current_step_ratio=self.true_global_step / self.trainer.max_steps,
                 )
             else:
                 guidance_inp = out["comp_normal"]
                 guidance_out = self.guidance(
-                    guidance_inp, prompt_utils, **batch, rgb_as_latents=False
+                    guidance_inp,
+                    prompt_utils,
+                    **batch,
+                    rgb_as_latents=False,
+                    current_step_ratio=self.true_global_step / self.trainer.max_steps,
                 )
 
             loss_normal_consistency = out["mesh"].normal_consistency()
@@ -69,7 +77,11 @@ class Fantasia3D(BaseLift3DSystem):
         else:  # texture training
             guidance_inp = out["comp_rgb"]
             guidance_out = self.guidance(
-                guidance_inp, prompt_utils, **batch, rgb_as_latents=False
+                guidance_inp,
+                prompt_utils,
+                **batch,
+                rgb_as_latents=False,
+                current_step_ratio=self.true_global_step / self.trainer.max_steps,
             )
 
         for name, value in guidance_out.items():

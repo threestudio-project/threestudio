@@ -38,7 +38,11 @@ class DreamFusion(BaseLift3DSystem):
         out = self(batch)
         prompt_utils = self.prompt_processor()
         guidance_out = self.guidance(
-            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
+            out["comp_rgb"],
+            prompt_utils,
+            **batch,
+            rgb_as_latents=False,
+            current_step_ratio=self.true_global_step / self.trainer.max_steps,
         )
 
         loss = 0.0
