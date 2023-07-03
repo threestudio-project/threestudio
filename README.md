@@ -29,6 +29,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
   <a href="https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg">
   </a>
+  <a href="https://huggingface.co/spaces/bennyguo/threestudio"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Gradio%20Demo-Huggingface-orange"></a>
+  <a href="http://t23-g-01.threestudio.ai"><img src="https://img.shields.io/badge/Gradio%20Demo-Tencent-blue?logo=tencentqq&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -36,6 +38,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 ## News
+- 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio/edit/main/README.md#gradio-web-interface).
 - 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-)  to give it a try.
 - 06/14/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
 - 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
@@ -161,6 +164,20 @@ python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0
 For all the options you can specify when exporting, see [the documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#exporters).
 
 See [here](https://github.com/threestudio-project/threestudio#supported-models) for example running commands of all our supported models. Please refer to [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) for tips on getting higher-quality results, and [here](https://github.com/threestudio-project/threestudio#vram-optimization) for reducing VRAM usage.
+
+### Gradio Web Interface
+
+Launch the Gradio web interface by
+
+```
+python gradio_app.py launch
+```
+
+Parameters:
+
+- `--listen`: listens to all addresses by setting `server_name="0.0.0.0"` when launching the Gradio app.
+- `--self-deploy`: enables changing arbitrary configurations directly from the web.
+- `--save`: enables checkpoint saving.
 
 For feature requests, bug reports, or discussions about technical problems, please [file an issue](https://github.com/threestudio-project/threestudio/issues/new). In case you want to discuss the generation quality or showcase your generation results, please feel free to participate in the [discussion panel](https://github.com/threestudio-project/threestudio/discussions).
 
