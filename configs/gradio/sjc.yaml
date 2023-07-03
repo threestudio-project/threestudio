@@ -15,6 +15,8 @@ data:
 
 system_type: sjc-system
 system:
+  subpixel_rendering: false
+
   geometry_type: volume-grid
   geometry:
     normal_type: null
@@ -91,4 +93,4 @@ trainer:
 checkpoint:
   save_last: false
   save_top_k: -1
-  every_n_train_steps: ${trainer.max_steps}
+  every_n_train_steps: 0 # do not save checkpoints during training

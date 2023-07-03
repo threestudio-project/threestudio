@@ -15,6 +15,9 @@ import numpy as np
 import psutil
 import trimesh
 
+from threestudio.utils.config import load_config
+from threestudio.utils.typing import *
+
 
 def tail(f, window=20):
     # Returns the last `window` lines of file `f`.
@@ -71,28 +74,24 @@ class ExperimentStatus:
 
 EXP_ROOT_DIR = "outputs-gradio"
 DEFAULT_PROMPT = "a delicious hamburger"
-model_config = [
+model_name_config = [
+    ("SJC (Stable Diffusion)", "configs/gradio/sjc.yaml"),
     ("DreamFusion (DeepFloyd-IF)", "configs/gradio/dreamfusion-if.yaml"),
     ("DreamFusion (Stable Diffusion)", "configs/gradio/dreamfusion-sd.yaml"),
     ("TextMesh (DeepFloyd-IF)", "configs/gradio/textmesh-if.yaml"),
-    ("Fantasia3D (Stable Diffusion, Geometry Only)", "configs/gradio/fantasia3d.yaml"),
-    ("SJC (Stable Diffusion)", "configs/gradio/sjc.yaml"),
     ("Latent-NeRF (Stable Diffusion)", "configs/gradio/latentnerf.yaml"),
+    ("Fantasia3D (Stable Diffusion, Geometry Only)", "configs/gradio/fantasia3d.yaml"),
 ]
-model_choices = [m[0] for m in model_config]
-model_name_to_config = {m[0]: m[1] for m in model_config}
+model_list = [m[0] for m in model_name_config]
+model_config: Dict[str, Dict[str, Any]] = {}
 
-
-def load_model_config(model_name):
-    return open(model_name_to_config[model_name]).read()
-
-
-def load_model_config_attrs(model_name):
-    config_str = load_model_config(model_name)
-    from threestudio.utils.config import load_config
-
-    cfg = load_config(
-        config_str,
+for model_name, config_path in model_name_config:
+    config = {"path": config_path}
+    with open(config_path) as f:
+        config["yaml"] = f.read()
+    config["obj"] = load_config(
+        config["yaml"],
+        # set name and tag to dummy values to avoid creating new directories
         cli_args=[
             "name=dummy",
             "tag=dummy",
@@ -102,16 +101,14 @@ def load_model_config_attrs(model_name):
         ],
         from_string=True,
     )
-    return {
-        "source": config_str,
-        "guidance_scale": cfg.system.guidance.guidance_scale,
-        "max_steps": cfg.trainer.max_steps,
-    }
+    model_config[model_name] = config
 
 
 def on_model_selector_change(model_name):
-    cfg = load_model_config_attrs(model_name)
-    return [cfg["source"], cfg["guidance_scale"]]
+    return [
+        model_config[model_name]["yaml"],
+        model_config[model_name]["obj"].system.guidance.guidance_scale,
+    ]
 
 
 def get_current_status(process, trial_dir, alive_path):
@@ -190,6 +187,7 @@ def run(
     guidance_scale: float,
     seed: int,
     max_steps: int,
+    save: bool,
 ):
     # update status every 1 second
     status_update_interval = 1
@@ -201,14 +199,15 @@ def run(
         f.write(config)
 
     # manually assign the output directory, name and tag so that we know the trial directory
-    name = os.path.basename(model_name_to_config[model_name]).split(".")[0]
+    name = os.path.basename(model_config[model_name]["path"]).split(".")[0]
     tag = datetime.now().strftime("@%Y%m%d-%H%M%S")
     trial_dir = os.path.join(EXP_ROOT_DIR, name, tag)
     alive_path = os.path.join(trial_dir, "alive")
 
     # spawn the training process
+    gpu = os.environ.get("CUDA_VISIBLE_DEVICES", "0")
     process = subprocess.Popen(
-        f"python launch.py --config {config_file.name} --train --gpu 0 --gradio trainer.enable_progress_bar=false".split()
+        f"python launch.py --config {config_file.name} --train --gpu {gpu} --gradio trainer.enable_progress_bar=false".split()
         + [
             f'name="{name}"',
             f'tag="{tag}"',
@@ -219,6 +218,7 @@ def run(
             f"seed={seed}",
             f"trainer.max_steps={max_steps}",
         ]
+        + (["checkpoint.every_n_train_steps=${trainer.max_steps}"] if save else []),
     )
 
     # spawn the watcher process
@@ -259,30 +259,79 @@ def stop_run(pid):
         print(f"Exception when killing process {pid}.")
     # button status: Stop -> Reset
     return [
-        gr.update(value="Reset", variant="secondary", visible=True),
+        # gr.update(
+        #     value="Reset (refresh the page if in queue)",
+        #     variant="secondary",
+        #     visible=True,
+        # just ask the user to refresh the page
+        # ),
+        gr.update(
+            value="Please Refresh the Page",
+            variant="secondary",
+            visible=True,
+            interactive=False,
+        ),
         gr.update(visible=False),
     ]
 
 
-def launch(port, listen=False):
-    with gr.Blocks(title="threestudio - Web Demo") as demo:
-        with gr.Row():
+def launch(port, listen=False, hf_space=False, self_deploy=False, save=False):
+    self_deploy = self_deploy or "TS_SELF_DEPLOY" in os.environ
+
+    css = """
+    #config-accordion, #logs-accordion {color: black !important;}
+    .dark #config-accordion, .dark #logs-accordion {color: white !important;}
+    .stop {background: darkred !important;}
+    """
+
+    with gr.Blocks(
+        title="threestudio - Web Demo",
+        theme=gr.themes.Monochrome(),
+        css=css,
+    ) as demo:
+        with gr.Row(equal_height=True):
+            if hf_space:
+                header = """
+                # threestudio Text-to-3D Web Demo
+
+                <div>
+                <a style="display: inline-block;" href="https://github.com/threestudio-project/threestudio"><img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white"></a>
+                <a style="display: inline-block;" href="https://huggingface.co/spaces/bennyguo/threestudio?duplicate=true"><img src="https://img.shields.io/badge/-Duplicate%20Space%20to%20skip%20the%20queue-blue?labelColor=white&style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAP5JREFUOE+lk7FqAkEURY+ltunEgFXS2sZGIbXfEPdLlnxJyDdYB62sbbUKpLbVNhyYFzbrrA74YJlh9r079973psed0cvUD4A+4HoCjsA85X0Dfn/RBLBgBDxnQPfAEJgBY+A9gALA4tcbamSzS4xq4FOQAJgCDwV2CPKV8tZAJcAjMMkUe1vX+U+SMhfAJEHasQIWmXNN3abzDwHUrgcRGmYcgKe0bxrblHEB4E/pndMazNpSZGcsZdBlYJcEL9Afo75molJyM2FxmPgmgPqlWNLGfwZGG6UiyEvLzHYDmoPkDDiNm9JR9uboiONcBXrpY1qmgs21x1QwyZcpvxt9NS09PlsPAAAAAElFTkSuQmCC&logoWidth=14" alt="Duplicate Space"></a>
+                </div>
+
+                ### Usage
+                - Select a model from the dropdown menu. If you duplicate this space and would like to use models based on DeepFloyd-IF, you need to [accept the license](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0) and set `HUGGING_FACE_HUB_TOKEN` in `Repository secrets` in your space setting. You may also set `TS_SELF_DEPLOY` to enable changing arbitrary configurations.
+                - Input a text prompt and hit the `Run` button to start.
+                - Video and mesh export (not supported for SJC and Latent-NeRF) are available after the training process is finished.
+                - **IMPORTANT NOTE: Keep this tab active when running the model.**
+                """
+            else:
+                header = """
+                # threestudio Text-to-3D Web Demo
+
+                ### Usage
+                - Select a model from the dropdown menu.
+                - Input a text prompt and hit the `Run` button to start.
+                - Video and mesh export (not supported for SJC and Latent-NeRF) are available after the training process is finished.
+                - **IMPORTANT NOTE: Keep this tab active when running the model.**
+                """
+            gr.Markdown(header)
+
+        with gr.Row(equal_height=False):
             pid = gr.State()
             with gr.Column(scale=1):
-                header = gr.Markdown(
-                    """
-                    # threestudio
-
-                    - Select a model from the dropdown menu.
-                    - Input a text prompt.
-                    - Hit Run!
-                    """
+                # generation status
+                status = gr.Textbox(
+                    value="Hit the Run button to start.",
+                    label="Status",
+                    lines=1,
+                    max_lines=1,
                 )
 
                 # model selection dropdown
                 model_selector = gr.Dropdown(
-                    value=model_choices[0],
-                    choices=model_choices,
+                    value=model_list[0],
+                    choices=model_list,
                     label="Select a model",
                 )
 
@@ -293,9 +342,9 @@ def launch(port, listen=False):
                 guidance_scale_input = gr.Slider(
                     minimum=0.0,
                     maximum=100.0,
-                    value=load_model_config_attrs(model_selector.value)[
-                        "guidance_scale"
-                    ],
+                    value=model_config[model_selector.value][
+                        "obj"
+                    ].system.guidance.guidance_scale,
                     step=0.5,
                     label="Guidance scale",
                 )
@@ -307,18 +356,28 @@ def launch(port, listen=False):
 
                 max_steps_input = gr.Slider(
                     minimum=1,
-                    maximum=5000,
-                    value=5000,
+                    maximum=20000 if self_deploy else 5000,
+                    value=10000 if self_deploy else 5000,
                     step=1,
                     label="Number of training steps",
                 )
 
+                save_checkbox = gr.Checkbox(
+                    value=save,
+                    label="Save Checkpoints",
+                    visible=False,
+                    interactive=False,
+                )
+
                 # full config viewer
-                with gr.Accordion("See full configurations", open=False):
+                with gr.Accordion(
+                    "See full configurations", open=False, elem_id="config-accordion"
+                ):
                     config_editor = gr.Code(
-                        value=load_model_config(model_selector.value),
+                        value=model_config[model_selector.value]["yaml"],
                         language="yaml",
-                        interactive=False,
+                        lines=10,
+                        interactive=self_deploy,  # disable editing if in HF space
                     )
 
                 # load config on model selection change
@@ -326,21 +385,16 @@ def launch(port, listen=False):
                     fn=on_model_selector_change,
                     inputs=model_selector,
                     outputs=[config_editor, guidance_scale_input],
+                    queue=False,
                 )
 
                 run_btn = gr.Button(value="Run", variant="primary")
                 stop_btn = gr.Button(value="Stop", variant="stop", visible=False)
 
-                # generation status
-                status = gr.Textbox(
-                    value="Hit the Run button to start.",
-                    label="Status",
-                    lines=1,
-                    max_lines=1,
-                )
-
             with gr.Column(scale=1):
-                with gr.Accordion("See terminal logs", open=False):
+                with gr.Accordion(
+                    "See terminal logs", open=False, elem_id="logs-accordion"
+                ):
                     # logs
                     logs = gr.Textbox(label="Logs", lines=10)
 
@@ -362,6 +416,7 @@ def launch(port, listen=False):
                 guidance_scale_input,
                 seed_input,
                 max_steps_input,
+                save_checkbox,
             ],
             outputs=[
                 pid,
@@ -375,17 +430,25 @@ def launch(port, listen=False):
             ],
         )
         stop_btn.click(
-            fn=stop_run, inputs=[pid], outputs=[run_btn, stop_btn], cancels=[run_event]
+            fn=stop_run,
+            inputs=[pid],
+            outputs=[run_btn, stop_btn],
+            cancels=[run_event],
+            queue=False,
         )
 
     launch_args = {"server_port": port}
     if listen:
         launch_args["server_name"] = "0.0.0.0"
-    demo.queue().launch(**launch_args)
+    demo.queue(concurrency_count=1).launch(**launch_args)
 
 
 def watch(
-    pid: int, trial_dir: str, alive_timeout: int, wait_timeout: int, check_interval: int
+    pid: int,
+    trial_dir: str,
+    alive_timeout: int,
+    wait_timeout: int,
+    check_interval: int,
 ) -> None:
     print(f"Spawn watcher for process {pid}")
 
@@ -408,16 +471,22 @@ def watch(
         while True:
             if not psutil.pid_exists(pid):
                 print(f"Process {pid} not exists, watcher exits.")
-                exit(0)
-            alive_timestamp = float(open(alive_path).read())
+                cleanup_and_exit()
+            try:
+                alive_timestamp = float(open(alive_path).read())
+            except:
+                continue
             if time.time() - alive_timestamp > alive_timeout:
                 print(f"Alive timeout for process {pid}, killed.")
                 try:
                     os.kill(pid, signal.SIGKILL)
                 except:
                     print(f"Exception when killing process {pid}.")
-                exit(0)
+                cleanup_and_exit()
             time.sleep(check_interval)
+
+    def cleanup_and_exit():
+        exit(0)
 
     # loop until alive file is found, or alive_timeout is reached
     loop_find_progress_file()
@@ -431,9 +500,18 @@ if __name__ == "__main__":
     args, extra = parser.parse_known_args()
     if args.operation == "launch":
         parser.add_argument("--listen", action="store_true")
+        parser.add_argument("--hf-space", action="store_true")
+        parser.add_argument("--self-deploy", action="store_true")
+        parser.add_argument("--save", action="store_true")
         parser.add_argument("--port", type=int, default=7860)
         args = parser.parse_args()
-        launch(args.port, listen=args.listen)
+        launch(
+            args.port,
+            listen=args.listen,
+            hf_space=args.hf_space,
+            self_deploy=args.self_deploy,
+            save=args.save,
+        )
     if args.operation == "watch":
         parser.add_argument("--pid", type=int)
         parser.add_argument("--trial-dir", type=str)
