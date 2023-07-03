@@ -73,6 +73,7 @@ system:
   exporter:
     fmt: obj
     save_uv: false
+    context_type: cuda
 
   loss:
     lambda_sds: 1.
