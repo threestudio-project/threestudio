@@ -28,6 +28,7 @@ class StableDiffusionGuidance(BaseObject):
         grad_clip: Optional[
             Any
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
+        time_prior: Optional[Any] = None  # [w1,w2,s1,s2]
         half_precision_weights: bool = True
 
         min_step_percent: float = 0.02
@@ -122,6 +123,20 @@ class StableDiffusionGuidance(BaseObject):
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.set_min_max_steps()  # set to default value
+        if self.cfg.time_prior is not None:
+            m1, m2, s1, s2 = self.cfg.time_prior
+            weights = torch.cat(
+                (
+                    torch.exp(
+                        -(torch.arange(self.num_train_timesteps, m1, -1) - m1 ^ 2)
+                        / (2 * s1 ^ 2)
+                    ),
+                    torch.ones(m1 - m2 + 1),
+                    torch.exp(-(torch.arange(m2 - 1, 0, -1) - m2 ^ 2) / (2 * s2 ^ 2)),
+                )
+            )
+            weights = weights / torch.sum(weights)
+            self.time_prior_acc_weights = torch.cumsum(weights, dim=0)
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
@@ -377,6 +392,7 @@ class StableDiffusionGuidance(BaseObject):
         camera_distances: Float[Tensor, "B"],
         rgb_as_latents=False,
         guidance_eval=False,
+        current_step_ratio=None,
         **kwargs,
     ):
         batch_size = rgb.shape[0]
@@ -394,14 +410,30 @@ class StableDiffusionGuidance(BaseObject):
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
 
-        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
-        t = torch.randint(
-            self.min_step,
-            self.max_step + 1,
-            [batch_size],
-            dtype=torch.long,
-            device=self.device,
-        )
+        if self.cfg.time_prior is not None:
+            time_index = torch.where(
+                (self.time_prior_acc_weights - current_step_ratio) > 0
+            )[0][0]
+            if time_index == 0 or torch.abs(
+                self.time_prior_acc_weights[time_index] - current_step_ratio
+            ) < torch.abs(
+                self.time_prior_acc_weights[time_index - 1] - current_step_ratio
+            ):
+                t = self.num_train_timesteps - time_index
+            else:
+                t = self.num_train_timesteps - time_index + 1
+            t = torch.clip(t, self.min_step, self.max_step + 1)
+            t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
+
+        else:
+            # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
+            t = torch.randint(
+                self.min_step,
+                self.max_step + 1,
+                [batch_size],
+                dtype=torch.long,
+                device=self.device,
+            )
 
         if self.cfg.use_sjc:
             grad, guidance_eval_utils = self.compute_grad_sjc(
