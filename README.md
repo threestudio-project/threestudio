@@ -130,17 +130,17 @@ If you want to resume from a checkpoint, do:
 
 ```sh
 # resume training from the last checkpoint, you may replace last.ckpt with any other checkpoints
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/ckpts/last.ckpt
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/dir/ckpts/last.ckpt
 # if the training has completed, you can still continue training for a longer time by setting trainer.max_steps
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/ckpts/last.ckpt trainer.max_steps=20000
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 resume=path/to/trial/dir/ckpts/last.ckpt trainer.max_steps=20000
 # you can also perform testing using resumed checkpoints
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 resume=path/to/trial/ckpts/last.ckpt
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --test --gpu 0 resume=path/to/trial/dir/ckpts/last.ckpt
 # note that the above commands use parsed configuration files from previous trials
 # which will continue using the same trial directory
 # if you want to save to a new trial directory, replace parsed.yaml with raw.yaml in the command
 
 # only load weights from saved checkpoint but dont resume training (i.e. dont load optimizer state):
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 system.weights=path/to/trial/ckpts/last.ckpt
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --train --gpu 0 system.weights=path/to/trial/dir/ckpts/last.ckpt
 ```
 
 ### Export Meshes
@@ -149,16 +149,16 @@ To export the scene to texture meshes, use the `--export` option. We currently s
 
 ```sh
 # this uses default mesh-exporter configurations which exports obj+mtl
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/ckpts/last.ckpt system.exporter_type=mesh-exporter
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/dir/ckpts/last.ckpt system.exporter_type=mesh-exporter
 # specify system.exporter.fmt=obj to get obj with vertex colors
 # you may also add system.exporter.save_uv=false to accelerate the process, suitable for a quick peek of the result
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/ckpts/last.ckpt system.exporter_type=mesh-exporter system.exporter.fmt=obj
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/dir/ckpts/last.ckpt system.exporter_type=mesh-exporter system.exporter.fmt=obj
 # for NeRF-based methods (DreamFusion, Magic3D coarse, Latent-NeRF, SJC)
 # you may need to adjust the isosurface threshold (25 by default) to get satisfying outputs
 # decrease the threshold if the extracted model is incomplete, increase if it is extruded
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/ckpts/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_threshold=10.
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/dir/ckpts/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_threshold=10.
 # use marching cubes of higher resolutions to get more detailed models
-python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/ckpts/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_method=mc-cpu system.geometry.isosurface_resolution=256
+python launch.py --config path/to/trial/dir/configs/parsed.yaml --export --gpu 0 resume=path/to/trial/dir/ckpts/last.ckpt system.exporter_type=mesh-exporter system.geometry.isosurface_method=mc-cpu system.geometry.isosurface_resolution=256
 ```
 
 For all the options you can specify when exporting, see [the documentation](https://github.com/threestudio-project/threestudio/blob/main/DOCUMENTATION.md#exporters).
@@ -219,11 +219,11 @@ python launch.py --config configs/prolificdreamer-scene.yaml --train --gpu 0 sys
 
 # --------- Stage 2 (Geometry Refinement) --------- #
 # refine geometry with 512x512 rasterization, Stable Diffusion SDS guidance
-python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/ckpts/last.ckpt
+python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage1/trial/dir/ckpts/last.ckpt
 
 # --------- Stage 3 (Texturing) --------- #
 # texturing with 512x512 rasterization, Stable Difusion VSD guidance
-python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/ckpts/last.ckpt
+python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/dir/ckpts/last.ckpt
 ```
 
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
@@ -289,11 +289,11 @@ Then convert the NeRF from the coarse stage to DMTet and train with differentiab
 
 ```sh
 # the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/ckpts/last.ckpt
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/dir/ckpts/last.ckpt
 # if you're unsatisfied with the surface extraced using the default threshold (25)
 # you can specify a threshold value using `system.geometry_convert_override`
 # decrease the value if the extracted surface is incomplete, increate if it is extruded
-python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/ckpts/last.ckpt system.geometry_convert_override.isosurface_threshold=10.
+python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/dir/ckpts/last.ckpt system.geometry_convert_override.isosurface_threshold=10.
 ```
 
 **Tips**
@@ -341,12 +341,12 @@ We currently only implement Latent-NeRF for text-guided and Sketch-Shape for (te
 # train Latent-NeRF in Stable Diffusion latent space
 python launch.py --config configs/latentnerf.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger"
 # refine Latent-NeRF in RGB space
-python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
+python launch.py --config configs/latentnerf-refine.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.weights=path/to/latent/stage/trial/dir/ckpts/last.ckpt
 
 # train Sketch-Shape in Stable Diffusion latent space
 python launch.py --config configs/sketchshape.yaml --train --gpu 0 system.guide_shape=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo"
 # refine Sketch-Shape in RGB space
-python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system.guide_shape=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo" system.weights=path/to/latent/stage/trial/ckpts/last.ckpt
+python launch.py --config configs/sketchshape-refine.yaml --train --gpu 0 system.guide_shape=load/shapes/teddy.obj system.prompt_processor.prompt="a teddy bear in a tuxedo" system.weights=path/to/latent/stage/trial/dir/ckpts/last.ckpt
 ```
 
 ### Fantasia3D [![arXiv](https://img.shields.io/badge/arXiv-2303.13873-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.13873)
@@ -382,7 +382,7 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_processor.prompt="hulk" system.geometry.shape_init=mesh:load/shapes/human.obj system.geometry.shape_init_params=0.9 system.geometry.shape_init_mesh_up=+y system.geometry.shape_init_mesh_front=+z
 # --------- Texture --------- #
 # to train PBR texture continued from a geometry checkpoint:
-python launch.py --config configs/fantasia3d-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of an ice cream sundae" system.geometry_convert_from=path/to/geometry/stage/trial/ckpts/last.ckpt
+python launch.py --config configs/fantasia3d-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of an ice cream sundae" system.geometry_convert_from=path/to/geometry/stage/trial/dir/ckpts/last.ckpt
 ```
 
 **Tips**
