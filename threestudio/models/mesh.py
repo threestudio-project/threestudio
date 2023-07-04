@@ -213,7 +213,7 @@ class Mesh:
 
         atlas = xatlas.Atlas()
         atlas.add_mesh(
-            self.v_pos.cpu().numpy(),
+            self.v_pos.detach().cpu().numpy(),
             self.t_pos_idx.cpu().numpy(),
         )
         co = xatlas.ChartOptions()
