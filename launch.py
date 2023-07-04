@@ -67,6 +67,7 @@ def main(args, extras) -> None:
     )
     from threestudio.utils.config import ExperimentConfig, load_config
     from threestudio.utils.typing import Optional
+    from threestudio.utils.misc import get_rank
 
     logger = logging.getLogger("pytorch_lightning")
     if args.verbose:
@@ -84,7 +85,7 @@ def main(args, extras) -> None:
     cfg: ExperimentConfig
     cfg = load_config(args.config, cli_args=extras, n_gpus=n_gpus)
 
-    pl.seed_everything(cfg.seed)
+    seed_everything(cfg.seed, workers=True) # using same seed to init model weights
 
     dm = threestudio.find(cfg.data_type)(cfg.data)
     system: BaseSystem = threestudio.find(cfg.system_type)(
@@ -92,6 +93,8 @@ def main(args, extras) -> None:
     )
     system.set_save_dir(os.path.join(cfg.trial_dir, "save"))
 
+    seed_everything(cfg.seed + get_rank(), workers=True) # using different seed now for loading different data
+    
     if args.gradio:
         fh = logging.FileHandler(os.path.join(cfg.trial_dir, "logs"))
         fh.setLevel(logging.INFO)
