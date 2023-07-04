@@ -48,12 +48,20 @@ class ProlificDreamer(BaseLift3DSystem):
         if self.cfg.stage == "geometry":
             guidance_inp = out["comp_normal"]
             guidance_out = self.guidance(
-                guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
+                guidance_inp,
+                self.prompt_utils,
+                **batch,
+                rgb_as_latents=False,
+                current_step_ratio=self.true_global_step / self.trainer.max_steps,
             )
         else:
             guidance_inp = out["comp_rgb"]
             guidance_out = self.guidance(
-                guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
+                guidance_inp,
+                self.prompt_utils,
+                **batch,
+                rgb_as_latents=False,
+                current_step_ratio=self.true_global_step / self.trainer.max_steps,
             )
 
         loss = 0.0
