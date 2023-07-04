@@ -1,0 +1,92 @@
+name: sjc-vsd
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: outputs
+seed: 0
+
+data_type: random-camera-datamodule
+data:
+  camera_distance_range: [1.50, 1.50]
+  elevation_range: [-10, 45]
+  camera_perturb: 0.0
+  center_perturb: 0.0
+  up_perturb: 0.0
+  light_position_perturb: 0.0
+  eval_elevation_deg: 20.0
+
+system_type: sjc-system
+system:
+  geometry_type: volume-grid
+  geometry:
+    normal_type: null
+    grid_size: [100, 100, 100]
+    density_bias: -1.0
+    n_feature_dims: 4
+
+  material_type: no-material
+  material:
+    n_output_dims: 4
+    color_activation: none
+
+  background_type: "neural-environment-map-background"
+  background:
+    color_activation: none
+    random_aug: false
+    n_output_dims: 4
+
+  renderer_type: nerf-volume-renderer
+  renderer:
+    num_samples_per_ray: 512
+    grid_prune: false
+
+  prompt_processor_type: stable-diffusion-prompt-processor
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: ???
+    view_dependent_prompt_front: false
+
+  guidance_type: "stable-diffusion-vsd-guidance"
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1-base"
+    guidance_scale: 7.5
+    min_step_percent: 0.02
+    max_step_percent: [5000, 0.98, 0.5, 5001] # annealed to 0.5 after 5000 steps
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+      name: None
+
+  loss:
+    lambda_vsd: 1.
+    lambda_lora: 1.
+    center_ratio: 0.78125 # = 50 / 64
+    lambda_depth: 0 # or try 10
+    lambda_emptiness: 0.
+    emptiness_scale: 10
+
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.01
+    params:
+      geometry:
+        lr: 0.01
+      background:
+        lr: 0.001
+      guidance:
+        lr: 0.0001
+
+trainer:
+  max_steps: 10000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 1
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true # save at each validation tim
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}
