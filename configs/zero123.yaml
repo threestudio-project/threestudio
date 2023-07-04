@@ -15,10 +15,10 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: [64, 128]
-    width: [64, 128]
-    batch_size: [12, 6]
-    resolution_milestones: [200]
+    height: [64, 128, 256]
+    width: [64, 128, 256]
+    batch_size: [12, 6, 2]
+    resolution_milestones: [100, 200]
     eval_height: 256
     eval_width: 256
     eval_batch_size: 1
@@ -109,9 +109,9 @@ system:
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     #min_step_percent: 0.02
-    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    min_step_percent: [0, 0.4, 0.1, 200]  # (start_iter, start_val, end_val, end_iter)
     #max_step_percent: 0.98
-    max_step_percent: [0, 0.85, 0.85, 2000]
+    max_step_percent: [0, 0.85, 0.4, 200]
 
   freq:
     n_ref: 2
@@ -127,7 +127,7 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.05
+    lambda_sds: 0.1
     lambda_rgb: 500.
     lambda_mask: 50.
     lambda_depth: 0.05
