@@ -118,7 +118,6 @@ system:
     ref_only_steps: 0
     guidance_eval: 0  # if "alternate", this must not be a multiple of system.freq.n_ref
     ref_or_zero123: "accumulate" # can be "accumulate" or "alternate"
-    actual_val: 50
 
   loggers:
     wandb:
