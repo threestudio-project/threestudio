@@ -109,9 +109,9 @@ system:
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     #min_step_percent: 0.02
-    min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    min_step_percent: [0, 0.1, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
     #max_step_percent: 0.98
-    max_step_percent: [0, 0.85, 0.85, 2000]
+    max_step_percent: [0, 0.4, 0.2, 2000]
 
   freq:
     n_ref: 2
@@ -127,7 +127,7 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.05
+    lambda_sds: 0.1
     lambda_rgb: 500.
     lambda_mask: 50.
     lambda_depth: 0.
@@ -136,8 +136,8 @@ system:
     lambda_normal_smooth: 5.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 1.0
-    lambda_sparsity: 0.1 # should be tweaked for every model
-    lambda_opaque: 0.05
+    lambda_sparsity: 1.0 # should be tweaked for every model
+    lambda_opaque: 1.0
 
   optimizer:
     name: Adan
@@ -156,7 +156,7 @@ trainer:
   max_steps: 300
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 20
+  val_check_interval: 2
   enable_progress_bar: true
   precision: 16-mixed
 
