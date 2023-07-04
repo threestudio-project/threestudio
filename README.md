@@ -38,7 +38,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 ## News
-- 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio/edit/main/README.md#gradio-web-interface).
+- 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
 - 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-)  to give it a try.
 - 06/14/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
 - 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
