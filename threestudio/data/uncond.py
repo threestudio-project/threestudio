@@ -28,10 +28,10 @@ class RandomCameraDataModuleConfig:
     # but OmegaConf does not support Union of containers
     height: Any = 64
     width: Any = 64
+    batch_size: Any = 1
     resolution_milestones: List[int] = field(default_factory=lambda: [])
     eval_height: int = 512
     eval_width: int = 512
-    batch_size: int = 1
     eval_batch_size: int = 1
     n_val_views: int = 1
     n_test_views: int = 120
