@@ -8,4 +8,5 @@ from . import (
     sjc,
     textmesh,
     zero123,
+    att3d
 )

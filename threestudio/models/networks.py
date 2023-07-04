@@ -3,6 +3,7 @@ import math
 import tinycudann as tcnn
 import torch
 import torch.nn as nn
+from torch.nn.utils.parametrizations import spectral_norm
 import torch.nn.functional as F
 
 import threestudio
@@ -92,6 +93,9 @@ class ProgressiveBandHashGrid(nn.Module, Updateable):
         enc = self.encoding(x)
         enc = enc * self.mask
         return enc
+    
+    def from_hyper_net(self, weight):
+        self.encoding.state_dict()["params"].copy_(weight)
 
     def update_step(self, epoch, global_step, on_load_weights=False):
         current_level = min(
@@ -103,6 +107,40 @@ class ProgressiveBandHashGrid(nn.Module, Updateable):
             threestudio.debug(f"Update current level to {current_level}")
         self.current_level = current_level
         self.mask[: self.current_level * self.n_features_per_level] = 1.0
+
+
+class MultipleHashGrid(nn.Module, Updateable):
+    def __init__(self, in_channels, config, dtype=torch.float32):
+        super(MultipleHashGrid, self).__init__()
+        resolutions = config.pop("resolutions")
+        config["otype"] = "Grid"
+        config["type"] = "Hash"
+        self.resolutions = resolutions
+        self.encodings = []
+        self.offsets = []
+        offset = 0
+        self.n_input_dims = in_channels
+        self.n_output_dims = 0
+        for i, resolution in enumerate(self.resolutions):
+            config.update({"base_resolution": resolution})
+            encoding = tcnn.Encoding(in_channels, config, dtype=dtype)
+            self.encodings.append(encoding)
+            self.offsets.append(offset)
+            offset += encoding.params.numel()
+            self.n_output_dims += encoding.n_output_dims
+        
+        threestudio.info(f"#Parameters of multiple hash grid is : {offset}")
+        threestudio.info(f"#Output dim of multiple hash grid is : {self.n_output_dims}")
+
+    def forward(self, x):
+        return torch.cat(
+            [encoding(x) for encoding in self.encodings], dim=-1
+        )
+    
+    def from_hyper_net(self, weight):
+        for i, encoding in enumerate(self.encodings):
+            size = encoding.params.numel()
+            encoding.state_dict()["params"].copy_(weight[self.offsets[i] : self.offsets[i] + size])
 
 
 class CompositeEncoding(nn.Module, Updateable):
@@ -136,6 +174,8 @@ def get_encoding(n_input_dims: int, config) -> nn.Module:
         encoding = ProgressiveBandFrequency(n_input_dims, config_to_primitive(config))
     elif config.otype == "ProgressiveBandHashGrid":
         encoding = ProgressiveBandHashGrid(n_input_dims, config_to_primitive(config))
+    elif config.otype == "MultipleHashGrid":
+        encoding = MultipleHashGrid(n_input_dims, config_to_primitive(config))
     else:
         encoding = TCNNEncoding(n_input_dims, config_to_primitive(config))
     encoding = CompositeEncoding(
@@ -185,6 +225,24 @@ class VanillaMLP(nn.Module):
 
     def make_activation(self):
         return nn.ReLU(inplace=True)
+
+
+class HyperNet(nn.Module):
+    def __init__(self, dim_in: int, dim_out: int, dim_hidden: int):
+        super().__init__()
+        self.linear1 = spectral_norm(nn.Linear(dim_in, dim_hidden, bias=True))
+        self.linear2 = spectral_norm(nn.Linear(dim_hidden, dim_out, bias=False))
+        # self.linear_1 = nn.Linear(dim_in, 32, bias=True)
+        # self.linear_2 = nn.Linear(32, dim_out, bias=False)
+    
+    def forward(self, x):
+        # disable autocast
+        # strange that the parameters will have empty gradients if autocast is enabled in AMP
+        with torch.cuda.amp.autocast(enabled=False):
+            x = self.linear1(x)
+            x = F.silu(x, inplace=True)
+            x = self.linear2(x)
+        return x
 
 
 class SphereInitVanillaMLP(nn.Module):
