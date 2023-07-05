@@ -133,7 +133,7 @@ system:
     lambda_depth_rel: [0, 0, 0.05, 100]
     lambda_normal: 0. # [0, 0, 0.05, 100]
     lambda_normal_smooth: 5.0
-    lambda_3d_normal_smooth: 5.0
+    lambda_3d_normal_smooth: 2.0
     lambda_orient: 1.0
     lambda_sparsity: 0.1 # should be tweaked for every model
     lambda_opaque: 0.05
