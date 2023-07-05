@@ -132,7 +132,7 @@ This is particularly useful if you run `launch.py` in a cluster using a command 
 ```bash
 cd git/threestudio
 . venv/bin/activate
-srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_bunny python launch.py --config configs/dreamfusion-if.yaml --train system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
+srun --account mod3d --partition=g40 --gpus 2 --job-name=3s_bunny python launch.py --config configs/dreamfusion-if.yaml --train --gpu -1 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
 ```
 
 ### Resume from checkpoints

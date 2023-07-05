@@ -1,8 +1,10 @@
 import argparse
+import ast
 import contextlib
 import logging
 import os
 import sys
+from typing import Union
 
 
 class ColoredFilter(logging.Filter):
@@ -42,19 +44,22 @@ class ColoredFilter(logging.Filter):
 def main(args, extras) -> None:
     # set CUDA_VISIBLE_DEVICES if needed, then import pytorch-lightning
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    env_gpus_str = os.environ.get("CUDA_VISIBLE_DEVICES", None)
-    env_gpus = list(env_gpus_str.split(",")) if env_gpus_str else []
-    selected_gpus = [0]
-    if len(env_gpus) > 0:
-        # CUDA_VISIBLE_DEVICES was set already, e.g. within SLURM srun or higher-level script.
-        # Use all available GPUs by default
+    devices: Union[int, list] = 0
+    gpus = ast.literal_eval(args.gpu)  # claforte: any concern with this?
+    n_gpus = -1  # if -1, downstream code will assume >1 GPU in use
+    if gpus == -1:
         devices = -1
-        selected_gpus = env_gpus
+        n_gpus = -1
+    elif isinstance(gpus, int):  # e.g. `--gpu 0`
+        devices = [gpus]
+        n_gpus = len(devices)
+    elif isinstance(gpus, tuple):  # e.g. `--gpu 0,1`
+        devices = list(gpus)
+        n_gpus = len(devices)
     else:
-        devices = "auto"
-        selected_gpus = list(args.gpu.split(","))
-        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(selected_gpus)
-    n_gpus = len(selected_gpus)
+        assert (
+            False
+        ), f"Unknown parameter type passed to --gpu: {gpus} type=({type(gpus)})"
 
     import pytorch_lightning as pl
     import torch
@@ -197,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gpu",
         default="0",
-        help="GPU(s) to be used. 0 defaults to all CUDA_VISIBLE_DEVICES if that env variable is defined, otherwise GPU 0.",
+        help="GPU(s) to be used. 0 means use the 1st available GPU. 1,2 means use the 2nd and 3rd available GPU. -1 defaults to all available devices.",
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
