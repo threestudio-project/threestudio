@@ -92,37 +92,37 @@ system:
     return_comp_normal: ${gt0:${system.loss.lambda_normal_smooth}}
     return_normal_perturb: ${gt0:${system.loss.lambda_3d_normal_smooth}}
 
-  prompt_processor_type: "stable-diffusion-prompt-processor"
-  prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    prompt: "a DSLR photo of a delicious hamburger"
-
-  guidance_type: "stable-diffusion-guidance"
-  guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    guidance_scale: 7.5
-    min_step_percent: 0.2
-    # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.6
-    # max_step_percent: [0, 0.98, 0.66, 2000]
-
-  # prompt_processor_type: "deep-floyd-prompt-processor"
+  # prompt_processor_type: "stable-diffusion-prompt-processor"
   # prompt_processor:
-  #   pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
-  #   prompt: "a DSLR photo of a delicious hamburger"
+  #   pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+  #   prompt: ???
 
-  # guidance_type: "deep-floyd-guidance"
+  # guidance_type: "stable-diffusion-guidance"
   # guidance:
-  #   pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
+  #   pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
   #   guidance_scale: 7.5
   #   min_step_percent: 0.2
   #   # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
   #   max_step_percent: 0.6
   #   # max_step_percent: [0, 0.98, 0.66, 2000]
 
+  prompt_processor_type: "deep-floyd-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
+    prompt: "a DSLR photo of a delicious hamburger"
+
+  guidance_type: "deep-floyd-guidance"
+  guidance:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
+    guidance_scale: 7.5
+    min_step_percent: 0.02
+    # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
+    max_step_percent: 0.4
+    # max_step_percent: [0, 0.98, 0.66, 2000]
+
   freq:
     ref_only_steps: 0
-    guidance_eval: 13
+    guidance_eval: 0
 
   loggers:
     wandb:
@@ -131,13 +131,13 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.1
-    lambda_rgb: 400.0
+    lambda_sds: 0.5
+    lambda_rgb: 500.0
     lambda_mask: 50.0
     lambda_depth: 0.05
     lambda_depth_rel: [0.0, 0.0, 1.0, 10000]
     lambda_normal: 0. # [0, 0, 0.05, 100]
-    lambda_normal_smooth: 2.0
+    lambda_normal_smooth: 5.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 0.01
     lambda_sparsity: 0.01
@@ -157,7 +157,7 @@ system:
         lr: 0.0
 
 trainer:
-  max_steps: 2000
+  max_steps: 300
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 20
