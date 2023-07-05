@@ -103,7 +103,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
         if guidance == "ref":
             gt_mask = batch["mask"]
             gt_rgb = batch["rgb"]
-            gt_depth = batch["depth"]
 
             # color loss
             gt_rgb = gt_rgb * gt_mask.float() + out["comp_rgb_bg"] * (
