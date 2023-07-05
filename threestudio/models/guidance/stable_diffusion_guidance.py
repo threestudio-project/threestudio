@@ -128,11 +128,13 @@ class StableDiffusionGuidance(BaseObject):
             weights = torch.cat(
                 (
                     torch.exp(
-                        -(torch.arange(self.num_train_timesteps, m1, -1) - m1 ^ 2)
-                        / (2 * s1 ^ 2)
+                        -((torch.arange(self.num_train_timesteps, m1, -1) - m1) ** 2)
+                        / (2 * s1**2)
                     ),
                     torch.ones(m1 - m2 + 1),
-                    torch.exp(-(torch.arange(m2 - 1, 0, -1) - m2 ^ 2) / (2 * s2 ^ 2)),
+                    torch.exp(
+                        -((torch.arange(m2 - 1, 0, -1) - m2) ** 2) / (2 * s2**2)
+                    ),
                 )
             )
             weights = weights / torch.sum(weights)
@@ -423,6 +425,7 @@ class StableDiffusionGuidance(BaseObject):
             else:
                 t = self.num_train_timesteps - time_index + 1
             t = torch.clip(t, self.min_step, self.max_step + 1)
+            print(f"t is {t}")
             t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
 
         else:
