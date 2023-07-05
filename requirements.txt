@@ -22,6 +22,7 @@ PyMCubes
 wandb
 gradio
 git+https://github.com/ashawkey/envlight.git
+torchmetrics
 
 # deepfloyd
 xformers

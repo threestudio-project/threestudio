@@ -12,6 +12,8 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
+  requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
     height: [64, 128]
     width: [64, 128]
@@ -124,14 +126,16 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.05
+    lambda_sds: 0.03
     lambda_rgb: 500.
     lambda_mask: 50.
     lambda_depth: 0.05
+    lambda_depth_rel: 0.
+    lambda_normal: 0. # [0, 0, 0.05, 100]
     lambda_normal_smooth: 5.0
-    lambda_3d_normal_smooth: 5.0
+    lambda_3d_normal_smooth: 2.0
     lambda_orient: 1.0
-    lambda_sparsity: 0.2 # should be tweaked for every model
+    lambda_sparsity: 0.1 # should be tweaked for every model
     lambda_opaque: 0.05
 
   optimizer:

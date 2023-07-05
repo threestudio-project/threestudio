@@ -40,6 +40,8 @@ class SingleImageDataModuleConfig:
     random_camera: dict = field(default_factory=dict)
     rays_noise_scale: float = 2e-3
     batch_size: int = 1
+    requires_depth: bool = False
+    requires_normal: bool = False
 
 
 class SingleImageDataBase:
@@ -84,20 +86,42 @@ class SingleImageDataBase:
         )
 
         # load depth
-        depth_path = self.cfg.image_path.replace("_rgba.png", "_depth.png")
-        assert os.path.exists(depth_path)
-        depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
-        depth = cv2.resize(
-            depth, (self.cfg.width, self.cfg.height), interpolation=cv2.INTER_AREA
-        )
-        self.depth: Float[Tensor, "1 H W 1"] = (
-            torch.from_numpy(depth.astype(np.float32) / 255.0)
-            .unsqueeze(0)
-            .to(self.rank)
-        )
-        print(
-            f"[INFO] single image dataset: load depth {depth_path} {self.depth.shape}"
-        )
+        if self.cfg.requires_depth:
+            depth_path = self.cfg.image_path.replace("_rgba.png", "_depth.png")
+            assert os.path.exists(depth_path)
+            depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+            depth = cv2.resize(
+                depth, (self.cfg.width, self.cfg.height), interpolation=cv2.INTER_AREA
+            )
+            self.depth: Float[Tensor, "1 H W 1"] = (
+                torch.from_numpy(depth.astype(np.float32) / 255.0)
+                .unsqueeze(0)
+                .to(self.rank)
+            )
+            print(
+                f"[INFO] single image dataset: load depth {depth_path} {self.depth.shape}"
+            )
+        else:
+            self.depth = None
+
+        # load normal
+        if self.cfg.requires_normal:
+            normal_path = self.cfg.image_path.replace("_rgba.png", "_normal.png")
+            assert os.path.exists(normal_path)
+            normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
+            normal = cv2.resize(
+                normal, (self.cfg.width, self.cfg.height), interpolation=cv2.INTER_AREA
+            )
+            self.normal: Float[Tensor, "1 H W 3"] = (
+                torch.from_numpy(normal.astype(np.float32) / 255.0)
+                .unsqueeze(0)
+                .to(self.rank)
+            )
+            print(
+                f"[INFO] single image dataset: load normal {normal_path} {self.normal.shape}"
+            )
+        else:
+            self.normal = None
 
         elevation_deg = torch.FloatTensor([self.cfg.default_elevation_deg])
         azimuth_deg = torch.FloatTensor([self.cfg.default_azimuth_deg])
@@ -171,7 +195,8 @@ class SingleImageIterableDataset(IterableDataset, SingleImageDataBase, Updateabl
             "azimuth": self.azimuth_deg,
             "camera_distances": self.camera_distance,
             "rgb": self.rgb,
-            "depth": self.depth,
+            "ref_depth": self.depth,
+            "ref_normal": self.normal,
             "mask": self.mask,
         }
         if self.cfg.use_random_camera:
