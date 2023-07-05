@@ -38,8 +38,6 @@ class ExperimentConfig:
     exp_dir: str = "outputs/default"
     trial_name: str = "exp"
     trial_dir: str = "outputs/default/exp"
-
-    """Number of gpus to use. -1 means all available GPUs (likely >1), disabling the inclusion of a the timestamp in the tag name."""
     n_gpus: int = 1
     ###
 
@@ -67,7 +65,7 @@ class ExperimentConfig:
         if self.timestamp is None:
             self.timestamp = ""
             if self.use_timestamp:
-                if self.n_gpus > 1 or self.n_gpus == -1:
+                if self.n_gpus > 1:
                     threestudio.warn(
                         "Timestamp is disabled when using multiple GPUs, please make sure you have a unique tag."
                     )
