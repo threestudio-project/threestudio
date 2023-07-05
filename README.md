@@ -125,8 +125,6 @@ If you define the `CUDA_VISIBLE_DEVICES` environment variable before you call `l
 
 `CUDA_VISIBLE_DEVICES=3,4 python launch.py --config configs/dreamfusion-if.yaml --train system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"`
 
-
-
 This is particularly useful if you run `launch.py` in a cluster using a command that automatically picks GPU(s) and exports their IDs through CUDA_VISIBLE_DEVICES, e.g. through SLURM:
 
 ```bash
