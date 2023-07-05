@@ -353,7 +353,7 @@ class DeepFloydGuidance(BaseObject):
         t = self.scheduler.timesteps_gpu[idxs]
 
         fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
-        imgs_noisy = latents_noisy.permute(0, 2, 3, 1)
+        imgs_noisy = (latents_noisy / 2 + 0.5).permute(0, 2, 3, 1)
 
         # get prev latent
         latents_1step = []
@@ -366,8 +366,8 @@ class DeepFloydGuidance(BaseObject):
             pred_1orig.append(step_output["pred_original_sample"])
         latents_1step = torch.cat(latents_1step)
         pred_1orig = torch.cat(pred_1orig)
-        imgs_1step = latents_1step.permute(0, 2, 3, 1)
-        imgs_1orig = pred_1orig.permute(0, 2, 3, 1)
+        imgs_1step = (latents_1step / 2 + 0.5).permute(0, 2, 3, 1)
+        imgs_1orig = (pred_1orig / 2 + 0.5).permute(0, 2, 3, 1)
 
         latents_final = []
         for b, i in enumerate(idxs):
@@ -390,7 +390,7 @@ class DeepFloydGuidance(BaseObject):
             latents_final.append(latents)
 
         latents_final = torch.cat(latents_final)
-        imgs_final = latents_final.permute(0, 2, 3, 1)
+        imgs_final = (latents_final / 2 + 0.5).permute(0, 2, 3, 1)
 
         return {
             "noise_levels": fracs,
