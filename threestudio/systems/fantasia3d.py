@@ -36,11 +36,6 @@ class Fantasia3D(BaseLift3DSystem):
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
-        if not self.cfg.texture:
-            # initialize SDF
-            # FIXME: what if using other geometry types?
-            self.geometry.initialize_shape()
-
     def training_step(self, batch, batch_idx):
         loss = 0.0
 

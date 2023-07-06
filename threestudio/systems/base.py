@@ -219,6 +219,7 @@ class BaseLift3DSystem(BaseSystem):
             self.cfg.geometry_convert_from  # from_coarse must be specified
             and not self.cfg.weights  # not initialized from coarse when weights are specified
             and not self.resumed  # not initialized from coarse when resumed from checkpoints
+            and not self.cfg.geometry.shape_init  # not initialized from custom geometry
         ):
             threestudio.info("Initializing geometry from a given checkpoint ...")
             from threestudio.utils.config import load_config, parse_structured
@@ -275,6 +276,8 @@ class BaseLift3DSystem(BaseSystem):
             threestudio.warn(
                 f"Saving directory not set for the system, visualization results will not be saved"
             )
+        if self.cfg.geometry.shape_init:
+            self.geometry.initialize_shape()
 
     def on_test_end(self) -> None:
         if self._save_dir is not None:
