@@ -78,3 +78,13 @@ python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml -
  system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
  system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
  data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test5_min_step_percent=[0,0.1,0.02,2000];max_step_percent=[0,0.3,0.3,2000]"
+
+
+# test6_lambda_sparsity=0.2
+# lambda_sparsity: 0.2
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test6_lambda_sparsity=0.2"
