@@ -25,9 +25,9 @@ data:
     azimuth_range: [-180, 180]
     camera_distance_range: [3.5, 3.8]
     fovy_range: [20.0, 25.0] # Zero123 has fixed fovy
-    progressive_until: 0
-    camera_perturb: 0.1
-    center_perturb: 0.1
+    progressive_until: 1500
+    camera_perturb: 0.05
+    center_perturb: 0.05
     up_perturb: 0.05
     light_position_perturb: 1.0
     light_distance_range: [7.5, 10.0]
@@ -77,7 +77,7 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 100000
+    ambient_only_steps: 100
     textureless_prob: 0.05
     albedo_activation: sigmoid
 

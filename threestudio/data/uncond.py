@@ -116,7 +116,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             yield {}
 
     def progressive_view(self, global_step):
-        r = min(1.0, global_step / (self.cfg.progressive_until + 1))
+        r = min(1.0, (global_step + 1) / (self.cfg.progressive_until + 1))
         self.elevation_range = [
             (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[0],
             (1 - r) * self.cfg.eval_elevation_deg + r * self.cfg.elevation_range[1],
