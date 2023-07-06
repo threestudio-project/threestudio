@@ -511,17 +511,17 @@ class StableDiffusionGuidance(BaseObject):
         # use only 50 timesteps, and find nearest of those to t
         self.scheduler.set_timesteps(50)
         self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
-        bs = latents_noisy.shape[0]  # batch size
-        large_enough_idxs = self.scheduler.timesteps_gpu.expand(
-            [bs, -1]
-        ) > t_orig.unsqueeze(
+        bs = min(4, latents_noisy.shape[0])  # batch size
+        large_enough_idxs = self.scheduler.timesteps_gpu.expand([bs, -1]) > t_orig[
+            :bs
+        ].unsqueeze(
             -1
         )  # sized [bs,50] > [bs,1]
         idxs = torch.min(large_enough_idxs, dim=1)[1]
         t = self.scheduler.timesteps_gpu[idxs]
 
         fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
-        imgs_noisy = self.decode_latents(latents_noisy).permute(0, 2, 3, 1)
+        imgs_noisy = self.decode_latents(latents_noisy[:bs]).permute(0, 2, 3, 1)
 
         # get prev latent
         latents_1step = []
@@ -563,6 +563,7 @@ class StableDiffusionGuidance(BaseObject):
         imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
 
         return {
+            "bs": bs,
             "noise_levels": fracs,
             "imgs_noisy": imgs_noisy,
             "imgs_1step": imgs_1step,
