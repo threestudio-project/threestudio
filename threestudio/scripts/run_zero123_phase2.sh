@@ -18,3 +18,21 @@ python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml -
  system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
  system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
  data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="baseline" data.random_camera.progressive_until=500
+
+
+# test1
+# camera_distance_range: [3.5, 3.8]
+# fovy_range: [20.0, 25.0] # Zero123 has fixed fovy
+# camera_perturb: 0.1
+# center_perturb: 0.1
+# up_perturb: 0.05
+# ...
+# min_step_percent: [0, 0.2, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+# max_step_percent: [0, 0.45, 0.3, 2000]
+#
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test1" data.random_camera.progressive_until=500

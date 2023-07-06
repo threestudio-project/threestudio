@@ -23,12 +23,12 @@ data:
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.8, 3.8]
-    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
+    camera_distance_range: [3.5, 3.8]
+    fovy_range: [20.0, 25.0] # Zero123 has fixed fovy
     progressive_until: 0
-    camera_perturb: 0.0
-    center_perturb: 0.0
-    up_perturb: 0.0
+    camera_perturb: 0.1
+    center_perturb: 0.1
+    up_perturb: 0.05
     light_position_perturb: 1.0
     light_distance_range: [7.5, 10.0]
     eval_elevation_deg: ${data.default_elevation_deg}
@@ -101,10 +101,10 @@ system:
   guidance:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 7.5
-    min_step_percent: 0.2
-    # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.6
-    # max_step_percent: [0, 0.98, 0.66, 2000]
+    # min_step_percent: 0.2
+    min_step_percent: [0, 0.2, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    #max_step_percent: 0.6
+    max_step_percent: [0, 0.45, 0.3, 2000]
     max_items_to_save: 4
 
   # prompt_processor_type: "deep-floyd-prompt-processor"
@@ -161,7 +161,7 @@ trainer:
   max_steps: 2000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 20
+  val_check_interval: 100
   enable_progress_bar: true
   precision: 16-mixed
 
