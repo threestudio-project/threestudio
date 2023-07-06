@@ -15,9 +15,9 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: 512
-    width: 512
-    batch_size: 4
+    height: 256 # Zero123 operates at 256x256
+    width: 256
+    batch_size: 8
     resolution_milestones: []
     eval_height: 512
     eval_width: 512
@@ -74,8 +74,7 @@ system:
     ambient_only_steps: 10000
     textureless_prob: 0.
 
-  # background_type: "solid-color-background" # unused
-  background_type: "neural-environment-map-background"
+  background_type: "solid-color-background" # unused
   background:
     random_aug: True
 
