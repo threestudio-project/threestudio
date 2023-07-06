@@ -442,6 +442,8 @@ class RandomCameraDataset(Dataset):
             "elevation": self.elevation_deg[index],
             "azimuth": self.azimuth_deg[index],
             "camera_distances": self.camera_distances[index],
+            "height": self.cfg.eval_height,
+            "width": self.cfg.eval_width,
         }
 
     def collate(self, batch):
