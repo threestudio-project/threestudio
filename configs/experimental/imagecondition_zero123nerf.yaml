@@ -105,6 +105,7 @@ system:
     # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: 0.6
     # max_step_percent: [0, 0.98, 0.66, 2000]
+    max_items_to_save: 4
 
   # prompt_processor_type: "deep-floyd-prompt-processor"
   # prompt_processor:
