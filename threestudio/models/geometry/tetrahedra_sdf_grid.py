@@ -182,7 +182,6 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
                 self.bbox.device
             )
             t_pos_idx = torch.tensor(mesh.faces, dtype=torch.int64).to(self.bbox.device)
-            print(v_pos.device)
             self.mesh = Mesh(v_pos=v_pos, t_pos_idx=t_pos_idx)
 
         else:

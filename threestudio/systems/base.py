@@ -284,6 +284,8 @@ class BaseLift3DSystem(BaseSystem):
             threestudio.info(f"Test results saved to {self._save_dir}")
 
     def on_predict_start(self) -> None:
+        if self.cfg.geometry.shape_init and self.cfg.geometry.fix_geometry:
+            self.geometry.initialize_shape()
         self.exporter: Exporter = threestudio.find(self.cfg.exporter_type)(
             self.cfg.exporter,
             geometry=self.geometry,
