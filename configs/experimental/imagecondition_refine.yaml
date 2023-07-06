@@ -73,7 +73,8 @@ system:
     ambient_only_steps: 0
     soft_shading: true
 
-  background_type: "neural-environment-map-background"
+  # background_type: "neural-environment-map-background"
+  background_type: "solid-color-background"
 
   # renderer_type: "nerf-volume-renderer"
   # renderer:
