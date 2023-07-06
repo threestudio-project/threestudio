@@ -6,8 +6,8 @@ seed: 0
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: 512
-  width: 512
+  height: 128
+  width: 128
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
@@ -15,9 +15,9 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: 512
-    width: 512
-    batch_size: 1
+    height: 64
+    width: 64
+    batch_size: 12
     resolution_milestones: []
     eval_height: 512
     eval_width: 512
@@ -82,9 +82,7 @@ system:
     textureless_prob: 0.05
     albedo_activation: sigmoid
 
-  background_type: "neural-environment-map-background"
-  background:
-    color_activation: sigmoid
+  background_type: "solid-color-background" # unused
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -93,7 +91,7 @@ system:
     return_comp_normal: ${gt0:${system.loss.lambda_normal_smooth}}
     return_normal_perturb: ${gt0:${system.loss.lambda_3d_normal_smooth}}
 
-  prompt_processor_type: "zero123-prompt-processor"
+  prompt_processor_type: "dummy-prompt-processor" # Zero123 doesn't use prompts
   prompt_processor:
     pretrained_model_name_or_path: ""
     prompt: ""
@@ -109,15 +107,13 @@ system:
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     #min_step_percent: 0.02
-    min_step_percent: [0, 0.1, 0.05, 200]  # (start_iter, start_val, end_val, end_iter)
+    min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
     #max_step_percent: 0.98
-    max_step_percent: [0, 0.4, 0.2, 200]
+    max_step_percent: [0, 0.85, 0.5, 200]
 
   freq:
-    n_ref: 2
     ref_only_steps: 0
-    guidance_eval: 0  # if "alternate", this must not be a multiple of system.freq.n_ref
-    ref_or_zero123: "accumulate" # can be "accumulate" or "alternate"
+    guidance_eval: 0
 
   loggers:
     wandb:
@@ -126,36 +122,30 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.2
+    lambda_sds: 0.1
     lambda_rgb: 500.
     lambda_mask: 50.
-    lambda_depth: 0.
-    lambda_depth_rel: 0.1
-    lambda_normal: 0.1 # [0, 0, 0.05, 100]
-    lambda_normal_smooth: 5.0
-    lambda_3d_normal_smooth: 5.0
+    lambda_depth: 0. # 0.05
+    lambda_depth_rel: 0. # [0, 0, 0.05, 100]
+    lambda_normal: 0. # [0, 0, 0.05, 100]
+    lambda_normal_smooth: 10.0
+    lambda_3d_normal_smooth: 10.0
     lambda_orient: 1.0
-    lambda_sparsity: 1.0 # should be tweaked for every model
-    lambda_opaque: 1.0
+    lambda_sparsity: 0.1 # should be tweaked for every model
+    lambda_opaque: 0.1
 
   optimizer:
-    name: Adan
+    name: Adam
     args:
-      lr: 0.05
-      max_grad_norm: 5.0
+      lr: 0.01
+      betas: [0.9, 0.99]
       eps: 1.e-8
-      weight_decay: 1e-5
-    params:
-      geometry:
-        lr: ${system.optimizer.args.lr}
-      background:
-        lr: 0.0
 
 trainer:
-  max_steps: 100
+  max_steps: 400
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 2
+  val_check_interval: 100
   enable_progress_bar: true
   precision: 16-mixed
 

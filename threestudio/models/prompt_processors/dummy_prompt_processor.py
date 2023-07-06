@@ -8,10 +8,11 @@ from threestudio.utils.misc import cleanup
 from threestudio.utils.typing import *
 
 
-@threestudio.register("zero123-prompt-processor")
-class Zero123PromptProcessor(PromptProcessor):
+@threestudio.register("dummy-prompt-processor")
+class DummyPromptProcessor(PromptProcessor):
     @dataclass
     class Config(PromptProcessor.Config):
         pretrained_model_name_or_path: str = ""
+        prompt: str = ""
 
     cfg: Config
