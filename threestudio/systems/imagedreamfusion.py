@@ -82,7 +82,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
 
             # bg_color = bg_color * (1.0 - is_white) + white * is_white
 
-            ambient_ratio = 0.5 + 0.5 * random.random()
+            ambient_ratio = 0.1 + 0.9 * random.random()
 
         batch["bg_color"] = bg_color
         batch["ambient_ratio"] = ambient_ratio
