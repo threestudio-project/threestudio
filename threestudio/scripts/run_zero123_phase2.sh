@@ -253,3 +253,19 @@ python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml -
  system.weights="outputs/anya_front/Phase1/ckpts/last.ckpt" system.freq.guidance_eval=13 \
  system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
  data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test26_min_step_percent:[0,0.4,0.2,200];max_step_percent:[0,0.85,0.5,200]"
+
+# test27_lambda_sds=5.0
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/anya_front/Phase1/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test27_lambda_sds=5.0"
+
+# test28_lambda_sds=10.0
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/anya_front/Phase1/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test28_lambda_sds=10.0"
