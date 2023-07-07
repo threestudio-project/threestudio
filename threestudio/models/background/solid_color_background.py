@@ -1,3 +1,4 @@
+import random
 from dataclasses import dataclass, field
 
 import torch
@@ -16,6 +17,8 @@ class SolidColorBackground(BaseBackground):
         n_output_dims: int = 3
         color: Tuple = (1.0, 1.0, 1.0)
         learned: bool = False
+        random_aug: bool = False
+        random_aug_prob: float = 0.5
 
     cfg: Config
 
@@ -31,7 +34,20 @@ class SolidColorBackground(BaseBackground):
             )
 
     def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B Nc"]:
-        return (
+        color = (
             torch.ones(*dirs.shape[:-1], self.cfg.n_output_dims).to(dirs)
             * self.env_color
         )
+        if (
+            self.training
+            and self.cfg.random_aug
+            and random.random() < self.cfg.random_aug_prob
+        ):
+            # use random background color with probability random_aug_prob
+            color = color * 0 + (  # prevent checking for unused parameters in DDP
+                torch.rand(self.cfg.n_output_dims)
+                .to(dirs)[None, :]
+                .expand(dirs.reshape(-1, 3).shape[0], -1)
+                .reshape(*dirs.shape[:-1], -1)
+            )
+        return color

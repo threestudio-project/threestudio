@@ -6,9 +6,8 @@ seed: 0
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: [128, 256, 512]
-  width: [128, 256, 512]
-  resolution_milestones: [200, 300]
+  height: 128
+  width: 128
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
@@ -16,12 +15,12 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: [64, 128, 256]
-    width: [64, 128, 256]
-    batch_size: [12, 4, 2]
-    resolution_milestones: [200, 300]
-    eval_height: 256
-    eval_width: 256
+    height: 64
+    width: 64
+    batch_size: 12
+    resolution_milestones: []
+    eval_height: 512
+    eval_width: 512
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
@@ -83,10 +82,6 @@ system:
     textureless_prob: 0.05
     albedo_activation: sigmoid
 
-  # background_type: "neural-environment-map-background"
-  # background:
-  #   color_activation: sigmoid
-
   background_type: "solid-color-background" # unused
 
   renderer_type: "nerf-volume-renderer"
@@ -111,9 +106,9 @@ system:
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
-    max_items_to_save: 4
-
+    #min_step_percent: 0.02
     min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
+    #max_step_percent: 0.98
     max_step_percent: [0, 0.85, 0.5, 200]
 
   freq:
@@ -133,8 +128,8 @@ system:
     lambda_depth: 0. # 0.05
     lambda_depth_rel: 0. # [0, 0, 0.05, 100]
     lambda_normal: 0. # [0, 0, 0.05, 100]
-    lambda_normal_smooth: 8.0
-    lambda_3d_normal_smooth: 8.0
+    lambda_normal_smooth: 10.0
+    lambda_3d_normal_smooth: 10.0
     lambda_orient: 1.0
     lambda_sparsity: 0.1 # should be tweaked for every model
     lambda_opaque: 0.1
@@ -157,4 +152,4 @@ trainer:
 checkpoint:
   save_last: true # save at each validation time
   save_top_k: -1
-  every_n_train_steps: 100 # ${trainer.max_steps}
+  every_n_train_steps: ${trainer.max_steps}
