@@ -31,6 +31,8 @@ from threestudio.utils.typing import *
 
 @dataclass
 class SingleImageDataModuleConfig:
+    # height and width should be Union[int, List[int]]
+    # but OmegaConf does not support Union of containers
     height: Any = 96
     width: Any = 96
     resolution_milestones: List[int] = field(default_factory=lambda: [])

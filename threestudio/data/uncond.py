@@ -24,7 +24,7 @@ from threestudio.utils.typing import *
 
 @dataclass
 class RandomCameraDataModuleConfig:
-    # height and width should be Union[int, List[int]]
+    # height, width, and batch_size should be Union[int, List[int]]
     # but OmegaConf does not support Union of containers
     height: Any = 64
     width: Any = 64
