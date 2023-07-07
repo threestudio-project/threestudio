@@ -309,6 +309,10 @@ class BaseLift3DSystem(BaseSystem):
 
     def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
         B, size = comp_rgb.shape[:2]
+        max_items = self.cfg.guidance.max_items_to_save
+        if max_items == -1:
+            max_items = B
+
         resize = lambda x: F.interpolate(
             x.permute(0, 3, 1, 2), (size, size), mode="bilinear", align_corners=False
         ).permute(0, 2, 3, 1)
@@ -322,7 +326,7 @@ class BaseLift3DSystem(BaseSystem):
             [
                 {
                     "type": "rgb",
-                    "img": merge12(comp_rgb),
+                    "img": merge12(comp_rgb[:max_items, ...]),
                     "kwargs": {"data_format": "HWC"},
                 },
             ]
@@ -330,7 +334,9 @@ class BaseLift3DSystem(BaseSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_noisy"])),
+                        "img": merge12(
+                            resize(guidance_eval_out["imgs_noisy"][:max_items, ...])
+                        ),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
@@ -339,7 +345,9 @@ class BaseLift3DSystem(BaseSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_1step"])),
+                        "img": merge12(
+                            resize(guidance_eval_out["imgs_1step"][:max_items, ...])
+                        ),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
@@ -348,7 +356,9 @@ class BaseLift3DSystem(BaseSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_1orig"])),
+                        "img": merge12(
+                            resize(guidance_eval_out["imgs_1orig"][:max_items, ...])
+                        ),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
@@ -357,12 +367,14 @@ class BaseLift3DSystem(BaseSystem):
                 [
                     {
                         "type": "rgb",
-                        "img": merge12(resize(guidance_eval_out["imgs_final"])),
+                        "img": merge12(
+                            resize(guidance_eval_out["imgs_final"][:max_items, ...])
+                        ),
                         "kwargs": {"data_format": "HWC"},
                     }
                 ]
             ),
             name="train_step",
             step=self.true_global_step,
-            texts=guidance_eval_out["texts"],
+            texts=guidance_eval_out["texts"][:max_items],
         )
