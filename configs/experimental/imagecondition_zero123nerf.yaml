@@ -15,16 +15,16 @@ data:
   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera:
-    height: 128
-    width: 128
-    batch_size: 12
+    height: 256
+    width: 256
+    batch_size: 6
     resolution_milestones: []
     eval_height: 256
     eval_width: 256
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.1, 3.8]
+    camera_distance_range: [3.2, 4.2]
     fovy_range: [20.0, 25.0] # Zero123 has fixed fovy
     progressive_until: 0
     camera_perturb: 0.05
@@ -79,7 +79,7 @@ system:
   material_type: "diffuse-with-point-light-material"
   material:
     ambient_only_steps: 100
-    textureless_prob: 0.05
+    textureless_prob: 0.0
     albedo_activation: sigmoid
 
   # background_type: "neural-environment-map-background"
@@ -180,7 +180,7 @@ system:
       eps: 1.e-8
 
 trainer:
-  max_steps: 200
+  max_steps: 1000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100
