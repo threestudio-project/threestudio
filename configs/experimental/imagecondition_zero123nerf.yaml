@@ -140,7 +140,7 @@ system:
 
   loss:
     # claforte branch:
-    lambda_sds: 2.0
+    lambda_sds: 0.3
     lambda_rgb: 400.0
     lambda_rgb_smooth: 5.0
     lambda_mask: 50.0
