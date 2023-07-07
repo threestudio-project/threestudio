@@ -187,6 +187,18 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             normals_perturb = out["normal_perturb"]
             set_loss("3d_normal_smooth", (normals - normals_perturb).abs().mean())
 
+        if self.C(self.cfg.loss.lambda_opacity_smooth) > 0:
+            if "opacity" not in out:
+                raise ValueError(
+                    "opacity is required for 2D opacity loss, but no opacity found in the output."
+                )
+            opacity = out["opacity"]
+            set_loss(
+                "opacity_smooth",
+                (opacity[:, 1:, :, :] - opacity[:, :-1, :, :]).square().mean()
+                + (opacity[:, :, 1:, :] - opacity[:, :, :-1, :]).square().mean(),
+            )
+
         if guidance != "ref":
             set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
 

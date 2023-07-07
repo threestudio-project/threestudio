@@ -143,6 +143,8 @@ system:
     lambda_orient: 0.01
     lambda_sparsity: 4.0 # was 0.01
     lambda_opaque: 0.05
+    lambda_opacity_smooth: 1.0
+
 
   optimizer:
     name: Adan
