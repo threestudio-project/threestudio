@@ -105,9 +105,9 @@ system:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 7.5
     # min_step_percent: 0.2
-    min_step_percent: [0, 0.03, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    min_step_percent: [0, 0.02, 0.01, 2000]  # (start_iter, start_val, end_val, end_iter)
     #max_step_percent: 0.6
-    max_step_percent: [0, 0.3, 0.3, 2000]
+    max_step_percent: [0, 0.15, 0.15, 2000]
     max_items_eval: 1
 
     # Vikram changes:
