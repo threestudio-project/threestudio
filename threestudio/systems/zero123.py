@@ -20,6 +20,7 @@ class Zero123(BaseLift3DSystem):
     class Config(BaseLift3DSystem.Config):
         freq: dict = field(default_factory=dict)
         refinement: bool = False
+        amb_ratio_min: float = 0.5
 
     cfg: Config
 
@@ -62,13 +63,13 @@ class Zero123(BaseLift3DSystem):
             ambient_ratio = 1.0
             shading = "diffuse"
             batch["shading"] = shading
-            bg_color = None
+            # bg_color = None
         elif guidance == "zero123":
             batch = batch["random_camera"]
             # claforte: surely there's a cleaner way to get batch size
-            bs = batch["rays_o"].shape[0]
+            # bs = batch["rays_o"].shape[0]
 
-            bg_color = torch.ones(bs, 3).to(self.device)
+            # bg_color = torch.ones(bs, 3).to(self.device)
             # bg_color = torch.rand(bs, 3).to(self.device)  # claforte: use dtype
 
             # # Override 50% of the bgcolors with white.
@@ -82,9 +83,11 @@ class Zero123(BaseLift3DSystem):
 
             # bg_color = bg_color * (1.0 - is_white) + white * is_white
 
-            ambient_ratio = 0.1 + 0.9 * random.random()
+            ambient_ratio = (
+                self.cfg.amb_ratio_min + (1 - self.cfg.amb_ratio_min) * random.random()
+            )
 
-        batch["bg_color"] = bg_color
+        batch["bg_color"] = None
         batch["ambient_ratio"] = ambient_ratio
 
         out = self(batch)

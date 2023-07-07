@@ -43,13 +43,12 @@ class NeuralEnvironmentMapBackground(BaseBackground):
             self.cfg.mlp_network_config,
         )
 
-    def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B 3"]:
+    def forward(self, dirs: Float[Tensor, "B H W 3"]) -> Float[Tensor, "B H W Nc"]:
         if not self.training and self.cfg.eval_color is not None:
             return torch.ones(*dirs.shape[:-1], self.cfg.n_output_dims).to(
                 dirs
             ) * torch.as_tensor(self.cfg.eval_color).to(dirs)
         # viewdirs must be normalized before passing to this function
-        squeezed_dim = dirs.view(-1, 3).shape[0]
         dirs = (dirs + 1.0) / 2.0  # (-1, 1) => (0, 1)
         dirs_embd = self.encoding(dirs.view(-1, 3))
         color = self.network(dirs_embd).view(*dirs.shape[:-1], self.cfg.n_output_dims)
@@ -61,9 +60,8 @@ class NeuralEnvironmentMapBackground(BaseBackground):
         ):
             # use random background color with probability random_aug_prob
             color = color * 0 + (  # prevent checking for unused parameters in DDP
-                torch.rand(self.cfg.n_output_dims)
-                .to(dirs)[None, :]
-                .expand(squeezed_dim, -1)
-                .view(*dirs.shape[:-1], -1)
+                torch.rand(dirs.shape[0], 1, 1, self.cfg.n_output_dims)
+                .to(dirs)
+                .expand(*dirs.shape[:-1], -1)
             )
         return color
