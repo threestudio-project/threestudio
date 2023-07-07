@@ -204,7 +204,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             if guidance != "ref" and self.C(self.cfg.loss.lambda_sparsity) > 0:
                 set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
 
-            if self.C(self.cfg.loss.lambda_opacity) > 0:
+            if self.C(self.cfg.loss.lambda_opaque) > 0:
                 opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
                 set_loss(
                     "opaque", binary_cross_entropy(opacity_clamped, opacity_clamped)

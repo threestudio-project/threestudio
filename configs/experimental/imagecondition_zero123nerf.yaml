@@ -20,7 +20,7 @@ data:
     batch_size: 12
     resolution_milestones: []
     eval_height: 256
-    eval_width: 156
+    eval_width: 256
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
@@ -103,7 +103,7 @@ system:
   guidance_type: "stable-diffusion-guidance"
   guidance:
     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    guidance_scale: 50
+    guidance_scale: 100
     min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: [0, 0.85, 0.5, 200]
 
@@ -133,13 +133,13 @@ system:
 
   loss:
     lambda_sds: 10.0
-    lambda_rgb: [0, 100.0, 10.0, 200]
-    lambda_mask: 10.0
+    lambda_rgb: 0.
+    lambda_mask: 0.
     lambda_depth: 0.
     lambda_depth_rel: 0. # [0.0, 0.0, 1.0, 10000]
     lambda_normal: 0. # [0, 0, 0.05, 100]
-    lambda_normal_smooth: 5.0
-    lambda_3d_normal_smooth: 5.0
+    lambda_normal_smooth: 10.0
+    lambda_3d_normal_smooth: 10.0
     lambda_orient: 1.0
     lambda_sparsity: 0.1
     lambda_opaque: 0.1
