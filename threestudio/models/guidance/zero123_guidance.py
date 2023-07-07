@@ -94,6 +94,9 @@ class Zero123Guidance(BaseObject):
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
+        """Maximum number of batch items to evaluate guidance for (for debugging) and to save on disk. -1 means save all items."""
+        max_items_eval: int = 4
+
     cfg: Config
 
     def configure(self) -> None:
@@ -350,7 +353,11 @@ class Zero123Guidance(BaseObject):
         # use only 50 timesteps, and find nearest of those to t
         self.scheduler.set_timesteps(50)
         self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
-        bs = min(4, latents_noisy.shape[0])  # batch size
+        bs = (
+            min(self.cfg.max_items_eval, latents_noisy.shape[0])
+            if self.cfg.max_items_eval > 0
+            else latents_noisy.shape[0]
+        )  # batch size
         large_enough_idxs = self.scheduler.timesteps_gpu.expand([bs, -1]) > t_orig[
             :bs
         ].unsqueeze(
@@ -365,7 +372,7 @@ class Zero123Guidance(BaseObject):
         # get prev latent
         latents_1step = []
         pred_1orig = []
-        for b in range(len(t)):
+        for b in range(bs):
             step_output = self.scheduler.step(
                 noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
             )
