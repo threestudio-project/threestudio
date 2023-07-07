@@ -170,9 +170,12 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             t = out[out_name]
             set_loss(
                 loss_name,
-                (t[:, 1:, :, :] - t[:, :-1, :, :]).square().mean()
-                + (t[:, :, 1:, :] - t[:, :, :-1, :]).square().mean(),
+                (t[:, 1:, :, :] - t[:, :-1, :, :]).abs().mean()
+                + (t[:, :, 1:, :] - t[:, :, :-1, :]).abs().mean(),
             )
+
+        if self.C(self.cfg.loss.lambda_rgb_smooth) > 0:
+            loss_total_variation("comp_rgb", "rgb_smooth")
 
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
             loss_total_variation("comp_normal", "normal_smooth")

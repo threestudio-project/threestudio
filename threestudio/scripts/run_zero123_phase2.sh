@@ -121,3 +121,28 @@ python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml -
  system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
  system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
  data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test10_lambda_opacity_smooth=20.0;lambda_depth_smooth=5"
+
+# test11_lambda_depth_smooth=50
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test11_lambda_depth_smooth=50"
+
+# test12_abs_total_variation
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test12_abs_total_variation"
+
+
+# test13_lambda_rgb_smooth=5.0
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/zero123/[64, 128]_anya_front_rgba.png_prog0@20230706-183840/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test13_lambda_rgb_smooth=5.0"

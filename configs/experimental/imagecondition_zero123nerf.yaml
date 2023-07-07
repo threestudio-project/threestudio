@@ -105,7 +105,7 @@ system:
     min_step_percent: [0, 0.1, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
     #max_step_percent: 0.6
     max_step_percent: [0, 0.3, 0.3, 2000]
-    max_items_to_save: 4
+    max_items_to_save: 1
 
   # prompt_processor_type: "deep-floyd-prompt-processor"
   # prompt_processor:
@@ -134,6 +134,7 @@ system:
   loss:
     lambda_sds: 0.1
     lambda_rgb: 400.0
+    lambda_rgb_smooth: 5.0
     lambda_mask: 50.0
     lambda_depth: 0.05
     lambda_depth_rel: [0.0, 0.0, 1.0, 10000]
