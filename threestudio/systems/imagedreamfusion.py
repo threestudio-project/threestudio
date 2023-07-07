@@ -18,6 +18,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         freq: dict = field(default_factory=dict)
+        refinement: bool = False
 
     cfg: Config
 
@@ -66,20 +67,20 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             bg_color = None
         elif guidance == "guidance":
             batch = batch["random_camera"]
-            # claforte: surely there's a cleaner way to get batch size
             bs = batch["rays_o"].shape[0]
 
-            bg_color = torch.rand(bs, 3).to(self.device)  # claforte: use dtype
+            bg_color = torch.ones(bs, 3).to(self.device)
+            # bg_color = torch.rand(bs, 3).to(self.device)  # claforte: use dtype
 
-            # Override 50% of the bgcolors with white.
-            # This results in better predictions with Zero123,
-            # since it was trained with a constant white background.
-            white = torch.ones(bs, 3).to(self.device)
+            # # Override 50% of the bgcolors with white.
+            # # This results in better predictions with Zero123,
+            # # since it was trained with a constant white background.
+            # white = torch.ones(bs, 3).to(self.device)
 
-            # is the batch item white? shaped [bs, 1]
-            is_white = (torch.rand(bs) > 0.5).to(self.device).float().unsqueeze(-1)
+            # # is the batch item white? shaped [bs, 1]
+            # is_white = (torch.rand(bs) > 0.5).to(self.device).float().unsqueeze(-1)
 
-            bg_color = bg_color * (1.0 - is_white) + white * is_white
+            # bg_color = bg_color * (1.0 - is_white) + white * is_white
 
             ambient_ratio = 0.1 + 0.9 * random.random()
 
@@ -160,20 +161,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             )
             set_loss("sds", guidance_out["loss_sds"])
 
-        if self.C(self.cfg.loss.lambda_orient) > 0:
-            if "normal" not in out:
-                raise ValueError(
-                    "Normal is required for orientation loss, no normal is found in the output."
-                )
-            set_loss(
-                "orient",
-                (
-                    out["weights"].detach()
-                    * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
-                ).sum()
-                / (out["opacity"] > 0).sum(),
-            )
-
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
             if "comp_normal" not in out:
                 raise ValueError(
@@ -199,11 +186,34 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             normals_perturb = out["normal_perturb"]
             set_loss("3d_normal_smooth", (normals - normals_perturb).abs().mean())
 
-        if guidance != "ref":
-            set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
+        if not self.cfg.refinement:
+            if self.C(self.cfg.loss.lambda_orient) > 0:
+                if "normal" not in out:
+                    raise ValueError(
+                        "Normal is required for orientation loss, no normal is found in the output."
+                    )
+                set_loss(
+                    "orient",
+                    (
+                        out["weights"].detach()
+                        * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
+                    ).sum()
+                    / (out["opacity"] > 0).sum(),
+                )
 
-        opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
-        set_loss("opaque", binary_cross_entropy(opacity_clamped, opacity_clamped))
+            if guidance != "ref" and self.C(self.cfg.loss.lambda_sparsity) > 0:
+                set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())
+
+            if self.C(self.cfg.loss.lambda_opaque) > 0:
+                opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
+                set_loss(
+                    "opaque", binary_cross_entropy(opacity_clamped, opacity_clamped)
+                )
+        else:
+            if self.C(self.cfg.loss.lambda_normal_consistency) > 0:
+                set_loss("normal_consistency", out["mesh"].normal_consistency())
+            if self.C(self.cfg.loss.lambda_laplacian_smoothness) > 0:
+                set_loss("laplacian_smoothness", out["mesh"].laplacian())
 
         loss = 0.0
         for name, value in loss_terms.items():
@@ -222,7 +232,8 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
 
         if guidance_eval:
             self.guidance_evaluation_save(
-                out["comp_rgb"].detach(), guidance_out["eval"]
+                out["comp_rgb"].detach()[: guidance_out["eval"]["bs"]],
+                guidance_out["eval"],
             )
 
         return {"loss": loss}
@@ -279,7 +290,17 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                 if "comp_normal" in out
                 else []
             )
-            + [{"type": "grayscale", "img": out["depth"][0], "kwargs": {}}]
+            + (
+                [
+                    {
+                        "type": "grayscale",
+                        "img": out["depth"][0],
+                        "kwargs": {},
+                    }
+                ]
+                if "depth" in out
+                else []
+            )
             + [
                 {
                     "type": "grayscale",
@@ -362,4 +383,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             fps=30,
             name="test",
             step=self.true_global_step,
+        )
+        shutil.rmtree(
+            os.path.join(self.get_save_dir(), f"it{self.true_global_step}-test")
         )

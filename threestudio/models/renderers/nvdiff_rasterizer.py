@@ -106,6 +106,6 @@ class NVDiffRasterizer(Rasterizer):
             gb_rgb = torch.lerp(gb_rgb_bg, gb_rgb_fg, mask.float())
             gb_rgb_aa = self.ctx.antialias(gb_rgb, rast, v_pos_clip, mesh.t_pos_idx)
 
-            out.update({"comp_rgb": gb_rgb_aa})
+            out.update({"comp_rgb": gb_rgb_aa, "comp_rgb_bg": gb_rgb_bg})
 
         return out
