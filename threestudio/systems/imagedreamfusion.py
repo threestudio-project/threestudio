@@ -162,17 +162,26 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                 / (out["opacity"] > 0).sum(),
             )
 
-        if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
-            if "comp_normal" not in out:
+        def loss_total_variation(out_name="comp_normal", loss_name="normal_smooth"):
+            if out_name not in out:
                 raise ValueError(
-                    "comp_normal is required for 2D normal smooth loss, no comp_normal is found in the output."
+                    f"{out_name} is required for 2D normal smooth loss, but not found in the output."
                 )
-            normal = out["comp_normal"]
+            t = out[out_name]
             set_loss(
-                "normal_smooth",
-                (normal[:, 1:, :, :] - normal[:, :-1, :, :]).square().mean()
-                + (normal[:, :, 1:, :] - normal[:, :, :-1, :]).square().mean(),
+                loss_name,
+                (t[:, 1:, :, :] - t[:, :-1, :, :]).square().mean()
+                + (t[:, :, 1:, :] - t[:, :, :-1, :]).square().mean(),
             )
+
+        if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
+            loss_total_variation("comp_normal", "normal_smooth")
+
+        if self.C(self.cfg.loss.lambda_depth_smooth) > 0:
+            loss_total_variation("depth", "depth_smooth")
+
+        if self.C(self.cfg.loss.lambda_opacity_smooth) > 0:
+            loss_total_variation("opacity", "opacity_smooth")
 
         if self.C(self.cfg.loss.lambda_3d_normal_smooth) > 0:
             if "normal" not in out:
@@ -186,18 +195,6 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
             normals = out["normal"]
             normals_perturb = out["normal_perturb"]
             set_loss("3d_normal_smooth", (normals - normals_perturb).abs().mean())
-
-        if self.C(self.cfg.loss.lambda_opacity_smooth) > 0:
-            if "opacity" not in out:
-                raise ValueError(
-                    "opacity is required for 2D opacity loss, but no opacity found in the output."
-                )
-            opacity = out["opacity"]
-            set_loss(
-                "opacity_smooth",
-                (opacity[:, 1:, :, :] - opacity[:, :-1, :, :]).square().mean()
-                + (opacity[:, :, 1:, :] - opacity[:, :, :-1, :]).square().mean(),
-            )
 
         if guidance != "ref":
             set_loss("sparsity", (out["opacity"] ** 2 + 0.01).sqrt().mean())

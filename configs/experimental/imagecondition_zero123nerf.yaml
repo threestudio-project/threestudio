@@ -137,14 +137,14 @@ system:
     lambda_mask: 50.0
     lambda_depth: 0.05
     lambda_depth_rel: [0.0, 0.0, 1.0, 10000]
+    lambda_depth_smooth: 5.0
     lambda_normal: 0. # [0, 0, 0.05, 100]
     lambda_normal_smooth: 2.0
     lambda_3d_normal_smooth: 5.0
     lambda_orient: 0.01
     lambda_sparsity: 4.0 # was 0.01
     lambda_opaque: 0.05
-    lambda_opacity_smooth: 1.0
-
+    lambda_opacity_smooth: 20.0
 
   optimizer:
     name: Adan
