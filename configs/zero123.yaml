@@ -111,7 +111,7 @@ system:
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
-    max_items_to_save: 4
+    max_items_eval: 4
 
     min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: [0, 0.85, 0.5, 200]

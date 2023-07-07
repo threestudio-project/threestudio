@@ -309,7 +309,7 @@ class BaseLift3DSystem(BaseSystem):
 
     def guidance_evaluation_save(self, comp_rgb, guidance_eval_out):
         B, size = comp_rgb.shape[:2]
-        max_items = self.cfg.guidance.max_items_to_save
+        max_items = self.cfg.guidance.max_items_eval
         if max_items == -1:
             max_items = B
 

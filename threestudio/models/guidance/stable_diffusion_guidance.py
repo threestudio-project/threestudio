@@ -545,7 +545,7 @@ class StableDiffusionGuidance(BaseObject):
         imgs_1orig = self.decode_latents(pred_1orig).permute(0, 2, 3, 1)
 
         latents_final = []
-        for b, i in enumerate(idxs[:max_items]):
+        for b, i in enumerate(idxs[:bs]):
             latents = latents_1step[b : b + 1]
             text_emb = (
                 text_embeddings[
