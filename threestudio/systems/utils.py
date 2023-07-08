@@ -53,6 +53,10 @@ def parse_optimizer(config, model):
     return optim
 
 
+# def parse_scheduler_to_instance(config, optimizer):
+#     if config.name == "ChainedScheduler":
+
+
 def parse_scheduler(config, optimizer):
     interval = config.get("interval", "epoch")
     assert interval in ["epoch", "step"]
