@@ -75,9 +75,6 @@ system:
     textureless_prob: 0.
 
   background_type: "solid-color-background" # unused
-  background:
-    random_aug: false
-    random_aug_prob: 0.5
 
   # renderer_type: "nerf-volume-renderer"
   # renderer:
