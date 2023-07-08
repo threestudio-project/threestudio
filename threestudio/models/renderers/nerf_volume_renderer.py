@@ -11,7 +11,7 @@ from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.networks import create_network_with_input_encoding
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.systems.utils import parse_optimizer, parse_scheduler
+from threestudio.systems.utils import parse_optimizer, parse_scheduler_to_instance
 from threestudio.utils.ops import chunk_batch, get_activation, validate_empty_rays
 from threestudio.utils.typing import *
 
@@ -32,42 +32,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
         grid_prune: bool = True
         prune_alpha_threshold: bool = True
 
-        # "density_activation": "shifted_trunc_exp",
-        # "density_bias": 0.0,
         proposal_network_config: Optional[dict] = None
-        # = field(
-        #     default_factory=lambda: {
-        #         "n_input_dims": 3,
-        #         "n_output_dims": 1,
-        #         "encoding_config": {
-        #             "otype": "HashGrid",
-        #             "n_levels": 5,
-        #             "n_features_per_level": 2,
-        #             "log2_hashmap_size": 17,
-        #             "base_resolution": 16,
-        #             "per_level_scale": 1.681792830507429,  # max_resolution: 128
-        #         },
-        #         "network_config": {
-        #             "otype": "FullyFusedMLP",
-        #             "activation": "ReLU",
-        #             "output_activation": "none",
-        #             "n_neurons": 64,
-        #             "n_hidden_layers": 1,
-        #         },
-        #     }
-        # )
         prop_optimizer_config: Optional[dict] = None
-        # = field(
-        #     default_factory=lambda: {
-        #         "name": "Adam",
-        #         "args": {
-        #             "lr": 1.0e-2,
-        #             "eps": 1.0e-15,
-        #             "weight_decay": 1.0e-6,
-        #         },
-        #     }
-        # )
-
         prop_scheduler_config: Optional[dict] = None
         num_samples_per_ray_proposal: int = 64
 
@@ -99,7 +65,9 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 self.cfg.prop_optimizer_config, self.prop_net
             )
             self.prop_scheduler = (
-                parse_scheduler(self.cfg.prop_scheduler_config, self.prop_optim)
+                parse_scheduler_to_instance(
+                    self.cfg.prop_scheduler_config, self.prop_optim
+                )
                 if self.cfg.prop_scheduler_config is not None
                 else None
             )
@@ -293,7 +261,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
             n_rays=n_rays,
         )
         if self.training and self.cfg.estimator == "proposal":
-            self.vars_in_forward["trans"] = trans_
+            self.vars_in_forward["trans"] = trans_.reshape(n_rays, -1)
 
         weights = weights_[..., None]
         opacity: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(
