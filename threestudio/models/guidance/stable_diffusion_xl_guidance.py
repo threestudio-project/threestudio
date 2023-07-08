@@ -343,6 +343,82 @@ class StableDiffusionXLGuidance(StableDiffusionGuidance):
 
         return grad, guidance_eval_utils
 
+    def __call__(
+        self,
+        rgb: Float[Tensor, "B H W C"],
+        prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        rgb_as_latents=False,
+        guidance_eval=False,
+        **kwargs,
+    ):
+        batch_size = rgb.shape[0]
+
+        rgb_BCHW = rgb.permute(0, 3, 1, 2)
+        latents: Float[Tensor, "B 4 128 128"]
+        if rgb_as_latents:
+            latents = F.interpolate(
+                rgb_BCHW, (128, 128), mode="bilinear", align_corners=False
+            )
+        else:
+            rgb_BCHW_512 = F.interpolate(
+                rgb_BCHW, (1024, 1024), mode="bilinear", align_corners=False
+            )
+            # encode image into latents with vae
+            latents = self.encode_images(rgb_BCHW_512)
+
+        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
+        t = torch.randint(
+            self.min_step,
+            self.max_step + 1,
+            [batch_size],
+            dtype=torch.long,
+            device=self.device,
+        )
+
+        if self.cfg.use_sjc:
+            grad, guidance_eval_utils = self.compute_grad_sjc(
+                latents, t, prompt_utils, elevation, azimuth, camera_distances
+            )
+        else:
+            grad, guidance_eval_utils = self.compute_grad_sds(
+                latents, t, prompt_utils, elevation, azimuth, camera_distances
+            )
+
+        grad = torch.nan_to_num(grad)
+        # clip grad for stable training?
+        if self.grad_clip_val is not None:
+            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
+
+        # loss = SpecifyGradient.apply(latents, grad)
+        # SpecifyGradient is not straghtforward, use a reparameterization trick instead
+        target = (latents - grad).detach()
+        # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
+        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+
+        guidance_out = {
+            "loss_sds": loss_sds,
+            "grad_norm": grad.norm(),
+            "min_step": self.min_step,
+            "max_step": self.max_step,
+        }
+
+        if guidance_eval:
+            guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
+            texts = []
+            for n, e, a, c in zip(
+                guidance_eval_out["noise_levels"], elevation, azimuth, camera_distances
+            ):
+                texts.append(
+                    f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+                )
+            guidance_eval_out.update({"texts": texts})
+            guidance_out.update({"eval": guidance_eval_out})
+
+        return guidance_out
+
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
     def get_noise_pred(

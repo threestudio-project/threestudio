@@ -5,8 +5,9 @@ seed: 0
 
 data_type: random-camera-datamodule
 data:
+  width: 128
+  height: 128
   camera_distance_range: [1.50, 1.50]
-  fovy_range: [45, 45] # fix FoV
   elevation_range: [-10, 45]
   camera_perturb: 0.0
   center_perturb: 0.0
