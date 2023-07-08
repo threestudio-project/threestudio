@@ -4,5 +4,6 @@ from . import (
     instructpix2pix_guidance,
     stable_diffusion_guidance,
     stable_diffusion_vsd_guidance,
+    stable_diffusion_xl_guidance,
     zero123_guidance,
 )

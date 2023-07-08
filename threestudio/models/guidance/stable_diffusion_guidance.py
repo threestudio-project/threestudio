@@ -32,8 +32,6 @@ class StableDiffusionGuidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        max_step_percent_annealed: float = 0.5
-        anneal_start_step: Optional[int] = None
 
         use_sjc: bool = False
         var_red: bool = True
@@ -162,7 +160,7 @@ class StableDiffusionGuidance(BaseObject):
     ) -> Float[Tensor, "B 4 64 64"]:
         input_dtype = imgs.dtype
         imgs = imgs * 2.0 - 1.0
-        posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
+        posterior = self.vae.encode(imgs.to(self.vae.dtype)).latent_dist
         latents = posterior.sample() * self.vae.config.scaling_factor
         return latents.to(input_dtype)
 
@@ -178,7 +176,7 @@ class StableDiffusionGuidance(BaseObject):
             latents, (latent_height, latent_width), mode="bilinear", align_corners=False
         )
         latents = 1 / self.vae.config.scaling_factor * latents
-        image = self.vae.decode(latents.to(self.weights_dtype)).sample
+        image = self.vae.decode(latents.to(self.vae.dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
 
