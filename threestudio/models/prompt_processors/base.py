@@ -113,9 +113,9 @@ class PromptProcessorOutput:
             text_embeddings_pooled = self.text_embeddings_pooled_vd[direction_idx]  # type: ignore
             uncond_text_embeddings_pooled = self.uncond_text_embeddings_pooled_vd[direction_idx]  # type: ignore
         else:
-            text_embeddings_pooled = self.text_embeddings_pooled.expand(batch_size, -1, -1)  # type: ignore
+            text_embeddings_pooled = self.text_embeddings_pooled.expand(batch_size, -1)  # type: ignore
             uncond_text_embeddings_pooled = self.uncond_text_embeddings_pooled.expand(  # type: ignore
-                batch_size, -1, -1
+                batch_size, -1
             )
 
         # IMPORTANT: we return (cond, uncond), which is in different order than other implementations!
