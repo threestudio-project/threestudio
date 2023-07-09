@@ -134,9 +134,9 @@ system:
       geometry.encoding:
         lr: 0.01
       geometry.density_network:
-        lr: 0.01
+        lr: 0.001
       geometry.feature_network:
-        lr: 0.01
+        lr: 0.001
       background:
         lr: 0.001
       guidance:

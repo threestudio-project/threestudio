@@ -378,11 +378,14 @@ class NeRFVolumeRenderer(VolumeRenderer):
                         step=global_step, occ_eval_fn=occ_eval_fn
                     )
         elif self.cfg.estimator == "proposal":
-            requires_grad = self.proposal_requires_grad_fn(global_step)
-            self.vars_in_forward["requires_grad"] = requires_grad
+            if self.training:
+                requires_grad = self.proposal_requires_grad_fn(global_step)
+                self.vars_in_forward["requires_grad"] = requires_grad
+            else:
+                self.vars_in_forward["requires_grad"] = False
 
     def update_step_end(self, epoch: int, global_step: int) -> None:
-        if self.cfg.estimator == "proposal":
+        if self.cfg.estimator == "proposal" and self.training:
             self.estimator.update_every_n_steps(
                 self.vars_in_forward["trans"],
                 self.vars_in_forward["requires_grad"],
