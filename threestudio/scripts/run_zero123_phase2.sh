@@ -296,3 +296,12 @@ python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml -
  system.weights="outputs/anya_front/Phase1/ckpts/last.ckpt" system.freq.guidance_eval=13 \
  system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
  data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test31_use_latest_anyaph1;min_step_percent:[0,0.1,0.02,1000];max_step_percent:[0,0.5,0.3,1000]"
+
+# test32_lambda_sds:0.06
+# Conclusion: doesn't really improve upon phase1
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_anya \
+python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml --train \
+ system.prompt_processor.prompt="A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )" \
+ system.weights="outputs/anya_front/Phase1/ckpts/last.ckpt" system.freq.guidance_eval=13 \
+ system.loggers.wandb.enable=true system.loggers.wandb.project="claforte-anya-new-ph2" \
+ data.image_path=./load/images/anya_front_rgba.png system.loggers.wandb.name="test32_lambda_sds:0.06"
