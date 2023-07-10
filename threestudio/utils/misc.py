@@ -110,3 +110,11 @@ def barrier():
         return
     else:
         torch.distributed.barrier()
+
+
+def broadcast(tensor, src=0):
+    if not _distributed_available():
+        return tensor
+    else:
+        torch.distributed.broadcast(tensor, src=src)
+        return tensor
