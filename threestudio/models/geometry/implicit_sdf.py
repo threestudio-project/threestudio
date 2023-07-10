@@ -135,10 +135,12 @@ class ImplicitSDF(BaseImplicitGeometry):
             scene = trimesh.load(mesh_path)
             if isinstance(scene, trimesh.Trimesh):
                 mesh = scene
-            else:
+            elif isinstance(scene, trimesh.scene.Scene):
                 mesh = trimesh.Trimesh()
                 for obj in scene.geometry.values():
                     mesh = trimesh.util.concatenate([mesh, obj])
+            else:
+                raise ValueError(f"Unknown mesh type at {mesh_path}.")
 
             # move to center
             centroid = mesh.vertices.mean(0)
