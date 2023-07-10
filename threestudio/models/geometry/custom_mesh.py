@@ -162,7 +162,7 @@ class CustomMesh(BaseExplicitGeometry):
 
     def export(self, points: Float[Tensor, "*N Di"], **kwargs) -> Dict[str, Any]:
         out: Dict[str, Any] = {}
-        if self.cfg.geometry_only or self.cfg.n_feature_dims == 0:
+        if self.cfg.n_feature_dims == 0:
             return out
         points_unscaled = points
         points = contract_to_unisphere(points_unscaled, self.bbox)
