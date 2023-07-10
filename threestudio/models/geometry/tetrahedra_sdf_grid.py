@@ -185,6 +185,14 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
             )
             t_pos_idx = torch.tensor(mesh.faces, dtype=torch.int64).to(self.bbox.device)
             self.mesh = Mesh(v_pos=v_pos, t_pos_idx=t_pos_idx)
+            self.register_buffer(
+                "v_buffer",
+                v_pos,
+            )
+            self.register_buffer(
+                "t_buffer",
+                t_pos_idx,
+            )
 
         else:
             raise ValueError(
@@ -194,6 +202,9 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
     def isosurface(self) -> Mesh:
         # return cached mesh if fix_geometry is True to save computation
         if self.cfg.fix_geometry and self.mesh is not None:
+            return self.mesh
+        elif hasattr(self, "v_buffer"):  # Custom mesh case
+            self.mesh = Mesh(v_pos=self.v_buffer, t_pos_idx=self.t_buffer)
             return self.mesh
         mesh = self.isosurface_helper(self.sdf, self.deformation)
         mesh.v_pos = scale_tensor(
