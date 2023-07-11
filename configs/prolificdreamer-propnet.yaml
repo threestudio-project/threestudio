@@ -87,14 +87,14 @@ system:
           args:
             start_factor: 0.01
             total_iters: 100
-        -
-          name: MultiStepLR
-          args:
-            milestones:
-              - ${idiv:${trainer.max_steps},2}
-              - ${idiv:${mul:${trainer.max_steps},3},4}
-              - ${idiv:${mul:${trainer.max_steps},9},10}
-            gamma: 0.33
+        # -
+        #   name: MultiStepLR
+        #   args:
+        #     milestones:
+        #       - ${idiv:${trainer.max_steps},2}
+        #       - ${idiv:${mul:${trainer.max_steps},3},4}
+        #       - ${idiv:${mul:${trainer.max_steps},9},10}
+        #     gamma: 0.33
 
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
