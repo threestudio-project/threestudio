@@ -10,7 +10,7 @@ import threestudio
 from threestudio.models.geometry.base import BaseImplicitGeometry, contract_to_unisphere
 from threestudio.models.mesh import Mesh
 from threestudio.models.networks import get_encoding, get_mlp
-from threestudio.utils.misc import get_rank
+from threestudio.utils.misc import broadcast, get_rank
 from threestudio.utils.typing import *
 
 
@@ -208,6 +208,10 @@ class ImplicitSDF(BaseImplicitGeometry):
             optim.zero_grad()
             loss.backward()
             optim.step()
+
+        # explicit broadcast to ensure param consistency across ranks
+        for param in self.parameters():
+            broadcast(param, src=0)
 
     def get_shifted_sdf(
         self, points: Float[Tensor, "*N Di"], sdf: Float[Tensor, "*N 1"]

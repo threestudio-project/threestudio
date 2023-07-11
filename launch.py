@@ -79,6 +79,7 @@ def main(args, extras) -> None:
         ProgressCallback,
     )
     from threestudio.utils.config import ExperimentConfig, load_config
+    from threestudio.utils.misc import get_rank
     from threestudio.utils.typing import Optional
 
     logger = logging.getLogger("pytorch_lightning")
@@ -97,7 +98,8 @@ def main(args, extras) -> None:
     cfg: ExperimentConfig
     cfg = load_config(args.config, cli_args=extras, n_gpus=n_gpus)
 
-    pl.seed_everything(cfg.seed)
+    # set a different seed for each device
+    pl.seed_everything(cfg.seed + get_rank(), workers=True)
 
     dm = threestudio.find(cfg.data_type)(cfg.data)
     system: BaseSystem = threestudio.find(cfg.system_type)(
