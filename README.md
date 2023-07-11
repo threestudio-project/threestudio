@@ -39,9 +39,10 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 ## News
+
 - 07/06/2023: Join our [Discord channel](https://discord.gg/yuQAdvwr) for lively discussions!
 - 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
-- 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-)  to give it a try.
+- 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-) to give it a try.
 - 06/14/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
 - 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
 - 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
@@ -427,7 +428,6 @@ python launch.py --config configs/textmesh-if.yaml --train --gpu 0 system.prompt
 
 - TextMesh uses a surface-based geometry representation, so you don't need to manually tune the isosurface threshold when exporting meshes!
 
-
 ### Control4D [![arXiv](https://img.shields.io/badge/arXiv-2305.20082-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.20082)
 
 **This is an experimental implementation of Control4D using threestudio! Control4D will release the full code including static and dynamic editing after paper acceptance.**
@@ -557,7 +557,6 @@ pip install -r requirements-dev.txt
 
 - If you are using VSCode as the text editor: (1) Install `editorconfig` extension. (2) Set the default linter to mypy to enable static type checking. (3) Set the default formatter to black. You could either manually format the document or let the editor format the document each time it is saved by setting `"editor.formatOnSave": true`.
 
-
 - Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
 
 - Make changes to the code, update README and DOCUMENTATION if needed, and open a pull request.
@@ -600,7 +599,7 @@ If you find threestudio helpful, please consider citing:
 
 ```
 @Misc{threestudio2023,
-  author =       {Yuan-Chen Guo and Ying-Tian Liu and Chen Wang and Zi-Xin Zou and Guan Luo and Chia-Hao Chen and Yan-Pei Cao and Song-Hai Zhang},
+  author =       {Yuan-Chen Guo and Ying-Tian Liu and Ruizhi Shao and Christian Laforte and Vikram Voleti and Guan Luo and Chia-Hao Chen and Zi-Xin Zou and Chen Wang and Yan-Pei Cao and Song-Hai Zhang},
   title =        {threestudio: A unified framework for 3D content generation},
   howpublished = {\url{https://github.com/threestudio-project/threestudio}},
   year =         {2023}
