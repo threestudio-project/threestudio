@@ -14,8 +14,8 @@ import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
-from threestudio.utils.typing import *
 from threestudio.utils.perceptual import PerceptualLoss
+from threestudio.utils.typing import *
 
 
 @threestudio.register("stable-diffusion-controlnet-guidance")
@@ -45,12 +45,14 @@ class ControlNetGuidance(BaseObject):
 
         use_sds: bool = False
 
+        use_du: bool = False
+        per_du_step: int = 10
+        start_du_step: int = 1000
+        cache_du: bool = False
+
         # Canny threshold
         canny_lower_bound: int = 50
         canny_upper_bound: int = 100
-
-        per_editing_step: int = 10
-        start_editing_step: int = 1000
 
     cfg: Config
 
@@ -139,8 +141,10 @@ class ControlNetGuidance(BaseObject):
 
         self.grad_clip_val: Optional[float] = None
 
-        self.edit_frames = {}
-        self.perceptual_loss = PerceptualLoss().eval().to(self.device)
+        if self.cfg.use_du:
+            if self.cfg.cache_du:
+                self.edit_frames = {}
+            self.perceptual_loss = PerceptualLoss().eval().to(self.device)
 
         threestudio.info(f"Loaded ControlNet!")
 
@@ -343,6 +347,75 @@ class ControlNetGuidance(BaseObject):
         grad = w * (noise_pred - noise)
         return grad
 
+    def compute_grad_du(
+        self,
+        latents: Float[Tensor, "B 4 64 64"],
+        rgb_BCHW_512: Float[Tensor, "B 3 512 512"],
+        cond_feature: Float[Tensor, "B 3 512 512"],
+        cond_rgb: Float[Tensor, "B H W 3"],
+        text_embeddings: Float[Tensor, "BB 77 768"],
+        **kwargs,
+    ):
+        batch_size, _, _, _ = cond_rgb.shape
+        assert batch_size == 1
+
+        origin_gt_rgb = F.interpolate(
+            cond_rgb.permute(0, 3, 1, 2), (512, 512), mode="bilinear"
+        ).permute(0, 2, 3, 1)
+        need_diffusion = (
+            self.global_step % self.cfg.per_du_step == 0
+            and self.global_step > self.cfg.start_du_step
+        )
+        if self.cfg.cache_du:
+            if torch.is_tensor(kwargs["index"]):
+                batch_index = kwargs["index"].item()
+            else:
+                batch_index = kwargs["index"]
+            if (
+                not (batch_index in self.edit_frames)
+            ) and self.global_step > self.cfg.start_du_step:
+                need_diffusion = True
+        need_loss = self.cfg.cache_du or need_diffusion
+        guidance_out = {}
+
+        if need_diffusion:
+            t = torch.randint(
+                self.min_step,
+                self.max_step,
+                [1],
+                dtype=torch.long,
+                device=self.device,
+            )
+            edit_latents = self.edit_latents(text_embeddings, latents, cond_feature, t)
+            edit_images = self.decode_latents(edit_latents)
+            edit_images = F.interpolate(
+                edit_images, (512, 512), mode="bilinear"
+            ).permute(0, 2, 3, 1)
+            if self.cfg.cache_du:
+                self.edit_frames[batch_index] = edit_images.detach().cpu()
+
+        if need_loss:
+            if self.cfg.cache_du:
+                if batch_index in self.edit_frames:
+                    gt_rgb = self.edit_frames[batch_index].to(cond_feature.device)
+                else:
+                    gt_rgb = origin_gt_rgb
+            else:
+                gt_rgb = edit_images
+            guidance_out.update(
+                {
+                    "loss_l1": torch.nn.functional.l1_loss(
+                        rgb_BCHW_512, gt_rgb.permute(0, 3, 1, 2), reduction="sum"
+                    ),
+                    "loss_p": self.perceptual_loss(
+                        rgb_BCHW_512.contiguous(),
+                        gt_rgb.permute(0, 3, 1, 2).contiguous(),
+                    ).sum(),
+                }
+            )
+
+        return guidance_out
+
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
@@ -350,8 +423,7 @@ class ControlNetGuidance(BaseObject):
         cond_rgb: Float[Tensor, "B H W C"],
         **kwargs,
     ):
-        batch_size, H, W, _ = rgb.shape
-        H, W = 512, 512
+        batch_size, _, _, _ = rgb.shape
         assert batch_size == 1
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
@@ -361,7 +433,7 @@ class ControlNetGuidance(BaseObject):
         )
         latents = self.encode_images(rgb_BCHW_512)
 
-        image_cond = self.prepare_image_cond(cond_rgb)
+        cond_feature = self.prepare_image_cond(cond_rgb)
 
         temp = torch.zeros(1).to(rgb.device)
         text_embeddings = prompt_utils.get_text_embeddings(temp, temp, temp, False)
@@ -375,56 +447,30 @@ class ControlNetGuidance(BaseObject):
             device=self.device,
         )
 
+        guidance_out = {}
         if self.cfg.use_sds:
-            grad = self.compute_grad_sds(text_embeddings, latents, image_cond, t)
+            grad = self.compute_grad_sds(text_embeddings, latents, cond_feature, t)
             grad = torch.nan_to_num(grad)
             if self.grad_clip_val is not None:
                 grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
             target = (latents - grad).detach()
             loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-            return {
-                "loss_sds": loss_sds,
-                "grad_norm": grad.norm(),
-                "min_step": self.min_step,
-                "max_step": self.max_step,
-            }
-        else:
-            if torch.is_tensor(kwargs["index"]):
-                batch_index = kwargs["index"].item()
-            else:
-                batch_index = kwargs["index"]
-            origin_gt_rgb = cond_rgb
-            if batch_index in self.edit_frames:
-                gt_rgb = self.edit_frames[batch_index].to(cond_rgb.device)
-            else:
-                gt_rgb = origin_gt_rgb
-            gt_rgb = torch.nn.functional.interpolate(
-                gt_rgb.permute(0, 3, 1, 2), (H, W), mode="bilinear", align_corners=False
-            ).permute(0, 2, 3, 1)
-            if (
-                self.cfg.per_editing_step > 0
-                and self.global_step > self.cfg.start_editing_step
-                and batch_index != 0
-            ):
-                if (
-                    not batch_index in self.edit_frames
-                    or self.global_step % self.cfg.per_editing_step == 0
-                ):
-                    edit_latents = self.edit_latents(text_embeddings, latents, image_cond, t)
-                    edit_images = self.decode_latents(edit_latents)
-                    edit_images = F.interpolate(edit_images, (H, W), mode="bilinear")
-                    self.edit_frames[batch_index] = edit_images.permute(0, 2, 3, 1).detach().cpu()
+            guidance_out.update(
+                {
+                    "loss_sds": loss_sds,
+                    "grad_norm": grad.norm(),
+                    "min_step": self.min_step,
+                    "max_step": self.max_step,
+                }
+            )
 
-            guidance_out = {
-                "loss_l1": torch.nn.functional.l1_loss(rgb_BCHW_512.permute(0, 2, 3, 1), gt_rgb, reduction="sum"),
-                "loss_p": self.perceptual_loss(
-                    rgb_BCHW_512.contiguous(),
-                    gt_rgb.permute(0, 3, 1, 2).contiguous(),
-                ).sum(),
-                # "edit_images": edit_images.permute(0, 2, 3, 1)
-            }
+        if self.cfg.use_du:
+            grad = self.compute_grad_du(
+                latents, rgb_BCHW_512, cond_feature, cond_rgb, text_embeddings, **kwargs
+            )
+            guidance_out.update(grad)
 
-            return guidance_out
+        return guidance_out
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         self.global_step = global_step

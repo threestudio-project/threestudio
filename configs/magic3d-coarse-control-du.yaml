@@ -1,4 +1,4 @@
-name: "magic3d-coarse-sd"
+name: "magic3d-coarse-control-du"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -10,15 +10,6 @@ data:
   train_data_interval: 2
   eval_data_interval: 2
   dataroot: ???
-# data_type: "random-camera-datamodule"
-# data:
-#   width: 64
-#   height: 64
-#   camera_distance_range: [1.5, 2.0]
-#   elevation_range: [-10, 45]
-#   light_sample_strategy: "magic3d"
-#   eval_camera_distance: 2.0
-#   eval_fovy_deg: 70.
 
 system_type: "magic3d-system"
 system:
@@ -62,7 +53,10 @@ system:
     min_step_percent: 0.05
     max_step_percent: 0.8
     condition_scale: 1.0
-    start_editing_step: 1000
+
+    use_du: True
+    start_du_step: 1000
+    cache_du: True
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
