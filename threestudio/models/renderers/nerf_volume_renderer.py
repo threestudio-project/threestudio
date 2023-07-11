@@ -11,6 +11,7 @@ from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
 from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
+from threestudio.utils.misc import cleanup
 
 
 @threestudio.register("nerf-volume-renderer")
@@ -24,6 +25,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
         prune_alpha_threshold: bool = True
         return_comp_normal: bool = False
         return_normal_perturb: bool = False
+        train_max_nums: int = -1 #5000000
 
     cfg: Config
 
@@ -69,14 +71,11 @@ class NeRFVolumeRenderer(VolumeRenderer):
             t_positions = (t_starts + t_ends) / 2.0
             t_dirs = rays_d_flatten[ray_indices]
             positions = t_origins + t_dirs * t_positions
-            if self.training:
-                sigma = self.geometry.forward_density(positions)[..., 0]
-            else:
-                sigma = chunk_batch(
-                    self.geometry.forward_density,
-                    self.cfg.eval_chunk_size,
-                    positions,
-                )[..., 0]
+            sigma = chunk_batch(
+                self.geometry.forward_density,
+                self.cfg.eval_chunk_size,
+                positions,
+            )[..., 0]
             return sigma
 
         if not self.cfg.grid_prune:
@@ -116,17 +115,58 @@ class NeRFVolumeRenderer(VolumeRenderer):
         t_intervals = t_ends - t_starts
 
         if self.training:
-            geo_out = self.geometry(
-                positions, output_normal=self.material.requires_normal
-            )
-            rgb_fg_all = self.material(
-                viewdirs=t_dirs,
-                positions=positions,
-                light_positions=t_light_positions,
-                **geo_out,
-                **kwargs
-            )
-            comp_rgb_bg = self.background(dirs=rays_d_flatten)
+            MAX_N = self.cfg.train_max_nums
+            if MAX_N > 0:
+                B = positions.shape[0]
+                interval = (B // MAX_N) + 1
+            else:
+                interval = -1
+            if interval > 1:
+                with torch.no_grad():
+                    geo_out = chunk_batch(
+                        self.geometry,
+                        self.cfg.eval_chunk_size,
+                        positions,
+                        output_normal=self.material.requires_normal,
+                    )
+                    rgb_fg_all = chunk_batch(
+                        self.material,
+                        self.cfg.eval_chunk_size,
+                        viewdirs=t_dirs,
+                        positions=positions,
+                        light_positions=t_light_positions,
+                        **geo_out
+                    )
+                    comp_rgb_bg = chunk_batch(
+                        self.background, self.cfg.eval_chunk_size, dirs=rays_d_flatten
+                    )
+                    
+                geo_out_interval = self.geometry(positions[::interval], output_normal=self.material.requires_normal)
+                rgb_fg_all_interval = self.material(
+                    viewdirs=t_dirs[::interval],
+                    positions=positions[::interval],
+                    light_positions=t_light_positions[::interval],
+                    **geo_out_interval,
+                    **kwargs
+                )
+                comp_rgb_bg_interval = self.background(dirs=rays_d_flatten[::interval])
+                for key in geo_out:
+                    if torch.is_tensor(geo_out[key]):
+                        if geo_out[key].shape[0] == B:
+                            geo_out[key] = geo_out[key].detach()
+                            geo_out[key][::interval] = geo_out_interval[key]
+                rgb_fg_all[::interval] = rgb_fg_all_interval
+                comp_rgb_bg[::interval] = comp_rgb_bg_interval
+            else:
+                geo_out = self.geometry(positions, output_normal=self.material.requires_normal)
+                rgb_fg_all = self.material(
+                    viewdirs=t_dirs,
+                    positions=positions,
+                    light_positions=t_light_positions,
+                    **geo_out,
+                    **kwargs
+                )
+                comp_rgb_bg = self.background(dirs=rays_d_flatten)
         else:
             geo_out = chunk_batch(
                 self.geometry,
@@ -264,9 +304,10 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 return density * self.render_step_size
 
             if self.training and not on_load_weights:
-                self.estimator.update_every_n_steps(
-                    step=global_step, occ_eval_fn=occ_eval_fn
-                )
+                with torch.no_grad():
+                    self.estimator.update_every_n_steps(
+                        step=global_step, occ_eval_fn=occ_eval_fn
+                    )
 
     def train(self, mode=True):
         self.randomized = mode and self.cfg.randomized

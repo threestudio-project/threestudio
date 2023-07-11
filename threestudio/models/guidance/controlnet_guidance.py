@@ -15,6 +15,7 @@ from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, parse_version
 from threestudio.utils.typing import *
+from threestudio.utils.perceptual import PerceptualLoss
 
 
 @threestudio.register("stable-diffusion-controlnet-guidance")
@@ -47,6 +48,9 @@ class ControlNetGuidance(BaseObject):
         # Canny threshold
         canny_lower_bound: int = 50
         canny_upper_bound: int = 100
+
+        per_editing_step: int = 10
+        start_editing_step: int = 1000
 
     cfg: Config
 
@@ -134,6 +138,9 @@ class ControlNetGuidance(BaseObject):
         )
 
         self.grad_clip_val: Optional[float] = None
+
+        self.edit_frames = {}
+        self.perceptual_loss = PerceptualLoss().eval().to(self.device)
 
         threestudio.info(f"Loaded ControlNet!")
 
@@ -339,11 +346,12 @@ class ControlNetGuidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        cond_rgb: Float[Tensor, "B H W C"],
         prompt_utils: PromptProcessorOutput,
+        cond_rgb: Float[Tensor, "B H W C"],
         **kwargs,
     ):
         batch_size, H, W, _ = rgb.shape
+        H, W = 512, 512
         assert batch_size == 1
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
@@ -381,18 +389,45 @@ class ControlNetGuidance(BaseObject):
                 "max_step": self.max_step,
             }
         else:
-            edit_latents = self.edit_latents(text_embeddings, latents, image_cond, t)
-            edit_images = self.decode_latents(edit_latents)
-            edit_images = F.interpolate(edit_images, (H, W), mode="bilinear")
+            if torch.is_tensor(kwargs["index"]):
+                batch_index = kwargs["index"].item()
+            else:
+                batch_index = kwargs["index"]
+            origin_gt_rgb = cond_rgb
+            if batch_index in self.edit_frames:
+                gt_rgb = self.edit_frames[batch_index].to(cond_rgb.device)
+            else:
+                gt_rgb = origin_gt_rgb
+            gt_rgb = torch.nn.functional.interpolate(
+                gt_rgb.permute(0, 3, 1, 2), (H, W), mode="bilinear", align_corners=False
+            ).permute(0, 2, 3, 1)
+            if (
+                self.cfg.per_editing_step > 0
+                and self.global_step > self.cfg.start_editing_step
+                and batch_index != 0
+            ):
+                if (
+                    not batch_index in self.edit_frames
+                    or self.global_step % self.cfg.per_editing_step == 0
+                ):
+                    edit_latents = self.edit_latents(text_embeddings, latents, image_cond, t)
+                    edit_images = self.decode_latents(edit_latents)
+                    edit_images = F.interpolate(edit_images, (H, W), mode="bilinear")
+                    self.edit_frames[batch_index] = edit_images.permute(0, 2, 3, 1).detach().cpu()
 
-            return {"edit_images": edit_images.permute(0, 2, 3, 1)}
+            guidance_out = {
+                "loss_l1": torch.nn.functional.l1_loss(rgb_BCHW_512.permute(0, 2, 3, 1), gt_rgb, reduction="sum"),
+                "loss_p": self.perceptual_loss(
+                    rgb_BCHW_512.contiguous(),
+                    gt_rgb.permute(0, 3, 1, 2).contiguous(),
+                ).sum(),
+                # "edit_images": edit_images.permute(0, 2, 3, 1)
+            }
+
+            return guidance_out
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        # clip grad for stable training as demonstrated in
-        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
-        # http://arxiv.org/abs/2303.15413
-        if self.cfg.grad_clip is not None:
-            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+        self.global_step = global_step
 
         self.set_min_max_steps(
             min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
