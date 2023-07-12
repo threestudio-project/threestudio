@@ -12,12 +12,14 @@ from threestudio.models.geometry.base import (
     contract_to_unisphere,
 )
 from threestudio.models.networks import get_encoding, get_mlp
+from threestudio.utils.base import Updateable
+from threestudio.utils.misc import C
 from threestudio.utils.ops import get_activation
 from threestudio.utils.typing import *
 
 
 @threestudio.register("implicit-volume")
-class ImplicitVolume(BaseImplicitGeometry):
+class ImplicitVolume(BaseImplicitGeometry, Updateable):
     @dataclass
     class Config(BaseImplicitGeometry.Config):
         n_input_dims: int = 3
@@ -74,6 +76,9 @@ class ImplicitVolume(BaseImplicitGeometry):
                 self.encoding.n_output_dims, 3, self.cfg.mlp_network_config
             )
 
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        self.density_blob_scale = C(self.cfg.density_blob_scale, epoch, global_step)
+
     def get_activated_density(
         self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]
     ) -> Tuple[Float[Tensor, "*N 1"], Float[Tensor, "*N 1"]]:
@@ -81,7 +86,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         if self.cfg.density_bias == "blob_dreamfusion":
             # pre-activation density bias
             density_bias = (
-                self.cfg.density_blob_scale
+                self.density_blob_scale
                 * torch.exp(
                     -0.5 * (points**2).sum(dim=-1) / self.cfg.density_blob_std**2
                 )[..., None]
@@ -89,7 +94,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         elif self.cfg.density_bias == "blob_magic3d":
             # pre-activation density bias
             density_bias = (
-                self.cfg.density_blob_scale
+                self.density_blob_scale
                 * (
                     1
                     - torch.sqrt((points**2).sum(dim=-1)) / self.cfg.density_blob_std
