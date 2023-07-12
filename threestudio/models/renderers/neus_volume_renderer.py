@@ -232,8 +232,8 @@ class NeuSVolumeRenderer(VolumeRenderer):
         if bg_color is None:
             bg_color = comp_rgb_bg
 
-        if bg_color.shape == (batch_size, height, width, 3):
-            bg_color = bg_color.reshape(-1, 3)
+        if bg_color.shape[:-1] == (batch_size, height, width):
+            bg_color = bg_color.reshape(batch_size * height * width, -1)
 
         comp_rgb = comp_rgb_fg + bg_color * (1.0 - opacity)
 
