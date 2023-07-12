@@ -488,8 +488,12 @@ https://github.com/threestudio-project/threestudio/assets/22424247/f4e7b66f-7a46
 
 **Example running commands**
 
+1. Take an image of your choice, or generate it from text using your favourite AI image generator such as Stable Diffusion XL (https://clipdrop.co/stable-diffusion) E.g. "A simple 3D render of a friendly dog"
+2. Remove its background using Clipdrop (https://clipdrop.co/remove-background)
+3. Save to `load/images/`, preferably with `_rgba.png` as the suffix
+4. Run Zero-1-to-3:
 ```sh
-python launch.py --config configs/zero123.yaml --train --gpu 0 data.image_path=./load/images/hamburger_rgba.png
+python launch.py --config configs/zero123.yaml --train --gpu 0 data.image_path=./load/images/dog1_rgba.png
 ```
 
 For more scripts for Zero-1-to-3, please check `threestudio/scripts/run_zero123.sh`.
