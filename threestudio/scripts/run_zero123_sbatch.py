@@ -2,13 +2,14 @@ import os
 import time
 
 files = [
-    "/fsx/proj-mod3d/threestudio/load/images/hamburger_rgba.png",
+    "~/git/threestudio/load/images/dog1_rgba.png",
+    "~/git/threestudio/load/images/dragon2_rgba.png",
 ]
 
 for file in files:
     name = os.path.basename(file).split("_rgba.png")[0]
     with open(
-        "/admin/home-vikram/git/threestudio/threestudio/scripts/zero123_sbatch.sh",
+        "~/git/threestudio/threestudio/scripts/zero123_sbatch.sh",
         "w",
     ) as f:
         f.write("#!/bin/bash\n")
@@ -18,17 +19,15 @@ for file in files:
         f.write("#SBATCH --gpus=1\n")
         f.write("#SBATCH --time=0-00:07:00\n")
         f.write("conda activate three\n")
-        f.write("cd /admin/home-vikram/git/threestudio/\n")
+        f.write("cd ~/git/threestudio/\n")
         f.write(f"NAME={name}\n")
         # Phase 1
         f.write(
-            "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/${NAME}_rgba.png use_timestamp=False name=${NAME} tag=Phase1 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
+            "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/${NAME}_rgba.png use_timestamp=true name=${NAME} tag=Phase1 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
         )
         # # Phase 1.5
         # f.write(
-        #     "python launch.py --config configs/zero123-geometry.yaml --train data.image_path=./load/images/${NAME}_rgba.png system.geometry_convert_from=./outputs/${NAME}/Phase1/ckpts/last.ckpt use_timestamp=False name=${NAME}_DEMO tag=Phase1p5 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1p5\n"
+        #     "python launch.py --config configs/zero123-geometry.yaml --train data.image_path=./load/images/${NAME}_rgba.png system.geometry_convert_from=./outputs/${NAME}/Phase1/ckpts/last.ckpt use_timestamp=False name=${NAME} tag=Phase1p5 system.loggers.wandb.enable=true system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1p5\n"
         # )
-    os.system(
-        "sbatch /admin/home-vikram/git/threestudio/threestudio/scripts/zero123_sbatch.sh"
-    )
+    os.system("sbatch ~/git/threestudio/threestudio/scripts/zero123_sbatch.sh")
     time.sleep(1)
