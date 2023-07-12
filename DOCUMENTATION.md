@@ -203,7 +203,8 @@ An explicit geometry parameterized with a feature volume. The feature volume has
 
 | name | type | description |
 | ---- | ---- | ----------- |
-
+| pos_encoding_config                  | dict              | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                                                               |
+| mlp_network_config                   | dict              | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                                                                                                                                                                                                                                     |
 ### tetrahedra-sdf-grid
 
 | name                                 | type              | description                                                                                                                                                                                                                                                                      |
@@ -212,13 +213,13 @@ An explicit geometry parameterized with a feature volume. The feature volume has
 | isosurface_deformable_grid           | bool              | Whether to optimize positions of tetrahedra grid vertices for surface extraction. Default: True                                                                                                                                                                                  |
 | isosurface_remove_outliers           | bool              | Whether to remove outlier components according to the number of faces. Only remove if the isosurface process does not require gradient. Default: False                                                                                                                           |
 | isosurface_outlier_n_faces_threshold | Union[int, float] | Extracted mesh components with number of faces less than this threshold will be removed if `isosurface_remove_outliers=True`. If `int`, direcly used as the threshold number of faces; if `float`, used as the ratio of all face numbers to compute the threshold. Default: 0.01 |
-| pos_encoding_config                  | dict              | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                                                               |
-| mlp_network_config                   | dict              | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                                                                                    |
-| shape_init                           | Optional[str]     | The shape to initializa the SDF as, in [None, "sphere", "ellipsoid"]. If None, does not initialize; if "sphere", initialized as a sphere; if "ellipsoid", initialized as an ellipsoid. Default: None                                                                             |
-| shape_init_params                    | Optional[Any]     | Parameters to specify the SDF initialization. If `shape_init="sphere"`, a float is used for the sphere radius; if `shape_init="ellipsoid"`, a tuple of three floats is used for the radius along x/y/z axis. Default: None                                                       |
-| force_shape_init                     | bool              | Whether to force initialization of the SDf even if weights are provided. Default:False                                                                                                                                                                                           |
 | geometry_only                        | bool              | Whether to only model the SDF. If True, the feature prediction is ommited. Default:False                                                                                                                                                                                         |
 | fix_geometry                         | bool              | Whether to optimize the geometry. If True, the SDF (and grid vertices if `isosurface_deformable_grid=True`) is fixed. Default: False                                                                                                                                             |
+
+### Custom mesh
+
+|  shape_init                   | str        | The shape to initializa the SDF as. Should be formatted as "mesh:path", where `path` points to the custom mesh. Default: ""                            |
+| shape_init_params            | Optional[Any]       | Parameters to specify the SDF initialization. A single float is used for uniform scaling; a tuple of three floats is used for scalings along x/y/z axis. Default: None   |
 
 ## Material
 
