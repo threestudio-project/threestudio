@@ -2,7 +2,7 @@ import os
 import time
 
 files = [
-    "/fsx/proj-mod3d/threestudio/load/images/chess1_rgba.png",
+    "/fsx/proj-mod3d/threestudio/load/images/hamburger_rgba.png",
 ]
 
 for file in files:
@@ -22,11 +22,11 @@ for file in files:
         f.write(f"NAME={name}\n")
         # Phase 1
         f.write(
-            "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/XL_20230604.ckpt use_timestamp=False name=${NAME}_DEMO tag=XL_Phase1 system.loggers.wandb.enable=false system.loggers.wandb.project='voletiv-zero123XL-demo-NEW2' system.loggers.wandb.name=${NAME}_XL_Phase1\n"
+            "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/${NAME}_rgba.png use_timestamp=False name=${NAME} tag=Phase1 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
         )
         # # Phase 1.5
         # f.write(
-        #     "python launch.py --config configs/zero123-geometry.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.geometry_convert_from=./outputs/${NAME}_DEMO/XL_Phase1/ckpts/last.ckpt system.guidance.pretrained_model_name_or_path=./load/zero123/XL_20230604.ckpt use_timestamp=False name=${NAME}_DEMO tag=XL_Phase1p5 system.loggers.wandb.enable=false system.loggers.wandb.project='voletiv-zero123XL-demo-NEW2' system.loggers.wandb.name=${NAME}_XL_Phase1p5\n"
+        #     "python launch.py --config configs/zero123-geometry.yaml --train data.image_path=./load/images/${NAME}_rgba.png system.geometry_convert_from=./outputs/${NAME}/Phase1/ckpts/last.ckpt use_timestamp=False name=${NAME}_DEMO tag=Phase1p5 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1p5\n"
         # )
     os.system(
         "sbatch /admin/home-vikram/git/threestudio/threestudio/scripts/zero123_sbatch.sh"

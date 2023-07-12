@@ -58,4 +58,4 @@ def normal_mask(normal_filename):
 
 
 # 5. Run Zero123
-# python launch.py --config configs/zero123.yaml --train --gpu 1 system.loggers.wandb.enable=true system.loggers.wandb.project="voletiv-zero123XL-demo" system.loggers.wandb.name="grootplant_64_128_d0.05_drel" data.image_path=./load/images/grootplant_rgba.png system.freq.guidance_eval=0 system.guidance.pretrained_model_name_or_path="./load/zero123/XL_20230604.ckpt" tag='${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_XL'
+# python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/grootplant_rgba.png

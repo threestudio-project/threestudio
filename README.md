@@ -469,28 +469,32 @@ python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 0 data.da
 
 **Installation**
 
-Download pretrained weights into `load/zero123`:
+Download pretrained Zero123XL weights into `load/zero123`:
 
 ```sh
 cd load/zero123
-wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
+wget https://zero123.cs.columbia.edu/assets/zero123-xl.ckpt
 ```
 
 **Results obtained by threestudio (Zero-1-to-3)**
 
 
-
 https://github.com/threestudio-project/threestudio/assets/22424247/f4e7b66f-7a46-4f9f-8fcd-750300cef651
-
 
 
 **IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
 
 **IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
 
+**Example running commands**
+
 ```sh
 python launch.py --config configs/zero123.yaml --train --gpu 0 data.image_path=./load/images/hamburger_rgba.png
 ```
+
+For more scripts for Zero-1-to-3, please check `threestudio/scripts/run_zero123.sh`.
+
+Previous Zero-1-to-3 weights are available at `https://huggingface.co/cvlab/zero123-weights/`. You can download them to `load/zero123` as above, and replace the path at `system.guidance.pretrained_model_name_or_path`.
 
 **Guidance evaluation**
 
