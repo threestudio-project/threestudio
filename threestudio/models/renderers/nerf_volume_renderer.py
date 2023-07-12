@@ -126,7 +126,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 **geo_out,
                 **kwargs
             )
-            comp_rgb_bg = self.background(dirs=rays_d_flatten)
+            comp_rgb_bg = self.background(dirs=rays_d)
         else:
             geo_out = chunk_batch(
                 self.geometry,
@@ -143,7 +143,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 **geo_out
             )
             comp_rgb_bg = chunk_batch(
-                self.background, self.cfg.eval_chunk_size, dirs=rays_d_flatten
+                self.background, self.cfg.eval_chunk_size, dirs=rays_d
             )
 
         weights: Float[Tensor, "Nr 1"]
@@ -184,8 +184,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 #        -> [bs, height, width, 3]):
                 bg_color = bg_color.expand(-1, height, width, -1)
 
-            if bg_color.shape == (batch_size, height, width, 3):
-                bg_color = bg_color.reshape(-1, 3)
+        if bg_color.shape == (batch_size, height, width, 3):
+            bg_color = bg_color.reshape(-1, 3)
 
         comp_rgb = comp_rgb_fg + bg_color * (1.0 - opacity)
 

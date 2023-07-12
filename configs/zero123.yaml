@@ -20,8 +20,8 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     width: [64, 128, 256]
     batch_size: [12, 4, 2]
     resolution_milestones: [200, 300]
-    eval_height: 256
-    eval_width: 256
+    eval_height: 512
+    eval_width: 512
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]

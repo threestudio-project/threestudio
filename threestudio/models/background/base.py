@@ -20,5 +20,5 @@ class BaseBackground(BaseModule):
     def configure(self):
         pass
 
-    def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B 3"]:
+    def forward(self, dirs: Float[Tensor, "B H W 3"]) -> Float[Tensor, "B H W Nc"]:
         raise NotImplementedError

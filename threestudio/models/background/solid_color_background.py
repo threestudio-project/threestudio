@@ -33,7 +33,7 @@ class SolidColorBackground(BaseBackground):
                 "env_color", torch.as_tensor(self.cfg.color, dtype=torch.float32)
             )
 
-    def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B Nc"]:
+    def forward(self, dirs: Float[Tensor, "B H W 3"]) -> Float[Tensor, "B H W Nc"]:
         color = (
             torch.ones(*dirs.shape[:-1], self.cfg.n_output_dims).to(dirs)
             * self.env_color
@@ -45,9 +45,8 @@ class SolidColorBackground(BaseBackground):
         ):
             # use random background color with probability random_aug_prob
             color = color * 0 + (  # prevent checking for unused parameters in DDP
-                torch.rand(self.cfg.n_output_dims)
-                .to(dirs)[None, :]
-                .expand(dirs.reshape(-1, 3).shape[0], -1)
-                .reshape(*dirs.shape[:-1], -1)
+                torch.rand(dirs.shape[0], 1, 1, self.cfg.n_output_dims)
+                .to(dirs)
+                .expand(*dirs.shape[:-1], -1)
             )
         return color
