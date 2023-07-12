@@ -20,6 +20,7 @@ import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup, parse_version
+from threestudio.utils.perceptual import PerceptualLoss
 from threestudio.utils.typing import *
 
 
@@ -57,6 +58,11 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
+
+        use_du: bool = False
+        per_du_step: int = 10
+        start_du_step: int = 0
+        du_diffusion_steps: int = 20
 
     cfg: Config
 
@@ -211,6 +217,11 @@ class StableDiffusionVSDGuidance(BaseModule):
         )
 
         self.grad_clip_val: Optional[float] = None
+
+        if self.cfg.use_du:
+            self.perceptual_loss = PerceptualLoss().eval().to(self.device)
+            for p in self.perceptual_loss.parameters():
+                p.requires_grad_(False)
 
         threestudio.info(f"Loaded Stable Diffusion!")
 
@@ -448,6 +459,88 @@ class StableDiffusionVSDGuidance(BaseModule):
         finally:
             unet.class_embedding = class_embedding
 
+    def compute_grad_du(
+        self,
+        latents: Float[Tensor, "B 4 64 64"],
+        rgb_BCHW_512: Float[Tensor, "B 3 512 512"],
+        text_embeddings: Float[Tensor, "BB 77 768"],
+        **kwargs,
+    ):
+        batch_size, _, _, _ = latents.shape
+        rgb_BCHW_512 = F.interpolate(rgb_BCHW_512, (512, 512), mode="bilinear")
+        assert batch_size == 1
+        need_diffusion = (
+            self.global_step % self.cfg.per_du_step == 0
+            and self.global_step > self.cfg.start_du_step
+        )
+        guidance_out = {}
+
+        if need_diffusion:
+            t = torch.randint(
+                self.min_step,
+                self.max_step,
+                [1],
+                dtype=torch.long,
+                device=self.device,
+            )
+            self.scheduler.config.num_train_timesteps = t.item()
+            self.scheduler.set_timesteps(self.cfg.du_diffusion_steps)
+            with torch.no_grad():
+                # add noise
+                noise = torch.randn_like(latents)
+                latents = self.scheduler.add_noise(latents, noise, t)  # type: ignore
+                for i, timestep in enumerate(self.scheduler.timesteps):
+                    # predict the noise residual with unet, NO grad!
+                    with torch.no_grad():
+                        latent_model_input = torch.cat([latents] * 2)
+                        with self.disable_unet_class_embedding(self.unet) as unet:
+                            cross_attention_kwargs = (
+                                {"scale": 0.0} if self.single_model else None
+                            )
+                            noise_pred = self.forward_unet(
+                                unet,
+                                latent_model_input,
+                                timestep,
+                                encoder_hidden_states=text_embeddings,
+                                cross_attention_kwargs=cross_attention_kwargs,
+                            )
+                    # perform classifier-free guidance
+                    noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
+                    noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+                        noise_pred_text - noise_pred_uncond
+                    )
+                    # get previous sample, continue loop
+                    latents = self.scheduler.step(
+                        noise_pred, timestep, latents
+                    ).prev_sample
+            edit_images = self.decode_latents(latents)
+            edit_images = F.interpolate(
+                edit_images, (512, 512), mode="bilinear"
+            ).permute(0, 2, 3, 1)
+            gt_rgb = edit_images
+            import cv2
+            import numpy as np
+
+            temp = (edit_images.detach().cpu()[0].numpy() * 255).astype(np.uint8)
+            cv2.imwrite(".threestudio_cache/test.jpg", temp[:, :, ::-1])
+
+            w = (1 - self.alphas[t]).view(-1, 1, 1, 1).item()
+            guidance_out.update(
+                {
+                    "loss_l1": w
+                    * torch.nn.functional.l1_loss(
+                        rgb_BCHW_512, gt_rgb.permute(0, 3, 1, 2), reduction="sum"
+                    ),
+                    "loss_p": w
+                    * self.perceptual_loss(
+                        rgb_BCHW_512.contiguous(),
+                        gt_rgb.permute(0, 3, 1, 2).contiguous(),
+                    ).sum(),
+                }
+            )
+
+        return guidance_out
+
     def compute_grad_vsd(
         self,
         latents: Float[Tensor, "B 4 64 64"],
@@ -650,7 +743,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
 
-        return {
+        guidance_out = {
             "loss_vsd": loss_vsd,
             "loss_lora": loss_lora,
             "grad_norm": grad.norm(),
@@ -658,13 +751,19 @@ class StableDiffusionVSDGuidance(BaseModule):
             "max_step": self.max_step,
         }
 
+        if self.cfg.use_du:
+            du_out = self.compute_grad_du(latents, rgb_BCHW, text_embeddings_vd)
+            guidance_out.update(du_out)
+
+        return guidance_out
+
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in
         # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
         # http://arxiv.org/abs/2303.15413
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
-
+        self.global_step = global_step
         self.set_min_max_steps(
             min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
             max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
