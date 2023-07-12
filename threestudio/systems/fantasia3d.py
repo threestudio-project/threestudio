@@ -68,9 +68,15 @@ class Fantasia3D(BaseLift3DSystem):
             )
         else:  # texture training
             guidance_inp = out["comp_rgb"]
-            guidance_out = self.guidance(
-                guidance_inp, prompt_utils, **batch, rgb_as_latents=False
-            )
+            cond_inp = out["comp_normal"]
+            if "control" in self.cfg.guidance_type:
+                guidance_out = self.guidance(
+                    guidance_inp, cond_inp, prompt_utils, **batch, rgb_as_latents=False
+                )
+            else:
+                guidance_out = self.guidance(
+                    guidance_inp, prompt_utils, **batch, rgb_as_latents=False
+                )
 
         for name, value in guidance_out.items():
             self.log(f"train/{name}", value)
