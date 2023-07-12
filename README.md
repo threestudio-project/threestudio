@@ -16,7 +16,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/e27cb946-ed34-4b8f-87aa-86b689337b0e.gif" width="68%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/22424247/0783ad8c-02ba-419b-aea1-9f5ecb16ac1b.gif" width="29%">
 <br/>
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/22424247/7d979fa7-f2b6-4b0a-85cf-2a13ef362b3c.png" width="97%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/22424247/82df7872-7bfb-4508-a045-414b45f0f745.png" width="97%">
 </p>
 
 <p align="center"><b>
@@ -476,17 +476,20 @@ cd load/zero123
 wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
 ```
 
-**Results obtained by threestudio (Zero-1-to-3, 128x128, 25000 iterations)**
+**Results obtained by threestudio (Zero-1-to-3)**
 
-https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668-461f-abe5-668e7b42cd50
+
+
+https://github.com/threestudio-project/threestudio/assets/22424247/f4e7b66f-7a46-4f9f-8fcd-750300cef651
+
+
 
 **IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
 
 **IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
 
 ```sh
-# object generation with 64x64 NeRF rendering, ~14GB VRAM
-python launch.py --config configs/zero123.yaml --train --gpu 0
+python launch.py --config configs/zero123.yaml --train --gpu 0 data.image_path=./load/images/hamburger_rgba.png
 ```
 
 **Guidance evaluation**
