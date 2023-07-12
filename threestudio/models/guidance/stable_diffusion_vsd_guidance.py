@@ -524,12 +524,15 @@ class StableDiffusionVSDGuidance(BaseModule):
             temp = (edit_images.detach().cpu()[0].numpy() * 255).astype(np.uint8)
             cv2.imwrite(".threestudio_cache/test.jpg", temp[:, :, ::-1])
 
+            w = (1 - self.alphas[t]).view(-1, 1, 1, 1).item()
             guidance_out.update(
                 {
-                    "loss_l1": torch.nn.functional.l1_loss(
+                    "loss_l1": w
+                    * torch.nn.functional.l1_loss(
                         rgb_BCHW_512, gt_rgb.permute(0, 3, 1, 2), reduction="sum"
                     ),
-                    "loss_p": self.perceptual_loss(
+                    "loss_p": w
+                    * self.perceptual_loss(
                         rgb_BCHW_512.contiguous(),
                         gt_rgb.permute(0, 3, 1, 2).contiguous(),
                     ).sum(),
