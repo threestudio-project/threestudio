@@ -187,7 +187,8 @@ def run(
     guidance_scale: float,
     seed: int,
     max_steps: int,
-    save: bool,
+    save_ckpt: bool,
+    save_root: str,
 ):
     # update status every 1 second
     status_update_interval = 1
@@ -201,7 +202,7 @@ def run(
     # manually assign the output directory, name and tag so that we know the trial directory
     name = os.path.basename(model_config[model_name]["path"]).split(".")[0]
     tag = datetime.now().strftime("@%Y%m%d-%H%M%S")
-    trial_dir = os.path.join(EXP_ROOT_DIR, name, tag)
+    trial_dir = os.path.join(save_root, EXP_ROOT_DIR, name, tag)
     alive_path = os.path.join(trial_dir, "alive")
 
     # spawn the training process
@@ -211,14 +212,16 @@ def run(
         + [
             f'name="{name}"',
             f'tag="{tag}"',
-            f"exp_root_dir={EXP_ROOT_DIR}",
+            f"exp_root_dir={os.path.join(save_root, EXP_ROOT_DIR)}",
             "use_timestamp=false",
             f'system.prompt_processor.prompt="{prompt}"',
             f"system.guidance.guidance_scale={guidance_scale}",
             f"seed={seed}",
             f"trainer.max_steps={max_steps}",
         ]
-        + (["checkpoint.every_n_train_steps=${trainer.max_steps}"] if save else []),
+        + (
+            ["checkpoint.every_n_train_steps=${trainer.max_steps}"] if save_ckpt else []
+        ),
     )
 
     # spawn the watcher process
@@ -275,7 +278,14 @@ def stop_run(pid):
     ]
 
 
-def launch(port, listen=False, hf_space=False, self_deploy=False, save=False):
+def launch(
+    port,
+    listen=False,
+    hf_space=False,
+    self_deploy=False,
+    save_ckpt=False,
+    save_root=".",
+):
     self_deploy = self_deploy or "TS_SELF_DEPLOY" in os.environ
 
     css = """
@@ -362,12 +372,14 @@ def launch(port, listen=False, hf_space=False, self_deploy=False, save=False):
                     label="Number of training steps",
                 )
 
-                save_checkbox = gr.Checkbox(
-                    value=save,
+                save_ckpt_checkbox = gr.Checkbox(
+                    value=save_ckpt,
                     label="Save Checkpoints",
                     visible=False,
                     interactive=False,
                 )
+
+                save_root_state = gr.State(value=save_root)
 
                 # full config viewer
                 with gr.Accordion(
@@ -416,7 +428,8 @@ def launch(port, listen=False, hf_space=False, self_deploy=False, save=False):
                 guidance_scale_input,
                 seed_input,
                 max_steps_input,
-                save_checkbox,
+                save_ckpt_checkbox,
+                save_root_state,
             ],
             outputs=[
                 pid,
@@ -502,7 +515,8 @@ if __name__ == "__main__":
         parser.add_argument("--listen", action="store_true")
         parser.add_argument("--hf-space", action="store_true")
         parser.add_argument("--self-deploy", action="store_true")
-        parser.add_argument("--save", action="store_true")
+        parser.add_argument("--save-ckpt", action="store_true")  # unused
+        parser.add_argument("--save-root", type=str, default=".")
         parser.add_argument("--port", type=int, default=7860)
         args = parser.parse_args()
         launch(
@@ -510,7 +524,8 @@ if __name__ == "__main__":
             listen=args.listen,
             hf_space=args.hf_space,
             self_deploy=args.self_deploy,
-            save=args.save,
+            save_ckpt=args.save_ckpt,
+            save_root=args.save_root,
         )
     if args.operation == "watch":
         parser.add_argument("--pid", type=int)

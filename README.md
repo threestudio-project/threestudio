@@ -31,6 +31,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
   </a>
   <a href="https://huggingface.co/spaces/bennyguo/threestudio"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Gradio%20Demo-Huggingface-orange"></a>
   <a href="http://t23-g-01.threestudio.ai"><img src="https://img.shields.io/badge/Gradio%20Demo-Tencent-blue?logo=tencentqq&logoColor=white"></a>
+  <a href="https://discord.gg/ejer2MAB8N"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -38,8 +39,10 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 ## News
+
+- 07/06/2023: Join our [Discord server](https://discord.gg/ejer2MAB8N) for lively discussions!
 - 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
-- 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-)  to give it a try.
+- 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-) to give it a try.
 - 06/14/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
 - 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
 - 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
@@ -56,7 +59,7 @@ See [installation.md](docs/installation.md) for additional information, includin
 
 The following steps have been tested on Ubuntu20.04.
 
-- You must have a NVIDIA graphics card with at least 6GB VRAM and have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
+- You must have an NVIDIA graphics card with at least 6GB VRAM and have [CUDA](https://developer.nvidia.com/cuda-downloads) installed.
 - Install `Python >= 3.8`.
 - (Optional, Recommended) Create a virtual environment:
 
@@ -90,7 +93,7 @@ pip install ninja
 pip install -r requirements.txt
 ```
 
-- (Optional, Recommended) The best-performing models in threestudio uses the newly-released T2I model [DeepFloyd IF](https://github.com/deep-floyd/IF) which currently requires signing a license agreement. If you would like use these models, you need to [accept the license on the model card of DeepFloyd IF](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login in the Hugging Face hub in terminal by `huggingface-cli login`.
+- (Optional, Recommended) The best-performing models in threestudio use the newly-released T2I model [DeepFloyd IF](https://github.com/deep-floyd/IF), which currently requires signing a license agreement. If you would like to use these models, you need to [accept the license on the model card of DeepFloyd IF](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login into the Hugging Face hub in the terminal by `huggingface-cli login`.
 
 - For contributors, see [here](https://github.com/threestudio-project/threestudio#contributing-to-threestudio).
 
@@ -98,7 +101,7 @@ pip install -r requirements.txt
 
 Here we show some basic usage of threestudio. First let's train a DreamFusion model to create a classic pancake bunny.
 
-**If you are experiencing unstable connections with Hugging Face, we suggest you either (1) setting environment variable `TRANSFORMERS_OFFLINE=1 DIFFUSERS_OFFLINE=1` before your running command after all needed files have been fetched on the first run, to prevent from connecting to Hugging Face each time you run, or (2) downloading the guidance model you used to a local folder following [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-an-entire-repository) and [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-files-to-local-folder), and set `pretrained_model_name_or_path` of the guidance and the prompt processor to the local path.**
+**If you are experiencing unstable connections with Hugging Face, we suggest you either (1) setting environment variable `TRANSFORMERS_OFFLINE=1 DIFFUSERS_OFFLINE=1 HF_HUB_OFFLINE=1` before your running command after all needed files have been fetched on the first run, to prevent from connecting to Hugging Face each time you run, or (2) downloading the guidance model you used to a local folder following [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-an-entire-repository) and [here](https://huggingface.co/docs/huggingface_hub/v0.14.1/guides/download#download-files-to-local-folder), and set `pretrained_model_name_or_path` of the guidance and the prompt processor to the local path.**
 
 ```sh
 # if you have agreed the license of DeepFloyd IF and have >20GB VRAM
@@ -114,14 +117,26 @@ The training lasts for 10,000 iterations. You can find visualizations of the cur
 
 ### Multi-GPU training
 
-Multi-GPU training is supported. Note that `data.batch_size` is the batch size **per rank (device)**. Also remember to
+Multi-GPU training is supported, but may still be [buggy](https://github.com/threestudio-project/threestudio/issues/195). Note that `data.batch_size` is the batch size **per rank (device)**. Also remember to
 
 - Set `data.n_val_views` to be a multiple of the number of GPUs.
-- Set a unique `tag` as timestamp is disabled in multi-GPU training and will not be appended after the tag. If you the same tag as previous trials, saved config files, code and visualizations will be overriden.
+- Set a unique `tag` as timestamp is disabled in multi-GPU training and will not be appended after the tag. If you the same tag as previous trials, saved config files, code and visualizations will be overridden.
 
 ```sh
 # this results in an effective batch size of 4 (number of GPUs) * 2 (data.batch_size) = 8
 python launch.py --config configs/dreamfusion-if.yaml --train --gpu 0,1,2,3 system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes" data.batch_size=2 data.n_val_views=4
+```
+
+If you define the `CUDA_VISIBLE_DEVICES` environment variable before you call `launch.py`, you don't need to specify `--gpu` - this will use all available GPUs from `CUDA_VISIBLE_DEVICES`. For instance, the following command will automatically use GPUs 3 and 4:
+
+`CUDA_VISIBLE_DEVICES=3,4 python launch.py --config configs/dreamfusion-if.yaml --train system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"`
+
+This is particularly useful if you run `launch.py` in a cluster using a command that automatically picks GPU(s) and exports their IDs through CUDA_VISIBLE_DEVICES, e.g. through SLURM:
+
+```bash
+cd git/threestudio
+. venv/bin/activate
+srun --account mod3d --partition=g40 --gpus=1 --job-name=3s_bunny python launch.py --config configs/dreamfusion-if.yaml --train system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes"
 ```
 
 ### Resume from checkpoints
@@ -235,7 +250,7 @@ https://user-images.githubusercontent.com/19284678/236694848-38ae4ea4-554b-4c9d-
 **Notable differences from the paper**
 
 - We use open-source T2I models (StableDiffusion, DeepFloyd IF), while the paper uses Imagen.
-- We use a guiandance scale of 20 for DeepFloyd IF, while the paper uses 100 for Imagen.
+- We use a guidance scale of 20 for DeepFloyd IF, while the paper uses 100 for Imagen.
 - We do not use sigmoid to normalize the albedo color but simply scale the color from `[-1,1]` to `[0,1]`, as we find this help convergence.
 - We use HashGrid encoding and uniformly sample points along rays, while the paper uses Integrated Positional Encoding and sampling strategy from MipNeRF360.
 - We adopt camera settings and density initialization strategy from Magic3D, which is slightly different from the DreamFusion paper.
@@ -269,10 +284,10 @@ https://user-images.githubusercontent.com/19284678/236694858-0ed6939e-cd7a-408f-
 **Notable differences from the paper**
 
 - We use open-source T2I models (StableDiffusion, DeepFloyd IF) for the coarse stage, while the paper uses eDiff-I.
-- In the coarse stage, we use a guiandance scale of 20 for DeepFloyd IF, while the paper uses 100 for eDiff-I.
+- In the coarse stage, we use a guidance scale of 20 for DeepFloyd IF, while the paper uses 100 for eDiff-I.
 - In the coarse stage, we use analytic normal, while the paper uses predicted normal.
 - In the coarse stage, we use orientation loss as in DreamFusion, while the paper does not.
-- There are many things that are ommited from the paper such as the weighting of loss terms and the DMTet grid resolution, which could be different.
+- There are many things that are omitted from the paper such as the weighting of loss terms and the DMTet grid resolution, which could be different.
 
 **Example running commands**
 
@@ -288,11 +303,11 @@ python launch.py --config configs/magic3d-coarse-sd.yaml --train --gpu 0 system.
 Then convert the NeRF from the coarse stage to DMTet and train with differentiable rasterization:
 
 ```sh
-# the refinement stage uses StableDiffusion, requires ~5GB VRAM in training
+# the refinement stage uses StableDiffusion, and requires ~5GB VRAM in training
 python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/dir/ckpts/last.ckpt
-# if you're unsatisfied with the surface extraced using the default threshold (25)
+# if you're unsatisfied with the surface extracted using the default threshold (25)
 # you can specify a threshold value using `system.geometry_convert_override`
-# decrease the value if the extracted surface is incomplete, increate if it is extruded
+# decrease the value if the extracted surface is incomplete, increase if it is extruded
 python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/dir/ckpts/last.ckpt system.geometry_convert_override.isosurface_threshold=10.
 ```
 
@@ -302,7 +317,7 @@ python launch.py --config configs/magic3d-refine-sd.yaml --train --gpu 0 system.
 - Magic3D uses a neural network to predict the surface normal, which may not resemble the true geometric normal and degrade geometry quality, so we use analytic normal instead.
 - Try increasing/decreasing `system.loss.lambda_sparsity` if your scene is stuffed with floaters/becoming empty.
 - Try increasing/decreasing `system.loss.lambda_orient` if you object is foggy/over-smoothed.
-- Try replacing the background to random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
+- Try replacing the background with random colors with a probability 0.5 by setting `system.background.random_aug=true` if you find the model incorrectly treats the background as part of the object.
 
 ### Score Jacobian Chaining [![arXiv](https://img.shields.io/badge/arXiv-2212.00774-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2212.00774)
 
@@ -413,7 +428,6 @@ python launch.py --config configs/textmesh-if.yaml --train --gpu 0 system.prompt
 
 - TextMesh uses a surface-based geometry representation, so you don't need to manually tune the isosurface threshold when exporting meshes!
 
-
 ### Control4D [![arXiv](https://img.shields.io/badge/arXiv-2305.20082-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.20082)
 
 **This is an experimental implementation of Control4D using threestudio! Control4D will release the full code including static and dynamic editing after paper acceptance.**
@@ -470,7 +484,7 @@ https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668
 **IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
 
 ```sh
-# object geneartion with 64x64 NeRF rendering, ~14GB VRAM
+# object generation with 64x64 NeRF rendering, ~14GB VRAM
 python launch.py --config configs/zero123.yaml --train --gpu 0
 ```
 
@@ -489,16 +503,16 @@ Also includes evaluation of the guidance during training. If `system.freq.guidan
 
 ## Prompt Library
 
-For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html) in [this file](https://github.com/threestudio-project/threestudio/blob/main/load/prompt_library.json). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's **exactly one match**. The used prompt will be printed to console. Also note that you can't use this syntax to point to every prompt in the library, as there are prompts that are subset of other prompts lmao. We will enhance the use of this feature.
+For easier comparison, we collect the 397 preset prompts from the website of [DreamFusion](https://dreamfusion3d.github.io/gallery.html) in [this file](https://github.com/threestudio-project/threestudio/blob/main/load/prompt_library.json). You can use these prompts by setting `system.prompt_processor.prompt=lib:keyword1_keyword2_..._keywordN`. Note that the prompt should starts with `lib:` and all the keywords are separated by `_`. The prompt processor will match the keywords to all the prompts in the library, and will only succeed if there's **exactly one match**. The used prompt will be printed to the console. Also note that you can't use this syntax to point to every prompt in the library, as there are prompts that are subset of other prompts lmao. We will enhance the use of this feature.
 
 ## Tips on Improving Quality
 
-It's important to note that existing techniques that lift 2D T2I models to 3D cannot consistently produce satisfying results. Results from the great papers like DreamFusion and Magic3D are (to some extend) cherry-pickled, so don't be frustrated if you did not get what you expected on your first trial. Here are some tips that may help you improve the generation quality:
+It's important to note that existing techniques that lift 2D T2I models to 3D cannot consistently produce satisfying results. Results from great papers like DreamFusion and Magic3D are (to some extent) cherry-pickled, so don't be frustrated if you do not get what you expected on your first trial. Here are some tips that may help you improve the generation quality:
 
-- **Increase batch size**. Large batch sizes help convergence and improve the 3D consistency of the geometry. State-of-the-art methods claims using large batch sizes: DreamFusion uses a batch size of 4; Magic3D uses a batch size of 32; Fantasia3D uses a batch size of 24; some results shown above uses a batch size of 8. You can easily change the batch size by setting `data.batch_size=N`. Increasing the batch size requires more VRAM. If you have limited VRAM but still want the benefit of large batch sizes, you may use [gradient accumulation provided by PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients) by setting `trainer.accumulate_grad_batches=N`. This will accumulate the gradient of several batches and achieve a large effective batch size. Note that if you use gradient accumulation, you may need to multiply all step values by N times in your config, such as values that have the name `X_steps` and `trainer.val_check_interval`, since now N batches equal to a large batch.
+- **Increase batch size**. Large batch sizes help convergence and improve the 3D consistency of the geometry. State-of-the-art methods claim using large batch sizes: DreamFusion uses a batch size of 4; Magic3D uses a batch size of 32; Fantasia3D uses a batch size of 24; some results shown above use a batch size of 8. You can easily change the batch size by setting `data.batch_size=N`. Increasing the batch size requires more VRAM. If you have limited VRAM but still want the benefit of large batch sizes, you may use [gradient accumulation provided by PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/advanced/training_tricks.html#accumulate-gradients) by setting `trainer.accumulate_grad_batches=N`. This will accumulate the gradient of several batches and achieve a large effective batch size. Note that if you use gradient accumulation, you may need to multiply all step values by N times in your config, such as values that have the name `X_steps` and `trainer.val_check_interval`, since now N batches equal to a large batch.
 - **Train longer.** This helps if you can already obtain reasonable results and would like to enhance the details. If the result is still a mess after several thousand steps, training for a longer time often won't help. You can set the total training iterations by `trainer.max_steps=N`.
 - **Try different seeds.** This is a simple solution if your results have correct overall geometry but suffer from the multi-face Janus problem. You can change the seed by setting `seed=N`. Good luck!
-- **Tuning regularization weights.** Some methods have regularizaion terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/threestudio-project/threestudio#supported-models) for more detailed instructions.
+- **Tuning regularization weights.** Some methods have regularization terms which can be essential to obtaining good geometry. Try tuning the weights of these regularizations by setting `system.loss.lambda_X=value`. The specific values depend on your situation, you may refer to [tips for each supported model](https://github.com/threestudio-project/threestudio#supported-models) for more detailed instructions.
 - **Try debiasing methods.** When conventional SDS techniques like DreamFusion, Magic3D, SJC, and others fail to produce the desired 3D results, Debiased Score Distillation Sampling (D-SDS) can be a solution. D-SDS is devised to tackle challenges such as artifacts or the Janus problem, employing two strategies: score debiasing and prompt debiasing. You can activate score debiasing by just setting `system.guidance.grad_clip=[0,0.5,2.0,10000]`, where the order is `start_step, start_value, end_value, end_step`. You can enable prompt debiasing by setting `system.prompt_processor.use_prompt_debiasing=true`. When using prompt debiasing, it's recommended to set a list of indices for words that should potentially be removed by `system.prompt_processor.prompt_debiasing_mask_ids=[i1,i2,...]`. For example, if the prompt is `a smiling dog` and you only want to remove the word `smiling` for certain views, you should set it to `[1]`. You could also manually specify the prompt for each view by setting `system.prompt_processor.prompt_side`, `system.prompt_processor.prompt_back` and `system.prompt_processor.prompt_overhead`. For a detailed explanation of these techniques, refer to [the D-SDS paper](https://arxiv.org/abs/2303.15413) or check out [the project page](https://susunghong.github.io/Debiased-Score-Distillation-Sampling/).
 - **Try Perp-Neg.** The [Perp-Neg algorithm](https://perp-neg.github.io/) can potentially alleviate the multi-face Janus problem. We now support Perp-Neg for `stable-diffusion-guidance` and `deep-floyd-guidance` by setting `system.prompt_processor.use_perp_neg=true`.
 
@@ -543,7 +557,6 @@ pip install -r requirements-dev.txt
 
 - If you are using VSCode as the text editor: (1) Install `editorconfig` extension. (2) Set the default linter to mypy to enable static type checking. (3) Set the default formatter to black. You could either manually format the document or let the editor format the document each time it is saved by setting `"editor.formatOnSave": true`.
 
-
 - Run `pre-commit install` to install pre-commit hooks which will automatically format the files before commit.
 
 - Make changes to the code, update README and DOCUMENTATION if needed, and open a pull request.
@@ -554,9 +567,9 @@ Here we just briefly introduce the code structure of this project. We will make 
 
 - All methods are implemented as a subclass of `BaseSystem` (in `systems/base.py`). There typically are six modules inside a system: geometry, material, background, renderer, guidance, and prompt_processor. All modules are subclass of `BaseModule` (in `utils/base.py`) except for guidance, and prompt_processor, which are subclass of `BaseObject` to prevent them from being treated as model parameters and better control their behavior in multi-GPU settings.
 - All systems, modules, and data modules have their configurations in their own dataclasses.
-- Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm (1) natually supports default values for properties; (2) effectively prevents wrong assignments of these properties (say typos in the yaml file) or inappropriate usage at runtime.
+- Base configurations for the whole project can be found in `utils/config.py`. In the `ExperimentConfig` dataclass, `data`, `system`, and module configurations under `system` are parsed to configurations of each class mentioned above. These configurations are strictly typed, which means you can only use defined properties in the dataclass and stick to the defined type of each property. This configuration paradigm (1) naturally supports default values for properties; (2) effectively prevents wrong assignments of these properties (say typos in the yaml file) or inappropriate usage at runtime.
 - This projects use both static and runtime type checking. For more details, see `utils/typing.py`.
-- To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem`, `BaseModule` and `BaseObject` are by default inherit to `Updateable`.
+- To update anything of a module at each training step, simply make it inherit to `Updateable` (see `utils/base.py`). At the beginning of each iteration, an `Updateable` will update itself, and update all its attributes that are also `Updateable`. Note that subclasses of `BaseSystem`, `BaseModule` and `BaseObject` are by default inherited to `Updateable`.
 
 ## Known Problems
 
@@ -586,7 +599,7 @@ If you find threestudio helpful, please consider citing:
 
 ```
 @Misc{threestudio2023,
-  author =       {Yuan-Chen Guo and Ying-Tian Liu and Chen Wang and Zi-Xin Zou and Guan Luo and Chia-Hao Chen and Yan-Pei Cao and Song-Hai Zhang},
+  author =       {Yuan-Chen Guo and Ying-Tian Liu and Ruizhi Shao and Christian Laforte and Vikram Voleti and Guan Luo and Chia-Hao Chen and Zi-Xin Zou and Chen Wang and Yan-Pei Cao and Song-Hai Zhang},
   title =        {threestudio: A unified framework for 3D content generation},
   howpublished = {\url{https://github.com/threestudio-project/threestudio}},
   year =         {2023}
