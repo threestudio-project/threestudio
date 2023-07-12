@@ -8,7 +8,7 @@ files = [
 for file in files:
     name = os.path.basename(file).split("_rgba.png")[0]
     with open(
-        "/admin/home-vikram/git/threestudio/threestudio/scripts/run_zero123_sbatch.sh",
+        "/admin/home-vikram/git/threestudio/threestudio/scripts/zero123_sbatch.sh",
         "w",
     ) as f:
         f.write("#!/bin/bash\n")
@@ -29,6 +29,6 @@ for file in files:
         #     "python launch.py --config configs/zero123-geometry.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.geometry_convert_from=./outputs/${NAME}_DEMO/XL_Phase1/ckpts/last.ckpt system.guidance.pretrained_model_name_or_path=./load/zero123/XL_20230604.ckpt use_timestamp=False name=${NAME}_DEMO tag=XL_Phase1p5 system.loggers.wandb.enable=false system.loggers.wandb.project='voletiv-zero123XL-demo-NEW2' system.loggers.wandb.name=${NAME}_XL_Phase1p5\n"
         # )
     os.system(
-        "sbatch /admin/home-vikram/git/threestudio/threestudio/scripts/run_zero123_sbatch.sh"
+        "sbatch /admin/home-vikram/git/threestudio/threestudio/scripts/zero123_sbatch.sh"
     )
     time.sleep(1)
