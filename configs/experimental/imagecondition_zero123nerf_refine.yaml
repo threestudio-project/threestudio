@@ -27,12 +27,12 @@ data:
     eval_batch_size: 1
     elevation_range: [-10, 45]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.2, 3.8]
+    camera_distance_range: [3.2, 3.9]
     fovy_range: [10.0, 15.0] # Zero123 has fixed fovy
     progressive_until: 0
-    camera_perturb: 0.0
-    center_perturb: 0.0
-    up_perturb: 0.0
+    camera_perturb: 0.1
+    center_perturb: 0.1
+    up_perturb: 0.1
     light_position_perturb: 1.0
     light_distance_range: [7.5, 10.0]
     eval_elevation_deg: ${data.default_elevation_deg}
@@ -95,7 +95,7 @@ system:
   guidance_type: "stable-diffusion-guidance"
   guidance:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-    guidance_scale: 50
+    guidance_scale: 100
     min_step_percent: [0, 0.4, 0.1, 200]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: [0, 0.7, 0.4, 200]
 
@@ -141,12 +141,12 @@ system:
   optimizer:
     name: Adam
     args:
-      lr: 0.01
+      lr: 0.005
       betas: [0.9, 0.99]
       eps: 1.e-8
 
 trainer:
-  max_steps: 200
+  max_steps: 500
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 5
