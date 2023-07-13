@@ -6,8 +6,8 @@ seed: 0
 data_type: "single-image-datamodule"
 data:
   image_path: ./load/images/hamburger_rgba.png
-  height: 256
-  width: 256
+  height: 512
+  width: 512
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
@@ -15,21 +15,21 @@ data:
   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera:
-    height: 128
-    width: 128
-    batch_size: 12
+    height: 256
+    width: 256
+    batch_size: 4
     resolution_milestones: []
-    eval_height: 256
-    eval_width: 256
+    eval_height: 512
+    eval_width: 512
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.8, 3.8]
-    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
-    progressive_until: 0
-    camera_perturb: 0.0
-    center_perturb: 0.0
-    up_perturb: 0.0
+    camera_distance_range: [3.8, 4.2]
+    fovy_range: [20.0, 20.0]
+    progressive_until: 20
+    camera_perturb: 0.01
+    center_perturb: 0.01
+    up_perturb: 0.01
     light_position_perturb: 1.0
     light_distance_range: [7.5, 10.0]
     eval_elevation_deg: ${data.default_elevation_deg}
@@ -97,15 +97,15 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-xl-base-0.9"
     prompt: ???
 
-  guidance_type: "stable-diffusion-guidance"
+  guidance_type: "sdxl-guidance"
   guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    guidance_scale: 100
-    min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: [0, 0.85, 0.5, 200]
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-xl-base-0.9"
+    guidance_scale: 7.5
+    min_step_percent: [0, 0.2, 0.4, 100]  # (start_iter, start_val, end_val, end_iter)
+    max_step_percent: [0, 0.5, 0.7, 100]
 
   # prompt_processor_type: "deep-floyd-prompt-processor"
   # prompt_processor:
@@ -132,30 +132,31 @@ system:
       name: None
 
   loss:
-    lambda_sds: 10.0
+    lambda_sds: 0.1
     lambda_rgb: 0.
     lambda_mask: 0.
     lambda_depth: 0.
     lambda_depth_rel: 0. # [0.0, 0.0, 1.0, 10000]
     lambda_normal: 0. # [0, 0, 0.05, 100]
-    lambda_normal_smooth: 10.0
-    lambda_3d_normal_smooth: 10.0
+    lambda_normal_smooth: 1.0
+    lambda_3d_normal_smooth: 1.0
     lambda_orient: 1.0
     lambda_sparsity: 0.1
     lambda_opaque: 0.1
 
   optimizer:
-    name: Adam
+    name: Adan
     args:
-      lr: 0.01
-      betas: [0.9, 0.99]
+      lr: 0.1
+      # betas: [0.9, 0.99]
       eps: 1.e-8
+      max_grad_norm: 5.0
 
 trainer:
-  max_steps: 200
+  max_steps: 100
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 20
+  val_check_interval: 10
   enable_progress_bar: true
   precision: 16-mixed
 
