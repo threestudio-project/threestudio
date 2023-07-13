@@ -3,21 +3,18 @@ tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
 
-# data_type: "single-image-datamodule"
-# data:
-#   image_path: ./load/images/hamburger_rgba.png
-#   height: 512
-#   width: 512
-#   default_elevation_deg: 0.0
-#   default_azimuth_deg: 0.0
-#   default_camera_distance: 3.8
-#   default_fovy_deg: 20.0
-#   requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
-#   requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
-#   random_camera:
-
-data_type: "random-camera-datamodule"
+data_type: "single-image-datamodule"
 data:
+  image_path: ./load/images/hamburger_rgba.png
+  height: 512
+  width: 512
+  default_elevation_deg: 0.0
+  default_azimuth_deg: 0.0
+  default_camera_distance: 3.8
+  default_fovy_deg: 20.0
+  requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
+  random_camera:
     height: 512
     width: 512
     batch_size: 2
