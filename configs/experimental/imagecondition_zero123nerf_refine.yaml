@@ -22,7 +22,7 @@ data:
     eval_height: 512
     eval_width: 512
     eval_batch_size: 1
-    elevation_range: [-10, 45]
+    elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
     camera_distance_range: [3.2, 3.9]
     fovy_range: [10.0, 15.0] # Zero123 has fixed fovy
