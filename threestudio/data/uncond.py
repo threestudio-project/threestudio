@@ -94,10 +94,9 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.width: int = self.widths[0]
         self.batch_size: int = self.batch_sizes[0]
         self.directions_unit_focal = self.directions_unit_focals[0]
-        self.elevation_range = self.cfg.elevation_range
-        self.azimuth_range = self.cfg.azimuth_range
         self.camera_distance_range = self.cfg.camera_distance_range
         self.fovy_range = self.cfg.fovy_range
+        self.progressive_view(0)
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
