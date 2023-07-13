@@ -17,10 +17,6 @@ Install [CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit-archive).
   - `sudo apt-key del 7fa2af80`
   - Run [command for CUDA 11.8 WSL-Ubuntu](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=deb_local)
 
-## Install Git LFS (Optional)
-
-To checkout resource files, such as precomputed large tetrahedral grids (256_tets.npz), please install and configure [Git LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage).
-
 ## Git Clone
 
 ```bash
