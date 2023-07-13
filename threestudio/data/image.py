@@ -154,7 +154,9 @@ class SingleImageDataBase:
 
     def load_images(self):
         # load image
-        assert os.path.exists(self.cfg.image_path)
+        assert os.path.exists(
+            self.cfg.image_path
+        ), f"Could not find image {self.cfg.image_path}!"
         rgba = cv2.cvtColor(
             cv2.imread(self.cfg.image_path, cv2.IMREAD_UNCHANGED), cv2.COLOR_BGRA2RGBA
         )

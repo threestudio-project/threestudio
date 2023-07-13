@@ -4,9 +4,11 @@
 
 # 3. Resize to 512x512 https://www.iloveimg.com/resize-image
 
+# (OPTIONAL)
 # 4. Estimate depth and normal https://omnidata.vision/demo/ (I used Omnidata Normal (with X-TC & 3DCC), and MiDaS Depth)
 
 
+# (OPTIONAL)
 # 5. Convert depth image from RGB to greyscale
 def depth_rgb_to_grey(depth_filename):
     # depth_filename = "image_depth.png"
@@ -33,6 +35,7 @@ def depth_rgb_to_grey(depth_filename):
     cv2.imwrite(depth_filename, depth)
 
 
+# (OPTIONAL)
 # 6. Mask normal
 def normal_mask(normal_filename):
     # filename = "image_normal.png"
@@ -55,5 +58,4 @@ def normal_mask(normal_filename):
 
 
 # 5. Run Zero123
-# python launch.py --config configs/zero123.yaml --train --gpu 0 system.loggers.wandb.enable=true system.loggers.wandb.project="voletiv-zero123XL-demo" system.loggers.wandb.name="grootplant_64_128_d0.05_drel_OLD" data.image_path=./load/images/grootplant_rgba.png system.freq.guidance_eval=0 system.guidance.pretrained_model_name_or_path="./load/zero123/105000.ckpt" tag='${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_OLD'
-# python launch.py --config configs/zero123.yaml --train --gpu 1 system.loggers.wandb.enable=true system.loggers.wandb.project="voletiv-zero123XL-demo" system.loggers.wandb.name="grootplant_64_128_d0.05_drel" data.image_path=./load/images/grootplant_rgba.png system.freq.guidance_eval=0 system.guidance.pretrained_model_name_or_path="./load/zero123/XL_20230604.ckpt" tag='${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_XL'
+# python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/grootplant_rgba.png

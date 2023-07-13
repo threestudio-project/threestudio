@@ -14,15 +14,16 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/e27cb946-ed34-4b8f-87aa-86b689337b0e.gif" width="68%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/22424247/0783ad8c-02ba-419b-aea1-9f5ecb16ac1b.gif" width="29%">
 <br/>
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/22aba281-e9f2-43d8-ab27-74c0210cff90.png" width="68%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/22424247/82df7872-7bfb-4508-a045-414b45f0f745.png" width="97%">
 </p>
 
 <p align="center"><b>
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
 | <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> |
 <br/>
-| <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
+| <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> | <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> |
 </b></p>
 
 <p align="center">
@@ -468,25 +469,36 @@ python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 0 data.da
 
 **Installation**
 
-Download pretrained weights into `load/zero123`:
+Download pretrained Zero123XL weights into `load/zero123`:
 
 ```sh
 cd load/zero123
-wget https://huggingface.co/cvlab/zero123-weights/resolve/main/105000.ckpt
+wget https://zero123.cs.columbia.edu/assets/zero123-xl.ckpt
 ```
 
-**Results obtained by threestudio (Zero-1-to-3, 128x128, 25000 iterations)**
+**Results obtained by threestudio (Zero-1-to-3)**
 
-https://github.com/threestudio-project/threestudio/assets/22424247/8a7fa056-7668-461f-abe5-668e7b42cd50
+
+https://github.com/threestudio-project/threestudio/assets/22424247/f4e7b66f-7a46-4f9f-8fcd-750300cef651
+
 
 **IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
 
 **IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
 
+**Example running commands**
+
+1. Take an image of your choice, or generate it from text using your favourite AI image generator such as Stable Diffusion XL (https://clipdrop.co/stable-diffusion) E.g. "A simple 3D render of a friendly dog"
+2. Remove its background using Clipdrop (https://clipdrop.co/remove-background)
+3. Save to `load/images/`, preferably with `_rgba.png` as the suffix
+4. Run Zero-1-to-3:
 ```sh
-# object generation with 64x64 NeRF rendering, ~14GB VRAM
-python launch.py --config configs/zero123.yaml --train --gpu 0
+python launch.py --config configs/zero123.yaml --train --gpu 0 data.image_path=./load/images/dog1_rgba.png
 ```
+
+For more scripts for Zero-1-to-3, please check `threestudio/scripts/run_zero123.sh`.
+
+Previous Zero-1-to-3 weights are available at `https://huggingface.co/cvlab/zero123-weights/`. You can download them to `load/zero123` as above, and replace the path at `system.guidance.pretrained_model_name_or_path`.
 
 **Guidance evaluation**
 
