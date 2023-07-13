@@ -9,7 +9,7 @@ files = [
 for file in files:
     name = os.path.basename(file).split("_rgba.png")[0]
     with open(
-        "~/git/threestudio/threestudio/scripts/zero123_sbatch.sh",
+        os.path.expanduser("~/git/threestudio/threestudio/scripts/zero123_sbatch.sh"),
         "w",
     ) as f:
         f.write("#!/bin/bash\n")
