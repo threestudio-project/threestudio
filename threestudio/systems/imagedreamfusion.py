@@ -350,7 +350,17 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
                 if "comp_normal" in out
                 else []
             )
-            + [{"type": "grayscale", "img": out["depth"][0], "kwargs": {}}]
+            + (
+                [
+                    {
+                        "type": "grayscale",
+                        "img": out["depth"][0],
+                        "kwargs": {},
+                    }
+                ]
+                if "depth" in out
+                else []
+            )
             + [
                 {
                     "type": "grayscale",
