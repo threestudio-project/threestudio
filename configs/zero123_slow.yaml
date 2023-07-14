@@ -8,7 +8,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
   height: [128, 256, 512]
   width: [128, 256, 512]
-  resolution_milestones: [200, 300]
+  resolution_milestones: [300, 500]
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
@@ -19,12 +19,12 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     height: [64, 128, 256]
     width: [64, 128, 256]
     batch_size: [12, 4, 2]
-    resolution_milestones: [200, 300]
+    resolution_milestones: [300, 500]
     eval_height: 512
     eval_width: 512
     eval_batch_size: 1
     elevation_range: [-10, 80]
-    azimuth_range: [5, 355] # avoid front view
+    azimuth_range: [10, 350] # avoid front view
     camera_distance_range: [3.8, 3.8]
     fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
     progressive_until: 0
@@ -103,7 +103,7 @@ system:
 
   guidance_type: "zero123-guidance"
   guidance:
-    pretrained_model_name_or_path: "./load/zero123/zero123-xl.ckpt"
+    pretrained_model_name_or_path: "./load/zero123/XL_20230604.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
     cond_image_path: ${data.image_path}
@@ -112,9 +112,9 @@ system:
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     #min_step_percent: 0.02
-    min_step_percent: [50, 0.7, 0.3, 200]  # (start_iter, start_val, end_val, end_iter)
+    min_step_percent: [50, 0.7, 0.3, 300]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: 0.98
-    # max_step_percent: [50, 0.98, 0.98, 200]
+    # max_step_percent: [50, 0.98, 0.98, 300]
 
   freq:
     ref_only_steps: 0
@@ -133,8 +133,8 @@ system:
     lambda_depth: 0. # 0.05
     lambda_depth_rel: 0. # [0, 0, 0.05, 100]
     lambda_normal: 0. # [0, 0, 0.05, 100]
-    lambda_normal_smooth: [100, 8.0, 5.0, 200]
-    lambda_3d_normal_smooth: [100, 8.0, 5.0, 200]
+    lambda_normal_smooth: [200, 8.0, 5.0, 300]
+    lambda_3d_normal_smooth: [200, 8.0, 5.0, 300]
     lambda_orient: 1.0
     lambda_sparsity: 0.5 # should be tweaked for every model
     lambda_opaque: 0.5
@@ -147,7 +147,7 @@ system:
       eps: 1.e-8
 
 trainer:
-  max_steps: 400
+  max_steps: 700
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100
