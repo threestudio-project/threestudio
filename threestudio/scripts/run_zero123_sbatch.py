@@ -2,8 +2,19 @@ import os
 import time
 
 files = [
+    "~/git/threestudio/load/images/anya_front_rgba.png",
+    "~/git/threestudio/load/images/bust1_rgba.png",
+    "~/git/threestudio/load/images/castle1_rgba.png",
+    "~/git/threestudio/load/images/castle2_rgba.png",
     "~/git/threestudio/load/images/dog1_rgba.png",
     "~/git/threestudio/load/images/dragon2_rgba.png",
+    "~/git/threestudio/load/images/fox1_rgba.png",
+    "~/git/threestudio/load/images/grootplant_rgba.png",
+    "~/git/threestudio/load/images/hero2_rgba.png",
+    "~/git/threestudio/load/images/horse2_rgba.png",
+    "~/git/threestudio/load/images/invention2_rgba.png",
+    "~/git/threestudio/load/images/sadhu1_rgba.png",
+    "~/git/threestudio/load/images/temple2_rgba.png",
 ]
 
 for file in files:
@@ -17,13 +28,13 @@ for file in files:
         f.write("#SBATCH --account=mod3d\n")
         f.write("#SBATCH --partition=g40\n")
         f.write("#SBATCH --gpus=1\n")
-        f.write("#SBATCH --time=0-00:07:00\n")
+        f.write("#SBATCH --time=0-00:15:00\n")
         f.write("conda activate three\n")
         f.write("cd ~/git/threestudio/\n")
         f.write(f"NAME={name}\n")
         # Phase 1
         f.write(
-            "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/${NAME}_rgba.png use_timestamp=true name=${NAME} tag=Phase1 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
+            "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png use_timestamp=false name=${NAME} tag=Phase1_highNoise_lr0.001fast_frontAvoid5_norm50 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
         )
         # # Phase 1.5
         # f.write(
