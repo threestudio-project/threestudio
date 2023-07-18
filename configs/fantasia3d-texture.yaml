@@ -23,6 +23,8 @@ system_type: "fantasia3d-system"
 system:
   # do texture training
   texture: true
+
+  # If using geometry from previous training
   geometry_convert_from: ???
   geometry_convert_inherit_texture: false
   geometry_type: "tetrahedra-sdf-grid"
@@ -39,6 +41,20 @@ system:
       per_level_scale: 1.4472692374403782 # max resolution 4096
     n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
     fix_geometry: true
+
+  # If using custom mesh
+  # geometry_type: "custom-mesh"
+  # geometry:
+  #   shape_init: ???
+  #   radius: 1.0 # consistent with coarse
+  #   pos_encoding_config:
+  #     otype: HashGrid
+  #     n_levels: 16
+  #     n_features_per_level: 2
+  #     log2_hashmap_size: 19
+  #     base_resolution: 16
+  #     per_level_scale: 1.4472692374403782 # max resolution 4096
+  #   n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
 
   material_type: "pbr-material"
   material:
