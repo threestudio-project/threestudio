@@ -57,9 +57,12 @@ class MeshExporter(Exporter):
             "save_normal": self.cfg.save_normal,
             "save_uv": self.cfg.save_uv,
             "save_vertex_color": False,
-            "map_Kd": None,
-            "map_Ks": None,
-            "map_Bump": None,
+            "map_Kd": None,  # Base Color
+            "map_Ks": None,  # Specular
+            "map_Bump": None,  # Normal
+            # ref: https://en.wikipedia.org/wiki/Wavefront_.obj_file#Physically-based_Rendering
+            "map_Pm": None,  # Metallic
+            "map_Pr": None,  # Roughness
             "map_format": self.cfg.texture_format,
         }
 
@@ -113,8 +116,6 @@ class MeshExporter(Exporter):
             threestudio.info(
                 "Perform UV padding on texture maps to avoid seams, may take a while ..."
             )
-            if "normal" in geo_out:
-                params["map_Bump"] = uv_padding(geo_out["normal"])
 
             if "albedo" in mat_out:
                 params["map_Kd"] = uv_padding(mat_out["albedo"])
@@ -122,6 +123,12 @@ class MeshExporter(Exporter):
                 threestudio.warn(
                     "save_texture is True but no albedo texture found, using default white texture"
                 )
+            if "metallic" in mat_out:
+                params["map_Pm"] = uv_padding(mat_out["metallic"])
+            if "roughness" in mat_out:
+                params["map_Pr"] = uv_padding(mat_out["roughness"])
+            if "bump" in mat_out:
+                params["map_Bump"] = uv_padding(mat_out["bump"])
             # TODO: map_Ks
         return [
             ExporterOutput(
@@ -136,9 +143,12 @@ class MeshExporter(Exporter):
             "save_normal": self.cfg.save_normal,
             "save_uv": self.cfg.save_uv,
             "save_vertex_color": False,
-            "map_Kd": None,
-            "map_Ks": None,
-            "map_Bump": None,
+            "map_Kd": None,  # Base Color
+            "map_Ks": None,  # Specular
+            "map_Bump": None,  # Normal
+            # ref: https://en.wikipedia.org/wiki/Wavefront_.obj_file#Physically-based_Rendering
+            "map_Pm": None,  # Metallic
+            "map_Pr": None,  # Roughness
             "map_format": self.cfg.texture_format,
         }
 

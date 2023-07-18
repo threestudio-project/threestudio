@@ -1,0 +1,96 @@
+name: sjc
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs-gradio"
+seed: 0
+
+data_type: random-camera-datamodule
+data:
+  camera_distance_range: [1.50, 1.50]
+  elevation_range: [-10, 45]
+  camera_perturb: 0.0
+  center_perturb: 0.0
+  up_perturb: 0.0
+  light_position_perturb: 0.0
+  eval_elevation_deg: 20.0
+
+system_type: sjc-system
+system:
+  subpixel_rendering: false
+
+  geometry_type: volume-grid
+  geometry:
+    normal_type: null
+    grid_size: [100, 100, 100]
+    density_bias: -1.0
+    n_feature_dims: 4
+
+  material_type: no-material
+  material:
+    n_output_dims: 4
+    color_activation: none
+
+  background_type: textured-background
+  background:
+    n_output_dims: 4
+    color_activation: none
+    height: 4
+    width: 4
+
+  renderer_type: nerf-volume-renderer
+  renderer:
+    num_samples_per_ray: 512
+    grid_prune: false
+
+  prompt_processor_type: stable-diffusion-prompt-processor
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: ???
+    view_dependent_prompt_front: true
+
+  guidance_type: stable-diffusion-guidance
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    guidance_scale: 100.
+    use_sjc: true
+    var_red: true
+    min_step_percent: 0.01
+    max_step_percent: 0.97
+    grad_clip: [0, 2.0, 8.0, 5000]
+
+  exporter_type: "dummy-exporter"
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+      name: None
+
+  loss:
+    lambda_sds: 1.
+    center_ratio: 0.78125 # = 50 / 64
+    lambda_depth: 0 # or try 10
+    lambda_emptiness: [5000, 1.e+4, 2.e+5, 5001]
+    emptiness_scale: 10
+
+  optimizer:
+    name: Adamax
+    args:
+      lr: 0.05
+    params:
+      geometry:
+        lr: 0.05
+      background:
+        lr: 0.0001 # maybe 0.001/0.01 is better
+
+trainer:
+  max_steps: 5000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: false
+  save_top_k: -1
+  every_n_train_steps: 0 # do not save checkpoints during training

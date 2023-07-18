@@ -1,0 +1,153 @@
+name: "zero123_geom"
+tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_prog${data.random_camera.progressive_until}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "single-image-datamodule"
+data: # threestudio/data/image.py -> SingleImageDataModuleConfig
+  image_path: ./load/images/hamburger_rgba.png
+  height: 512
+  width: 512
+  default_elevation_deg: 0.0
+  default_azimuth_deg: 0.0
+  default_camera_distance: 3.8
+  default_fovy_deg: 20.0
+  requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
+  random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
+    height: 256 # Zero123 operates at 256x256
+    width: 256
+    batch_size: 8
+    resolution_milestones: []
+    eval_height: 512
+    eval_width: 512
+    eval_batch_size: 1
+    elevation_range: [-10, 45]
+    azimuth_range: [-180, 180]
+    camera_distance_range: [3.8, 3.8]
+    fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
+    progressive_until: 0
+    camera_perturb: 0.0
+    center_perturb: 0.0
+    up_perturb: 0.0
+    light_position_perturb: 1.0
+    light_distance_range: [7.5, 10.0]
+    eval_elevation_deg: ${data.default_elevation_deg}
+    eval_camera_distance: ${data.default_camera_distance}
+    eval_fovy_deg: ${data.default_fovy_deg}
+    light_sample_strategy: "dreamfusion"
+    batch_uniform_azimuth: False
+    n_val_views: 30
+    n_test_views: 120
+
+system_type: "zero123-system"
+system:
+  refinement: true
+  geometry_convert_from: ???
+  geometry_convert_inherit_texture: true
+  geometry_type: "tetrahedra-sdf-grid"
+  geometry:
+    radius: 2.0 # consistent with coarse
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
+    pos_encoding_config: # consistent with coarse, no progressive band
+      otype: HashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.4472692374403782 # max resolution 4096
+    mlp_network_config:
+      otype: "VanillaMLP"
+      activation: "ReLU"
+      output_activation: "none"
+      n_neurons: 64
+      n_hidden_layers: 2
+    fix_geometry: false # optimize grid sdf and deformation
+
+  # material_type: "no-material" # unused
+  # material:
+  #   n_output_dims: 0
+
+  material_type: "diffuse-with-point-light-material"
+  material:
+    ambient_only_steps: 10000
+    textureless_prob: 0.
+
+  background_type: "solid-color-background" # unused
+
+  # renderer_type: "nerf-volume-renderer"
+  # renderer:
+  #   radius: ${system.geometry.radius}
+  #   num_samples_per_ray: 512
+  #   return_comp_normal: ${gt0:${system.loss.lambda_normal_smooth}}
+  #   return_normal_perturb: ${gt0:${system.loss.lambda_3d_normal_smooth}}
+
+  renderer_type: "nvdiff-rasterizer"
+  renderer:
+    context_type: cuda
+
+  prompt_processor_type: "dummy-prompt-processor" # Zero123 doesn't use prompts
+  prompt_processor:
+    pretrained_model_name_or_path: ""
+    prompt: ""
+
+  guidance_type: "zero123-guidance"
+  guidance:
+    pretrained_model_name_or_path: "./load/zero123/zero123-xl.ckpt"
+    pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
+    vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
+    cond_image_path: ${data.image_path}
+    cond_elevation_deg: ${data.default_elevation_deg}
+    cond_azimuth_deg: ${data.default_azimuth_deg}
+    cond_camera_distance: ${data.default_camera_distance}
+    guidance_scale: 3.0
+    min_step_percent: 0.02
+    # min_step_percent: [0, 0.4, 0.02, 2000]  # (start_iter, start_val, end_val, end_iter)
+    max_step_percent: 0.5
+    # max_step_percent: [0, 0.85, 0.85, 2000]
+
+  freq:
+    ref_only_steps: 0
+    guidance_eval: 0  # if "alternate", this must not be a multiple of system.freq.n_ref
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+      name: None
+
+  loss:
+    lambda_sds: 1.0
+    lambda_rgb: 10000.0
+    lambda_mask: 100.0
+    lambda_depth: 0.
+    lambda_depth_rel: 0. # [0.0, 0.0, 1.0, 10000]
+    lambda_normal: 0. # [0, 0, 0.05, 100]
+    lambda_normal_smooth: 0.
+    lambda_3d_normal_smooth: 0.
+    lambda_normal_consistency: [50, 10000.0, 1000.0, 51] # 10000.
+    lambda_laplacian_smoothness: 0.
+    lambda_orient: 0.
+    lambda_sparsity: 0.
+    lambda_opaque: 0.
+
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-8
+
+trainer:
+  max_steps: 200
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 50
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true # save at each validation time
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

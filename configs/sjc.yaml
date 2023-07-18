@@ -6,6 +6,7 @@ seed: 0
 data_type: random-camera-datamodule
 data:
   camera_distance_range: [1.50, 1.50]
+  elevation_range: [-10, 45]
   camera_perturb: 0.0
   center_perturb: 0.0
   up_perturb: 0.0
@@ -40,13 +41,13 @@ system:
 
   prompt_processor_type: stable-diffusion-prompt-processor
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
     view_dependent_prompt_front: true
 
   guidance_type: stable-diffusion-guidance
   guidance:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 100.
     use_sjc: true
     var_red: true
@@ -56,7 +57,7 @@ system:
   loggers:
     wandb:
       enable: false
-      project: 'threestudio'
+      project: "threestudio"
       name: None
 
   loss:

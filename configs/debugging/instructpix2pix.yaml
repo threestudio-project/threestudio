@@ -1,0 +1,10 @@
+system:
+  guidance_type: "instructpix2pix-guidance"
+  guidance:
+    min_step_percent: 0.8
+    max_step_percent: 0.98
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: "Turn him into Elon Musk"

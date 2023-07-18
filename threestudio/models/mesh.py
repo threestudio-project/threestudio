@@ -166,7 +166,8 @@ class Mesh:
         for i in range(0, 3):
             pos[i] = self.v_pos[self.t_pos_idx[:, i]]
             tex[i] = self.v_tex[self.t_tex_idx[:, i]]
-            vn_idx[i] = self.t_nrm_idx[:, i]
+            # t_nrm_idx is always the same as t_pos_idx
+            vn_idx[i] = self.t_pos_idx[:, i]
 
         tangents = torch.zeros_like(self.v_nrm)
         tansum = torch.zeros_like(self.v_nrm)
@@ -212,7 +213,7 @@ class Mesh:
 
         atlas = xatlas.Atlas()
         atlas.add_mesh(
-            self.v_pos.cpu().numpy(),
+            self.v_pos.detach().cpu().numpy(),
             self.t_pos_idx.cpu().numpy(),
         )
         co = xatlas.ChartOptions()

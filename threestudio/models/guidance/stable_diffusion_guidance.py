@@ -44,6 +44,9 @@ class StableDiffusionGuidance(BaseObject):
 
         view_dependent_prompting: bool = True
 
+        """Maximum number of batch items to evaluate guidance for (for debugging) and to save on disk. -1 means save all items."""
+        max_items_eval: int = 4
+
     cfg: Config
 
     def configure(self) -> None:
@@ -121,8 +124,7 @@ class StableDiffusionGuidance(BaseObject):
             )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        self.set_min_max_steps()  # set to default value
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
@@ -427,6 +429,8 @@ class StableDiffusionGuidance(BaseObject):
         guidance_out = {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
+            "min_step": self.min_step,
+            "max_step": self.max_step,
         }
 
         if guidance_eval:
@@ -510,22 +514,26 @@ class StableDiffusionGuidance(BaseObject):
         # use only 50 timesteps, and find nearest of those to t
         self.scheduler.set_timesteps(50)
         self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
-        bs = latents_noisy.shape[0]  # batch size
-        large_enough_idxs = self.scheduler.timesteps_gpu.expand(
-            [bs, -1]
-        ) > t_orig.unsqueeze(
+        bs = (
+            min(self.cfg.max_items_eval, latents_noisy.shape[0])
+            if self.cfg.max_items_eval > 0
+            else latents_noisy.shape[0]
+        )  # batch size
+        large_enough_idxs = self.scheduler.timesteps_gpu.expand([bs, -1]) > t_orig[
+            :bs
+        ].unsqueeze(
             -1
         )  # sized [bs,50] > [bs,1]
         idxs = torch.min(large_enough_idxs, dim=1)[1]
         t = self.scheduler.timesteps_gpu[idxs]
 
         fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
-        imgs_noisy = self.decode_latents(latents_noisy).permute(0, 2, 3, 1)
+        imgs_noisy = self.decode_latents(latents_noisy[:bs]).permute(0, 2, 3, 1)
 
         # get prev latent
         latents_1step = []
         pred_1orig = []
-        for b in range(len(t)):
+        for b in range(bs):
             step_output = self.scheduler.step(
                 noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
             )
@@ -562,6 +570,7 @@ class StableDiffusionGuidance(BaseObject):
         imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
 
         return {
+            "bs": bs,
             "noise_levels": fracs,
             "imgs_noisy": imgs_noisy,
             "imgs_1step": imgs_1step,
@@ -576,11 +585,7 @@ class StableDiffusionGuidance(BaseObject):
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
-        # t annealing from ProlificDreamer
-        if (
-            self.cfg.anneal_start_step is not None
-            and global_step > self.cfg.anneal_start_step
-        ):
-            self.max_step = int(
-                self.num_train_timesteps * self.cfg.max_step_percent_annealed
-            )
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )

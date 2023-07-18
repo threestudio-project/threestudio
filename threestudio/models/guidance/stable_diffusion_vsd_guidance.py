@@ -45,14 +45,15 @@ class StableDiffusionVSDGuidance(BaseModule):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         guidance_scale_lora: float = 1.0
+        grad_clip: Optional[
+            Any
+        ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
         lora_cfg_training: bool = True
         lora_n_timestamp_samples: int = 1
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        max_step_percent_annealed: float = 0.5
-        anneal_start_step: Optional[int] = 5000
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
@@ -203,12 +204,13 @@ class StableDiffusionVSDGuidance(BaseModule):
         self.pipe_lora.scheduler = self.scheduler_lora
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
-        self.min_step = int(self.num_train_timesteps * self.cfg.min_step_percent)
-        self.max_step = int(self.num_train_timesteps * self.cfg.max_step_percent)
+        self.set_min_max_steps()  # set to default value
 
         self.alphas: Float[Tensor, "..."] = self.scheduler.alphas_cumprod.to(
             self.device
         )
+
+        self.grad_clip_val: Optional[float] = None
 
         threestudio.info(f"Loaded Stable Diffusion!")
 
@@ -637,6 +639,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         )
 
         grad = torch.nan_to_num(grad)
+        # clip grad for stable training?
+        if self.grad_clip_val is not None:
+            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # reparameterization trick
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
@@ -649,13 +654,18 @@ class StableDiffusionVSDGuidance(BaseModule):
             "loss_vsd": loss_vsd,
             "loss_lora": loss_lora,
             "grad_norm": grad.norm(),
+            "min_step": self.min_step,
+            "max_step": self.max_step,
         }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        if (
-            self.cfg.anneal_start_step is not None
-            and global_step > self.cfg.anneal_start_step
-        ):
-            self.max_step = int(
-                self.num_train_timesteps * self.cfg.max_step_percent_annealed
-            )
+        # clip grad for stable training as demonstrated in
+        # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
+        # http://arxiv.org/abs/2303.15413
+        if self.cfg.grad_clip is not None:
+            self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
+
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )

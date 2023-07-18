@@ -116,3 +116,41 @@ class CustomProgressBar(TQDMProgressBar):
         items = super().get_metrics(*args, **kwargs)
         items.pop("v_num", None)
         return items
+
+
+class ProgressCallback(Callback):
+    def __init__(self, save_path):
+        super().__init__()
+        self.save_path = save_path
+        self._file_handle = None
+
+    @property
+    def file_handle(self):
+        if self._file_handle is None:
+            self._file_handle = open(self.save_path, "w")
+        return self._file_handle
+
+    @rank_zero_only
+    def write(self, msg: str) -> None:
+        self.file_handle.seek(0)
+        self.file_handle.truncate()
+        self.file_handle.write(msg)
+        self.file_handle.flush()
+
+    @rank_zero_only
+    def on_train_batch_end(self, trainer, pl_module, *args, **kwargs):
+        self.write(
+            f"Generation progress: {pl_module.true_global_step / trainer.max_steps * 100:.2f}%"
+        )
+
+    @rank_zero_only
+    def on_validation_start(self, trainer, pl_module):
+        self.write(f"Rendering validation image ...")
+
+    @rank_zero_only
+    def on_test_start(self, trainer, pl_module):
+        self.write(f"Rendering video ...")
+
+    @rank_zero_only
+    def on_predict_start(self, trainer, pl_module):
+        self.write(f"Exporting mesh assets ...")

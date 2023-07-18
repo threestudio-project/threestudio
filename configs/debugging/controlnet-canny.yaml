@@ -1,0 +1,13 @@
+system:
+  guidance_type: "controlnet-guidance"
+  guidance:
+    control_type: "canny"
+    min_step_percent: 0.8
+    max_step_percent: 0.98
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: "Elon Musk, RAW photo, (high detailed skin:1.2), 8k uhd, dslr, soft lighting, high quality, film grain, Fujifilm XT3"
+    # negative_prompt: "(overexposed, underexposed, out of focus, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4), text, close up, cropped, out of frame, worst quality, low quality, jpeg artifacts, ugly, duplicate, morbid, mutilated, extra fingers, mutated hands, poorly drawn hands, poorly drawn face, mutation, deformed, blurry, dehydrated, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, extra arms, extra legs, fused fingers, too many fingers, long neck"
+    negative_prompt: "(overexposed, underexposed, out of focus, deformed iris, deformed pupils, semi-realistic, cgi, 3d, render, sketch, cartoon, drawing, anime:1.4)"

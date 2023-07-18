@@ -1,28 +1,33 @@
 name: "zero123"
-tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}"
+tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_prog${data.random_camera.progressive_until}"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   image_path: ./load/images/hamburger_rgba.png
-  height: 192
-  width: 192
+  height: [128, 256, 512]
+  width: [128, 256, 512]
+  resolution_milestones: [200, 300]
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
-  default_camera_distance: 3.2
+  default_camera_distance: 3.8
   default_fovy_deg: 20.0
+  requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
-    height: 128
-    width: 128
-    eval_height: 256
-    eval_width: 256
-    batch_size: 2
+    height: [64, 128, 256]
+    width: [64, 128, 256]
+    batch_size: [12, 4, 2]
+    resolution_milestones: [200, 300]
+    eval_height: 512
+    eval_width: 512
     eval_batch_size: 1
-    elevation_range: [-10, 60]
+    elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.2, 3.3]
+    camera_distance_range: [3.8, 3.8]
     fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
+    progressive_until: 0
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
@@ -59,15 +64,18 @@ system:
     # coarse to fine hash grid encoding
     # to ensure smooth analytic normals
     pos_encoding_config:
-      otype: ProgressiveBandHashGrid
+      otype: HashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.447269237440378 # max resolution 4096
-      start_level: 8 # resolution ~200
-      start_step: 2000
-      update_steps: 500
+    mlp_network_config:
+      otype: "VanillaMLP"
+      activation: "ReLU"
+      output_activation: "none"
+      n_neurons: 64
+      n_hidden_layers: 2
 
   material_type: "diffuse-with-point-light-material"
   material:
@@ -75,9 +83,11 @@ system:
     textureless_prob: 0.05
     albedo_activation: sigmoid
 
-  background_type: "neural-environment-map-background"
-  background:
-    color_activation: sigmoid
+  # background_type: "neural-environment-map-background"
+  # background:
+  #   color_activation: sigmoid
+
+  background_type: "solid-color-background" # unused
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -86,14 +96,14 @@ system:
     return_comp_normal: ${gt0:${system.loss.lambda_normal_smooth}}
     return_normal_perturb: ${gt0:${system.loss.lambda_3d_normal_smooth}}
 
-  prompt_processor_type: "zero123-prompt-processor"
+  prompt_processor_type: "dummy-prompt-processor" # Zero123 doesn't use prompts
   prompt_processor:
     pretrained_model_name_or_path: ""
     prompt: ""
 
   guidance_type: "zero123-guidance"
   guidance:
-    pretrained_model_name_or_path: "./load/zero123/105000.ckpt"
+    pretrained_model_name_or_path: "./load/zero123/zero123-xl.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
     cond_image_path: ${data.image_path}
@@ -101,16 +111,14 @@ system:
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
-    min_step_percent: 0.02
-    # min_step_percent: [0, 0.66, 0.33, 2000]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.98
-    # max_step_percent: [0, 0.98, 0.66, 2000]
+    #min_step_percent: 0.02
+    min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
+    #max_step_percent: 0.98
+    max_step_percent: [0, 0.85, 0.5, 200]
 
   freq:
-    n_ref: 2
     ref_only_steps: 0
-    guidance_eval: 0  # must not be a multiple of system.freq.n_ref
-    ref_or_zero123: "alternate" # can be "accumulate" or "alternate"
+    guidance_eval: 0
 
   loggers:
     wandb:
@@ -119,31 +127,27 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.003
-    lambda_rgb: 200.
+    lambda_sds: 0.1
+    lambda_rgb: 500.
     lambda_mask: 50.
-    lambda_depth: 1.
-    lambda_normal_smooth: 0.0
-    lambda_3d_normal_smooth: 0.5
-    lambda_orient: [0, 1., 20., 5000]
-    lambda_sparsity: 2.0 # should be tweaked for every model
-    lambda_opaque: 0.5
+    lambda_depth: 0. # 0.05
+    lambda_depth_rel: 0. # [0, 0, 0.05, 100]
+    lambda_normal: 0. # [0, 0, 0.05, 100]
+    lambda_normal_smooth: 8.0
+    lambda_3d_normal_smooth: 8.0
+    lambda_orient: 1.0
+    lambda_sparsity: 0.1 # should be tweaked for every model
+    lambda_opaque: 0.1
 
   optimizer:
-    name: Adan
+    name: Adam
     args:
       lr: 0.01
-      max_grad_norm: 5.0
+      betas: [0.9, 0.99]
       eps: 1.e-8
-      weight_decay: 1e-5
-    params:
-      geometry:
-        lr: ${system.optimizer.args.lr}
-      background:
-        lr: ${system.optimizer.args.lr}
 
 trainer:
-  max_steps: 10000
+  max_steps: 400
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100
@@ -153,4 +157,4 @@ trainer:
 checkpoint:
   save_last: true # save at each validation time
   save_top_k: -1
-  every_n_train_steps: ${trainer.max_steps}
+  every_n_train_steps: 100 # ${trainer.max_steps}

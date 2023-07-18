@@ -1,0 +1,2 @@
+The mud_road_puresky.hdr HDR probe is from https://polyhaven.com/a/mud_road_puresky
+CC0 License.

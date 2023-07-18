@@ -5,7 +5,7 @@ seed: 0
 
 data_type: "random-camera-datamodule"
 data:
-  batch_size: 1
+  batch_size: [1, 1]
   # 0-4999: 64x64, >=5000: 512x512
   # this drastically reduces VRAM usage as empty space is pruned in early training
   width: [64, 512]
@@ -66,9 +66,7 @@ system:
     pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1"
     guidance_scale: 7.5
     min_step_percent: 0.02
-    max_step_percent: 0.98
-    max_step_percent_annealed: 0.5
-    anneal_start_step: 10000
+    max_step_percent: [10000, 0.98, 0.5, 10001] # annealed to 0.5 after 10000 steps
     view_dependent_prompting: false
 
   loggers:

@@ -1,0 +1,102 @@
+name: "latentnerf"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs-gradio"
+seed: 0
+
+data_type: "random-camera-datamodule"
+data:
+  elevation_range: [-10, 45]
+
+system_type: "latentnerf-system"
+system:
+  geometry_type: "implicit-volume"
+  geometry:
+    n_feature_dims: 4
+    normal_type: null
+
+    density_bias: "blob_dreamfusion"
+    density_activation: trunc_exp
+    density_blob_scale: 5.
+    density_blob_std: 0.2
+
+    pos_encoding_config:
+      otype: HashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.381912879967776 # max resolution 2048
+
+  material_type: "no-material"
+  material:
+    n_output_dims: 4
+    color_activation: none
+
+  background_type: "neural-environment-map-background"
+  background:
+    n_output_dims: 4
+    color_activation: none
+
+  renderer_type: "nerf-volume-renderer"
+  renderer:
+    num_samples_per_ray: 512
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: ???
+
+  guidance_type: "stable-diffusion-guidance"
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    guidance_scale: 100.
+    weighting_strategy: sds
+    grad_clip: [0, 2.0, 8.0, 5000]
+
+  exporter_type: "dummy-exporter"
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+      name: None
+
+  loss:
+    lambda_sds: 1.
+    lambda_sparsity: 5.e-4
+    lambda_opaque: 0.0
+    lambda_orient: 0.0
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+  scheduler:
+    name: SequentialLR
+    interval: step
+    warmup_steps: 100
+    milestones:
+      - ${system.scheduler.warmup_steps}
+    schedulers:
+      - name: LinearLR # linear warm-up in the first system.warmup_steps steps
+        args:
+          start_factor: 0.1
+          end_factor: 1.0
+          total_iters: ${system.scheduler.warmup_steps}
+      - name: ExponentialLR
+        args:
+          gamma: ${calc_exp_lr_decay_rate:0.1,${sub:${trainer.max_steps},${system.scheduler.warmup_steps}}}
+
+trainer:
+  max_steps: 5000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: false
+  save_top_k: -1
+  every_n_train_steps: 0 # do not save checkpoints during training

@@ -13,10 +13,12 @@ from threestudio.models.renderers.base import VolumeRenderer
 from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
 
+
 def volsdf_density(sdf, inv_std):
-    beta = 1 / (inv_std  / 2)
-    alpha = inv_std / 2
+    beta = 1 / inv_std
+    alpha = inv_std
     return alpha * (0.5 + 0.5 * sdf.sign() * torch.expm1(-sdf.abs() / beta))
+
 
 class LearnedVariance(nn.Module):
     def __init__(self, init_val):
@@ -137,7 +139,7 @@ class NeuSVolumeRenderer(VolumeRenderer):
                 p = prev_cdf - next_cdf
                 c = prev_cdf
                 alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
-            
+
             return alpha
 
         if not self.cfg.grid_prune:
@@ -164,7 +166,9 @@ class NeuSVolumeRenderer(VolumeRenderer):
                     cone_angle=0.0,
                 )
 
-        ray_indices, t_starts_, t_ends_ = validate_empty_rays(ray_indices, t_starts_, t_ends_)
+        ray_indices, t_starts_, t_ends_ = validate_empty_rays(
+            ray_indices, t_starts_, t_ends_
+        )
         ray_indices = ray_indices.long()
         t_starts, t_ends = t_starts_[..., None], t_ends_[..., None]
         t_origins = rays_o_flatten[ray_indices]
@@ -173,7 +177,6 @@ class NeuSVolumeRenderer(VolumeRenderer):
         t_positions = (t_starts + t_ends) / 2.0
         positions = t_origins + t_dirs * t_positions
         t_intervals = t_ends - t_starts
-
 
         if self.training:
             geo_out = self.geometry(positions, output_normal=True)
@@ -184,7 +187,7 @@ class NeuSVolumeRenderer(VolumeRenderer):
                 **geo_out,
                 **kwargs
             )
-            comp_rgb_bg = self.background(dirs=rays_d_flatten)
+            comp_rgb_bg = self.background(dirs=rays_d)
         else:
             geo_out = chunk_batch(
                 self.geometry,
@@ -201,9 +204,10 @@ class NeuSVolumeRenderer(VolumeRenderer):
                 **geo_out
             )
             comp_rgb_bg = chunk_batch(
-                self.background, self.cfg.eval_chunk_size, dirs=rays_d_flatten
+                self.background, self.cfg.eval_chunk_size, dirs=rays_d
             )
 
+        # grad or normal?
         alpha: Float[Tensor, "Nr 1"] = self.get_alpha(
             geo_out["sdf"], geo_out["normal"], t_dirs, t_intervals
         )
@@ -227,9 +231,9 @@ class NeuSVolumeRenderer(VolumeRenderer):
 
         if bg_color is None:
             bg_color = comp_rgb_bg
-        else:
-            if bg_color.shape == (batch_size, height, width, 3):
-                bg_color = bg_color.reshape(-1, 3)
+
+        if bg_color.shape[:-1] == (batch_size, height, width):
+            bg_color = bg_color.reshape(batch_size * height * width, -1)
 
         comp_rgb = comp_rgb_fg + bg_color * (1.0 - opacity)
 

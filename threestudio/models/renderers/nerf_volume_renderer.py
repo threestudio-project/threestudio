@@ -9,9 +9,9 @@ from threestudio.models.background.base import BaseBackground
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
+from threestudio.utils.misc import cleanup
 from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
-from threestudio.utils.misc import cleanup
 
 
 @threestudio.register("nerf-volume-renderer")
@@ -25,7 +25,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
         prune_alpha_threshold: bool = True
         return_comp_normal: bool = False
         return_normal_perturb: bool = False
-        train_max_nums: int = -1 #5000000
+        train_max_nums: int = -1  # 5000000
 
     cfg: Config
 
@@ -102,7 +102,9 @@ class NeRFVolumeRenderer(VolumeRenderer):
                     cone_angle=0.0,
                 )
 
-        ray_indices, t_starts_, t_ends_ = validate_empty_rays(ray_indices, t_starts_, t_ends_)
+        ray_indices, t_starts_, t_ends_ = validate_empty_rays(
+            ray_indices, t_starts_, t_ends_
+        )
         ray_indices = ray_indices.long()
         t_starts, t_ends = t_starts_[..., None], t_ends_[..., None]
         t_origins = rays_o_flatten[ray_indices]
@@ -138,8 +140,10 @@ class NeRFVolumeRenderer(VolumeRenderer):
                     comp_rgb_bg = chunk_batch(
                         self.background, self.cfg.eval_chunk_size, dirs=rays_d_flatten
                     )
-                    
-                geo_out_interval = self.geometry(positions[::interval], output_normal=self.material.requires_normal)
+
+                geo_out_interval = self.geometry(
+                    positions[::interval], output_normal=self.material.requires_normal
+                )
                 rgb_fg_all_interval = self.material(
                     viewdirs=t_dirs[::interval],
                     positions=positions[::interval],
@@ -156,7 +160,9 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 rgb_fg_all[::interval] = rgb_fg_all_interval
                 comp_rgb_bg[::interval] = comp_rgb_bg_interval
             else:
-                geo_out = self.geometry(positions, output_normal=self.material.requires_normal)
+                geo_out = self.geometry(
+                    positions, output_normal=self.material.requires_normal
+                )
                 rgb_fg_all = self.material(
                     viewdirs=t_dirs,
                     positions=positions,
@@ -181,7 +187,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 **geo_out
             )
             comp_rgb_bg = chunk_batch(
-                self.background, self.cfg.eval_chunk_size, dirs=rays_d_flatten
+                self.background, self.cfg.eval_chunk_size, dirs=rays_d
             )
 
         weights: Float[Tensor, "Nr 1"]
@@ -215,15 +221,15 @@ class NeRFVolumeRenderer(VolumeRenderer):
         if bg_color is None:
             bg_color = comp_rgb_bg
         else:
-            if bg_color.shape == (batch_size, 3):
+            if bg_color.shape[:-1] == (batch_size,):
                 # e.g. constant random color used for Zero123
                 # [bs,3] -> [bs, 1, 1, 3]):
                 bg_color = bg_color.unsqueeze(1).unsqueeze(1)
                 #        -> [bs, height, width, 3]):
                 bg_color = bg_color.expand(-1, height, width, -1)
 
-            if bg_color.shape == (batch_size, height, width, 3):
-                bg_color = bg_color.reshape(-1, 3)
+        if bg_color.shape[:-1] == (batch_size, height, width):
+            bg_color = bg_color.reshape(batch_size * height * width, -1)
 
         comp_rgb = comp_rgb_fg + bg_color * (1.0 - opacity)
 
