@@ -267,7 +267,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             local_y = F.normalize(torch.cross(local_z, local_x, dim=-1), dim=-1)
             rot = torch.stack([local_x, local_y, local_z], dim=-1)
             light_azimuth = (
-                torch.rand(self.batch_size) * math.pi - 2 * math.pi
+                torch.rand(self.batch_size) * math.pi * 2 - math.pi
             )  # [-pi, pi]
             light_elevation = (
                 torch.rand(self.batch_size) * math.pi / 3 + math.pi / 6
