@@ -101,10 +101,10 @@ system:
       eps: 1.e-15
 
 trainer:
-  max_steps: 600
+  max_steps: 5000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
-  val_check_interval: 200
+  val_check_interval: 500
   enable_progress_bar: true
   precision: 16-mixed
 
