@@ -74,10 +74,6 @@ system:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
 
-  # prompt_processor_type: "stable-diffusion-prompt-processor"
-  # prompt_processor:
-  #   pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-
   guidance_type: "stable-diffusion-guidance"
   guidance:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
@@ -85,14 +81,20 @@ system:
     weighting_strategy: sds
     min_step_percent: 0.02
     max_step_percent: 0.50
-  # guidance_type: "stable-diffusion-controlnet-guidance"
-  # guidance:
-  #   control_type: "normal"
-  #   min_step_percent: 0.02
-  #   max_step_percent: 0.50
-  #   condition_scale: 1.0
-  #   guidance_scale: 100
-  #   use_sds: true
+
+  # If using controlnet guidance:
+#   prompt_processor_type: "stable-diffusion-prompt-processor"
+#   prompt_processor:
+#     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+
+#   guidance_type: "stable-diffusion-controlnet-guidance"
+#   guidance:
+#     control_type: "normal"
+#     min_step_percent: 0.02
+#     max_step_percent: 0.50
+#     condition_scale: 1.0
+#     guidance_scale: 100
+#     use_sds: true
 
 
   loggers:
