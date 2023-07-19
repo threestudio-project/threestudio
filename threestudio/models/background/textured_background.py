@@ -36,7 +36,7 @@ class TexturedBackground(BaseBackground):
 
     def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B Nc"]:
         dirs_shape = dirs.shape[:-1]
-        uv = self.spherical_xyz_to_uv(dirs)
+        uv = self.spherical_xyz_to_uv(dirs.reshape(-1, dirs.shape[-1]))
         uv = 2 * uv - 1  # rescale to [-1, 1] for grid_sample
         uv = uv.reshape(1, -1, 1, 2)
         color = (

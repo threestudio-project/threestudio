@@ -145,11 +145,11 @@ class ProgressCallback(Callback):
 
     @rank_zero_only
     def on_validation_start(self, trainer, pl_module):
-        self.write(f"Saving validation image ...")
+        self.write(f"Rendering validation image ...")
 
     @rank_zero_only
     def on_test_start(self, trainer, pl_module):
-        self.write(f"Saving test video ...")
+        self.write(f"Rendering video ...")
 
     @rank_zero_only
     def on_predict_start(self, trainer, pl_module):

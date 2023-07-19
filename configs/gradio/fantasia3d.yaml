@@ -54,6 +54,8 @@ system:
   background_type: "solid-color-background" # unused
 
   renderer_type: "nvdiff-rasterizer"
+  renderer:
+    context_type: cuda
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
@@ -72,6 +74,7 @@ system:
     fmt: obj
     save_uv: false
     save_texture: false
+    context_type: cuda
 
   loggers:
     wandb:
@@ -101,4 +104,4 @@ trainer:
 checkpoint:
   save_last: false
   save_top_k: -1
-  every_n_train_steps: ${trainer.max_steps}
+  every_n_train_steps: 0 # do not save checkpoints during training

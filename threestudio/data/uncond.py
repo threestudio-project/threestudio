@@ -24,14 +24,14 @@ from threestudio.utils.typing import *
 
 @dataclass
 class RandomCameraDataModuleConfig:
-    # height and width should be Union[int, List[int]]
+    # height, width, and batch_size should be Union[int, List[int]]
     # but OmegaConf does not support Union of containers
     height: Any = 64
     width: Any = 64
+    batch_size: Any = 1
     resolution_milestones: List[int] = field(default_factory=lambda: [])
     eval_height: int = 512
     eval_width: int = 512
-    batch_size: int = 1
     eval_batch_size: int = 1
     n_val_views: int = 1
     n_test_views: int = 120
@@ -267,7 +267,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             local_y = F.normalize(torch.cross(local_z, local_x, dim=-1), dim=-1)
             rot = torch.stack([local_x, local_y, local_z], dim=-1)
             light_azimuth = (
-                torch.rand(self.batch_size) * math.pi - 2 * math.pi
+                torch.rand(self.batch_size) * math.pi * 2 - math.pi
             )  # [-pi, pi]
             light_elevation = (
                 torch.rand(self.batch_size) * math.pi / 3 + math.pi / 6
@@ -442,6 +442,8 @@ class RandomCameraDataset(Dataset):
             "elevation": self.elevation_deg[index],
             "azimuth": self.azimuth_deg[index],
             "camera_distances": self.camera_distances[index],
+            "height": self.cfg.eval_height,
+            "width": self.cfg.eval_width,
         }
 
     def collate(self, batch):
