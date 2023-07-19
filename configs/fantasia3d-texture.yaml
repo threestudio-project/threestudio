@@ -29,8 +29,9 @@ system:
   geometry_convert_inherit_texture: false
   geometry_type: "tetrahedra-sdf-grid"
   geometry:
-    shape_init: ???
     radius: 1.0 # consistent with coarse
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
     pos_encoding_config:
       otype: HashGrid
       n_levels: 16
@@ -39,6 +40,7 @@ system:
       base_resolution: 16
       per_level_scale: 1.4472692374403782 # max resolution 4096
     n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
+    fix_geometry: true
 
   # If using custom mesh
   # geometry_type: "custom-mesh"
@@ -117,7 +119,7 @@ trainer:
   max_steps: 5000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
-  val_check_interval: 200
+  val_check_interval: 500
   enable_progress_bar: true
   precision: 16-mixed
 
