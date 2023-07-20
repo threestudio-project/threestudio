@@ -68,8 +68,11 @@ class Fantasia3D(BaseLift3DSystem):
             )
         else:  # texture training
             guidance_inp = out["comp_rgb"]
-            cond_inp = out["comp_normal"]
-            if "controlnet" in self.cfg.guidance_type:
+            if isinstance(
+                self.guidance,
+                threestudio.models.guidance.controlnet_guidance.ControlNetGuidance,
+            ):
+                cond_inp = out["comp_normal"]
                 guidance_out = self.guidance(
                     guidance_inp, cond_inp, prompt_utils, **batch, rgb_as_latents=False
                 )
