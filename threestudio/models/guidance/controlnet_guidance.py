@@ -37,6 +37,8 @@ class ControlNetGuidance(BaseObject):
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
 
+        fixed_size: int = -1
+
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
@@ -343,14 +345,18 @@ class ControlNetGuidance(BaseObject):
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 DH DW"]
+        if self.cfg.fixed_size > 0:
+            RH, RW = self.cfg.fixed_size, self.cfg.fixed_size
+        else:
+            RH, RW = H // 8 * 8, W // 8 * 8
         rgb_BCHW_HW8 = F.interpolate(
-            rgb_BCHW, (H // 8 * 8, W // 8 * 8), mode="bilinear", align_corners=False
+            rgb_BCHW, (RH, RW), mode="bilinear", align_corners=False
         )
         latents = self.encode_images(rgb_BCHW_HW8)
 
         image_cond = self.prepare_image_cond(cond_rgb)
         image_cond = F.interpolate(
-            image_cond, (H // 8 * 8, W // 8 * 8), mode="bilinear", align_corners=False
+            image_cond, (RH, RW), mode="bilinear", align_corners=False
         )
 
         temp = torch.zeros(1).to(rgb.device)
