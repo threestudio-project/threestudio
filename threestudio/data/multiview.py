@@ -199,7 +199,7 @@ class MultiviewDataset(Dataset):
         self.cfg: MultiviewsDataModuleConfig = cfg
 
         assert self.cfg.eval_batch_size == 1
-        scale = 2**self.cfg.eval_downsample_resolution
+        scale = self.cfg.eval_downsample_resolution
 
         camera_dict = json.load(
             open(os.path.join(self.cfg.dataroot, "transforms.json"), "r")
