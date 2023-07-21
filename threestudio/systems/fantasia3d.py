@@ -70,7 +70,10 @@ class Fantasia3D(BaseLift3DSystem):
             guidance_inp = out["comp_rgb"]
             if isinstance(
                 self.guidance,
-                threestudio.models.guidance.controlnet_guidance.ControlNetGuidance,
+                (
+                    threestudio.models.guidance.controlnet_guidance.ControlNetGuidance,
+                    threestudio.models.guidance.controlnet_vsd_guidance.ControlNetVSDGuidance,
+                ),
             ):
                 cond_inp = out["comp_normal"]
                 guidance_out = self.guidance(

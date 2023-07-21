@@ -94,8 +94,22 @@ system:
 #     control_type: "normal"
 #     min_step_percent: 0.02
 #     max_step_percent: 0.50
-#     condition_scale: 1.0
+#     condition_scale: 2.0
 #     guidance_scale: 100
+#     use_sds: true
+
+  # If using controlnet vsd guidance:
+#   prompt_processor_type: "stable-diffusion-prompt-processor"
+#   prompt_processor:
+#     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+
+#   guidance_type: "stable-diffusion-controlnet-vsd-guidance"
+#   guidance:
+#     control_type: "normal"
+#     min_step_percent: 0.02
+#     max_step_percent: 0.50
+#     condition_scale: 1.0
+#     guidance_scale: 7.5
 #     use_sds: true
 
 
@@ -106,6 +120,7 @@ system:
 
   loss:
     lambda_sds: 1.
+    lambda_lora: 1.
     lambda_normal_consistency: 0.
 
   optimizer:
