@@ -71,6 +71,7 @@ system:
   renderer_type: "nerf-volume-renderer"
   renderer:
     radius: ${system.geometry.radius}
+    grid_prune: false
     num_samples_per_ray: 512
 
   prompt_processor_type: "stable-diffusion-prompt-processor"

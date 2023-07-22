@@ -30,11 +30,14 @@ class DeepFloydPromptProcessor(PromptProcessor):
             load_in_8bit=True,
             variant="8bit",
             device_map="auto",
+            cache_dir="/mnt/disk-1/logan/cache",
         )  # FIXME: behavior of auto device map in multi-GPU training
+
         self.pipe = IFPipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             text_encoder=self.text_encoder,  # pass the previously instantiated 8bit text encoder
             unet=None,
+            cache_dir="/mnt/disk-1/logan/cache",
         )
 
     def destroy_text_encoder(self) -> None:

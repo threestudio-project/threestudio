@@ -3,7 +3,7 @@ import math
 import tinycudann as tcnn
 import torch
 import torch.nn as nn
-from torch.nn.utils.parametrizations import spectral_norm
+from torch.nn.utils import spectral_norm
 import torch.nn.functional as F
 
 import threestudio
@@ -63,6 +63,9 @@ class TCNNEncoding(nn.Module):
 
     def forward(self, x):
         return self.encoding(x)
+    
+    def from_hyper_net(self, weight):
+        self.encoding.state_dict()["params"].copy_(weight)
 
 
 class ProgressiveBandHashGrid(nn.Module, Updateable):

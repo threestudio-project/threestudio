@@ -20,7 +20,7 @@ class ATT3D(BaseLift3DSystem):
     def configure(self):
         # create geometry, material, background, renderer
         super().configure()
-        self.hypernet = HyperNet(77 * 4096, 1023584, 32)
+        self.hypernet = HyperNet(77 * 4096, 1634048, 32)
         # self.hypernet = HyperNet(77 * 768, 1023584, 32)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
@@ -40,11 +40,11 @@ class ATT3D(BaseLift3DSystem):
     def training_step(self, batch, batch_idx):
 
         prompt_utils = self.prompt_processor()
-        # text_embeddings: Tensor = prompt_utils.text_embeddings
+        text_embeddings: Tensor = prompt_utils.text_embeddings
 
-        # text_embeddings = text_embeddings.view(1, -1).float().contiguous()
-        # spatial_features = self.hypernet(text_embeddings)
-        # self.renderer.geometry.encoding.encoding.from_hyper_net(spatial_features[0])
+        text_embeddings = text_embeddings.view(1, -1).float().contiguous()
+        spatial_features = self.hypernet(text_embeddings)
+        self.renderer.geometry.encoding.encoding.from_hyper_net(spatial_features[0])
 
         out = self(batch)
         guidance_out = self.guidance(

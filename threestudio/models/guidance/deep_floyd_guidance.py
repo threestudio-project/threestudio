@@ -241,6 +241,7 @@ class DeepFloydGuidance(BaseObject):
         return {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
+            "grad": grad,
         }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):

@@ -112,6 +112,10 @@ class DreamFusion(BaseLift3DSystem):
 
     def test_step(self, batch, batch_idx):
         out = self(batch)
+        prompt_utils = self.prompt_processor()
+        guidance_out = self.guidance(
+            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
+        )
         self.save_image_grid(
             f"it{self.true_global_step}-test/{batch['index'][0]}.png",
             [
@@ -121,27 +125,77 @@ class DreamFusion(BaseLift3DSystem):
                     "kwargs": {"data_format": "HWC"},
                 },
             ]
-            + (
-                [
-                    {
-                        "type": "rgb",
-                        "img": out["comp_normal"][0],
-                        "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-                    }
-                ]
-                if "comp_normal" in out
-                else []
-            )
-            + [
-                {
-                    "type": "grayscale",
-                    "img": out["opacity"][0, :, :, 0],
-                    "kwargs": {"cmap": None, "data_range": (0, 1)},
-                },
-            ],
-            name="test_step",
-            step=self.true_global_step,
+            # + (
+            #     [
+            #         {
+            #             "type": "rgb",
+            #             "img": out["comp_normal"][0],
+            #             "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
+            #         }
+            #     ]
+            #     if "comp_normal" in out
+            #     else []
+            # )
+            # + [
+            #     {
+            #         "type": "grayscale",
+            #         "img": out["opacity"][0, :, :, 0],
+            #         "kwargs": {"cmap": None, "data_range": (0, 1)},
+            #     },
+            # ],
+            # name="test_step",
+            # step=self.true_global_step,
         )
+        # self.save_image_grid(
+        #     f"geometry/{batch['index'][0]}.png",
+        #     [
+        #         {
+        #             "type": "rgb",
+        #             "img": out["comp_normal"][0],
+        #             "kwargs": {"data_format": "HWC"},
+        #         }
+        #     ]
+        # )
+        # self.save_image_grid(
+        #     f"material/{batch['index'][0]}.png",
+        #     [
+        #         {
+        #             "type": "rgb",
+        #             "img": out["comp_rgb_fg"][0],
+        #             "kwargs": {"data_format": "HWC"},
+        #         }
+        #     ]
+        # )
+        # self.save_image_grid(
+        #     f"background/{batch['index'][0]}.png",
+        #     [
+        #         {
+        #             "type": "rgb",
+        #             "img": out["comp_rgb_bg"][0],
+        #             "kwargs": {"data_format": "HWC"},
+        #         }
+        #     ]
+        # )
+        # self.save_image_grid(
+        #     f"renderer/{batch['index'][0]}.png",
+        #     [
+        #         {
+        #             "type": "rgb",
+        #             "img": out["comp_rgb"][0],
+        #             "kwargs": {"data_format": "HWC"},
+        #         }
+        #     ]
+        # )
+        # self.save_image_grid(
+        #     f"guidance/{batch['index'][0]}.png",
+        #     [
+        #         {
+        #             "type": "rgb",
+        #             "img": guidance_out["grad"][0],
+        #             "kwargs": {"data_format": "CHW"},
+        #         }
+        #     ]
+        # )
 
     def on_test_epoch_end(self):
         self.save_img_sequence(
