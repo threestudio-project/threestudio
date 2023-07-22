@@ -2,7 +2,7 @@
 python launch.py --config configs/textmesh-if.yaml --gpu 0 --train data.batch_size=4 system.prompt_processor.prompt=???
 
 # stage 2
-python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 system.prompt_processor.prompt=??? system.geometry_convert_from=???
+python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 data.batch_size=4 system.prompt_processor.prompt=??? system.geometry_convert_from=???
 
 # stage 3
 ...
