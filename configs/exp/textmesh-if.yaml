@@ -1,0 +1,105 @@
+name: "textmesh-if"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "random-camera-datamodule"
+data:
+  batch_size: 1
+  width: 64
+  height: 64
+  camera_distance_range: [1.5, 2.0]
+  fovy_range: [40, 70]
+  elevation_range: [-10, 90]
+  light_sample_strategy: "dreamfusion"
+  eval_camera_distance: 2.0
+  eval_fovy_deg: 70.
+
+system_type: "textmesh-system"
+system:
+  geometry_type: "implicit-sdf"
+  geometry:
+    radius: 2.0
+    normal_type: finite_difference
+    # progressive eps from Neuralangelo
+    finite_difference_normal_eps: progressive
+
+    sdf_bias: sphere
+    sdf_bias_params: 0.5
+
+    # coarse to fine hash grid encoding
+    pos_encoding_config:
+      otype: ProgressiveBandHashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.381912879967776 # max resolution 2048
+      start_level: 8 # resolution ~200
+      start_step: 2000
+      update_steps: 500
+
+  material_type: "diffuse-with-point-light-material"
+  material:
+    ambient_only_steps: 2001
+    albedo_activation: sigmoid
+
+  background_type: "neural-environment-map-background"
+  background:
+    color_activation: sigmoid
+
+  renderer_type: "neus-volume-renderer"
+  renderer:
+    radius: ${system.geometry.radius}
+    num_samples_per_ray: 512
+    cos_anneal_end_steps: ${trainer.max_steps}
+    eval_chunk_size: 8192
+
+  prompt_processor_type: "deep-floyd-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
+    prompt: ???
+
+  guidance_type: "deep-floyd-guidance"
+  guidance:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
+    guidance_scale: 20.
+    weighting_strategy: sds
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+
+  loss:
+    lambda_sds: 1.
+    lambda_orient: 0.0
+    lambda_sparsity: 0.0
+    lambda_opaque: 0.0
+    lambda_eikonal: 1000.
+  optimizer:
+    name: Adam
+    args:
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+    params:
+      geometry.encoding:
+        lr: 0.01
+      geometry.sdf_network:
+        lr: 0.001
+      geometry.feature_network:
+        lr: 0.001
+      background:
+        lr: 0.001
+      renderer:
+        lr: 0.001
+
+trainer:
+  max_steps: 10000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true # save at each validation time
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}
