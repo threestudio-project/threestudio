@@ -22,18 +22,29 @@ system:
   stage: texture
   geometry_convert_from: ???
   geometry_type: "tetrahedra-sdf-grid"
+  geometry_convert_inherit_texture: true
   geometry:
-    radius: 1.0 # consistent with last stage
+    radius: 2.0 # consistent with last stage
     isosurface_resolution: 128 # consistent with last stage
     isosurface_deformable_grid: true
     isosurface_remove_outliers: true
     pos_encoding_config:
-      otype: HashGrid
+      otype: ProgressiveBandHashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
-      per_level_scale: 1.447269237440378 # max resolution 4096
+      per_level_scale: 1.381912879967776 # max resolution 2048
+      start_level: 16
+      start_step: 2000
+      update_steps: 500
+    # pos_encoding_config:
+    #   otype: HashGrid
+    #   n_levels: 16
+    #   n_features_per_level: 2
+    #   log2_hashmap_size: 19
+    #   base_resolution: 16
+    #   per_level_scale: 1.447269237440378 # max resolution 4096
     fix_geometry: true
 
   material_type: "no-material"
