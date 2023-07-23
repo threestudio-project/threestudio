@@ -17,6 +17,7 @@ class ProlificDreamer(BaseLift3DSystem):
         # in ['coarse', 'geometry', 'texture']
         stage: str = "coarse"
         visualize_samples: bool = False
+        eval_vis_shading: bool = False
 
     cfg: Config
 
@@ -30,11 +31,11 @@ class ProlificDreamer(BaseLift3DSystem):
         )
         self.prompt_utils = self.prompt_processor()
 
-    def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, batch: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         if self.cfg.stage == "geometry":
             render_out = self.renderer(**batch, render_rgb=False)
         else:
-            render_out = self.renderer(**batch)
+            render_out = self.renderer(**batch, **kwargs)
         return {
             **render_out,
         }
@@ -175,10 +176,46 @@ class ProlificDreamer(BaseLift3DSystem):
         pass
 
     def test_step(self, batch, batch_idx):
-        out = self(batch)
-        self.save_image_grid(
-            f"it{self.true_global_step}-test/{batch['index'][0]}.png",
-            (
+        if not self.cfg.eval_vis_shading:
+            out = self(batch)
+            self.save_image_grid(
+                f"it{self.true_global_step}-test/{batch['index'][0]}.png",
+                (
+                    [
+                        {
+                            "type": "rgb",
+                            "img": out["comp_rgb"][0],
+                            "kwargs": {"data_format": "HWC"},
+                        },
+                    ]
+                    if "comp_rgb" in out
+                    else []
+                )
+                + (
+                    [
+                        {
+                            "type": "rgb",
+                            "img": out["comp_normal"][0],
+                            "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
+                        }
+                    ]
+                    if "comp_normal" in out
+                    else []
+                )
+                + [
+                    {
+                        "type": "grayscale",
+                        "img": out["opacity"][0, :, :, 0],
+                        "kwargs": {"cmap": None, "data_range": (0, 1)},
+                    },
+                ],
+                name="test_step",
+                step=self.true_global_step,
+            )
+        else:
+            out = self(batch, shading="albedo")
+            self.save_image_grid(
+                f"it{self.true_global_step}-test/{batch['index'][0]}.png",
                 [
                     {
                         "type": "rgb",
@@ -187,29 +224,25 @@ class ProlificDreamer(BaseLift3DSystem):
                     },
                 ]
                 if "comp_rgb" in out
-                else []
+                else [],
+                name="test_step",
+                step=self.true_global_step,
             )
-            + (
+            out = self(batch, shading="textureless")
+            self.save_image_grid(
+                f"it{self.true_global_step}-test-textureless/{batch['index'][0]}.png",
                 [
                     {
                         "type": "rgb",
-                        "img": out["comp_normal"][0],
-                        "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-                    }
+                        "img": out["comp_rgb"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    },
                 ]
-                if "comp_normal" in out
-                else []
+                if "comp_rgb" in out
+                else [],
+                name="test_step",
+                step=self.true_global_step,
             )
-            + [
-                {
-                    "type": "grayscale",
-                    "img": out["opacity"][0, :, :, 0],
-                    "kwargs": {"cmap": None, "data_range": (0, 1)},
-                },
-            ],
-            name="test_step",
-            step=self.true_global_step,
-        )
 
     def on_test_epoch_end(self):
         self.save_img_sequence(
@@ -221,3 +254,13 @@ class ProlificDreamer(BaseLift3DSystem):
             name="test",
             step=self.true_global_step,
         )
+        if self.cfg.eval_vis_shading:
+            self.save_img_sequence(
+                f"it{self.true_global_step}-test-textureless",
+                f"it{self.true_global_step}-test-textureless",
+                "(\d+)\.png",
+                save_format="mp4",
+                fps=30,
+                name="test",
+                step=self.true_global_step,
+            )

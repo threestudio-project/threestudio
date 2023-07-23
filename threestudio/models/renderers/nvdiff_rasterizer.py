@@ -97,7 +97,8 @@ class NVDiffRasterizer(Rasterizer):
                 positions=positions,
                 light_positions=gb_light_positions[selector],
                 **extra_geo_info,
-                **geo_out
+                **geo_out,
+                **kwargs,
             )
             gb_rgb_fg = torch.zeros(batch_size, height, width, 3).to(rgb_fg)
             gb_rgb_fg[selector] = rgb_fg
