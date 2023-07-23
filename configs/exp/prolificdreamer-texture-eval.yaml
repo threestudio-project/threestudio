@@ -16,6 +16,7 @@ data:
   up_perturb: 0.
   eval_camera_distance: 1.5
   eval_fovy_deg: 70.
+  eval_elevation_deg: 30.
 
 system_type: "prolificdreamer-system"
 system:
