@@ -82,7 +82,7 @@ class ControlNetVSDGuidance(BaseObject):
         threestudio.info(f"Loading ControlNet ...")
 
         controlnet_name_or_path: str
-        if self.cfg.control_type == "normal":
+        if self.cfg.control_type in ("normal", "input_normal"):
             controlnet_name_or_path = "lllyasviel/control_v11p_sd15_normalbae"
         elif self.cfg.control_type == "canny":
             controlnet_name_or_path = "lllyasviel/control_v11p_sd15_canny"
@@ -427,6 +427,10 @@ class ControlNetVSDGuidance(BaseObject):
             control = control.unsqueeze(-1).repeat(1, 1, 3)
             control = control.unsqueeze(0)
             control = control.permute(0, 3, 1, 2)
+        elif self.cfg.control_type == "input_normal":
+            control = cond_rgb.permute(0, 3, 1, 2)
+        else:
+            raise ValueError(f"Unknown control type: {self.cfg.control_type}")
 
         return F.interpolate(control, (512, 512), mode="bilinear", align_corners=False)
 
@@ -470,7 +474,6 @@ class ControlNetVSDGuidance(BaseObject):
                 mid_block_additional_residual=mid_block_res_sample,
             )
 
-            ########################### TODO: change this
             noise_pred_est = self.forward_control_unet(
                 self.unet_lora,
                 latent_model_input,
@@ -480,7 +483,6 @@ class ControlNetVSDGuidance(BaseObject):
                 down_block_additional_residuals=down_block_res_samples,
                 mid_block_additional_residual=mid_block_res_sample,
             )
-            ##########################################
 
         # perform classifier-free guidance
         (
@@ -549,7 +551,6 @@ class ControlNetVSDGuidance(BaseObject):
         # use view-independent text embeddings in LoRA
         text_embeddings, _ = text_embeddings.chunk(2)
 
-        #################### TODO: change this
         down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
             self.controlnet,
             noisy_latents,
@@ -572,7 +573,6 @@ class ControlNetVSDGuidance(BaseObject):
             down_block_additional_residuals=down_block_res_samples,
             mid_block_additional_residual=mid_block_res_sample,
         )
-        #################################
         return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
 
     def get_latents(
