@@ -3,7 +3,6 @@ import math
 import tinycudann as tcnn
 import torch
 import torch.nn as nn
-from torch.nn.utils import spectral_norm
 import torch.nn.functional as F
 
 import threestudio
@@ -11,6 +10,7 @@ from threestudio.utils.base import Updateable
 from threestudio.utils.config import config_to_primitive
 from threestudio.utils.misc import get_rank
 from threestudio.utils.ops import get_activation
+from threestudio.utils.norm import spectral_norm
 from threestudio.utils.typing import *
 
 

@@ -33,6 +33,11 @@ class DreamFusion(BaseLift3DSystem):
             self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        self.save_data(
+            f"prompt",
+            self.prompt_processor().text_embeddings
+        )
+        threestudio.info(f"Geometry Encoding Shape {self.geometry.encoding.encoding.encoding.params.shape}")
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
@@ -77,7 +82,7 @@ class DreamFusion(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}.png",
+            f"val/it{self.true_global_step}-{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",

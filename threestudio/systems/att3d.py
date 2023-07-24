@@ -24,6 +24,14 @@ class ATT3D(BaseLift3DSystem):
         # self.hypernet = HyperNet(77 * 768, 1023584, 32)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+
+        # prompt_utils = self.prompt_processor()
+        # text_embeddings: Tensor = prompt_utils.text_embeddings
+
+        # text_embeddings = text_embeddings.view(1, -1).float().contiguous()
+        # spatial_features = self.hypernet(text_embeddings)
+        # self.geometry.encoding.encoding.from_hyper_net(spatial_features[0])
+
         render_out = self.renderer(**batch)
         return {
             **render_out,
@@ -36,16 +44,11 @@ class ATT3D(BaseLift3DSystem):
             self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        threestudio.info(f"Geometry Encoding {self.geometry.encoding.encoding.encoding.params.shape}")
 
     def training_step(self, batch, batch_idx):
 
         prompt_utils = self.prompt_processor()
-        text_embeddings: Tensor = prompt_utils.text_embeddings
-
-        text_embeddings = text_embeddings.view(1, -1).float().contiguous()
-        spatial_features = self.hypernet(text_embeddings)
-        self.renderer.geometry.encoding.encoding.from_hyper_net(spatial_features[0])
-
         out = self(batch)
         guidance_out = self.guidance(
             out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
@@ -87,7 +90,7 @@ class ATT3D(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}.png",
+            f"val/it{self.true_global_step}-{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
@@ -162,4 +165,9 @@ class ATT3D(BaseLift3DSystem):
             fps=30,
             name="test",
             step=self.true_global_step,
+        )
+
+        self.save_data(
+            f"densegrid",
+            self.geometry.encoding.encoding.encoding.params
         )
