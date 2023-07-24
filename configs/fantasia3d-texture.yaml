@@ -25,28 +25,13 @@ system:
   texture: true
 
   # If using geometry from previous training
-  # geometry_convert_from: ???
-  # geometry_convert_inherit_texture: false
-  # geometry_type: "tetrahedra-sdf-grid"
-  # geometry:
-  #   radius: 1.0 # consistent with coarse
-  #   isosurface_resolution: 128
-  #   isosurface_deformable_grid: true
-  #   pos_encoding_config:
-  #     otype: HashGrid
-  #     n_levels: 16
-  #     n_features_per_level: 2
-  #     log2_hashmap_size: 19
-  #     base_resolution: 16
-  #     per_level_scale: 1.4472692374403782 # max resolution 4096
-  #   n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
-  #   fix_geometry: true
-
-  # If using custom mesh
-  geometry_type: "custom-mesh"
+  geometry_convert_from: ???
+  geometry_convert_inherit_texture: false
+  geometry_type: "tetrahedra-sdf-grid"
   geometry:
-    shape_init: ???
     radius: 1.0 # consistent with coarse
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
     pos_encoding_config:
       otype: HashGrid
       n_levels: 16
@@ -55,6 +40,21 @@ system:
       base_resolution: 16
       per_level_scale: 1.4472692374403782 # max resolution 4096
     n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
+    fix_geometry: true
+
+  # If using custom mesh
+#   geometry_type: "custom-mesh"
+#   geometry:
+#     shape_init: ???
+#     radius: 1.0 # consistent with coarse
+#     pos_encoding_config:
+#       otype: HashGrid
+#       n_levels: 16
+#       n_features_per_level: 2
+#       log2_hashmap_size: 19
+#       base_resolution: 16
+#       per_level_scale: 1.4472692374403782 # max resolution 4096
+#     n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
 
   material_type: "pbr-material"
   material:
@@ -73,18 +73,18 @@ system:
   renderer:
     context_type: cuda
 
-#   prompt_processor_type: "stable-diffusion-prompt-processor"
-#   prompt_processor:
-#     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-#     prompt: ???
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: ???
 
-#   guidance_type: "stable-diffusion-guidance"
-#   guidance:
-#     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-#     guidance_scale: 100
-#     weighting_strategy: sds
-#     min_step_percent: 0.02
-#     max_step_percent: 0.50
+  guidance_type: "stable-diffusion-guidance"
+  guidance:
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    guidance_scale: 100
+    weighting_strategy: sds
+    min_step_percent: 0.02
+    max_step_percent: 0.50
 
   # If using controlnet guidance:
 #   prompt_processor_type: "stable-diffusion-prompt-processor"
@@ -101,18 +101,18 @@ system:
 #     use_sds: true
 
   # If using controlnet vsd guidance:
-  prompt_processor_type: "stable-diffusion-prompt-processor"
-  prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+#   prompt_processor_type: "stable-diffusion-prompt-processor"
+#   prompt_processor:
+#     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
 
-  guidance_type: "stable-diffusion-controlnet-vsd-guidance"
-  guidance:
-    control_type: "input_normal"
-    min_step_percent: 0.02
-    max_step_percent: 0.50
-    condition_scale: 1.0
-    guidance_scale: 100
-    use_sds: true
+#   guidance_type: "stable-diffusion-controlnet-vsd-guidance"
+#   guidance:
+#     control_type: "input_normal"
+#     min_step_percent: 0.02
+#     max_step_percent: 0.50
+#     condition_scale: 1.0
+#     guidance_scale: 100
+#     use_sds: true
 
 
   loggers:
