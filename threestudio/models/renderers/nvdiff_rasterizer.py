@@ -63,6 +63,21 @@ class NVDiffRasterizer(Rasterizer):
         )
         out.update({"comp_normal": gb_normal_aa})  # in [0, 1]
 
+        # Compute normal in view space.
+        # TODO: make is clear whether to compute this.
+        w2c = kwargs["c2w"][:, :3, :3].inverse()
+        gb_normal_viewspace = torch.einsum("bij,bhwj->bhwi", w2c, gb_normal)
+        gb_normal_viewspace = F.normalize(gb_normal_viewspace, dim=-1)
+        gb_normal_viewspace_aa = torch.lerp(
+            torch.zeros_like(gb_normal_viewspace),
+            (gb_normal_viewspace + 1.0) / 2.0,
+            mask.float(),
+        ).contiguous()
+        gb_normal_viewspace_aa = self.ctx.antialias(
+            gb_normal_viewspace_aa, rast, v_pos_clip, mesh.t_pos_idx
+        )
+        out.update({"comp_normal_viewspace": gb_normal_viewspace_aa})
+
         # TODO: make it clear whether to compute the normal, now we compute it in all cases
         # consider using: require_normal_computation = render_normal or (render_rgb and material.requires_normal)
         # or

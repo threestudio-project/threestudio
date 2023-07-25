@@ -43,7 +43,6 @@ class Fantasia3D(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
         loss = 0.0
-
         out = self(batch)
         prompt_utils = self.prompt_processor()
 
@@ -75,7 +74,7 @@ class Fantasia3D(BaseLift3DSystem):
                     threestudio.models.guidance.controlnet_vsd_guidance.ControlNetVSDGuidance,
                 ),
             ):
-                cond_inp = out["comp_normal"]
+                cond_inp = out["comp_normal_viewspace"]
                 guidance_out = self.guidance(
                     guidance_inp, cond_inp, prompt_utils, **batch, rgb_as_latents=False
                 )

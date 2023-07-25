@@ -428,6 +428,9 @@ class ControlNetVSDGuidance(BaseObject):
             control = control.unsqueeze(0)
             control = control.permute(0, 3, 1, 2)
         elif self.cfg.control_type == "input_normal":
+            cond_rgb[..., 0] = (
+                1 - cond_rgb[..., 0]
+            )  # Flip the sign on the x-axis to match bae system
             control = cond_rgb.permute(0, 3, 1, 2)
         else:
             raise ValueError(f"Unknown control type: {self.cfg.control_type}")
