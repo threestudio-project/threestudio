@@ -43,6 +43,7 @@ class Fantasia3D(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
         loss = 0.0
+
         out = self(batch)
         prompt_utils = self.prompt_processor()
 

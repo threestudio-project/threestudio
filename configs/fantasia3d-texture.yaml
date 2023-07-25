@@ -43,18 +43,18 @@ system:
     fix_geometry: true
 
   # If using custom mesh
-#   geometry_type: "custom-mesh"
-#   geometry:
-#     shape_init: ???
-#     radius: 1.0 # consistent with coarse
-#     pos_encoding_config:
-#       otype: HashGrid
-#       n_levels: 16
-#       n_features_per_level: 2
-#       log2_hashmap_size: 19
-#       base_resolution: 16
-#       per_level_scale: 1.4472692374403782 # max resolution 4096
-#     n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
+  # geometry_type: "custom-mesh"
+  # geometry:
+  #   shape_init: ???
+  #   radius: 1.0 # consistent with coarse
+  #   pos_encoding_config:
+  #     otype: HashGrid
+  #     n_levels: 16
+  #     n_features_per_level: 2
+  #     log2_hashmap_size: 19
+  #     base_resolution: 16
+  #     per_level_scale: 1.4472692374403782 # max resolution 4096
+  #   n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
 
   material_type: "pbr-material"
   material:
@@ -70,8 +70,6 @@ system:
   background_type: "solid-color-background"
 
   renderer_type: "nvdiff-rasterizer"
-  renderer:
-    context_type: cuda
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
