@@ -9,7 +9,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   height: [128, 256, 512]
   width: [128, 256, 512]
   resolution_milestones: [200, 300]
-  default_elevation_deg: 0.0
+  default_elevation_deg: 10.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
@@ -113,7 +113,7 @@ system:
     guidance_scale: 3.0
     #min_step_percent: 0.02
     min_step_percent: [50, 0.7, 0.3, 200]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: 0.98
+    max_step_percent: [50, 0.98, 0.8, 200]
     # max_step_percent: [50, 0.98, 0.98, 200]
 
   freq:
