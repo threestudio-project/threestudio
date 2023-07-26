@@ -181,6 +181,7 @@ class PromptProcessor(BaseObject):
         prompt_overhead: Optional[str] = None
 
         negative_prompt: str = ""
+        compositional_prompt_dir: str = ""
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         overhead_threshold: float = 60.0
         front_threshold: float = 45.0

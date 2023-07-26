@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
@@ -21,16 +23,15 @@ class ATT3D(BaseLift3DSystem):
         # create geometry, material, background, renderer
         super().configure()
         self.hypernet = HyperNet(77 * 4096, 1634048, 32)
-        # self.hypernet = HyperNet(77 * 768, 1023584, 32)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
 
-        # prompt_utils = self.prompt_processor()
-        # text_embeddings: Tensor = prompt_utils.text_embeddings
+        prompt_utils = self.prompt_processor()
+        text_embeddings: Tensor = prompt_utils.text_embeddings
 
-        # text_embeddings = text_embeddings.view(1, -1).float().contiguous()
-        # spatial_features = self.hypernet(text_embeddings)
-        # self.geometry.encoding.encoding.from_hyper_net(spatial_features[0])
+        text_embeddings = text_embeddings.view(1, -1).float().contiguous()
+        spatial_features = self.hypernet(text_embeddings)
+        self.geometry.encoding.encoding.from_hyper_net(spatial_features[0])
 
         render_out = self.renderer(**batch)
         return {
@@ -44,7 +45,6 @@ class ATT3D(BaseLift3DSystem):
             self.cfg.prompt_processor
         )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
-        threestudio.info(f"Geometry Encoding {self.geometry.encoding.encoding.encoding.params.shape}")
 
     def training_step(self, batch, batch_idx):
 

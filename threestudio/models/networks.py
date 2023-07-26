@@ -65,7 +65,7 @@ class TCNNEncoding(nn.Module):
         return self.encoding(x)
     
     def from_hyper_net(self, weight):
-        self.encoding.state_dict()["params"].copy_(weight)
+        self.encoding.state_dict()["params"] = weight
 
 
 class ProgressiveBandHashGrid(nn.Module, Updateable):
@@ -98,7 +98,7 @@ class ProgressiveBandHashGrid(nn.Module, Updateable):
         return enc
     
     def from_hyper_net(self, weight):
-        self.encoding.state_dict()["params"].copy_(weight)
+        self.encoding.state_dict()["params"] = weight
 
     def update_step(self, epoch, global_step, on_load_weights=False):
         current_level = min(
@@ -143,7 +143,7 @@ class MultipleHashGrid(nn.Module, Updateable):
     def from_hyper_net(self, weight):
         for i, encoding in enumerate(self.encodings):
             size = encoding.params.numel()
-            encoding.state_dict()["params"].copy_(weight[self.offsets[i] : self.offsets[i] + size])
+            encoding.state_dict()["params"] = weight[self.offsets[i] : self.offsets[i] + size]
 
 
 class CompositeEncoding(nn.Module, Updateable):

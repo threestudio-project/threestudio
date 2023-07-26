@@ -78,6 +78,7 @@ system:
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
+    grid_prune: false
 
   prompt_processor_type: "deep-floyd-prompt-processor"
   prompt_processor:

@@ -5,19 +5,17 @@ from torch import optim
 import numpy as np
 from spec_norm import spectral_norm
 
-from tqdm import tqdm, trange
+import argparse
+import os
+from tqdm import tqdm
 
 
-df = "./outputs/dreamfusion-if-lowres/a_pig_wearing_medieval_armor_holding_a_blue_balloon@20230717-154644/ckpts/epoch=0-step=10000.ckpt"
-dg = "./outputs/att3d-if/a_pig_wearing_medieval_armor_holding_a_blue_balloon@20230717-145300/save/densegrid.npy"
-pr = "./outputs/dreamfusion-if-lowres/a_pig_wearing_medieval_armor_holding_a_blue_balloon@20230717-170246/save/prompt.npy"
+dg = "outputs/hypernet/densegrid.npy"
+pr = "outputs/hypernet/prompt.npy"
 
 
 def load_data(path: str) -> torch.Tensor:
-    if path.endswith(".ckpt"):
-        dat = torch.load(path)["state_dict"]["geometry.encoding.encoding.encoding.params"]
-    else:
-        dat = torch.from_numpy(np.load(path))
+    dat = torch.from_numpy(np.load(path)).flatten().float().cuda()
     return dat
 
 
@@ -36,12 +34,24 @@ class Hyper(nn.Module):
         return loss
     
 
+def setup():
+    parser = argparse.ArgumentParser("TCNN Encoder")
+    parser.add_argument("--gpu", default="1")
+    parser.add_argument("--seed", default=0)
+    args = parser.parse_args()
+    
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    return args
+    
+
 def train_hyper_net():
 
-    x = load_data(pr).flatten().float().cuda()
-    y = load_data(df).cuda()
+    setup()
 
-    print(f"[DATA] X: {x.shape} {x.dtype}, Y: {y.shape} {y.dtype}")
+    x = load_data(pr)
+    y = load_data(dg)
 
     config = {
         "in_dim": x.shape[0],
@@ -49,8 +59,10 @@ def train_hyper_net():
         "out_dim": y.shape[0]
     }
 
+    print(f"X Shape {x.shape}, Y Shape {y.shape}")
+
     net = Hyper(**config).cuda()
-    opt = optim.Adam(net.parameters(), lr=1e-4, betas=[0.9, 0.999])
+    opt = optim.Adam(net.parameters(), lr=0.1, betas=[0.9, 0.999])
 
     with tqdm(range(10000)) as loader:
         for _ in loader:
