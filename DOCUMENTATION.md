@@ -409,7 +409,7 @@ For the first three options, you can check more details in [pipe_stable_diffusio
 
 No specific configuration.
 
-## stable-diffusion-vsd-guidance
+### stable-diffusion-vsd-guidance
 
 | name                               | type          | description                                                                                                                                                     |
 | ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -419,6 +419,25 @@ No specific configuration.
 | max_step_percent_annealed          | float         | The precent range (max value) of the random timesteps to add noise and denoise after t annealing. Default: 0.5                                                  |
 | anneal_start_step                  | Optional[int] | If specified, denotes at which step to perform t annealing. Default: 5000                                                                                       |
 | camera_condition_type              | str           | Which to use as the camera condition for the LoRA model, in ["extrinsics", "mvp"]. Default: "extrinsics"                                                        |
+
+### controlnet-guidance
+
+View-dependent prompting is currently disabled for controlnet guidance.
+
+| name                               | type          | description                                                                                                                                                     |
+| ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| control_type                       | str           | Type of control. If "normal", a normalbae detector will be used to estimate the normal map from input image. If "canny", a canny edge detector will be used, and you might want to specify canny_lower_bound and canny_upper_bound. If "input_normal", the viewspace normal from the geometry will be used directly.      |
+| condition_scale                    | float         | strength of the conditional control input on ControlNet model. Default: 1.5. |
+| ddim_scheduler_name_or_path        | str           | Name or path for the ddim_scheduler |
+
+### controlnet-vsd-guidance
+
+In addition to configurations in controlnet-guidance:
+
+| name                               | type          | description                                                                                                                                                     |
+| ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+
+| guidance_scale_lora                | float         | The classifier free guidance scale for the LoRA model. Default: 1.                                                                                              |
 
 ## Prompt Processors
 
