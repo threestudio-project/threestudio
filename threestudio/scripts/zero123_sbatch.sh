@@ -7,4 +7,4 @@
 conda activate three
 cd ~/git/threestudio/
 NAME=temple2
-python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png use_timestamp=false name=${NAME} tag=Phase1_highNoise_lr0.001fast_frontAvoid5_norm50 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1
+python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png use_timestamp=false name=SAI/${NAME} tag=Phase1_SAI_new_elev5_EXP1 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1

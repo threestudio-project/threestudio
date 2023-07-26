@@ -37,7 +37,9 @@ def instantiate_from_config(config):
 
 
 # load model
-def load_model_from_config(config, ckpt, device, vram_O=True, verbose=False):
+def load_model_from_config(
+    config, ckpt, device, vram_O=True, vae_ckpt="", clip_ckpt="", verbose=False
+):
     pl_sd = torch.load(ckpt, map_location="cpu")
 
     if "global_step" in pl_sd and verbose:
@@ -52,6 +54,12 @@ def load_model_from_config(config, ckpt, device, vram_O=True, verbose=False):
         print("[INFO] missing keys: \n", m)
     if len(u) > 0 and verbose:
         print("[INFO] unexpected keys: \n", u)
+    if vae_ckpt and not vram_O:
+        print(f"Loading VAE from {vae_ckpt}")
+        model.first_stage_model.load_state_dict(torch.load(vae_ckpt))
+    if clip_ckpt:
+        print(f"Loading CLIP from {clip_ckpt}")
+        model.cond_stage_model.load_state_dict(torch.load(clip_ckpt))
 
     # manually load ema and delete it to save GPU memory
     if model.use_ema:
@@ -78,6 +86,8 @@ class Zero123Guidance(BaseObject):
         pretrained_model_name_or_path: str = "load/zero123/105000.ckpt"
         pretrained_config: str = "load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
         vram_O: bool = True
+        vae_ckpt: str = ""
+        clip_ckpt: str = ""
 
         cond_image_path: str = "load/images/hamburger_rgba.png"
         cond_elevation_deg: float = 0.0
@@ -110,6 +120,8 @@ class Zero123Guidance(BaseObject):
             self.cfg.pretrained_model_name_or_path,
             device=self.device,
             vram_O=self.cfg.vram_O,
+            vae_ckpt=self.cfg.vae_ckpt,
+            clip_ckpt=self.cfg.clip_ckpt,
         )
 
         for p in self.model.parameters():
@@ -289,7 +301,7 @@ class Zero123Guidance(BaseObject):
             [batch_size],
             dtype=torch.long,
             device=self.device,
-        )
+        ).sort()[0]
 
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
