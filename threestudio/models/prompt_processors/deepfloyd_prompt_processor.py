@@ -78,8 +78,8 @@ class DeepFloydPromptProcessor(PromptProcessor):
             text_input_ids = text_inputs.input_ids
             attention_mask = text_inputs.attention_mask
             text_embeddings = text_encoder(
-                text_input_ids,
-                attention_mask=attention_mask,
+                text_input_ids.to(text_encoder.device),
+                attention_mask=attention_mask.to(text_encoder.device),
             )
             text_embeddings = text_embeddings[0]
 

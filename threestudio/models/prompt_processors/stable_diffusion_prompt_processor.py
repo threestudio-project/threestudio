@@ -88,7 +88,7 @@ class StableDiffusionPromptProcessor(PromptProcessor):
                 max_length=tokenizer.model_max_length,
                 return_tensors="pt",
             )
-            text_embeddings = text_encoder(tokens.input_ids)[0]
+            text_embeddings = text_encoder(tokens.input_ids.to(text_encoder.device))[0]
 
         for prompt, embedding in zip(prompts, text_embeddings):
             torch.save(
