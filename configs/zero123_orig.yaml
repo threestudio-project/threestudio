@@ -147,7 +147,7 @@ system:
       eps: 1.e-8
 
 trainer:
-  max_steps: 400
+  max_steps: 600
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100
