@@ -3,7 +3,7 @@ import time
 
 files = [
     "~/git/threestudio/load/images/anya_front_rgba.png",
-    "~/git/threestudio/load/images/bust1_rgba.png",
+    # "~/git/threestudio/load/images/bust1_rgba.png",
     "~/git/threestudio/load/images/castle1_rgba.png",
     "~/git/threestudio/load/images/castle2_rgba.png",
     "~/git/threestudio/load/images/dog1_rgba.png",
@@ -28,6 +28,7 @@ files = [
     "~/git/threestudio/load/images/km8_rgba.png",
 ]
 
+type = "sai"
 for file in files:
     name = os.path.basename(file).split("_rgba.png")[0]
     with open(
@@ -43,13 +44,15 @@ for file in files:
         f.write("conda activate three\n")
         f.write("cd ~/git/threestudio/\n")
         f.write(f"NAME={name}\n")
+        f.write(f"TYPE={type}\n")
         # Phase 1
         f.write(
-            "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png use_timestamp=false name=SAI/${NAME} tag=Phase1_SAI_new_elev5_EXP1 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
+            "python launch.py --config configs/zero123_${TYPE}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png use_timestamp=false name=SAI/${NAME} tag=Phase1_${TYPE}_EXPconst0.5 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123_SAI' system.loggers.wandb.name=${NAME}_${TYPE}\n"
         )
+        # /admin/home-vikram/git/threestudio/outputs/SAI/temple2/Phase1_SAI_new_elev5_EXP9_lr0.01_dmitryFix_new/configs/raw.yaml
         # new, elev 10
         # f.write(
-        #     "python launch.py --config configs/zero123.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png data.default_elevation_deg=5.0 use_timestamp=false name=${NAME} tag=Phase1_new_elev5 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
+        #     "python launch.py --config configs/zero123_sai.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png data.default_elevation_deg=-10.0 use_timestamp=false name=SAI/${NAME} tag=Phase1_SAI_new_elev5_EXP2_lr0.001 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
         # )
         # original, elev 5
         # f.write(
