@@ -54,7 +54,7 @@ def load_model_from_config(
         print("[INFO] missing keys: \n", m)
     if len(u) > 0 and verbose:
         print("[INFO] unexpected keys: \n", u)
-    if vae_ckpt and not vram_O:
+    if vae_ckpt:
         print(f"Loading VAE from {vae_ckpt}")
         model.first_stage_model.load_state_dict(torch.load(vae_ckpt))
     if clip_ckpt:
