@@ -301,7 +301,7 @@ class Zero123Guidance(BaseObject):
             [batch_size],
             dtype=torch.long,
             device=self.device,
-        ).sort()[0]
+        )
 
         # predict the noise residual with unet, NO grad!
         with torch.no_grad():
