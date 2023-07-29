@@ -46,7 +46,7 @@ system:
   # geometry_type: "custom-mesh"
   # geometry:
   #   shape_init: ???
-  #   radius: 1.0 # consistent with coarse
+  #   shape_init_params: 0.9
   #   pos_encoding_config:
   #     otype: HashGrid
   #     n_levels: 16
@@ -109,7 +109,7 @@ system:
 #     min_step_percent: 0.02
 #     max_step_percent: 0.50
 #     condition_scale: 1.0
-#     guidance_scale: 100
+#     guidance_scale: 7.5
 #     use_sds: true
 
 
