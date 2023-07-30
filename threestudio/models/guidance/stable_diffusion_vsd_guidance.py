@@ -482,11 +482,12 @@ class StableDiffusionVSDGuidance(BaseModule):
                 )
 
             # use view-independent text embeddings in LoRA
+            text_embeddings_cond, _ = text_embeddings.chunk(2)
             noise_pred_est = self.forward_unet(
                 self.unet_lora,
                 latent_model_input,
                 torch.cat([t] * 2),
-                encoder_hidden_states=text_embeddings,
+                encoder_hidden_states=torch.cat([text_embeddings_cond] * 2),
                 class_labels=torch.cat(
                     [
                         camera_condition.view(B, -1),
@@ -521,13 +522,13 @@ class StableDiffusionVSDGuidance(BaseModule):
             ) + noise_pred_est * torch.cat([alpha_t] * 2, dim=0).view(-1, 1, 1, 1)
 
         (
-            noise_pred_est_text,
+            noise_pred_est_camera,
             noise_pred_est_uncond,
         ) = noise_pred_est.chunk(2)
 
         # NOTE: guidance scale definition here is aligned with diffusers, but different from other guidance
         noise_pred_est = noise_pred_est_uncond + self.cfg.guidance_scale_lora * (
-            noise_pred_est_text - noise_pred_est_uncond
+            noise_pred_est_camera - noise_pred_est_uncond
         )
 
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
@@ -563,14 +564,14 @@ class StableDiffusionVSDGuidance(BaseModule):
                 f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
             )
         # use view-independent text embeddings in LoRA
-        text_embeddings, _ = text_embeddings.chunk(2)
+        text_embeddings_cond, _ = text_embeddings.chunk(2)
         if self.cfg.lora_cfg_training and random.random() < 0.1:
             camera_condition = torch.zeros_like(camera_condition)
         noise_pred = self.forward_unet(
             self.unet_lora,
             noisy_latents,
             t,
-            encoder_hidden_states=text_embeddings.repeat(
+            encoder_hidden_states=text_embeddings_cond.repeat(
                 self.cfg.lora_n_timestamp_samples, 1, 1
             ),
             class_labels=camera_condition.view(B, -1).repeat(
