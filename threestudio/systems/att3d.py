@@ -48,6 +48,7 @@ class ATT3D(BaseLift3DSystem):
 
     def training_step(self, batch, batch_idx):
 
+        self.prompt_processor.update_text_embeddings()
         prompt_utils = self.prompt_processor()
         out = self(batch)
         guidance_out = self.guidance(

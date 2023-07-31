@@ -181,7 +181,7 @@ class PromptProcessor(BaseObject):
         prompt_overhead: Optional[str] = None
 
         negative_prompt: str = ""
-        compositional_prompt_dir: str = ""
+        composite_prompt_dir: Optional[str] = None
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         overhead_threshold: float = 60.0
         front_threshold: float = 45.0
@@ -295,31 +295,67 @@ class PromptProcessor(BaseObject):
 
         with open(os.path.join("load/prompt_library.json"), "r") as f:
             self.prompt_library = json.load(f)
-        # use provided prompt or find prompt in library
-        self.prompt = self.preprocess_prompt(self.cfg.prompt)
-        # use provided negative prompt
-        self.negative_prompt = self.cfg.negative_prompt
+
+        if self.cfg.composite_prompt_dir is None:
+            self.composite_prompts = [self.cfg.prompt]
+        else:
+            with open(self.cfg.composite_prompt_dir, "r") as f:
+                self.composite_prompts = json.load(f)["compositional_prompts"]
+                
+
+        self.prompt_list = []
+        self.negative_prompt_list = []
+        self.prompts_vd_list = []
+        self.negative_prompts_vd_list = []
+        for prompt in self.composite_prompts:
+            # use provided prompt or find prompt in library
+            prompt = self.preprocess_prompt(prompt)
+            # use provided negative prompt
+            negative_prompt = self.cfg.negative_prompt
+
+            self.prompt_list.append(prompt)
+            self.negative_prompt_list.append(self.cfg.negative_prompt)
+
+            # view-dependent prompting
+            if self.cfg.use_prompt_debiasing:
+                assert (
+                    self.cfg.prompt_side is None
+                    and self.cfg.prompt_back is None
+                    and self.cfg.prompt_overhead is None
+                ), "Do not manually assign prompt_side, prompt_back or prompt_overhead when using prompt debiasing"
+                prompts = self.get_debiased_prompt(prompt)
+                self.prompts_vd_list += [
+                    d.prompt(prompt) for d, prompt in zip(self.directions, prompts)
+                ]
+            else:
+                self.prompts_vd_list += [
+                    d.prompt(self.cfg.get(f"prompt_{d.name}", None) or prompt) # type ignore
+                    for d in self.directions
+                ]
+            
+            self.negative_prompts_vd_list += [
+                d.negative_prompt(negative_prompt) for d in self.directions
+            ]
+        
+        prompts_display = " ".join(
+            [
+                f"[{prompt}]" for prompt in self.prompt_list[:10]
+            ]
+        )
+        threestudio.info(
+            f"Using {len(self.prompt_list)} prompts, Display first {min(len(self.prompt_list), 10)}: {prompts_display}"
+        )
+
+        self.prompt_id = 0
+        self.prompt_tot = len(self.prompt_list)
+        self.prompt = self.prompt_list[0]
+        self.negative_prompt = self.negative_prompt_list[0]
+        self.prompts_vd = self.prompts_vd_list[:4]
+        self.negative_prompts_vd = self.negative_prompts_vd_list[:4]
 
         threestudio.info(
             f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
         )
-
-        # view-dependent prompting
-        if self.cfg.use_prompt_debiasing:
-            assert (
-                self.cfg.prompt_side is None
-                and self.cfg.prompt_back is None
-                and self.cfg.prompt_overhead is None
-            ), "Do not manually assign prompt_side, prompt_back or prompt_overhead when using prompt debiasing"
-            prompts = self.get_debiased_prompt(self.prompt)
-            self.prompts_vd = [
-                d.prompt(prompt) for d, prompt in zip(self.directions, prompts)
-            ]
-        else:
-            self.prompts_vd = [
-                d.prompt(self.cfg.get(f"prompt_{d.name}", None) or self.prompt)  # type: ignore
-                for d in self.directions
-            ]
 
         prompts_vd_display = " ".join(
             [
@@ -328,10 +364,6 @@ class PromptProcessor(BaseObject):
             ]
         )
         threestudio.info(f"Using view-dependent prompts {prompts_vd_display}")
-
-        self.negative_prompts_vd = [
-            d.negative_prompt(self.negative_prompt) for d in self.directions
-        ]
 
         self.prepare_text_embeddings()
         self.load_text_embeddings()
@@ -345,10 +377,10 @@ class PromptProcessor(BaseObject):
         os.makedirs(self._cache_dir, exist_ok=True)
 
         all_prompts = (
-            [self.prompt]
-            + [self.negative_prompt]
-            + self.prompts_vd
-            + self.negative_prompts_vd
+            self.prompt_list
+            + self.negative_prompt_list
+            + self.prompts_vd_list
+            + self.negative_prompts_vd_list
         )
         prompts_to_process = []
         for prompt in all_prompts:
@@ -366,26 +398,49 @@ class PromptProcessor(BaseObject):
                     continue
             prompts_to_process.append(prompt)
 
+        threestudio.info(f"Prepare text embeddings [{len(prompts_to_process)}/{len(all_prompts)}]")
+
         if len(prompts_to_process) > 0:
-            if self.cfg.spawn:
-                ctx = mp.get_context("spawn")
-                subprocess = ctx.Process(
-                    target=self.spawn_func,
-                    args=(
+            # prevent from cuda out of memory
+            proc_bat = 50
+            proc_tot = (len(prompts_to_process) + proc_bat - 1) // proc_bat
+
+            for i in range(proc_tot):
+                prompts_batch = prompts_to_process[i*proc_bat : (i+1)*proc_bat]
+                if self.cfg.spawn:
+                    ctx = mp.get_context("spawn")
+                    subprocess = ctx.Process(
+                        target=self.spawn_func,
+                        args=(
+                            self.cfg.pretrained_model_name_or_path,
+                            prompts_batch,
+                            self._cache_dir,
+                        ),
+                    )
+                    subprocess.start()
+                    subprocess.join()
+                else:
+                    self.spawn_func(
                         self.cfg.pretrained_model_name_or_path,
-                        prompts_to_process,
+                        prompts_batch,
                         self._cache_dir,
-                    ),
-                )
-                subprocess.start()
-                subprocess.join()
-            else:
-                self.spawn_func(
-                    self.cfg.pretrained_model_name_or_path,
-                    prompts_to_process,
-                    self._cache_dir,
-                )
-            cleanup()
+                    )
+                cleanup()
+                barrier()
+                threestudio.info(f"Processing {(i+1)*proc_bat}/{len(prompts_to_process)}")
+
+    @rank_zero_only
+    def update_text_embeddings(self):
+        self.prompt_id = (self.prompt_id + 1) % self.prompt_tot
+        self.prompt = self.prompt_list[self.prompt_id]
+        self.negative_prompt = self.negative_prompt_list[self.prompt_id]
+        self.prompts_vd = self.prompts_vd_list[
+            4*self.prompt_id : 4*(self.prompt_id+1)
+        ]
+        self.negative_prompts_vd = self.negative_prompts_vd_list[
+            4*self.prompt_id : 4*(self.prompt_id+1)
+        ]
+        self.load_text_embeddings()
 
     def load_text_embeddings(self):
         # synchronize, to ensure the text embeddings have been computed and saved to cache

@@ -83,7 +83,8 @@ system:
   prompt_processor_type: "deep-floyd-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
-    prompt: ???
+    prompt: "composite_prompts"
+    composite_prompt_dir: ???
 
   guidance_type: "deep-floyd-guidance"
   guidance:
@@ -119,10 +120,10 @@ system:
         lr: 0.001
 
 trainer:
-  max_steps: 10000
+  max_steps: 100000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 200
+  val_check_interval: 5000
   enable_progress_bar: true
   precision: 16-mixed
 
