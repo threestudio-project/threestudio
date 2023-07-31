@@ -53,6 +53,24 @@ def parse_optimizer(config, model):
     return optim
 
 
+def parse_scheduler_to_instance(config, optimizer):
+    if config.name == "ChainedScheduler":
+        schedulers = [
+            parse_scheduler_to_instance(conf, optimizer) for conf in config.schedulers
+        ]
+        scheduler = lr_scheduler.ChainedScheduler(schedulers)
+    elif config.name == "Sequential":
+        schedulers = [
+            parse_scheduler_to_instance(conf, optimizer) for conf in config.schedulers
+        ]
+        scheduler = lr_scheduler.SequentialLR(
+            optimizer, schedulers, milestones=config.milestones
+        )
+    else:
+        scheduler = getattr(lr_scheduler, config.name)(optimizer, **config.args)
+    return scheduler
+
+
 def parse_scheduler(config, optimizer):
     interval = config.get("interval", "epoch")
     assert interval in ["epoch", "step"]
