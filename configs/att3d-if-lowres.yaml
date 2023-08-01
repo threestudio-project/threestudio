@@ -1,4 +1,4 @@
-name: "att3d-if"
+name: "att3d-if-lowres"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -67,17 +67,18 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 2001
-    albedo_activation: scale_-11_01
+    ambient_only_steps: 1000
+    albedo_activation: sigmoid
 
   background_type: "neural-environment-map-background"
   background:
-    color_activation: scale_-11_01
+    color_activation: sigmoid
+    random_aug: true
 
   renderer_type: "nerf-volume-renderer"
   renderer:
     radius: ${system.geometry.radius}
-    num_samples_per_ray: 512
+    num_samples_per_ray: 256
     grid_prune: false
 
   prompt_processor_type: "deep-floyd-prompt-processor"
@@ -102,8 +103,8 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_orient: [0, 10., 1000., 5000]
-    lambda_sparsity: 1.
+    lambda_orient: 0.0
+    lambda_sparsity: 0.0
     lambda_opaque: 0.0
   optimizer:
     name: Adam
@@ -123,7 +124,7 @@ trainer:
   max_steps: 100000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 2000
+  val_check_interval: 1000
   enable_progress_bar: true
   precision: 16-mixed
 

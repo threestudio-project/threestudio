@@ -44,7 +44,7 @@ class ATT3D(BaseLift3DSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        # self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def training_step(self, batch, batch_idx):
 
@@ -127,7 +127,7 @@ class ATT3D(BaseLift3DSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-test/{batch['index'][0]}.png",
+            f"{self.prompt_processor.prompt}-it{self.true_global_step}-test/{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
@@ -159,8 +159,8 @@ class ATT3D(BaseLift3DSystem):
 
     def on_test_epoch_end(self):
         self.save_img_sequence(
-            f"it{self.true_global_step}-test",
-            f"it{self.true_global_step}-test",
+            f"{self.prompt_processor.prompt}-it{self.true_global_step}-test",
+            f"{self.prompt_processor.prompt}-it{self.true_global_step}-test",
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
@@ -169,6 +169,11 @@ class ATT3D(BaseLift3DSystem):
         )
 
         self.save_data(
-            f"densegrid",
-            self.geometry.encoding.encoding.encoding.params
+            f"{self.prompt_processor.prompt}-text-embedding",
+            self.prompt_processor.text_embeddings
+        )
+
+        self.save_data(
+            f"{self.prompt_processor.prompt}-densegrid",
+            self.hypernet(self.prompt_processor.text_embeddings.view(1, -1).float().contiguous())[0]
         )

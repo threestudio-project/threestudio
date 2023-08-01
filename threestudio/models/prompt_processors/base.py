@@ -181,6 +181,7 @@ class PromptProcessor(BaseObject):
         prompt_overhead: Optional[str] = None
 
         negative_prompt: str = ""
+        prompt_id: int = 0
         composite_prompt_dir: Optional[str] = None
         pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
         overhead_threshold: float = 60.0
@@ -346,12 +347,12 @@ class PromptProcessor(BaseObject):
             f"Using {len(self.prompt_list)} prompts, Display first {min(len(self.prompt_list), 10)}: {prompts_display}"
         )
 
-        self.prompt_id = 0
+        self.prompt_id = self.cfg.prompt_id % len(self.prompt_list)
         self.prompt_tot = len(self.prompt_list)
-        self.prompt = self.prompt_list[0]
-        self.negative_prompt = self.negative_prompt_list[0]
-        self.prompts_vd = self.prompts_vd_list[:4]
-        self.negative_prompts_vd = self.negative_prompts_vd_list[:4]
+        self.prompt = self.prompt_list[self.prompt_id]
+        self.negative_prompt = self.negative_prompt_list[self.prompt_id]
+        self.prompts_vd = self.prompts_vd_list[4*self.prompt_id : 4*(self.prompt_id+1)]
+        self.negative_prompts_vd = self.negative_prompts_vd_list[4*self.prompt_id : 4*(self.prompt_id+1)]
 
         threestudio.info(
             f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
@@ -402,7 +403,7 @@ class PromptProcessor(BaseObject):
 
         if len(prompts_to_process) > 0:
             # prevent from cuda out of memory
-            proc_bat = 50
+            proc_bat = 100
             proc_tot = (len(prompts_to_process) + proc_bat - 1) // proc_bat
 
             for i in range(proc_tot):
