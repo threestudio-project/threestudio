@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import partial
 
 import nerfacc
 import torch
@@ -10,11 +11,13 @@ from threestudio.models.background.base import BaseBackground
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
+from threestudio.models.renderers.importance_estimator import ImportanceEstimator
 from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
 
 
 def volsdf_density(sdf, inv_std):
+    inv_std = inv_std.clamp(0.0, 80.0)
     beta = 1 / inv_std
     alpha = inv_std
     return alpha * (0.5 + 0.5 * sdf.sign() * torch.expm1(-sdf.abs() / beta))
@@ -41,11 +44,13 @@ class NeuSVolumeRenderer(VolumeRenderer):
         num_samples_per_ray: int = 512
         randomized: bool = True
         eval_chunk_size: int = 160000
-        grid_prune: bool = True
-        prune_alpha_threshold: bool = True
         learned_variance_init: float = 0.3
         cos_anneal_end_steps: int = 0
         use_volsdf: bool = False
+
+        estimator: str = "importance"  # should in ['occgrid', 'importance']
+        grid_prune: bool = True
+        num_samples_per_ray_proposal: int = 64
 
     cfg: Config
 
@@ -57,16 +62,23 @@ class NeuSVolumeRenderer(VolumeRenderer):
     ) -> None:
         super().configure(geometry, material, background)
         self.variance = LearnedVariance(self.cfg.learned_variance_init)
-        self.estimator = nerfacc.OccGridEstimator(
-            roi_aabb=self.bbox.view(-1), resolution=32, levels=1
-        )
-        if not self.cfg.grid_prune:
-            self.estimator.occs.fill_(True)
-            self.estimator.binaries.fill_(True)
-        self.render_step_size = (
-            1.732 * 2 * self.cfg.radius / self.cfg.num_samples_per_ray
-        )
-        self.randomized = self.cfg.randomized
+        if self.cfg.estimator == "occgrid":
+            self.estimator = nerfacc.OccGridEstimator(
+                roi_aabb=self.bbox.view(-1), resolution=32, levels=1
+            )
+            if not self.cfg.grid_prune:
+                self.estimator.occs.fill_(True)
+                self.estimator.binaries.fill_(True)
+            self.render_step_size = (
+                1.732 * 2 * self.cfg.radius / self.cfg.num_samples_per_ray
+            )
+            self.randomized = self.cfg.randomized
+        elif self.cfg.estimator == "importance":
+            self.estimator = ImportanceEstimator()
+        else:
+            raise NotImplementedError(
+                "unknown estimator, should be in ['occgrid', 'importance']"
+            )
         self.cos_anneal_ratio = 1.0
 
     def get_alpha(self, sdf, normal, dirs, dists):
@@ -113,58 +125,104 @@ class NeuSVolumeRenderer(VolumeRenderer):
         )
         n_rays = rays_o_flatten.shape[0]
 
-        def alpha_fn(t_starts, t_ends, ray_indices):
-            t_starts, t_ends = t_starts[..., None], t_ends[..., None]
-            t_origins = rays_o_flatten[ray_indices]
-            t_positions = (t_starts + t_ends) / 2.0
-            t_dirs = rays_d_flatten[ray_indices]
-            positions = t_origins + t_dirs * t_positions
-            if self.training:
-                sdf = self.geometry.forward_sdf(positions)[..., 0]
+        if self.cfg.estimator == "occgrid":
+
+            def alpha_fn(t_starts, t_ends, ray_indices):
+                t_starts, t_ends = t_starts[..., None], t_ends[..., None]
+                t_origins = rays_o_flatten[ray_indices]
+                t_positions = (t_starts + t_ends) / 2.0
+                t_dirs = rays_d_flatten[ray_indices]
+                positions = t_origins + t_dirs * t_positions
+                if self.training:
+                    sdf = self.geometry.forward_sdf(positions)[..., 0]
+                else:
+                    sdf = chunk_batch(
+                        self.geometry.forward_sdf,
+                        self.cfg.eval_chunk_size,
+                        positions,
+                    )[..., 0]
+
+                inv_std = self.variance(sdf)
+                if self.cfg.use_volsdf:
+                    alpha = self.render_step_size * volsdf_density(sdf, inv_std)
+                else:
+                    estimated_next_sdf = sdf - self.render_step_size * 0.5
+                    estimated_prev_sdf = sdf + self.render_step_size * 0.5
+                    prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
+                    next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
+                    p = prev_cdf - next_cdf
+                    c = prev_cdf
+                    alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
+
+                return alpha
+
+            if not self.cfg.grid_prune:
+                with torch.no_grad():
+                    ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
+                        rays_o_flatten,
+                        rays_d_flatten,
+                        alpha_fn=None,
+                        render_step_size=self.render_step_size,
+                        alpha_thre=0.0,
+                        stratified=self.randomized,
+                        cone_angle=0.0,
+                        early_stop_eps=0,
+                    )
             else:
-                sdf = chunk_batch(
-                    self.geometry.forward_sdf,
-                    self.cfg.eval_chunk_size,
-                    positions,
-                )[..., 0]
+                with torch.no_grad():
+                    ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
+                        rays_o_flatten,
+                        rays_d_flatten,
+                        alpha_fn=alpha_fn if self.cfg.prune_alpha_threshold else None,
+                        render_step_size=self.render_step_size,
+                        alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
+                        stratified=self.randomized,
+                        cone_angle=0.0,
+                    )
+        elif self.cfg.estimator == "importance":
+            assert self.cfg.use_volsdf == True
 
-            inv_std = self.variance(sdf)
-            if self.cfg.use_volsdf:
-                alpha = self.render_step_size * volsdf_density(sdf, inv_std)
-            else:
-                estimated_next_sdf = sdf - self.render_step_size * 0.5
-                estimated_prev_sdf = sdf + self.render_step_size * 0.5
-                prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
-                next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
-                p = prev_cdf - next_cdf
-                c = prev_cdf
-                alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
-
-            return alpha
-
-        if not self.cfg.grid_prune:
-            with torch.no_grad():
-                ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
-                    rays_o_flatten,
-                    rays_d_flatten,
-                    alpha_fn=None,
-                    render_step_size=self.render_step_size,
-                    alpha_thre=0.0,
-                    stratified=self.randomized,
-                    cone_angle=0.0,
-                    early_stop_eps=0,
+            def prop_sigma_fn(
+                t_starts: Float[Tensor, "Nr Ns"],
+                t_ends: Float[Tensor, "Nr Ns"],
+                proposal_network,
+            ):
+                t_origins: Float[Tensor, "Nr 1 3"] = rays_o_flatten.unsqueeze(-2)
+                t_dirs: Float[Tensor, "Nr 1 3"] = rays_d_flatten.unsqueeze(-2)
+                positions: Float[Tensor, "Nr Ns 3"] = (
+                    t_origins + t_dirs * (t_starts + t_ends)[..., None] / 2.0
                 )
+                with torch.no_grad():
+                    geo_out = chunk_batch(
+                        proposal_network,
+                        self.cfg.eval_chunk_size,
+                        positions.reshape(-1, 3),
+                        output_normal=False,
+                    )
+                    inv_std = self.variance(geo_out["sdf"])
+                    density = volsdf_density(geo_out["sdf"], inv_std)
+                return density.reshape(positions.shape[:2])
+
+            t_starts_, t_ends_ = self.estimator.sampling(
+                prop_sigma_fns=[partial(prop_sigma_fn, proposal_network=self.geometry)],
+                prop_samples=[self.cfg.num_samples_per_ray_proposal],
+                num_samples=self.cfg.num_samples_per_ray,
+                n_rays=n_rays,
+                near_plane=1.0e-3,
+                far_plane=4,  # FIXME: tweak for different camera settings, camera_distance(1.5) + object_radius(sqrt(3)) < 4 now
+                sampling_type="uniform",
+                stratified=self.randomized,
+            )
+            ray_indices = (
+                torch.arange(n_rays, device=rays_o_flatten.device)
+                .unsqueeze(-1)
+                .expand(-1, t_starts_.shape[1])
+            )
+            ray_indices = ray_indices.flatten()
+            t_starts_ = t_starts_.flatten()
+            t_ends_ = t_ends_.flatten()
         else:
-            with torch.no_grad():
-                ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
-                    rays_o_flatten,
-                    rays_d_flatten,
-                    alpha_fn=alpha_fn if self.cfg.prune_alpha_threshold else None,
-                    render_step_size=self.render_step_size,
-                    alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
-                    stratified=self.randomized,
-                    cone_angle=0.0,
-                )
+            raise NotImplementedError
 
         ray_indices, t_starts_, t_ends_ = validate_empty_rays(
             ray_indices, t_starts_, t_ends_
@@ -283,28 +341,28 @@ class NeuSVolumeRenderer(VolumeRenderer):
             if self.cfg.cos_anneal_end_steps == 0
             else min(1.0, global_step / self.cfg.cos_anneal_end_steps)
         )
+        if self.cfg.estimator == "occgrid":
+            if self.cfg.grid_prune:
 
-        if self.cfg.grid_prune:
+                def occ_eval_fn(x):
+                    sdf = self.geometry.forward_sdf(x)
+                    inv_std = self.variance(sdf)
+                    if self.cfg.use_volsdf:
+                        alpha = self.render_step_size * volsdf_density(sdf, inv_std)
+                    else:
+                        estimated_next_sdf = sdf - self.render_step_size * 0.5
+                        estimated_prev_sdf = sdf + self.render_step_size * 0.5
+                        prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
+                        next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
+                        p = prev_cdf - next_cdf
+                        c = prev_cdf
+                        alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
+                    return alpha
 
-            def occ_eval_fn(x):
-                sdf = self.geometry.forward_sdf(x)
-                inv_std = self.variance(sdf)
-                if self.cfg.use_volsdf:
-                    alpha = self.render_step_size * volsdf_density(sdf, inv_std)
-                else:
-                    estimated_next_sdf = sdf - self.render_step_size * 0.5
-                    estimated_prev_sdf = sdf + self.render_step_size * 0.5
-                    prev_cdf = torch.sigmoid(estimated_prev_sdf * inv_std)
-                    next_cdf = torch.sigmoid(estimated_next_sdf * inv_std)
-                    p = prev_cdf - next_cdf
-                    c = prev_cdf
-                    alpha = ((p + 1e-5) / (c + 1e-5)).clip(0.0, 1.0)
-                return alpha
-
-            if self.training and not on_load_weights:
-                self.estimator.update_every_n_steps(
-                    step=global_step, occ_eval_fn=occ_eval_fn
-                )
+                if self.training and not on_load_weights:
+                    self.estimator.update_every_n_steps(
+                        step=global_step, occ_eval_fn=occ_eval_fn
+                    )
 
     def train(self, mode=True):
         self.randomized = mode and self.cfg.randomized
