@@ -176,6 +176,7 @@ class PromptProcessor(BaseObject):
         prompt: str = "a hamburger"
 
         # manually assigned view-dependent prompts
+        prompt_front: Optional[str] = None
         prompt_side: Optional[str] = None
         prompt_back: Optional[str] = None
         prompt_overhead: Optional[str] = None
@@ -316,7 +317,7 @@ class PromptProcessor(BaseObject):
             ]
         else:
             self.prompts_vd = [
-                d.prompt(self.cfg.get(f"prompt_{d.name}", None) or self.prompt)  # type: ignore
+                self.cfg.get(f"prompt_{d.name}", d.prompt(self.prompt))  # type: ignore
                 for d in self.directions
             ]
 
