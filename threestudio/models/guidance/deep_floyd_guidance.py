@@ -56,6 +56,8 @@ class DeepFloydGuidance(BaseObject):
             requires_safety_checker=False,
             variant="fp16" if self.cfg.half_precision_weights else None,
             torch_dtype=self.weights_dtype,
+            cache_dir="/mnt/disk-2/logan/cache/hub",
+            local_files_only=True
         ).to(self.device)
 
         if self.cfg.enable_memory_efficient_attention:

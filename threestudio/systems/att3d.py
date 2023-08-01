@@ -44,7 +44,7 @@ class ATT3D(BaseLift3DSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
-        # self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def training_step(self, batch, batch_idx):
 
@@ -91,7 +91,7 @@ class ATT3D(BaseLift3DSystem):
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"val/it{self.true_global_step}-{batch['index'][0]}.png",
+            f"val/{self.prompt_processor.prompt}-it{self.true_global_step}-{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",

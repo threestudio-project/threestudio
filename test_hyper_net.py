@@ -19,15 +19,13 @@ def load_data(cate: str) -> torch.Tensor:
     return embed, grid
 
 
-def load_hyper_net(name: str) -> nn.Module:
+def load_model(name: str, config: dict) -> nn.Module:
     ckpt = torch.load(os.path.join(path, f"{name}.ckpt"))
-    model = HyperNet(77 * 4096, 32, 1634048).cuda()
+    model = HyperNet(**config).cuda()
     state_dict = model.state_dict()
-    new_dict = dict()
     for k in state_dict.keys():
-        new_dict[k] = ckpt["state_dict"]["hypernet." + k]
-    
-    model.load_state_dict(new_dict)
+        state_dict[k] = ckpt["state_dict"]["hypernet." + k]
+    model.load_state_dict(state_dict)
     return model
 
 
@@ -62,15 +60,13 @@ def train_hyper_net():
 
     setup()
 
-    x = load_data(pr)
-    y = load_data(dg)
+    x, y = load_data("bunny")
 
     config = {
         "in_dim": x.shape[0],
         "hid_dim": 32,
         "out_dim": y.shape[0]
     }
-
     print(f"X Shape {x.shape}, Y Shape {y.shape}")
 
     net = HyperNet(**config).cuda()
@@ -89,12 +85,25 @@ def train_hyper_net():
             )
 
 
-model = load_hyper_net("model")
+def test_hyper_net():
 
-embed_bunny, grid_bunny = load_data("bunny")
-embed_pig, grid_pig = load_data("pig")
+    setup()
 
-print(F.mse_loss(grid_bunny, grid_pig))
+    embed_bunny, grid_bunny = load_data("bunny")
+    embed_pig, grid_pig = load_data("pig")
 
-print(model(embed_bunny, grid_bunny))
-print(model(embed_pig, grid_pig))
+    config = {
+        "in_dim": embed_bunny.shape[0],
+        "hid_dim": 32,
+        "out_dim": grid_bunny.shape[0]
+    }
+
+    model = load_model("model", config)
+
+    print(f"Embedding Error {F.mse_loss(embed_bunny, embed_pig)}")
+    print(f"Densegrid Error {F.mse_loss(grid_bunny, grid_pig)}")
+    print(f"Model Output Error {model(embed_bunny, grid_bunny)}")
+    print(f"Model Output Error {model(embed_pig, grid_pig)}")
+
+
+test_hyper_net()
