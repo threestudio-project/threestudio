@@ -432,12 +432,7 @@ View-dependent prompting is currently disabled for controlnet guidance.
 
 ### controlnet-vsd-guidance
 
-In addition to configurations in controlnet-guidance:
-
-| name                               | type          | description                                                                                                                                                     |
-| ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-
-| guidance_scale_lora                | float         | The classifier free guidance scale for the LoRA model. Default: 1.                                                                                              |
+No specific configuration beyond those in stable-duffusion-vsd-guidance and controlnet-guidance
 
 ## Prompt Processors
 

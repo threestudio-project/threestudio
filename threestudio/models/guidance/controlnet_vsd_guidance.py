@@ -1,4 +1,4 @@
-# Yanke Song: Currently sample and sample_lora are not supported yet. Alao LoRA is not taking camera embedding as input as we are already giving precise controls via normal/edge map.
+# Yanke Song: Currently sample, sample_lora and edit_latents are not supported yet.
 import os
 import random
 from contextlib import contextmanager
@@ -67,6 +67,9 @@ class ControlNetVSDGuidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
+
+        view_dependent_prompting: bool = True
+        camera_condition_type: str = "extrinsics"
 
         diffusion_steps: int = 20
 
@@ -298,18 +301,20 @@ class ControlNetVSDGuidance(BaseObject):
         latents: Float[Tensor, "..."],
         t: Float[Tensor, "..."],
         encoder_hidden_states: Float[Tensor, "..."],
-        cross_attention_kwargs,
         down_block_additional_residuals,
         mid_block_additional_residual,
+        class_labels: Optional[Float[Tensor, "B 16"]] = None,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Float[Tensor, "..."]:
         input_dtype = latents.dtype
         return unet(
             latents.to(self.weights_dtype),
             t.to(self.weights_dtype),
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
-            cross_attention_kwargs=cross_attention_kwargs,
             down_block_additional_residuals=down_block_additional_residuals,
             mid_block_additional_residual=mid_block_additional_residual,
+            class_labels=class_labels,
+            cross_attention_kwargs=cross_attention_kwargs,
         ).sample.to(input_dtype)
 
     @torch.cuda.amp.autocast(enabled=False)
@@ -350,58 +355,6 @@ class ControlNetVSDGuidance(BaseObject):
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
 
-    def edit_latents(
-        self,
-        text_embeddings: Float[Tensor, "BB 77 768"],
-        latents: Float[Tensor, "B 4 64 64"],
-        image_cond: Float[Tensor, "B 3 512 512"],
-        t: Int[Tensor, "B"],
-    ) -> Float[Tensor, "B 4 64 64"]:
-        self.scheduler.config.num_train_timesteps = t.item()
-        self.scheduler.set_timesteps(self.cfg.diffusion_steps)
-        with torch.no_grad():
-            # add noise
-            noise = torch.randn_like(latents)
-            latents = self.scheduler.add_noise(latents, noise, t)  # type: ignore
-
-            # sections of code used from https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion_instruct_pix2pix.py
-            threestudio.debug("Start editing...")
-            for i, t in enumerate(self.scheduler.timesteps):
-                # predict the noise residual with unet, NO grad!
-                with torch.no_grad():
-                    # pred noise
-                    latent_model_input = torch.cat([latents] * 2)
-                    (
-                        down_block_res_samples,
-                        mid_block_res_sample,
-                    ) = self.forward_controlnet(
-                        self.controlnet,
-                        latent_model_input,
-                        t,
-                        encoder_hidden_states=text_embeddings,
-                        image_cond=image_cond,
-                        condition_scale=self.cfg.condition_scale,
-                    )
-
-                    noise_pred = self.forward_control_unet(
-                        self.unet,
-                        latent_model_input,
-                        t,
-                        encoder_hidden_states=text_embeddings,
-                        cross_attention_kwargs=None,
-                        down_block_additional_residuals=down_block_res_samples,
-                        mid_block_additional_residual=mid_block_res_sample,
-                    )
-                # perform classifier-free guidance
-                noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-                    noise_pred_text - noise_pred_uncond
-                )
-                # get previous sample, continue loop
-                latents = self.scheduler.step(noise_pred, t, latents).prev_sample
-            threestudio.debug("Editing finished.")
-        return latents
-
     def prepare_image_cond(self, cond_rgb: Float[Tensor, "B H W C"]):
         if self.cfg.control_type == "normal":
             cond_rgb = (
@@ -440,7 +393,9 @@ class ControlNetVSDGuidance(BaseObject):
     def compute_grad_vsd(
         self,
         latents: Float[Tensor, "B 4 64 64"],
+        text_embeddings_vd: Float[Tensor, "BB 77 768"],
         text_embeddings: Float[Tensor, "BB 77 768"],
+        camera_condition: Float[Tensor, "B 4 4"],
         image_cond: Float[Tensor, "B 3 512 512"],
     ):
         B = latents.shape[0]
@@ -458,6 +413,7 @@ class ControlNetVSDGuidance(BaseObject):
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
+            cross_attention_kwargs = {"scale": 0.0} if self.single_model else None
             down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
                 self.controlnet,
                 latent_model_input,
@@ -471,10 +427,10 @@ class ControlNetVSDGuidance(BaseObject):
                 self.unet,
                 latent_model_input,
                 t,
-                encoder_hidden_states=text_embeddings,
-                cross_attention_kwargs=None,
+                encoder_hidden_states=text_embeddings_vd,
                 down_block_additional_residuals=down_block_res_samples,
                 mid_block_additional_residual=mid_block_res_sample,
+                cross_attention_kwargs=cross_attention_kwargs,
             )
 
             noise_pred_est = self.forward_control_unet(
@@ -482,9 +438,16 @@ class ControlNetVSDGuidance(BaseObject):
                 latent_model_input,
                 t,
                 encoder_hidden_states=text_embeddings,
-                cross_attention_kwargs={"scale": 1.0},
                 down_block_additional_residuals=down_block_res_samples,
                 mid_block_additional_residual=mid_block_res_sample,
+                class_labels=torch.cat(
+                    [
+                        camera_condition.view(B, -1),
+                        torch.zeros_like(camera_condition.view(B, -1)),
+                    ],
+                    dim=0,
+                ),
+                cross_attention_kwargs={"scale": 1.0},
             )
 
         # perform classifier-free guidance
@@ -528,6 +491,7 @@ class ControlNetVSDGuidance(BaseObject):
         self,
         latents: Float[Tensor, "B 4 64 64"],
         text_embeddings: Float[Tensor, "BB 77 768"],
+        camera_condition: Float[Tensor, "B 4 4"],
         image_cond: Float[Tensor, "B 3 512 512"],
     ):
         B = latents.shape[0]
@@ -572,9 +536,12 @@ class ControlNetVSDGuidance(BaseObject):
             encoder_hidden_states=text_embeddings.repeat(
                 self.cfg.lora_n_timestamp_samples, 1, 1
             ),
-            cross_attention_kwargs={"scale": 1.0},
             down_block_additional_residuals=down_block_res_samples,
             mid_block_additional_residual=mid_block_res_sample,
+            class_labels=camera_condition.view(B, -1).repeat(
+                self.cfg.lora_n_timestamp_samples, 1
+            ),
+            cross_attention_kwargs={"scale": 1.0},
         )
         return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
 
@@ -598,30 +565,62 @@ class ControlNetVSDGuidance(BaseObject):
         rgb: Float[Tensor, "B H W C"],
         cond_rgb: Float[Tensor, "B H W C"],
         prompt_utils: PromptProcessorOutput,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        mvp_mtx: Float[Tensor, "B 4 4"],
+        c2w: Float[Tensor, "B 4 4"],
         rgb_as_latents=False,
         **kwargs,
     ):
         batch_size, H, W, _ = rgb.shape
-        assert batch_size == 1
+        assert batch_size == 1  # Need enhancement
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
 
         image_cond = self.prepare_image_cond(cond_rgb)
 
-        temp = torch.zeros(1).to(rgb.device)
-        text_embeddings = prompt_utils.get_text_embeddings(temp, temp, temp, False)
+        # view-dependent text embeddings
+        text_embeddings_vd = prompt_utils.get_text_embeddings(
+            elevation,
+            azimuth,
+            camera_distances,
+            view_dependent_prompting=self.cfg.view_dependent_prompting,
+        )
+
+        # input text embeddings, view-independent
+        text_embeddings = prompt_utils.get_text_embeddings(
+            elevation, azimuth, camera_distances, view_dependent_prompting=False
+        )
+
+        if self.cfg.camera_condition_type == "extrinsics":
+            camera_condition = c2w
+        elif self.cfg.camera_condition_type == "mvp":
+            camera_condition = mvp_mtx
+        else:
+            raise ValueError(
+                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
+            )
 
         if (
             self.cfg.use_sds
         ):  # did not change to vsd for backward compatibility in config files
-            grad = self.compute_grad_vsd(latents, text_embeddings, image_cond)
+            grad = self.compute_grad_vsd(
+                latents,
+                text_embeddings_vd,
+                text_embeddings,
+                camera_condition,
+                image_cond,
+            )
             grad = torch.nan_to_num(grad)
             if self.grad_clip_val is not None:
                 grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
             target = (latents - grad).detach()
             loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-            loss_lora = self.train_lora(latents, text_embeddings, image_cond)
+            loss_lora = self.train_lora(
+                latents, text_embeddings, camera_condition, image_cond
+            )
             return {
                 "loss_sds": loss_vsd,
                 "loss_lora": loss_lora,
