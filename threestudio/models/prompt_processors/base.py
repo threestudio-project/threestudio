@@ -317,7 +317,7 @@ class PromptProcessor(BaseObject):
             ]
         else:
             self.prompts_vd = [
-                self.cfg.get(f"prompt_{d.name}", d.prompt(self.prompt))  # type: ignore
+                self.cfg.get(f"prompt_{d.name}", None) or d.prompt(self.prompt)  # type: ignore
                 for d in self.directions
             ]
 
