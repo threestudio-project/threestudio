@@ -433,11 +433,12 @@ class ControlNetVSDGuidance(BaseObject):
                 cross_attention_kwargs=cross_attention_kwargs,
             )
 
+            text_embeddings_cond, _ = text_embeddings.chunk(2)
             noise_pred_est = self.forward_control_unet(
                 self.unet_lora,
                 latent_model_input,
                 t,
-                encoder_hidden_states=text_embeddings,
+                encoder_hidden_states=torch.cat([text_embeddings_cond] * 2),
                 down_block_additional_residuals=down_block_res_samples,
                 mid_block_additional_residual=mid_block_res_sample,
                 class_labels=torch.cat(
@@ -474,12 +475,12 @@ class ControlNetVSDGuidance(BaseObject):
             ) + noise_pred_est * torch.cat([alpha_t] * 2, dim=0).view(-1, 1, 1, 1)
 
         (
-            noise_pred_est_text,
+            noise_pred_est_camera,
             noise_pred_est_uncond,
         ) = noise_pred_est.chunk(2)
 
         noise_pred_est = noise_pred_est_uncond + self.cfg.guidance_scale_lora * (
-            noise_pred_est_text - noise_pred_est_uncond
+            noise_pred_est_camera - noise_pred_est_uncond
         )
 
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
@@ -516,13 +517,13 @@ class ControlNetVSDGuidance(BaseObject):
                 f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
             )
         # use view-independent text embeddings in LoRA
-        text_embeddings, _ = text_embeddings.chunk(2)
+        text_embeddings_cond, _ = text_embeddings.chunk(2)
 
         down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
             self.controlnet,
             noisy_latents,
             t,
-            encoder_hidden_states=text_embeddings.repeat(
+            encoder_hidden_states=text_embeddings_cond.repeat(
                 self.cfg.lora_n_timestamp_samples, 1, 1
             ),
             image_cond=image_cond,
@@ -533,7 +534,7 @@ class ControlNetVSDGuidance(BaseObject):
             self.unet_lora,
             noisy_latents,
             t,
-            encoder_hidden_states=text_embeddings.repeat(
+            encoder_hidden_states=text_embeddings_cond.repeat(
                 self.cfg.lora_n_timestamp_samples, 1, 1
             ),
             down_block_additional_residuals=down_block_res_samples,
