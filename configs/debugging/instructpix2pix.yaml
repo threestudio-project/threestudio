@@ -1,5 +1,5 @@
 system:
-  guidance_type: "instructpix2pix-guidance"
+  guidance_type: "stable-diffusion-instructpix2pix-guidance"
   guidance:
     min_step_percent: 0.8
     max_step_percent: 0.98

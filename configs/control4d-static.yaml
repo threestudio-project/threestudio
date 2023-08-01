@@ -56,6 +56,7 @@ system:
     min_step_percent: 0.05
     max_step_percent: 0.8
     condition_scale: 1.0
+    fixed_size: 512
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:

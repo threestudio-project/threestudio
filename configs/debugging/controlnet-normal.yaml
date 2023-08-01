@@ -1,5 +1,5 @@
 system:
-  guidance_type: "controlnet-guidance"
+  guidance_type: "stable-diffusion-controlnet-guidance"
   guidance:
     control_type: "normal"
     min_step_percent: 0.05

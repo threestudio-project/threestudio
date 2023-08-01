@@ -34,6 +34,8 @@ class InstructPix2PixGuidance(BaseObject):
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
         half_precision_weights: bool = True
 
+        fixed_size: int = -1
+
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
 
@@ -131,8 +133,8 @@ class InstructPix2PixGuidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     def encode_images(
-        self, imgs: Float[Tensor, "B 3 512 512"]
-    ) -> Float[Tensor, "B 4 64 64"]:
+        self, imgs: Float[Tensor, "B 3 H W"]
+    ) -> Float[Tensor, "B 4 DH DW"]:
         input_dtype = imgs.dtype
         imgs = imgs * 2.0 - 1.0
         posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
@@ -141,8 +143,8 @@ class InstructPix2PixGuidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     def encode_cond_images(
-        self, imgs: Float[Tensor, "B 3 512 512"]
-    ) -> Float[Tensor, "B 4 64 64"]:
+        self, imgs: Float[Tensor, "B 3 H W"]
+    ) -> Float[Tensor, "B 4 DH DW"]:
         input_dtype = imgs.dtype
         imgs = imgs * 2.0 - 1.0
         posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
@@ -153,15 +155,9 @@ class InstructPix2PixGuidance(BaseObject):
 
     @torch.cuda.amp.autocast(enabled=False)
     def decode_latents(
-        self,
-        latents: Float[Tensor, "B 4 H W"],
-        latent_height: int = 64,
-        latent_width: int = 64,
-    ) -> Float[Tensor, "B 3 512 512"]:
+        self, latents: Float[Tensor, "B 4 DH DW"]
+    ) -> Float[Tensor, "B 3 H W"]:
         input_dtype = latents.dtype
-        latents = F.interpolate(
-            latents, (latent_height, latent_width), mode="bilinear", align_corners=False
-        )
         latents = 1 / self.vae.config.scaling_factor * latents
         image = self.vae.decode(latents.to(self.weights_dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
@@ -170,10 +166,10 @@ class InstructPix2PixGuidance(BaseObject):
     def edit_latents(
         self,
         text_embeddings: Float[Tensor, "BB 77 768"],
-        latents: Float[Tensor, "B 4 64 64"],
-        image_cond_latents: Float[Tensor, "B 4 64 64"],
+        latents: Float[Tensor, "B 4 DH DW"],
+        image_cond_latents: Float[Tensor, "B 4 DH DW"],
         t: Int[Tensor, "B"],
-    ) -> Float[Tensor, "B 4 64 64"]:
+    ) -> Float[Tensor, "B 4 DH DW"]:
         self.scheduler.config.num_train_timesteps = t.item()
         self.scheduler.set_timesteps(self.cfg.diffusion_steps)
         with torch.no_grad():
@@ -213,8 +209,8 @@ class InstructPix2PixGuidance(BaseObject):
     def compute_grad_sds(
         self,
         text_embeddings: Float[Tensor, "BB 77 768"],
-        latents: Float[Tensor, "B 4 64 64"],
-        image_cond_latents: Float[Tensor, "B 4 64 64"],
+        latents: Float[Tensor, "B 4 DH DW"],
+        image_cond_latents: Float[Tensor, "B 4 DH DW"],
         t: Int[Tensor, "B"],
     ):
         with torch.no_grad():
@@ -252,17 +248,24 @@ class InstructPix2PixGuidance(BaseObject):
         batch_size, H, W, _ = rgb.shape
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 64 64"]
-        rgb_BCHW_512 = F.interpolate(
-            rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+        latents: Float[Tensor, "B 4 DH DW"]
+        if self.cfg.fixed_size > 0:
+            RH, RW = self.cfg.fixed_size, self.cfg.fixed_size
+        else:
+            RH, RW = H // 8 * 8, W // 8 * 8
+        rgb_BCHW_HW8 = F.interpolate(
+            rgb_BCHW, (RH, RW), mode="bilinear", align_corners=False
         )
-        latents = self.encode_images(rgb_BCHW_512)
+        latents = self.encode_images(rgb_BCHW_HW8)
 
         cond_rgb_BCHW = cond_rgb.permute(0, 3, 1, 2)
-        cond_rgb_BCHW_512 = F.interpolate(
-            cond_rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+        cond_rgb_BCHW_HW8 = F.interpolate(
+            cond_rgb_BCHW,
+            (RH, RW),
+            mode="bilinear",
+            align_corners=False,
         )
-        cond_latents = self.encode_cond_images(cond_rgb_BCHW_512)
+        cond_latents = self.encode_cond_images(cond_rgb_BCHW_HW8)
 
         temp = torch.zeros(1).to(rgb.device)
         text_embeddings = prompt_utils.get_text_embeddings(temp, temp, temp, False)
@@ -316,13 +319,12 @@ if __name__ == "__main__":
     from threestudio.utils.config import ExperimentConfig, load_config
     from threestudio.utils.typing import Optional
 
-    cfg = load_config("configs/experimental/instructpix2pix.yaml")
+    cfg = load_config("configs/debugging/instructpix2pix.yaml")
     guidance = threestudio.find(cfg.system.guidance_type)(cfg.system.guidance)
     prompt_processor = threestudio.find(cfg.system.prompt_processor_type)(
         cfg.system.prompt_processor
     )
     rgb_image = cv2.imread("assets/face.jpg")[:, :, ::-1].copy() / 255
-    rgb_image = cv2.resize(rgb_image, (512, 512))
     rgb_image = torch.FloatTensor(rgb_image).unsqueeze(0).to(guidance.device)
     prompt_utils = prompt_processor()
     guidance_out = guidance(rgb_image, rgb_image, prompt_utils)
