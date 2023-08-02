@@ -15,14 +15,14 @@ data:
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
-system_type: "dreamfusion-system"
+system_type: "dreamfusion-triplane-system"
 system:
   geometry_type: triplane
   geometry:
-    radius: 1.0
+    radius: 2.0
     normal_type: "finite_difference"
     finite_difference_normal_eps: 1.e-3
-    plane_size: [128, 128]
+    plane_size: [256, 256]
 
     # the density initialization proposed in the DreamFusion paper
     # does not work very well
@@ -45,7 +45,6 @@ system:
       activation: Softplus
       n_neurons: 64
       n_hidden_layers: 1
-      zero_out_init: true
 
   # material_type: "diffuse-with-point-light-material"
   # material:
@@ -74,7 +73,8 @@ system:
   renderer_type: "nerf-volume-renderer"
   renderer:
     radius: ${system.geometry.radius}
-    num_samples_per_ray: 256
+    num_samples_per_ray: 512
+    return_comp_normal: true
     # grid_prune: false
 
   prompt_processor_type: "deep-floyd-prompt-processor"
@@ -98,8 +98,9 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_orient: [0, 10., 1000., 5000] # original
-    # lambda_orient: [0, 1., 100., 5000]
+    # lambda_orient: [0, 10., 1000., 5000] # original
+    lambda_orient: [0, 1., 100., 5000]
+    lambda_normal_smooth: 0.
     # lambda_orient: 0.
     lambda_sparsity: 1.
     lambda_opaque: 0.0
@@ -113,7 +114,7 @@ system:
       geometry:
         lr: 0.01
       material:
-        lr: 0.01
+        lr: 0.005
       background:
         lr: 0.001
 
