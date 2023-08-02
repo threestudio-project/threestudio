@@ -47,7 +47,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         )
         normal_type: Optional[
             str
-        ] = "finite_difference"  # in ['pred', 'finite_difference', 'finite_difference_laplacian']
+        ] = "finite_difference"  # in ['pred', 'finite_difference', 'finite_difference_laplacian', 'analytic']
         finite_difference_normal_eps: float = 0.01
 
         # automatically determine the threshold

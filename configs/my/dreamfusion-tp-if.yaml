@@ -1,0 +1,131 @@
+name: "tp-if"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "random-camera-datamodule"
+data:
+  batch_size: 1
+  width: 64
+  height: 64
+  camera_distance_range: [1.5, 2.0]
+  fovy_range: [40, 70]
+  elevation_range: [-10, 90]
+  light_sample_strategy: "dreamfusion"
+  eval_camera_distance: 2.0
+  eval_fovy_deg: 70.
+
+system_type: "dreamfusion-system"
+system:
+  geometry_type: triplane
+  geometry:
+    radius: 1.0
+    normal_type: "finite_difference"
+    finite_difference_normal_eps: 1.e-3
+    plane_size: [128, 128]
+
+    # the density initialization proposed in the DreamFusion paper
+    # does not work very well
+    # density_bias: "blob_dreamfusion"
+    # density_activation: exp
+    # density_blob_scale: 5.
+    # density_blob_std: 0.2
+
+    # use Magic3D density initialization instead
+    # density_bias: -5.0
+    density_bias: blob
+    density_activation: softplus
+    density_blob_scale: 10.
+    density_blob_std: 0.5
+
+    n_feature_dims_plane: 32
+    n_feature_dims: 32
+    mlp_network_config:
+      otype: VanillaMLP
+      activation: Softplus
+      n_neurons: 64
+      n_hidden_layers: 1
+      zero_out_init: true
+
+  # material_type: "diffuse-with-point-light-material"
+  # material:
+  #   ambient_only_steps: 2001
+  #   albedo_activation: scale_-11_01
+
+  material_type: no-material
+  material:
+    input_feature_dims: 32
+    requires_normal: true
+    mlp_network_config:
+      otype: VanillaMLP
+      activation: Softplus
+      n_neurons: 16
+      n_hidden_layers: 2
+
+  # material_type: neural-radiance-material
+  # material:
+  #   input_feature_dims: 32
+  #   requires_normal: true
+
+  background_type: "neural-environment-map-background"
+  background:
+    color_activation: scale_-11_01
+
+  renderer_type: "nerf-volume-renderer"
+  renderer:
+    radius: ${system.geometry.radius}
+    num_samples_per_ray: 256
+    # grid_prune: false
+
+  prompt_processor_type: "deep-floyd-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
+    prompt: ???
+
+  guidance_type: "deep-floyd-guidance"
+  guidance:
+    pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
+    guidance_scale: 20.
+    weighting_strategy: sds
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+      name: None
+
+  loss:
+    lambda_sds: 1.
+    lambda_orient: [0, 10., 1000., 5000] # original
+    # lambda_orient: [0, 1., 100., 5000]
+    # lambda_orient: 0.
+    lambda_sparsity: 1.
+    lambda_opaque: 0.0
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+    params:
+      geometry:
+        lr: 0.01
+      material:
+        lr: 0.01
+      background:
+        lr: 0.001
+
+trainer:
+  max_steps: 10000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true # save at each validation time
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

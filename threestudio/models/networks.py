@@ -154,16 +154,18 @@ class VanillaMLP(nn.Module):
             config["n_neurons"],
             config["n_hidden_layers"],
         )
+        self.activation = config.get("activation", "ReLU")
+        self.zero_out_init = config.get("zero_out_init", False)
         layers = [
             self.make_linear(dim_in, self.n_neurons, is_first=True, is_last=False),
-            self.make_activation(),
+            self.make_activation(self.activation),
         ]
         for i in range(self.n_hidden_layers - 1):
             layers += [
                 self.make_linear(
                     self.n_neurons, self.n_neurons, is_first=False, is_last=False
                 ),
-                self.make_activation(),
+                self.make_activation(self.activation),
             ]
         layers += [
             self.make_linear(self.n_neurons, dim_out, is_first=False, is_last=True)
@@ -181,10 +183,17 @@ class VanillaMLP(nn.Module):
 
     def make_linear(self, dim_in, dim_out, is_first, is_last):
         layer = nn.Linear(dim_in, dim_out, bias=False)
+        if is_last and self.zero_out_init:
+            torch.nn.init.constant_(layer.weight, 0.0)
         return layer
 
-    def make_activation(self):
-        return nn.ReLU(inplace=True)
+    def make_activation(self, activation="ReLU"):
+        if activation == "ReLU":
+            return nn.ReLU(inplace=True)
+        elif activation == "Softplus":
+            return nn.Softplus()
+        else:
+            raise NotImplementedError
 
 
 class SphereInitVanillaMLP(nn.Module):

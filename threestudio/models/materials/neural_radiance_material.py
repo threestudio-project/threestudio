@@ -29,6 +29,7 @@ class NeuralRadianceMaterial(BaseMaterial):
                 "n_hidden_layers": 2,
             }
         )
+        requires_normal: bool = False
 
     cfg: Config
 
@@ -36,6 +37,7 @@ class NeuralRadianceMaterial(BaseMaterial):
         self.encoding = get_encoding(3, self.cfg.dir_encoding_config)
         self.n_input_dims = self.cfg.input_feature_dims + self.encoding.n_output_dims  # type: ignore
         self.network = get_mlp(self.n_input_dims, 3, self.cfg.mlp_network_config)
+        self.requires_normal = self.cfg.requires_normal
 
     def forward(
         self,
