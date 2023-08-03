@@ -38,6 +38,8 @@ system:
     density_blob_scale: 10.
     density_blob_std: 0.5
 
+    feature_reduction: mean
+
     n_feature_dims_plane: 32
     n_feature_dims: 32
     mlp_network_config:

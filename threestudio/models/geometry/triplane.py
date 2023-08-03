@@ -39,6 +39,7 @@ class Triplane(BaseImplicitGeometry):
             }
         )
         finite_difference_normal_eps: float = 0.001
+        feature_reduction: str = "mean"  # should in ['mean', 'concat']
 
     cfg: Config
 
@@ -49,6 +50,10 @@ class Triplane(BaseImplicitGeometry):
             "finite_difference",
             "finite_difference_laplacian",
         ], f"Unsupported normal type {self.cfg.normal_type}"
+        assert self.cfg.feature_reduction in [
+            "mean",
+            "concat",
+        ], f"Unsupported feature reduction {self.cfg.feature_reduction}"
 
         if self.cfg.density_bias == "blob":
             self.register_buffer("density_scale", torch.tensor(0.0))
@@ -63,11 +68,18 @@ class Triplane(BaseImplicitGeometry):
                 self.cfg.plane_size[1],
             )
         )
-        self.network = get_mlp(
-            self.cfg.n_feature_dims_plane,
-            self.cfg.n_feature_dims + 1,
-            self.cfg.mlp_network_config,
-        )
+        if self.cfg.feature_reduction == "mean":
+            self.network = get_mlp(
+                self.cfg.n_feature_dims_plane,
+                self.cfg.n_feature_dims + 1,
+                self.cfg.mlp_network_config,
+            )
+        else:
+            self.network = get_mlp(
+                self.cfg.n_feature_dims_plane * 3,
+                self.cfg.n_feature_dims + 1,
+                self.cfg.mlp_network_config,
+            )
 
         # if self.cfg.density_bias == "blob":
         #     self.register_buffer("density_scale", torch.tensor(0.0))
@@ -106,23 +118,29 @@ class Triplane(BaseImplicitGeometry):
     #     out = out.reshape(df, -1).T.reshape(*points_shape, df)
     #     return out
 
-    def get_bilinear_feature(
-        self, points: Float[Tensor, "*N 3"], planes: Float[Tensor, "3 C H W"]
-    ) -> Float[Tensor, "*N C"]:
+    def get_triplane_encoding(
+        self, points: Float[Tensor, "N 3"], planes: Float[Tensor, "3 C H W"]
+    ) -> Float[Tensor, "N D"]:
         points_shape = points.shape[:-1]
         # construct the 2D indices
-        indices2D: Float[Tensor, "3 *N 2"] = torch.stack(
+        indices2D: Float[Tensor, "3 N 2"] = torch.stack(
             (points[..., [0, 1]], points[..., [0, 2]], points[..., [1, 2]]), dim=0
         )
-        out: Float[Tensor, "3 C 1 Np"] = F.grid_sample(
+        out: Float[Tensor, "3 C 1 N"] = F.grid_sample(
             planes,
             indices2D.view(3, 1, -1, 2),
             align_corners=False,
             mode="bilinear",
         )
-        out: Float[Tensor, "*N C"] = (
-            out.squeeze(2).permute(2, 0, 1).mean(dim=1).reshape(*points_shape, -1)
-        )
+        if self.cfg.feature_reduction == "mean":
+            out = (
+                out.squeeze(2).permute(2, 0, 1).mean(dim=1).reshape(*points_shape, -1)
+            )  # : Float[Tensor, "N C"]
+        else:
+            out = (
+                out.squeeze(2).permute(2, 0, 1).reshape(*points_shape, -1)
+            )  # : Float[Tensor, "N 3C"]
+
         return out
 
     def forward(
@@ -134,7 +152,7 @@ class Triplane(BaseImplicitGeometry):
         )  # points normalized to (0, 1)
         points = points * 2 - 1  # convert to [-1, 1] for grid sample
 
-        out = self.get_bilinear_feature(points, self.planes)
+        out = self.get_triplane_encoding(points, self.planes)
         out = self.network(out)
 
         density, features = out[..., 0:1], out[..., 1:]
@@ -202,7 +220,7 @@ class Triplane(BaseImplicitGeometry):
         points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
         points = points * 2 - 1  # convert to [-1, 1] for grid sample
 
-        out = self.get_bilinear_feature(points, self.planes)
+        out = self.get_triplane_encoding(points, self.planes)
         out = self.network(out)
         density = out[..., 0:1]
         density = density * torch.exp(self.density_scale)
