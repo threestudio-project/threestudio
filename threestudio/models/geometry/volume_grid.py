@@ -135,7 +135,7 @@ class VolumeGrid(BaseImplicitGeometry):
                     density_offset: Float[Tensor, "... 3 1"] = self.forward_density(
                         points_offset
                     )
-                    normal = (density_offset[..., 0::1, 0] - density) / eps
+                    normal = -(density_offset[..., 0::1, 0] - density) / eps
                 normal = F.normalize(normal, dim=-1)
             elif self.cfg.normal_type == "pred":
                 normal = self.get_trilinear_feature(points, self.normal_grid)

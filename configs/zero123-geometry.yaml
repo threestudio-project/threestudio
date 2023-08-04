@@ -75,8 +75,6 @@ system:
     textureless_prob: 0.
 
   background_type: "solid-color-background" # unused
-  background:
-    random_aug: True
 
   # renderer_type: "nerf-volume-renderer"
   # renderer:
@@ -96,7 +94,7 @@ system:
 
   guidance_type: "zero123-guidance"
   guidance:
-    pretrained_model_name_or_path: "./load/zero123/XL_20230604.ckpt"
+    pretrained_model_name_or_path: "./load/zero123/zero123-xl.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
     cond_image_path: ${data.image_path}

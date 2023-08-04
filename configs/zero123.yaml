@@ -20,8 +20,8 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     width: [64, 128, 256]
     batch_size: [12, 4, 2]
     resolution_milestones: [200, 300]
-    eval_height: 256
-    eval_width: 256
+    eval_height: 512
+    eval_width: 512
     eval_batch_size: 1
     elevation_range: [-10, 80]
     azimuth_range: [-180, 180]
@@ -103,7 +103,7 @@ system:
 
   guidance_type: "zero123-guidance"
   guidance:
-    pretrained_model_name_or_path: "./load/zero123/XL_20230604.ckpt"
+    pretrained_model_name_or_path: "./load/zero123/zero123-xl.ckpt"
     pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
     vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
     cond_image_path: ${data.image_path}
