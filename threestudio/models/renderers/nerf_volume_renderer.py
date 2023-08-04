@@ -11,6 +11,7 @@ from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.networks import create_network_with_input_encoding
 from threestudio.models.renderers.base import VolumeRenderer
+from threestudio.models.renderers.importance_estimator import ImportanceEstimator
 from threestudio.systems.utils import parse_optimizer, parse_scheduler_to_instance
 from threestudio.utils.ops import chunk_batch, get_activation, validate_empty_rays
 from threestudio.utils.typing import *
@@ -57,6 +58,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 1.732 * 2 * self.cfg.radius / self.cfg.num_samples_per_ray
             )
             self.randomized = self.cfg.randomized
+        elif self.cfg.estimator == "importance":
+            self.estimator = ImportanceEstimator()
         elif self.cfg.estimator == "proposal":
             self.prop_net = create_network_with_input_encoding(
                 **self.cfg.proposal_network_config
@@ -197,6 +200,46 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 sampling_type="uniform",
                 stratified=self.randomized,
                 requires_grad=self.vars_in_forward["requires_grad"],
+            )
+            ray_indices = (
+                torch.arange(n_rays, device=rays_o_flatten.device)
+                .unsqueeze(-1)
+                .expand(-1, t_starts_.shape[1])
+            )
+            ray_indices = ray_indices.flatten()
+            t_starts_ = t_starts_.flatten()
+            t_ends_ = t_ends_.flatten()
+        elif self.cfg.estimator == "importance":
+
+            def prop_sigma_fn(
+                t_starts: Float[Tensor, "Nr Ns"],
+                t_ends: Float[Tensor, "Nr Ns"],
+                proposal_network,
+            ):
+                t_origins: Float[Tensor, "Nr 1 3"] = rays_o_flatten.unsqueeze(-2)
+                t_dirs: Float[Tensor, "Nr 1 3"] = rays_d_flatten.unsqueeze(-2)
+                positions: Float[Tensor, "Nr Ns 3"] = (
+                    t_origins + t_dirs * (t_starts + t_ends)[..., None] / 2.0
+                )
+                with torch.no_grad():
+                    geo_out = chunk_batch(
+                        proposal_network,
+                        self.cfg.eval_chunk_size,
+                        positions.reshape(-1, 3),
+                        output_normal=False,
+                    )
+                    density = geo_out["density"]
+                return density.reshape(positions.shape[:2])
+
+            t_starts_, t_ends_ = self.estimator.sampling(
+                prop_sigma_fns=[partial(prop_sigma_fn, proposal_network=self.geometry)],
+                prop_samples=[self.cfg.num_samples_per_ray_proposal],
+                num_samples=self.cfg.num_samples_per_ray,
+                n_rays=n_rays,
+                near_plane=1.0e-3,
+                far_plane=4,  # FIXME: tweak for different camera settings, camera_distance(1.5) + object_radius(sqrt(3)) < 4 now
+                sampling_type="uniform",
+                stratified=self.randomized,
             )
             ray_indices = (
                 torch.arange(n_rays, device=rays_o_flatten.device)
