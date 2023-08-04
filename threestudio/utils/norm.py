@@ -34,7 +34,7 @@ class SpectralNorm:
         height = weight_mat.size(0)
         return weight_mat.reshape(height, -1)
     
-    def mv(self, mat, vec):
+    def mv(self, mat: torch.Tensor, vec: torch.Tensor):
         chunk = 1000000
         out = []
         for i in range(0, mat.shape[0], chunk):
@@ -192,6 +192,6 @@ def spectral_norm(module: Module,
                   name: str = 'weight',
                   n_power_iterations: int = 1,
                   eps: float = 1e-12,
-                  dim=0) -> Module:
+                  dim: int = 0) -> Module:
     SpectralNorm.apply(module, name, n_power_iterations, dim, eps)
     return module

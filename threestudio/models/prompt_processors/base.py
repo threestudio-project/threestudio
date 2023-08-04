@@ -303,7 +303,6 @@ class PromptProcessor(BaseObject):
             with open(self.cfg.composite_prompt_dir, "r") as f:
                 self.composite_prompts = json.load(f)["compositional_prompts"]
                 
-
         self.prompt_list = []
         self.negative_prompt_list = []
         self.prompts_vd_list = []
@@ -431,8 +430,13 @@ class PromptProcessor(BaseObject):
                 threestudio.info(f"Processing {(i+1)*proc_bat}/{len(prompts_to_process)}")
 
     @rank_zero_only
-    def update_text_embeddings(self):
-        self.prompt_id = (self.prompt_id + 1) % self.prompt_tot
+    def update_text_embeddings(self, fix: bool = False):
+        # for single prompt, wont reload
+        if self.prompt_tot == 1:
+            return
+
+        if not fix:
+            self.prompt_id = torch.randint(0, self.prompt_tot, size=[1]).item()
         self.prompt = self.prompt_list[self.prompt_id]
         self.negative_prompt = self.negative_prompt_list[self.prompt_id]
         self.prompts_vd = self.prompts_vd_list[

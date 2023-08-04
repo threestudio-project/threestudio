@@ -15,24 +15,40 @@ from threestudio.utils.typing import *
 class ATT3D(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        pass
+        use_hyper_net: bool = True
+        hidden_dim: int = 8
 
     cfg: Config
 
     def configure(self):
-        # create geometry, material, background, renderer
+        # create geometry, material, background, renderer, prompt_processor
         super().configure()
-        self.hypernet = HyperNet(77 * 4096, 1634048, 32)
+        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
+            self.cfg.prompt_processor
+        )
+        if self.cfg.use_hyper_net:
+            self.hypernet = HyperNet(
+                self.prompt_processor.text_embeddings.flatten().shape[0],
+                self.geometry.encoding.encoding.encoding.params.shape[0],
+                self.cfg.hidden_dim
+            )
+        else:
+            size = self.geometry.encoding.encoding.encoding.params.shape[0]
+            self.hypernet = nn.Parameter(
+                (torch.rand(size).cuda() * 2 - 1) / 10000, requires_grad=True
+            )
+
+    def from_hyper_net(self):
+        if self.cfg.use_hyper_net:
+            prompt_utils = self.prompt_processor()
+            features = self.hypernet(
+                prompt_utils.text_embeddings.flatten().float().contiguous()
+            )
+            self.geometry.encoding.encoding.from_hyper_net(features)
+        else:
+            self.geometry.encoding.encoding.from_hyper_net(self.hypernet)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-
-        prompt_utils = self.prompt_processor()
-        text_embeddings: Tensor = prompt_utils.text_embeddings
-
-        text_embeddings = text_embeddings.view(1, -1).float().contiguous()
-        spatial_features = self.hypernet(text_embeddings)
-        self.geometry.encoding.encoding.from_hyper_net(spatial_features[0])
-
         render_out = self.renderer(**batch)
         return {
             **render_out,
@@ -41,15 +57,13 @@ class ATT3D(BaseLift3DSystem):
     def on_fit_start(self) -> None:
         super().on_fit_start()
         # only used in training
-        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
-        )
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
     def training_step(self, batch, batch_idx):
 
         self.prompt_processor.update_text_embeddings()
         prompt_utils = self.prompt_processor()
+        self.from_hyper_net()
         out = self(batch)
         guidance_out = self.guidance(
             out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
@@ -89,45 +103,59 @@ class ATT3D(BaseLift3DSystem):
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
-        out = self(batch)
-        self.save_image_grid(
-            f"val/{self.prompt_processor.prompt}-it{self.true_global_step}-{batch['index'][0]}.png",
-            [
-                {
-                    "type": "rgb",
-                    "img": out["comp_rgb"][0],
-                    "kwargs": {"data_format": "HWC"},
-                },
-            ]
-            + (
+        demon_num = min(2, self.prompt_processor.prompt_tot)
+        pid = self.prompt_processor.prompt_id
+        for ind in range(demon_num):
+            self.prompt_processor.prompt_id = ind
+            self.prompt_processor.update_text_embeddings(fix=True)
+            self.from_hyper_net()
+            out = self(batch)
+            self.save_image_grid(
+                f"val/{self.prompt_processor.prompt}/it{self.true_global_step}-{batch['index'][0]}.png",
                 [
                     {
                         "type": "rgb",
-                        "img": out["comp_normal"][0],
-                        "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-                    }
+                        "img": out["comp_rgb"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    },
                 ]
-                if "comp_normal" in out
-                else []
+                + (
+                    [
+                        {
+                            "type": "rgb",
+                            "img": out["comp_normal"][0],
+                            "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
+                        }
+                    ]
+                    if "comp_normal" in out
+                    else []
+                )
+                + [
+                    {
+                        "type": "grayscale",
+                        "img": out["opacity"][0, :, :, 0],
+                        "kwargs": {"cmap": None, "data_range": (0, 1)},
+                    },
+                ],
+                name="validation_step",
+                step=self.true_global_step,
             )
-            + [
-                {
-                    "type": "grayscale",
-                    "img": out["opacity"][0, :, :, 0],
-                    "kwargs": {"cmap": None, "data_range": (0, 1)},
-                },
-            ],
-            name="validation_step",
-            step=self.true_global_step,
-        )
+
+        # resume, only update in training_step
+        self.prompt_processor.prompt_id = pid
+        self.prompt_processor.update_text_embeddings(fix=True)
 
     def on_validation_epoch_end(self):
         pass
 
+    def on_test_epoch_start(self) -> None:
+        super().on_test_epoch_start()
+        self.from_hyper_net()
+
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"{self.prompt_processor.prompt}-it{self.true_global_step}-test/{batch['index'][0]}.png",
+            f"{self.prompt_processor.prompt}/it{self.true_global_step}-test/{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
@@ -160,20 +188,10 @@ class ATT3D(BaseLift3DSystem):
     def on_test_epoch_end(self):
         self.save_img_sequence(
             f"{self.prompt_processor.prompt}-it{self.true_global_step}-test",
-            f"{self.prompt_processor.prompt}-it{self.true_global_step}-test",
+            f"{self.prompt_processor.prompt}/it{self.true_global_step}-test",
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
             name="test",
             step=self.true_global_step,
-        )
-
-        self.save_data(
-            f"{self.prompt_processor.prompt}-text-embedding",
-            self.prompt_processor.text_embeddings
-        )
-
-        self.save_data(
-            f"{self.prompt_processor.prompt}-densegrid",
-            self.hypernet(self.prompt_processor.text_embeddings.view(1, -1).float().contiguous())[0]
         )
