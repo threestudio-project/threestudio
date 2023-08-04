@@ -1,0 +1,31 @@
+{
+  "compositional_prompts": [
+    "lib:orangutan_wheel",
+    "lib:raccoon_astronaut",
+    "lib:macarons",
+    "lib:photo_corgi_selfie",
+    "lib:dim",
+    "lib:lion_newspaper",
+    "lib:Michelangelo_dog",
+    "lib:tiger_doctor",
+    "lib:steam_engine",
+    "lib:frog_sweater",
+    "lib:humanoid_cello",
+    "lib:opera_house",
+    "lib:vehicle",
+    "lib:chimpanzee_England",
+    "lib:bunny_pancakes",
+    "lib:fresh_bread",
+    "lib:bulldozer_snow",
+    "lib:Packard_car",
+    "lib:Tower_Bridge",
+    "lib:robot_dinosaur_chess",
+    "lib:squirrel_gesturing_charts",
+    "lib:peacock",
+    "lib:couple",
+    "lib:pirate",
+    "lib:delicious_hamburger",
+    "lib:pink_flower",
+    "lib:English_castle"
+  ]
+}

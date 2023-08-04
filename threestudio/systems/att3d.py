@@ -16,7 +16,7 @@ class ATT3D(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         use_hyper_net: bool = True
-        hidden_dim: int = 8
+        hidden_dim: int = 32
 
     cfg: Config
 
@@ -35,7 +35,7 @@ class ATT3D(BaseLift3DSystem):
         else:
             size = self.geometry.encoding.encoding.encoding.params.shape[0]
             self.hypernet = nn.Parameter(
-                (torch.rand(size).cuda() * 2 - 1) / 10000, requires_grad=True
+                (torch.rand(size).cuda() * 2 - 1) / 1000, requires_grad=True
             )
 
     def from_hyper_net(self):

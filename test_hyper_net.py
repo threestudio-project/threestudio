@@ -16,12 +16,9 @@ path = "outputs/hypernet"
 class HyperNet(nn.Module):
     def __init__(self, in_dim: int, hid_dim: int, out_dim: int, batch_size: int, calc_type: bool, **kwargs) -> None:
         super().__init__()
-        # self.linear1 = spectral_norm(self.make_linear(in_dim, hid_dim, bias=True, init_range=1e-3))
-        # self.linear2 = spectral_norm(self.make_linear(hid_dim, out_dim, bias=False, init_range=1e-3))
         self.linear1 = spectral_norm(self.make_linear(in_dim, hid_dim, bias=True))
         self.linear2 = spectral_norm(self.make_linear(hid_dim, out_dim, bias=False, init_range=1e-3))
         self.calc_type = calc_type
-
         self.param = nn.parameter.Parameter(torch.randn(batch_size, hid_dim).cuda(), requires_grad=True)
 
     def make_linear(self, in_dim, out_dim, bias, init_range=None):

@@ -368,6 +368,29 @@ class PromptProcessor(BaseObject):
         self.prepare_text_embeddings()
         self.load_text_embeddings()
 
+        self.text_embeddings_list = []
+        self.uncond_text_embeddings_list = []
+        self.text_embeddings_vd_list = []
+        self.uncond_text_embeddings_vd_list = []
+        for ind in range(self.prompt_tot):
+            self.prompt_id = ind
+            
+            self.prompt = self.prompt_list[self.prompt_id]
+            self.negative_prompt = self.negative_prompt_list[self.prompt_id]
+            self.prompts_vd = self.prompts_vd_list[
+                4*self.prompt_id : 4*(self.prompt_id+1)
+            ]
+            self.negative_prompts_vd = self.negative_prompts_vd_list[
+                4*self.prompt_id : 4*(self.prompt_id+1)
+            ]
+
+            self.load_text_embeddings()
+
+            self.text_embeddings_list.append(self.text_embeddings)
+            self.uncond_text_embeddings_list.append(self.uncond_text_embeddings)
+            self.text_embeddings_vd_list.append(self.text_embeddings_vd)
+            self.uncond_text_embeddings_vd_list.append(self.uncond_text_embeddings_vd)
+
     @staticmethod
     def spawn_func(pretrained_model_name_or_path, prompts, cache_dir):
         raise NotImplementedError
@@ -445,7 +468,12 @@ class PromptProcessor(BaseObject):
         self.negative_prompts_vd = self.negative_prompts_vd_list[
             4*self.prompt_id : 4*(self.prompt_id+1)
         ]
-        self.load_text_embeddings()
+        # self.load_text_embeddings()
+
+        self.text_embeddings = self.text_embeddings_list[self.prompt_id]
+        self.uncond_text_embeddings = self.uncond_text_embeddings_list[self.prompt_id]
+        self.text_embeddings_vd = self.text_embeddings_vd_list[self.prompt_id]
+        self.uncond_text_embeddings_vd = self.uncond_text_embeddings_vd_list[self.prompt_id]
 
     def load_text_embeddings(self):
         # synchronize, to ensure the text embeddings have been computed and saved to cache
