@@ -103,7 +103,7 @@ class ATT3D(BaseLift3DSystem):
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
-        demon_num = min(2, self.prompt_processor.prompt_tot)
+        demon_num = min(4, self.prompt_processor.prompt_tot)
         pid = self.prompt_processor.prompt_id
         for ind in range(demon_num):
             self.prompt_processor.prompt_id = ind
