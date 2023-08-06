@@ -103,9 +103,10 @@ class ATT3D(BaseLift3DSystem):
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
-        demon_num = min(4, self.prompt_processor.prompt_tot)
-        pid = self.prompt_processor.prompt_id
-        for ind in range(demon_num):
+        prompt_id = self.prompt_processor.prompt_id
+        prompt_tot = self.prompt_processor.prompt_tot
+        prompt_list = torch.arange(0, min(prompt_tot, 4))
+        for ind in prompt_list:
             self.prompt_processor.prompt_id = ind
             self.prompt_processor.update_text_embeddings(fix=True)
             self.from_hyper_net()
@@ -140,9 +141,8 @@ class ATT3D(BaseLift3DSystem):
                 name="validation_step",
                 step=self.true_global_step,
             )
-
         # resume, only update in training_step
-        self.prompt_processor.prompt_id = pid
+        self.prompt_processor.prompt_id = prompt_id
         self.prompt_processor.update_text_embeddings(fix=True)
 
     def on_validation_epoch_end(self):

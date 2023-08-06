@@ -1,0 +1,20 @@
+{
+  "compositional_prompts": [
+    "a squirrel, blue",
+    "an airplane, blue",
+    "a hamburger, blue",
+    "a pineapple, blue",
+    "a squirrel, red",
+    "an airplane, red",
+    "a hamburger, red",
+    "a pineapple, red",
+    "a squirrel, green",
+    "an airplane, green",
+    "a hamburger, green",
+    "a pineapple, green",
+    "a squirrel, purple",
+    "an airplane, purple",
+    "a hamburger, purple",
+    "a pineapple, purple"
+  ]
+}
