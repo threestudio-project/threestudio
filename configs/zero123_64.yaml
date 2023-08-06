@@ -98,16 +98,14 @@ system:
 
   guidance_type: "zero123-guidance"
   guidance:
-    pretrained_model_name_or_path: "./load/zero123/zero123-xl.ckpt"
-    pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
-    vram_O: ${not:${gt0:${system.freq.guidance_eval}}}
+    pretrained_model_name_or_path: "bennyguo/zero123-diffusers"
     cond_image_path: ${data.image_path}
     cond_elevation_deg: ${data.default_elevation_deg}
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
     #min_step_percent: 0.02
-    min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
+    min_step_percent: [0, 0.4, 0.2, 200] # (start_iter, start_val, end_val, end_iter)
     #max_step_percent: 0.98
     max_step_percent: [0, 0.85, 0.5, 200]
 
