@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 from dataclasses import dataclass, field
 
@@ -9,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 from diffusers import DDIMScheduler, DDPMScheduler, StableDiffusionPipeline
+from diffusers.loaders import AttnProcsLayers
+from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.pipelines import DiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from omegaconf import OmegaConf
@@ -16,20 +19,34 @@ from tqdm import tqdm
 
 import threestudio
 from extern.zero123 import Zero123Pipeline
-from threestudio.utils.base import BaseObject
+from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup, parse_version
 from threestudio.utils.typing import *
 
 
-@threestudio.register("zero123-guidance")
-class Zero123Guidance(BaseObject):
+class ToWeightsDType(nn.Module):
+    def __init__(self, module: nn.Module, dtype: torch.dtype):
+        super().__init__()
+        self.module = module
+        self.dtype = dtype
+
+    def forward(self, x: Float[Tensor, "..."]) -> Float[Tensor, "..."]:
+        return self.module(x).to(self.dtype)
+
+
+@threestudio.register("zero123-vsd-guidance")
+class Zero123VSDGuidance(BaseModule):
     @dataclass
-    class Config(BaseObject.Config):
+    class Config(BaseModule.Config):
         pretrained_model_name_or_path: str = "bennyguo/zero123-diffusers"
         enable_sequential_cpu_offload: bool = False
         guidance_scale: float = 5.0
+        guidance_scale_lora: float = 1.0
         grad_clip: Optional[Any] = None
         half_precision_weights: bool = True
+
+        lora_cfg_training: bool = True
+        lora_n_timestamp_samples: int = 1
 
         height: int = 256
         width: int = 256
@@ -54,36 +71,70 @@ class Zero123Guidance(BaseObject):
             torch.float16 if self.cfg.half_precision_weights else torch.float32
         )
 
+        @dataclass
+        class SubModules:
+            pipe: Zero123Pipeline
+            pipe_lora: Zero123Pipeline
+
         # need to make sure the pipeline file is in path
         sys.path.append("extern/")
-        self.pipe = Zero123Pipeline.from_pretrained(
+        pipe = Zero123Pipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             safety_checker=None,
             requires_safety_checker=False,
             variant="fp16" if self.cfg.half_precision_weights else None,
             torch_dtype=self.weights_dtype,
         ).to(self.device)
-
-        self.vae = self.pipe.vae
-        self.unet = self.pipe.unet
+        pipe_lora = pipe
+        self.submodules = SubModules(pipe=pipe, pipe_lora=pipe_lora)
 
         if self.cfg.enable_sequential_cpu_offload:
             self.pipe.enable_sequential_cpu_offload()
 
         for p in self.vae.parameters():
             p.requires_grad_(False)
-
         for p in self.unet.parameters():
             p.requires_grad_(False)
-
+        for p in self.unet_lora.parameters():
+            p.requires_grad_(False)
         for p in self.pipe.clip_camera_projection.parameters():
             p.requires_grad_(False)
+
+        # set up LoRA layers
+        lora_attn_procs = {}
+        for name in self.unet_lora.attn_processors.keys():
+            cross_attention_dim = (
+                None
+                if name.endswith("attn1.processor")
+                else self.unet_lora.config.cross_attention_dim
+            )
+            if name.startswith("mid_block"):
+                hidden_size = self.unet_lora.config.block_out_channels[-1]
+            elif name.startswith("up_blocks"):
+                block_id = int(name[len("up_blocks.")])
+                hidden_size = list(reversed(self.unet_lora.config.block_out_channels))[
+                    block_id
+                ]
+            elif name.startswith("down_blocks"):
+                block_id = int(name[len("down_blocks.")])
+                hidden_size = self.unet_lora.config.block_out_channels[block_id]
+
+            lora_attn_procs[name] = LoRAAttnProcessor(
+                hidden_size=hidden_size, cross_attention_dim=cross_attention_dim
+            )
+        self.unet_lora.set_attn_processor(lora_attn_procs)
+
+        self.lora_layers = AttnProcsLayers(self.unet_lora.attn_processors)
+        self.lora_layers._load_state_dict_pre_hooks.clear()
+        self.lora_layers._state_dict_hooks.clear()
 
         self.scheduler = DDIMScheduler.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             subfolder="scheduler",
             torch_dtype=self.weights_dtype,
         )
+        self.scheduler_lora = self.scheduler
+
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.set_min_max_steps()  # set to default value
 
@@ -104,6 +155,30 @@ class Zero123Guidance(BaseObject):
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
         self.min_step = int(self.num_train_timesteps * min_step_percent)
         self.max_step = int(self.num_train_timesteps * max_step_percent)
+
+    @property
+    def pipe(self):
+        return self.submodules.pipe
+
+    @property
+    def pipe_lora(self):
+        return self.submodules.pipe_lora
+
+    @property
+    def unet(self):
+        return self.submodules.pipe.unet
+
+    @property
+    def unet_lora(self):
+        return self.submodules.pipe_lora.unet
+
+    @property
+    def vae(self):
+        return self.submodules.pipe.vae
+
+    @property
+    def vae_lora(self):
+        return self.submodules.pipe_lora.vae
 
     @torch.cuda.amp.autocast(enabled=False)
     def prepare_image_embeddings(
@@ -175,13 +250,53 @@ class Zero123Guidance(BaseObject):
         latents: Float[Tensor, "..."],
         t: Float[Tensor, "..."],
         encoder_hidden_states: Float[Tensor, "..."],
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Float[Tensor, "..."]:
         input_dtype = latents.dtype
         return self.unet(
             latents.to(self.weights_dtype),
             t.to(self.weights_dtype),
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
+            cross_attention_kwargs=cross_attention_kwargs,
         ).sample.to(input_dtype)
+
+    def train_lora(
+        self,
+        latents: Float[Tensor, "B 8 32 32"],
+        camera_embeddings: Float[Tensor, "B 1 768"],
+    ):
+        B = latents.shape[0]
+        latents = latents.detach().repeat(self.cfg.lora_n_timestamp_samples, 1, 1, 1)
+        camera_embeddings = camera_embeddings.detach()
+
+        t = torch.randint(
+            int(self.num_train_timesteps * 0.0),
+            int(self.num_train_timesteps * 1.0),
+            [B * self.cfg.lora_n_timestamp_samples],
+            dtype=torch.long,
+            device=self.device,
+        )
+
+        noise = torch.randn_like(latents[:, :4])
+        noisy_latents = self.scheduler_lora.add_noise(latents[:, :4], noise, t)
+        if self.scheduler_lora.config.prediction_type == "epsilon":
+            target = noise
+        elif self.scheduler_lora.config.prediction_type == "v_prediction":
+            target = self.scheduler_lora.get_velocity(latents, noise, t)
+        else:
+            raise ValueError(
+                f"Unknown prediction type {self.scheduler_lora.config.prediction_type}"
+            )
+
+        if self.cfg.lora_cfg_training and random.random() < 0.1:
+            camera_embeddings = torch.zeros_like(camera_embeddings)
+        noise_pred = self.forward_unet(
+            torch.cat([noisy_latents, latents[:, 4:]], dim=1),
+            t,
+            encoder_hidden_states=camera_embeddings,
+            cross_attention_kwargs={"scale": 1.0},
+        )
+        return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
 
     def __call__(
         self,
@@ -271,7 +386,7 @@ class Zero123Guidance(BaseObject):
                 ],
                 dim=0,
             )
-            noise_pred = self.forward_unet(
+            noise_pred_pretrain = self.forward_unet(
                 latent_model_input,
                 torch.cat([t] * 2),
                 encoder_hidden_states=torch.cat(
@@ -281,16 +396,38 @@ class Zero123Guidance(BaseObject):
                     ],
                     dim=0,
                 ),
+                cross_attention_kwargs={"scale": 0.0},
+            )
+            noise_pred_est = self.forward_unet(
+                latent_model_input,
+                torch.cat([t] * 2),
+                encoder_hidden_states=torch.cat(
+                    [
+                        image_embeddings.repeat(batch_size, 1, 1),
+                        torch.zeros_like(image_embeddings).repeat(batch_size, 1, 1),
+                    ],
+                    dim=0,
+                ),
+                cross_attention_kwargs={"scale": 1.0},
             )
 
         # perform guidance
-        noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
-        noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-            noise_pred_cond - noise_pred_uncond
+        (
+            noise_pred_pretrain_cond,
+            noise_pred_pretrain_uncond,
+        ) = noise_pred_pretrain.chunk(2)
+        noise_pred_pretrain = noise_pred_pretrain_uncond + self.cfg.guidance_scale * (
+            noise_pred_pretrain_cond - noise_pred_pretrain_uncond
+        )
+
+        noise_pred_est_cond, noise_pred_est_uncond = noise_pred_est.chunk(2)
+        noise_pred_est = noise_pred_est_uncond + self.cfg.guidance_scale_lora * (
+            noise_pred_est_cond - noise_pred_est_uncond
         )
 
         w = (1 - self.alphas[t]).reshape(-1, 1, 1, 1)
-        grad = w * (noise_pred - noise)
+        grad = w * (noise_pred_pretrain - noise_pred_est)
+
         grad = torch.nan_to_num(grad)
         # clip grad for stable training?
         if self.grad_clip_val is not None:
@@ -300,10 +437,19 @@ class Zero123Guidance(BaseObject):
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         target = (latents - grad).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+
+        loss_lora = self.train_lora(
+            torch.cat(
+                [latents, self.image_latents.repeat(batch_size, 1, 1, 1)],
+                dim=1,
+            ),
+            image_embeddings,
+        )
 
         guidance_out = {
-            "loss_sds": loss_sds,
+            "loss_vsd": loss_vsd,
+            "loss_lora": loss_lora,
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,
@@ -313,7 +459,7 @@ class Zero123Guidance(BaseObject):
             guidance_eval_utils = {
                 "t_orig": t,
                 "latent_model_input": latent_model_input,
-                "noise_pred": noise_pred,
+                "noise_pred": noise_pred_pretrain,
                 "image_embeddings": image_embeddings,
             }
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
