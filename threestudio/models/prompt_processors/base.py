@@ -355,15 +355,10 @@ class PromptProcessor(BaseObject):
         self.text_embeddings_vd_list = []
         self.uncond_text_embeddings_vd_list = []
         for ind in range(self.prompt_tot):
-            self.prompt_id = ind
-            self.prompt = self.prompt_list[self.prompt_id]
-            self.negative_prompt = self.negative_prompt_list[self.prompt_id]
-            self.prompts_vd = self.prompts_vd_list[
-                4*self.prompt_id : 4*(self.prompt_id+1)
-            ]
-            self.negative_prompts_vd = self.negative_prompts_vd_list[
-                4*self.prompt_id : 4*(self.prompt_id+1)
-            ]
+            self.prompt = self.prompt_list[ind]
+            self.negative_prompt = self.negative_prompt_list[ind]
+            self.prompts_vd = self.prompts_vd_list[4*ind : 4*(ind+1)]
+            self.negative_prompts_vd = self.negative_prompts_vd_list[4*ind : 4*(ind+1)]
             self.load_text_embeddings()
 
             self.text_embeddings_list.append(self.text_embeddings)
@@ -371,7 +366,6 @@ class PromptProcessor(BaseObject):
             self.text_embeddings_vd_list.append(self.text_embeddings_vd)
             self.uncond_text_embeddings_vd_list.append(self.uncond_text_embeddings_vd)
         
-        self.prompt_id = self.cfg.prompt_id % len(self.prompt_list)
         self.update_text_embeddings(fix=True)
 
         threestudio.info(

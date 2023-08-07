@@ -114,9 +114,6 @@ class DreamFusion(BaseLift3DSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         prompt_utils = self.prompt_processor()
-        guidance_out = self.guidance(
-            out["comp_rgb"], prompt_utils, **batch, rgb_as_latents=False
-        )
         self.save_image_grid(
             f"it{self.true_global_step}-test/{batch['index'][0]}.png",
             [
@@ -157,8 +154,4 @@ class DreamFusion(BaseLift3DSystem):
             fps=30,
             name="test",
             step=self.true_global_step,
-        )
-        self.save_data(
-            f"prompt",
-            self.prompt_processor().text_embeddings
         )
