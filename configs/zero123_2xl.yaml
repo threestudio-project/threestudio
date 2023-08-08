@@ -9,7 +9,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   height: [128, 256, 512]
   width: [128, 256, 512]
   resolution_milestones: [200, 300]
-  default_elevation_deg: 10.0
+  default_elevation_deg: 5.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
@@ -24,7 +24,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     eval_width: 512
     eval_batch_size: 1
     elevation_range: [-10, 80]
-    azimuth_range: [5, 355] # avoid front view
+    azimuth_range: [-180, 180]
     camera_distance_range: [3.8, 3.8]
     fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
     progressive_until: 0
@@ -111,10 +111,8 @@ system:
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
-    #min_step_percent: 0.02
     min_step_percent: [50, 0.7, 0.3, 200]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: [50, 0.98, 0.8, 200]
-    # max_step_percent: [50, 0.98, 0.98, 200]
 
   freq:
     ref_only_steps: 0
