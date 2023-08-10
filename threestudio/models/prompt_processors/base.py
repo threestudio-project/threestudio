@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, BertForMaskedLM
 import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import barrier, cleanup, get_rank
-from threestudio.utils.ops import shifted_cosine_decay, shifted_expotional_decay
+from threestudio.utils.ops import shifted_expotional_decay, get_interpolation
 from threestudio.utils.typing import *
 
 
@@ -36,8 +36,8 @@ class DirectionConfig:
 
 @dataclass
 class PromptProcessorOutput:
-    text_embeddings: Float[Tensor, "N Nf"]
-    uncond_text_embeddings: Float[Tensor, "N Nf"]
+    text_embeddings: Float[Tensor, "1 N Nf"]
+    uncond_text_embeddings: Float[Tensor, "1 N Nf"]
     text_embeddings_vd: Float[Tensor, "Nv N Nf"]
     uncond_text_embeddings_vd: Float[Tensor, "Nv N Nf"]
     directions: List[DirectionConfig]
@@ -47,6 +47,13 @@ class PromptProcessorOutput:
     perp_neg_f_fsb: Tuple[float, float, float]
     perp_neg_f_fs: Tuple[float, float, float]
     perp_neg_f_sf: Tuple[float, float, float]
+    use_att3d_interpolation: bool
+    att3d_interpolate_type: str # ["none", "latent", "loss", "guidance"]
+    att3d_interpolate_weight: float
+    text_embeddings_list: Float[Tensor, "2 1 N Nf"]
+    uncond_text_embeddings_list: Float[Tensor, "2 1 N Nf"]
+    text_embeddings_vd_list: Float[Tensor, "2 Nv N Nf"]
+    uncond_text_embeddings_vd_list: Float[Tensor, "2 Nv N Nf"]
 
     def get_text_embeddings(
         self,
@@ -164,6 +171,41 @@ class PromptProcessorOutput:
             neg_guidance_weights, device=elevation.device
         ).reshape(batch_size, 2)
 
+    def get_text_embeddings_att3d(
+        self,
+        elevation: Float[Tensor, "B"],
+        azimuth: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+        view_dependent_prompting: bool = True,
+    ) -> Tuple[Float[Tensor, "BB N Nf"], float]:
+        assert (
+            self.att3d_interpolate_type == "guidance"
+        ), "Only used with guidance interpolation"
+
+        batch_size = elevation.shape[0]
+        embed_size = self.text_embeddings.shape[1:]
+
+        if view_dependent_prompting:
+            # Get direction
+            direction_idx = torch.zeros_like(elevation, dtype=torch.long)
+            for d in self.directions:
+                direction_idx[
+                    d.condition(elevation, azimuth, camera_distances)
+                ] = self.direction2idx[d.name]
+
+            # Get text embeddings
+            text_embeddings = self.text_embeddings_vd_list[:, direction_idx].view(-1, *embed_size)  # type: ignore
+            uncond_text_embeddings = self.uncond_text_embeddings_vd_list[0, direction_idx]  # type: ignore
+        else:
+            text_embeddings = self.text_embeddings_list.expand(
+                1, batch_size, -1, -1
+            ).view(-1, *embed_size)  # type: ignore
+            uncond_text_embeddings = self.uncond_text_embeddings_list[0].expand(  # type: ignore
+                batch_size, -1, -1
+            )
+
+        return torch.cat([text_embeddings, uncond_text_embeddings], dim=0), self.att3d_interpolate_weight
+
 
 def shift_azimuth_deg(azimuth: Float[Tensor, "..."]) -> Float[Tensor, "..."]:
     # shift azimuth angle (in degrees), to [-180, 180]
@@ -209,6 +251,10 @@ class PromptProcessor(BaseObject):
         pretrained_model_name_or_path_prompt_debiasing: str = "bert-base-uncased"
         # index of words that can potentially be removed
         prompt_debiasing_mask_ids: Optional[List[int]] = None
+
+        use_att3d_interpolation: bool = False
+        att3d_interpolate_type: str = "none" # ["none", "latent", "loss", "guidance"]
+        att3d_interpolate_weight: float = 0.0
 
     cfg: Config
 
@@ -350,6 +396,10 @@ class PromptProcessor(BaseObject):
         self.prompt_tot = len(self.prompt_list)
         self.prepare_text_embeddings()
 
+        # att3d interpolate
+        self.interpolate_weight = self.cfg.att3d_interpolate_weight
+        self.interpolate_id = torch.randperm(self.prompt_tot).sort().values[:2]
+
         self.text_embeddings_list = []
         self.uncond_text_embeddings_list = []
         self.text_embeddings_vd_list = []
@@ -366,7 +416,11 @@ class PromptProcessor(BaseObject):
             self.text_embeddings_vd_list.append(self.text_embeddings_vd)
             self.uncond_text_embeddings_vd_list.append(self.uncond_text_embeddings_vd)
         
-        self.update_text_embeddings(fix=True)
+        self.text_embeddings_list = torch.stack(self.text_embeddings_list)
+        self.uncond_text_embeddings_list = torch.stack(self.uncond_text_embeddings_list)
+        self.text_embeddings_vd_list = torch.stack(self.text_embeddings_vd_list)
+        self.uncond_text_embeddings_vd_list = torch.stack(self.uncond_text_embeddings_vd_list)
+        self.update_text_embeddings(val=True)
 
         threestudio.info(
             f"Using prompt [{self.prompt}] and negative prompt [{self.negative_prompt}]"
@@ -441,28 +495,69 @@ class PromptProcessor(BaseObject):
                 barrier()
                 threestudio.info(f"Processing {i*proc_bat+len(prompts_batch)}/{len(prompts_to_process)}")
 
-    @rank_zero_only
-    def update_text_embeddings(self, fix: bool = False):
+    def update_text_embeddings(self, val: bool = False):
         # for single prompt, wont reload
         if self.prompt_tot == 1:
             return
+        
+        if self.cfg.use_att3d_interpolation:
+            if val:
+                interpolate_weight = self.cfg.att3d_interpolate_weight
+                s, t = self.prompt_id, (self.prompt_id + 1) % self.prompt_tot
+            else:
+                self.interpolate_weight = get_interpolation(self.cfg.att3d_interpolate_type)()
+                self.interpolate_id = torch.randperm(self.prompt_tot).sort().values[:2]
+                self.prompt_id = self.interpolate_id[0] if self.interpolate_weight <= 0.5 else self.interpolate_id[1]
+                interpolate_weight = self.interpolate_weight
+                s, t = self.interpolate_id
+            
+            self.prompt = self.prompt_list[self.prompt_id]
+            self.negative_prompt = self.negative_prompt_list[self.prompt_id]
+            self.prompts_vd = self.prompts_vd_list[
+                4*self.prompt_id : 4*(self.prompt_id+1)
+            ]
+            self.negative_prompts_vd = self.negative_prompts_vd_list[
+                4*self.prompt_id : 4*(self.prompt_id+1)
+            ]
+            # self.load_text_embeddings()
 
-        if not fix:
-            self.prompt_id = torch.randint(0, self.prompt_tot, size=[1]).item()
-        self.prompt = self.prompt_list[self.prompt_id]
-        self.negative_prompt = self.negative_prompt_list[self.prompt_id]
-        self.prompts_vd = self.prompts_vd_list[
-            4*self.prompt_id : 4*(self.prompt_id+1)
-        ]
-        self.negative_prompts_vd = self.negative_prompts_vd_list[
-            4*self.prompt_id : 4*(self.prompt_id+1)
-        ]
-        # self.load_text_embeddings()
+            self.text_embeddings = torch.lerp(
+                self.text_embeddings_list[s],
+                self.text_embeddings_list[t],
+                interpolate_weight
+            )
+            self.uncond_text_embeddings = torch.lerp(
+                self.uncond_text_embeddings_list[s],
+                self.uncond_text_embeddings_list[t],
+                interpolate_weight
+            )
+            self.text_embeddings_vd = torch.lerp(
+                self.text_embeddings_vd_list[s],
+                self.text_embeddings_vd_list[t],
+                interpolate_weight
+            )
+            self.uncond_text_embeddings_vd = torch.lerp(
+                self.uncond_text_embeddings_vd_list[s],
+                self.uncond_text_embeddings_vd_list[t],
+                interpolate_weight
+            )
+        else:
+            if not val:
+                self.prompt_id = torch.randint(0, self.prompt_tot, size=[1]).item()
+            self.prompt = self.prompt_list[self.prompt_id]
+            self.negative_prompt = self.negative_prompt_list[self.prompt_id]
+            self.prompts_vd = self.prompts_vd_list[
+                4*self.prompt_id : 4*(self.prompt_id+1)
+            ]
+            self.negative_prompts_vd = self.negative_prompts_vd_list[
+                4*self.prompt_id : 4*(self.prompt_id+1)
+            ]
+            # self.load_text_embeddings()
 
-        self.text_embeddings = self.text_embeddings_list[self.prompt_id]
-        self.uncond_text_embeddings = self.uncond_text_embeddings_list[self.prompt_id]
-        self.text_embeddings_vd = self.text_embeddings_vd_list[self.prompt_id]
-        self.uncond_text_embeddings_vd = self.uncond_text_embeddings_vd_list[self.prompt_id]
+            self.text_embeddings = self.text_embeddings_list[self.prompt_id]
+            self.uncond_text_embeddings = self.uncond_text_embeddings_list[self.prompt_id]
+            self.text_embeddings_vd = self.text_embeddings_vd_list[self.prompt_id]
+            self.uncond_text_embeddings_vd = self.uncond_text_embeddings_vd_list[self.prompt_id]
 
     def load_text_embeddings(self):
         # synchronize, to ensure the text embeddings have been computed and saved to cache
@@ -589,4 +684,11 @@ class PromptProcessor(BaseObject):
             perp_neg_f_fsb=self.cfg.perp_neg_f_fsb,
             perp_neg_f_fs=self.cfg.perp_neg_f_fs,
             perp_neg_f_sf=self.cfg.perp_neg_f_sf,
+            use_att3d_interpolation=self.cfg.use_att3d_interpolation and (self.cfg.att3d_interpolate_type == "guidance"),
+            att3d_interpolate_type=self.cfg.att3d_interpolate_type,
+            att3d_interpolate_weight=self.interpolate_weight,
+            text_embeddings_list=self.text_embeddings_list[self.interpolate_id],
+            uncond_text_embeddings_list=self.uncond_text_embeddings_list[self.interpolate_id],
+            text_embeddings_vd_list=self.text_embeddings_vd_list[self.interpolate_id],
+            uncond_text_embeddings_vd_list=self.uncond_text_embeddings_vd_list[self.interpolate_id]
         )

@@ -181,6 +181,32 @@ class DeepFloydGuidance(BaseObject):
             noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
                 e_pos + accum_grad
             )
+        elif prompt_utils.use_att3d_interpolation:
+            (
+                text_embeddings,
+                interpolate_weight,
+            ) = prompt_utils.get_text_embeddings_att3d(
+                elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+            )
+            with torch.no_grad():
+                noise = torch.randn_like(latents)
+                latents_noisy = self.scheduler.add_noise(latents, noise, t)
+                latent_model_input = torch.cat([latents_noisy] * 3, dim=0)
+                noise_pred = self.forward_unet(
+                    latent_model_input,
+                    torch.cat([t] * 3),
+                    encoder_hidden_states=text_embeddings,
+                )  # (3B, 6, 64, 64)
+            
+            noise_pred_text, _ = noise_pred[:batch_size * 2].split(3, dim=1)
+            noise_pred_uncond, _ = noise_pred[batch_size * 2:].split(3, dim=1)
+
+            noise_pred_text = torch.lerp(
+                noise_pred_text[:batch_size], noise_pred_text[batch_size:], interpolate_weight
+            )
+            noise_pred = noise_pred_text + self.cfg.guidance_scale * (
+                noise_pred_text - noise_pred_uncond
+            )
         else:
             text_embeddings = prompt_utils.get_text_embeddings(
                 elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting

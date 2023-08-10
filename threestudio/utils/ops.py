@@ -437,3 +437,20 @@ def perpendicular_component(x: Float[Tensor, "B C H W"], y: Float[Tensor, "B C H
         ).view(-1, 1, 1, 1)
         * y
     )
+
+
+def get_interpolation(name) -> Callable:
+    def Bern(a) -> float:
+        return float(torch.rand(1) <= a)
+    
+    def Dir() -> float:
+        return torch.rand(1).item()
+
+    if name == "none":
+        return lambda: Bern(0.5)
+    elif name == "latent":
+        return lambda: Dir()
+    elif name == "loss":
+        return lambda: Bern(Dir())
+    else:
+        return lambda: Dir()

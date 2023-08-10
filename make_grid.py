@@ -3,10 +3,12 @@ import cv2
 import argparse
 from PIL import Image
 import os
+import imageio
+from tqdm import tqdm
 
 
 def make_path_composite():
-    path = "outputs/att3d-if/composite_prompts@20230805-094945/save"
+    path = "outputs/att3d-if/composite_prompts@20230804-194850/save"
     themes = [
         "blue",
         "red",
@@ -32,8 +34,8 @@ def make_path_composite():
 
 def make_path_list():
     paths = [
-        "outputs/dreamfusion-if/a_pineapple,_blue@20230807-140650/save/it5000-test/0.png",
-        "outputs/dreamfusion-if/a_hamburger,_green@20230807-140549/save/it5000-test/0.png"
+        "outputs/att3d-if/composite_prompts@20230804-172543/save/a hamburger/it20000-test/0.png",
+        "outputs/att3d-if/composite_prompts@20230804-172543/save/a pineapple/it20000-test/0.png"
     ]
     return paths
 
@@ -54,21 +56,20 @@ def setup():
     parser = argparse.ArgumentParser("Grid")
     parser.add_argument("--h", default=0, type=int)
     parser.add_argument("--resize", default=256, type=int)
-    parser.add_argument("--save_dir", default="./image_grid.png", type=str)
+    parser.add_argument("--save_dir", default="./image_grid.mp4", type=str)
     args = parser.parse_args()
     return args
 
 
-def make_grid():
-    args = setup()
+def make_grid(paths, h, resize):
     imgs = []
-    for path in make_path_all():
+    for path in paths:
         img = cv2.imread(path)
         img = img[:, :img.shape[1] // 3]
-        img = np.array(Image.fromarray(img).resize((args.resize, args.resize)))
+        img = np.array(Image.fromarray(img).resize((resize, resize)))
         imgs.append(img)
     
-    h = int(max(args.h, 1))
+    h = int(max(h, 1))
     w = (len(imgs) + h - 1) // h
     grids = []
     for i in range(h):
@@ -77,7 +78,23 @@ def make_grid():
             grid_row += [np.ones_like(imgs[0]) * 255 for _ in range(w - len(grid_row))]
         grids.append(np.concatenate(grid_row, axis=1))
     grids = np.concatenate(grids, axis=0)
-    cv2.imwrite(args.save_dir, grids)
+    return grids
 
 
-make_grid()
+def make_video():
+    args = setup()
+    imgs = []
+    paths = [os.path.dirname(path) for path in make_path_all()]
+    num = np.inf
+    for path in paths:
+        num = min(num, len(os.listdir(path)))
+    
+    for i in tqdm(range(num)):
+        path_frame = [os.path.join(path, f"{i}.png") for path in paths]
+        imgs.append(make_grid(path_frame, args.h, args.resize, args.clip))
+
+    imgs = [cv2.cvtColor(i, cv2.COLOR_BGR2RGB) for i in imgs]
+    imageio.mimsave(args.save_dir, imgs, fps=30)
+
+
+make_video()

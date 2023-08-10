@@ -1,4 +1,4 @@
-name: "att3d-if"
+name: "att3d-if-interpolate"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -14,6 +14,7 @@ data:
   light_sample_strategy: "dreamfusion"
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
+  n_test_views: 1
 
 system_type: "att3d-system"
 system:
@@ -74,7 +75,8 @@ system:
   prompt_processor:
     pretrained_model_name_or_path: "DeepFloyd/IF-I-XL-v1.0"
     prompt: "composite_prompts"
-    composite_prompt_dir: ???
+    composite_prompt_dir: "load/composite_prompts_2.json"
+    use_att3d_interpolation: true
 
   guidance_type: "deep-floyd-guidance"
   guidance:
@@ -110,10 +112,10 @@ system:
         lr: 0.001
 
 trainer:
-  max_steps: 20000
+  max_steps: 15000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 1000
+  val_check_interval: 500
   enable_progress_bar: true
   precision: 16-mixed
 

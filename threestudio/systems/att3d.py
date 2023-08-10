@@ -108,7 +108,7 @@ class ATT3D(BaseLift3DSystem):
         prompt_list = torch.arange(0, min(prompt_tot, 4))
         for ind in prompt_list:
             self.prompt_processor.prompt_id = ind
-            self.prompt_processor.update_text_embeddings(fix=True)
+            self.prompt_processor.update_text_embeddings(val=True)
             self.from_hyper_net()
             out = self(batch)
             self.save_image_grid(
@@ -143,7 +143,7 @@ class ATT3D(BaseLift3DSystem):
             )
         # resume, only update in training_step
         self.prompt_processor.prompt_id = prompt_id
-        self.prompt_processor.update_text_embeddings(fix=True)
+        self.prompt_processor.update_text_embeddings(val=True)
 
     def on_validation_epoch_end(self):
         pass
@@ -153,42 +153,52 @@ class ATT3D(BaseLift3DSystem):
         self.from_hyper_net()
 
     def test_step(self, batch, batch_idx):
-        out = self(batch)
-        self.save_image_grid(
-            f"{self.prompt_processor.prompt}/it{self.true_global_step}-test/{batch['index'][0]}.png",
-            [
-                {
-                    "type": "rgb",
-                    "img": out["comp_rgb"][0],
-                    "kwargs": {"data_format": "HWC"},
-                },
-            ]
-            + (
+        if self.prompt_processor.cfg.use_att3d_interpolation:
+            weights = torch.linspace(0, 1, 601)
+        else:
+            weights = torch.linspace(0, 1, 1)
+        
+        from tqdm import tqdm
+        for ind, weight in tqdm(enumerate(weights)):
+            self.prompt_processor.cfg.att3d_interpolate_weight = weight.item()
+            self.prompt_processor.update_text_embeddings(val=True)
+            self.from_hyper_net()
+            out = self(batch)
+            self.save_image_grid(
+                f"it{self.true_global_step}-test/{ind}.png",
                 [
                     {
                         "type": "rgb",
-                        "img": out["comp_normal"][0],
-                        "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-                    }
+                        "img": out["comp_rgb"][0],
+                        "kwargs": {"data_format": "HWC"},
+                    },
                 ]
-                if "comp_normal" in out
-                else []
+                + (
+                    [
+                        {
+                            "type": "rgb",
+                            "img": out["comp_normal"][0],
+                            "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
+                        }
+                    ]
+                    if "comp_normal" in out
+                    else []
+                )
+                + [
+                    {
+                        "type": "grayscale",
+                        "img": out["opacity"][0, :, :, 0],
+                        "kwargs": {"cmap": None, "data_range": (0, 1)},
+                    },
+                ],
+                name="test_step",
+                step=self.true_global_step,
             )
-            + [
-                {
-                    "type": "grayscale",
-                    "img": out["opacity"][0, :, :, 0],
-                    "kwargs": {"cmap": None, "data_range": (0, 1)},
-                },
-            ],
-            name="test_step",
-            step=self.true_global_step,
-        )
 
     def on_test_epoch_end(self):
         self.save_img_sequence(
-            f"{self.prompt_processor.prompt}-it{self.true_global_step}-test",
-            f"{self.prompt_processor.prompt}/it{self.true_global_step}-test",
+            f"{self.prompt_processor.prompt.replace(' ', '_')}-it{self.true_global_step}-test",
+            f"it{self.true_global_step}-test",
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
