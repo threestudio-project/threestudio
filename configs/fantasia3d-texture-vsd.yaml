@@ -1,4 +1,4 @@
-name: "fantasia3d-texture"
+name: "fantasia3d-texture-vsd"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -19,7 +19,7 @@ data:
   eval_camera_distance: 3.
   eval_fovy_deg: 45.
 
-system_type: "fantasia3d-system"
+system_type: "fantasia3d-vsd-system"
 system:
   # do texture training
   texture: true
@@ -56,25 +56,23 @@ system:
       base_resolution: 16
       per_level_scale: 1.4472692374403782 # max resolution 4096
     n_feature_dims: 8 # albedo3 + roughness1 + metallic1 + bump3
-    # shape_init_mesh_up: +y
-    # shape_init_mesh_front: +z
-    shape_init_mesh_up: +z
-    shape_init_mesh_front: +x
+    shape_init_mesh_up: +y
+    shape_init_mesh_front: +z
 
-  # material_type: "pbr-material"
-  # material:
-  #   material_activation: sigmoid
-  #   environment_texture: "load/lights/mud_road_puresky_1k.hdr"
-  #   environment_scale: 2.0
-  #   min_metallic: 0.0
-  #   max_metallic: 0.9
-  #   min_roughness: 0.08
-  #   max_roughness: 0.9
-  #   use_bump: true
-  material_type: "diffuse-with-point-light-material"
+  material_type: "pbr-material"
   material:
-    ambient_only_steps: 200100
-    soft_shading: true
+    material_activation: sigmoid
+    environment_texture: "load/lights/mud_road_puresky_1k.hdr"
+    environment_scale: 2.0
+    min_metallic: 0.0
+    max_metallic: 0.9
+    min_roughness: 0.08
+    max_roughness: 0.9
+    use_bump: true
+#   material_type: "diffuse-with-point-light-material"
+#   material:
+#     ambient_only_steps: 200100
+#     soft_shading: true
 
   background_type: "solid-color-background"
 
