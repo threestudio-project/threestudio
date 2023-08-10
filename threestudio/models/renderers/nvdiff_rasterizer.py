@@ -68,8 +68,10 @@ class NVDiffRasterizer(Rasterizer):
         w2c = kwargs["c2w"][:, :3, :3].inverse()
         gb_normal_viewspace = torch.einsum("bij,bhwj->bhwi", w2c, gb_normal)
         gb_normal_viewspace = F.normalize(gb_normal_viewspace, dim=-1)
+        bg_normal = torch.zeros_like(gb_normal_viewspace)
+        bg_normal[..., 2] = 1
         gb_normal_viewspace_aa = torch.lerp(
-            torch.zeros_like(gb_normal_viewspace),
+            (bg_normal + 1.0) / 2.0,
             (gb_normal_viewspace + 1.0) / 2.0,
             mask.float(),
         ).contiguous()

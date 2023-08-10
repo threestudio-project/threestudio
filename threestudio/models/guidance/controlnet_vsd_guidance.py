@@ -42,9 +42,9 @@ class ToWeightsDType(nn.Module):
 
 
 @threestudio.register("stable-diffusion-controlnet-vsd-guidance")
-class ControlNetVSDGuidance(BaseObject):
+class ControlNetVSDGuidance(BaseModule):
     @dataclass
-    class Config(BaseObject.Config):
+    class Config(BaseModule.Config):
         cache_dir: Optional[str] = None
         pretrained_model_name_or_path: str = "SG161222/Realistic_Vision_V2.0"
         pretrained_model_name_or_path_lora: str = "SG161222/Realistic_Vision_V2.0"
@@ -57,7 +57,7 @@ class ControlNetVSDGuidance(BaseObject):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         guidance_scale_lora: float = 1.0
-        condition_scale: float = 1.5
+        condition_scale: float = 0.5
         grad_clip: Optional[
             Any
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
@@ -124,22 +124,25 @@ class ControlNetVSDGuidance(BaseObject):
         pipe = StableDiffusionControlNetPipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path, controlnet=controlnet, **pipe_kwargs
         ).to(self.device)
-        if (
-            self.cfg.pretrained_model_name_or_path
-            == self.cfg.pretrained_model_name_or_path_lora
-        ):
-            self.single_model = True
-            pipe_lora = pipe
-        else:
-            self.single_model = False
-            pipe_lora = StableDiffusionControlNetPipeline.from_pretrained(
-                self.cfg.pretrained_model_name_or_path_lora,
-                controlnet=controlnet,
-                **pipe_lora_kwargs,
-            ).to(self.device)
-            del pipe_lora.vae
-            cleanup()
-            pipe_lora.vae = pipe.vae
+
+        # force single model false
+        # if (
+        #     self.cfg.pretrained_model_name_or_path
+        #     == self.cfg.pretrained_model_name_or_path_lora
+        # ):
+        #     self.single_model = True
+        #     pipe_lora = pipe
+        # else:
+        self.single_model = False
+        pipe_lora = StableDiffusionControlNetPipeline.from_pretrained(
+            self.cfg.pretrained_model_name_or_path_lora,
+            controlnet=controlnet,
+            **pipe_lora_kwargs,
+        ).to(self.device)
+        del pipe_lora.vae
+        cleanup()
+        pipe_lora.vae = pipe.vae
+
         self.submodules = SubModules(pipe=pipe, pipe_lora=pipe_lora)
 
         self.scheduler = DDIMScheduler.from_pretrained(
@@ -200,6 +203,8 @@ class ControlNetVSDGuidance(BaseObject):
         for p in self.unet.parameters():
             p.requires_grad_(False)
         for p in self.unet_lora.parameters():
+            p.requires_grad_(False)
+        for p in self.controlnet.parameters():
             p.requires_grad_(False)
 
         # set up LoRA layers
@@ -311,10 +316,10 @@ class ControlNetVSDGuidance(BaseObject):
             latents.to(self.weights_dtype),
             t.to(self.weights_dtype),
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
+            cross_attention_kwargs=cross_attention_kwargs,
+            class_labels=class_labels,
             down_block_additional_residuals=down_block_additional_residuals,
             mid_block_additional_residual=mid_block_additional_residual,
-            class_labels=class_labels,
-            cross_attention_kwargs=cross_attention_kwargs,
         ).sample.to(input_dtype)
 
     @torch.cuda.amp.autocast(enabled=False)
@@ -439,8 +444,7 @@ class ControlNetVSDGuidance(BaseObject):
                 latent_model_input,
                 t,
                 encoder_hidden_states=torch.cat([text_embeddings_cond] * 2),
-                down_block_additional_residuals=down_block_res_samples,
-                mid_block_additional_residual=mid_block_res_sample,
+                cross_attention_kwargs={"scale": 1.0},
                 class_labels=torch.cat(
                     [
                         camera_condition.view(B, -1),
@@ -448,7 +452,8 @@ class ControlNetVSDGuidance(BaseObject):
                     ],
                     dim=0,
                 ),
-                cross_attention_kwargs={"scale": 1.0},
+                down_block_additional_residuals=None,
+                mid_block_additional_residual=None,
             )
 
         # perform classifier-free guidance
@@ -519,17 +524,6 @@ class ControlNetVSDGuidance(BaseObject):
         # use view-independent text embeddings in LoRA
         text_embeddings_cond, _ = text_embeddings.chunk(2)
 
-        down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
-            self.controlnet,
-            noisy_latents,
-            t,
-            encoder_hidden_states=text_embeddings_cond.repeat(
-                self.cfg.lora_n_timestamp_samples, 1, 1
-            ),
-            image_cond=image_cond,
-            condition_scale=self.cfg.condition_scale,
-        )
-
         noise_pred = self.forward_control_unet(
             self.unet_lora,
             noisy_latents,
@@ -537,12 +531,12 @@ class ControlNetVSDGuidance(BaseObject):
             encoder_hidden_states=text_embeddings_cond.repeat(
                 self.cfg.lora_n_timestamp_samples, 1, 1
             ),
-            down_block_additional_residuals=down_block_res_samples,
-            mid_block_additional_residual=mid_block_res_sample,
-            class_labels=camera_condition.view(B, -1).repeat(
-                self.cfg.lora_n_timestamp_samples, 1
-            ),
             cross_attention_kwargs={"scale": 1.0},
+            class_labels=torch.ones(B, 4, 4, device=noisy_latents.device)
+            .view(B, -1)
+            .repeat(self.cfg.lora_n_timestamp_samples, 1),
+            down_block_additional_residuals=None,
+            mid_block_additional_residual=None,
         )
         return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
 
