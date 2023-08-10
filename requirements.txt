@@ -5,7 +5,7 @@ typeguard
 git+https://github.com/KAIR-BAIR/nerfacc.git@v0.5.2
 git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 diffusers
-transformers
+transformers==4.28.1
 accelerate
 opencv-python
 tensorboard
@@ -26,7 +26,7 @@ torchmetrics
 
 # deepfloyd
 xformers
-bitsandbytes
+bitsandbytes==0.38.1
 sentencepiece
 safetensors
 huggingface_hub
