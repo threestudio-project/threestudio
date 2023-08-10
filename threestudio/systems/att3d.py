@@ -155,17 +155,28 @@ class ATT3D(BaseLift3DSystem):
     def test_step(self, batch, batch_idx):
         if self.prompt_processor.cfg.use_att3d_interpolation:
             weights = torch.linspace(0, 1, 601)
+            from tqdm import tqdm
+            for ind, weight in tqdm(enumerate(weights)):
+                self.prompt_processor.cfg.att3d_interpolate_weight = weight.item()
+                self.prompt_processor.update_text_embeddings(val=True)
+                self.from_hyper_net()
+                out = self(batch)
+                self.save_image_grid(
+                    f"it{self.true_global_step}-test/{ind}.png",
+                    [
+                        {
+                            "type": "rgb",
+                            "img": out["comp_rgb"][0],
+                            "kwargs": {"data_format": "HWC"},
+                        },
+                    ],
+                    name="test_step",
+                    step=self.true_global_step,
+                )
         else:
-            weights = torch.linspace(0, 1, 1)
-        
-        from tqdm import tqdm
-        for ind, weight in tqdm(enumerate(weights)):
-            self.prompt_processor.cfg.att3d_interpolate_weight = weight.item()
-            self.prompt_processor.update_text_embeddings(val=True)
-            self.from_hyper_net()
             out = self(batch)
             self.save_image_grid(
-                f"it{self.true_global_step}-test/{ind}.png",
+                f"it{self.true_global_step}-test/{batch['index'][0]}.png",
                 [
                     {
                         "type": "rgb",

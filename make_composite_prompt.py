@@ -1,30 +1,51 @@
 import json
 
-themes = [
-    "blue",
-    "red",
-    "green",
-    "purple"
+### <subjects> x <colors>
+# themes = [
+#     "blue",
+#     "red",
+#     "green",
+#     "purple"
+# ]
+
+# subjects = [
+#     "a squirrel",
+#     "an airplane",
+#     "a hamburger",
+#     "a pineapple"
+# ]
+
+activities = [
+    "riding a bicycle",
+    "sitting on a chair",
+    "playing the guitar",
+    "holding a shovel",
+    "holding a blue balloon",
+    "holding a book",
+    "wielding a katana"
 ]
 
-subjects = [
-    "a squirrel",
-    "an airplane",
-    "a hamburger",
-    "a pineapple"
+themes = [
+    "made out of gold",
+    "carved out of wood",
+    "wearing a leather jacket",
+    "wearing a tophat",
+    "wearing a party hat",
+    "wearing a sombrero",
+    "wearing medieval armor"
 ]
 
 
 def main():
     prompts = []
     for i, theme in enumerate(themes):
-        for j, subject in enumerate(subjects):
+        for j, activity in enumerate(activities):
             if i != j:
-                prompts.append(f"{subject}, {theme}")
+                prompts.append(f"a pig {activity} {theme}")
     prompt_library = {
         "compositional_prompts": prompts
     }
-    with open("load/composite_prompts_3.json", "w") as f:
+    with open("load/composite_prompts_5.json", "w") as f:
         json.dump(prompt_library, f, indent=2)
 
 
