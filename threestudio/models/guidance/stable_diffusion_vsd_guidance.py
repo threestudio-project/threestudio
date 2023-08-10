@@ -573,17 +573,34 @@ class StableDiffusionVSDGuidance(BaseModule):
         latents: Float[Tensor, "B 4 64 64"],
         text_embeddings: Float[Tensor, "BB 77 768"],
         camera_condition: Float[Tensor, "B 4 4"],
+        current_step_ratio=None,
     ):
         B = latents.shape[0]
         latents = latents.detach().repeat(self.cfg.lora_n_timestamp_samples, 1, 1, 1)
 
-        t = torch.randint(
-            int(self.num_train_timesteps * 0.0),
-            int(self.num_train_timesteps * 1.0),
-            [B * self.cfg.lora_n_timestamp_samples],
-            dtype=torch.long,
-            device=self.device,
-        )
+        if self.cfg.time_prior is not None:
+            time_index = torch.where(
+                (self.time_prior_acc_weights - current_step_ratio) > 0
+            )[0][0]
+            if time_index == 0 or torch.abs(
+                self.time_prior_acc_weights[time_index] - current_step_ratio
+            ) < torch.abs(
+                self.time_prior_acc_weights[time_index - 1] - current_step_ratio
+            ):
+                t = self.num_train_timesteps - time_index
+            else:
+                t = self.num_train_timesteps - time_index + 1
+            t = torch.clip(t, self.min_step, self.max_step + 1)
+            t = torch.full((B,), t, dtype=torch.long, device=self.device)
+        else:
+            # random timestamp
+            t = torch.randint(
+                self.min_step,
+                self.max_step + 1,
+                [B],
+                dtype=torch.long,
+                device=self.device,
+            )
 
         noise = torch.randn_like(latents)
         noisy_latents = self.scheduler_lora.add_noise(latents, noise, t)
@@ -686,7 +703,12 @@ class StableDiffusionVSDGuidance(BaseModule):
         target = (latents - grad).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
+        loss_lora = self.train_lora(
+            latents,
+            text_embeddings,
+            camera_condition,
+            current_step_ratio,
+        )
 
         return {
             "loss_vsd": loss_vsd,

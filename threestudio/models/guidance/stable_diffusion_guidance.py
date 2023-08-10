@@ -425,7 +425,6 @@ class StableDiffusionGuidance(BaseObject):
             else:
                 t = self.num_train_timesteps - time_index + 1
             t = torch.clip(t, self.min_step, self.max_step + 1)
-            print(f"t is {t}")
             t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
 
         else:
