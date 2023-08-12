@@ -218,7 +218,7 @@ class HyperNet(nn.Module):
     def __init__(self, dim_in: int, dim_out: int, dim_hidden: int):
         super().__init__()
         self.linear1 = spectral_norm(self.make_linear(dim_in, dim_hidden, bias=True, init_range=1e-1))
-        self.linear2 = spectral_norm(self.make_linear(dim_hidden, dim_out, bias=False, init_range=1e-3))
+        self.linear2 = spectral_norm(self.make_linear(dim_hidden, dim_out, bias=False, init_range=1e-1))
 
     def make_linear(self, dim_in, dim_out, bias, init_range = None):
         layer = nn.Linear(dim_in, dim_out, bias=bias)

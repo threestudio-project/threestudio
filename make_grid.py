@@ -8,25 +8,54 @@ from tqdm import tqdm
 
 
 def make_path_composite():
-    path = "outputs/att3d-if/composite_prompts@20230804-194850/save"
-    themes = [
-        "blue",
-        "red",
-        "green",
-        "purple"
+    # path = "outputs/att3d-if/composite_prompts@20230804-194850/save"
+    # themes = [
+    #     "blue",
+    #     "red",
+    #     "green",
+    #     "purple"
+    # ]
+
+    # subjects = [
+    #     "a squirrel",
+    #     "an airplane",
+    #     "a hamburger",
+    #     "a pineapple"
+    # ]
+
+    # paths = []
+    # for subject in subjects:
+    #     for theme in themes:
+    #         subpath = os.path.join(path, f"{subject}, {theme}")
+    #         folder = sorted(os.listdir(subpath))[0]
+    #         paths.append(os.path.join(subpath, folder, "0.png"))
+    # return paths
+
+    path = "outputs/att3d-if/composite_prompts@20230810-222327/save"
+    activities = [
+        "riding a bicycle",
+        "sitting on a chair",
+        "playing the guitar",
+        "holding a shovel",
+        "holding a blue balloon",
+        "holding a book",
+        "wielding a katana"
     ]
 
-    subjects = [
-        "a squirrel",
-        "an airplane",
-        "a hamburger",
-        "a pineapple"
+    themes = [
+        "made out of gold",
+        "carved out of wood",
+        "wearing a leather jacket",
+        "wearing a tophat",
+        "wearing a party hat",
+        "wearing a sombrero",
+        "wearing medieval armor"
     ]
 
     paths = []
-    for subject in subjects:
-        for theme in themes:
-            subpath = os.path.join(path, f"{subject}, {theme}")
+    for theme in themes:
+        for activity in activities:
+            subpath = os.path.join(path, f"a pig {activity} {theme}")
             folder = sorted(os.listdir(subpath))[0]
             paths.append(os.path.join(subpath, folder, "0.png"))
     return paths

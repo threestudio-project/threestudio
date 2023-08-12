@@ -176,7 +176,7 @@ class ATT3D(BaseLift3DSystem):
         else:
             out = self(batch)
             self.save_image_grid(
-                f"it{self.true_global_step}-test/{batch['index'][0]}.png",
+                f"{self.prompt_processor.prompt}/it{self.true_global_step}-test/{batch['index'][0]}.png",
                 [
                     {
                         "type": "rgb",
@@ -207,12 +207,23 @@ class ATT3D(BaseLift3DSystem):
             )
 
     def on_test_epoch_end(self):
-        self.save_img_sequence(
-            f"{self.prompt_processor.prompt.replace(' ', '_')}-it{self.true_global_step}-test",
-            f"it{self.true_global_step}-test",
-            "(\d+)\.png",
-            save_format="mp4",
-            fps=30,
-            name="test",
-            step=self.true_global_step,
-        )
+        if self.prompt_processor.cfg.use_att3d_interpolation:
+            self.save_img_sequence(
+                f"{self.prompt_processor.prompt.replace(' ', '_')}-it{self.true_global_step}-test",
+                f"it{self.true_global_step}-test",
+                "(\d+)\.png",
+                save_format="mp4",
+                fps=30,
+                name="test",
+                step=self.true_global_step,
+            )
+        else:
+            self.save_img_sequence(
+                f"{self.prompt_processor.prompt}-it{self.true_global_step}-test",
+                f"{self.prompt_processor.prompt}/it{self.true_global_step}-test",
+                "(\d+)\.png",
+                save_format="mp4",
+                fps=30,
+                name="test",
+                step=self.true_global_step,
+            )
