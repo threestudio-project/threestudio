@@ -118,3 +118,8 @@ def broadcast(tensor, src=0):
     else:
         torch.distributed.broadcast(tensor, src=src)
         return tensor
+
+
+def disable_gradient(model):
+    for param in model.parameters():
+        param.requires_grad_(False)

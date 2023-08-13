@@ -10,3 +10,6 @@ indent_size = 4
 
 [*.md]
 trim_trailing_whitespace = false
+
+[*.yaml]
+indent_size = 2
