@@ -10,5 +10,5 @@ from . import (
     sjc,
     textmesh,
     zero123,
-    zero123_debug,
+    zero123_simple,
 )

@@ -1,25 +1,29 @@
+import os
 import random
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 from diffusers import (
     AutoencoderKL,
     ControlNetModel,
     DDPMScheduler,
     DPMSolverSinglestepScheduler,
-    StableDiffusionPipeline,
     UNet2DConditionModel,
 )
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.models.embeddings import TimestepEmbedding
 from diffusers.utils.import_utils import is_xformers_available
+from PIL import Image
 from tqdm import tqdm
 
 import threestudio
+from extern.zero123 import Zero123Pipeline
 from threestudio.models.networks import ToDTypeWrapper
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
@@ -28,17 +32,16 @@ from threestudio.utils.ops import perpendicular_component
 from threestudio.utils.typing import *
 
 
-@threestudio.register("stable-diffusion-unified-guidance")
-class StableDiffusionUnifiedGuidance(BaseModule):
+@threestudio.register("zero123-unified-guidance")
+class Zero123UnifiedGuidance(BaseModule):
     @dataclass
     class Config(BaseModule.Config):
         # guidance type, in ["sds", "vsd"]
         guidance_type: str = "sds"
 
-        pretrained_model_name_or_path: str = "runwayml/stable-diffusion-v1-5"
-        guidance_scale: float = 100.0
+        pretrained_model_name_or_path: str = "bennyguo/zero123-diffusers"
+        guidance_scale: float = 5.0
         weighting_strategy: str = "dreamfusion"
-        view_dependent_prompting: bool = True
 
         min_step_percent: Any = 0.02
         max_step_percent: Any = 0.98
@@ -48,27 +51,16 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         return_rgb_multistep_orig: bool = False
         n_rgb_multistep_orig_steps: int = 4
 
-        # TODO
-        # controlnet
-        controlnet_model_name_or_path: Optional[str] = None
-        preprocessor: Optional[str] = None
-        control_scale: float = 1.0
-
-        # TODO
-        # lora
-        lora_model_name_or_path: Optional[str] = None
+        cond_image_path: str = ""
+        cond_elevation_deg: float = 0.0
+        cond_azimuth_deg: float = 0.0
+        cond_camera_distance: float = 1.2
 
         # efficiency-related configurations
         half_precision_weights: bool = True
-        enable_memory_efficient_attention: bool = False
-        enable_sequential_cpu_offload: bool = False
-        enable_attention_slicing: bool = False
-        enable_channels_last_format: bool = False
-        token_merging: bool = False
-        token_merging_params: Optional[dict] = field(default_factory=dict)
 
         # VSD configurations, only used when guidance_type is "vsd"
-        vsd_phi_model_name_or_path: Optional[str] = "stabilityai/stable-diffusion-2-1"
+        vsd_phi_model_name_or_path: Optional[str] = "bennyguo/zero123-diffusers"
         vsd_guidance_scale_phi: float = 1.0
         vsd_use_lora: bool = True
         vsd_lora_cfg_training: bool = False
@@ -86,29 +78,29 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
         @dataclass
         class NonTrainableModules:
-            pipe: StableDiffusionPipeline
-            pipe_phi: Optional[StableDiffusionPipeline] = None
-            controlnet: Optional[ControlNetModel] = None
+            pipe: Zero123Pipeline
+            pipe_phi: Optional[Zero123Pipeline] = None
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
         )
 
-        threestudio.info(f"Loading Stable Diffusion ...")
+        threestudio.info(f"Loading Zero123 ...")
+
+        # need to make sure the pipeline file is in path
+        sys.path.append("extern/")
 
         pipe_kwargs = {
-            "tokenizer": None,
             "safety_checker": None,
-            "feature_extractor": None,
             "requires_safety_checker": False,
+            "variant": "fp16" if self.cfg.half_precision_weights else None,
             "torch_dtype": self.weights_dtype,
         }
-        pipe = StableDiffusionPipeline.from_pretrained(
+        pipe = Zero123Pipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             **pipe_kwargs,
         ).to(self.device)
         self.prepare_pipe(pipe)
-        self.configure_pipe_token_merging(pipe)
 
         # phi network for VSD
         # introduce two trainable modules:
@@ -126,12 +118,11 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             if self.cfg.vsd_phi_model_name_or_path is None:
                 pipe_phi = pipe
             else:
-                pipe_phi = StableDiffusionPipeline.from_pretrained(
+                pipe_phi = Zero123Pipeline.from_pretrained(
                     self.cfg.vsd_phi_model_name_or_path,
                     **pipe_kwargs,
                 ).to(self.device)
                 self.prepare_pipe(pipe_phi)
-                self.configure_pipe_token_merging(pipe_phi)
 
             # set up camera embedding
             if self.cfg.vsd_use_camera_condition:
@@ -181,20 +172,6 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
         threestudio.info(f"Loaded Stable Diffusion!")
 
-        # controlnet
-        controlnet = None
-        if self.cfg.controlnet_model_name_or_path is not None:
-            threestudio.info(f"Loading ControlNet ...")
-
-            controlnet = ControlNetModel.from_pretrained(
-                self.cfg.controlnet_model_name_or_path,
-                torch_dtype=self.weights_dtype,
-            ).to(self.device)
-            controlnet.eval()
-            disable_gradient(controlnet)
-
-            threestudio.info(f"Loaded ControlNet!")
-
         self.scheduler = DDPMScheduler.from_config(pipe.scheduler.config)
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
 
@@ -211,65 +188,102 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         self._non_trainable_modules = NonTrainableModules(
             pipe=pipe,
             pipe_phi=pipe_phi,
-            controlnet=controlnet,
         )
 
+        # self.clip_image_embeddings and self.image_latents
+        self.prepare_image_embeddings()
+
     @property
-    def pipe(self) -> StableDiffusionPipeline:
+    def pipe(self) -> Zero123Pipeline:
         return self._non_trainable_modules.pipe
 
     @property
-    def pipe_phi(self) -> StableDiffusionPipeline:
+    def pipe_phi(self) -> Zero123Pipeline:
         if self._non_trainable_modules.pipe_phi is None:
             raise RuntimeError("phi model is not available.")
         return self._non_trainable_modules.pipe_phi
 
-    @property
-    def controlnet(self) -> ControlNetModel:
-        if self._non_trainable_modules.controlnet is None:
-            raise RuntimeError("ControlNet model is not available.")
-        return self._non_trainable_modules.controlnet
-
-    def prepare_pipe(self, pipe: StableDiffusionPipeline):
-        if self.cfg.enable_memory_efficient_attention:
-            if parse_version(torch.__version__) >= parse_version("2"):
-                threestudio.info(
-                    "PyTorch2.0 uses memory efficient attention by default."
-                )
-            elif not is_xformers_available():
-                threestudio.warn(
-                    "xformers is not available, memory efficient attention is not enabled."
-                )
-            else:
-                pipe.enable_xformers_memory_efficient_attention()
-
-        if self.cfg.enable_sequential_cpu_offload:
-            pipe.enable_sequential_cpu_offload()
-
-        if self.cfg.enable_attention_slicing:
-            pipe.enable_attention_slicing(1)
-
-        if self.cfg.enable_channels_last_format:
-            pipe.unet.to(memory_format=torch.channels_last)
-
-        # FIXME: pipe.__call__ requires text_encoder.dtype
-        # pipe.text_encoder.to("meta")
+    def prepare_pipe(self, pipe: Zero123Pipeline):
         cleanup()
 
+        pipe.image_encoder.eval()
         pipe.vae.eval()
         pipe.unet.eval()
+        pipe.clip_camera_projection.eval()
 
+        disable_gradient(pipe.image_encoder)
         disable_gradient(pipe.vae)
         disable_gradient(pipe.unet)
+        disable_gradient(pipe.clip_camera_projection)
 
         # disable progress bar
         pipe.set_progress_bar_config(disable=True)
 
-    def configure_pipe_token_merging(self, pipe: StableDiffusionPipeline):
-        if self.cfg.token_merging:
-            import tomesd
+    def prepare_image_embeddings(self) -> None:
+        if not os.path.exists(self.cfg.cond_image_path):
+            raise RuntimeError(
+                f"Condition image not found at {self.cfg.cond_image_path}"
+            )
+        image = Image.open(self.cfg.cond_image_path).convert("RGBA").resize((256, 256))
+        image = (
+            TF.to_tensor(image)
+            .unsqueeze(0)
+            .to(device=self.device, dtype=self.weights_dtype)
+        )
+        # rgba -> rgb, apply white background
+        image = image[:, :3] * image[:, 3:4] + (1 - image[:, 3:4])
 
-            tomesd.apply_patch(pipe.unet, **self.cfg.token_merging_params)
+        with torch.no_grad():
+            self.clip_image_embeddings: Float[
+                Tensor, "1 1 D"
+            ] = self.extract_clip_image_embeddings(image)
+
+            # encoded latents should be multiplied with vae.config.scaling_factor
+            # but zero123 was not trained this way
+            self.image_latents: Float[Tensor, "1 4 Hl Wl"] = (
+                self.vae_encode(self.pipe.vae, image * 2.0 - 1.0, mode=True)
+                / self.pipe.vae.config.scaling_factor
+            )
+
+    def extract_clip_image_embeddings(
+        self, images: Float[Tensor, "B 3 H W"]
+    ) -> Float[Tensor, "B 1 D"]:
+        # expect images in [0, 1]
+        images_pil = [TF.to_pil_image(image) for image in images]
+        images_processed = self.pipe.feature_extractor(
+            images=images_pil, return_tensors="pt"
+        ).pixel_values.to(device=self.device, dtype=self.weights_dtype)
+        clip_image_embeddings = self.pipe.image_encoder(images_processed).image_embeds
+        return clip_image_embeddings.to(images.dtype)
+
+    def get_image_camera_embeddings(
+        self,
+        elevation_deg: Float[Tensor, "B"],
+        azimuth_deg: Float[Tensor, "B"],
+        camera_distances: Float[Tensor, "B"],
+    ) -> Float[Tensor, "B 1 D"]:
+        batch_size = elevation_deg.shape[0]
+        camera_embeddings: Float[Tensor, "B 1 4"] = torch.stack(
+            [
+                torch.deg2rad(self.cfg.cond_elevation_deg - elevation_deg),
+                torch.sin(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
+                torch.cos(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
+                camera_distances - self.cfg.cond_camera_distance,
+            ],
+            dim=-1,
+        )[:, None, :]
+
+        image_camera_embeddings = self.pipe.clip_camera_projection(
+            torch.cat(
+                [
+                    self.clip_image_embeddings.repeat(batch_size, 1, 1),
+                    camera_embeddings,
+                ],
+                dim=-1,
+            ).to(self.weights_dtype)
+        )
+
+        return image_camera_embeddings
 
     @torch.cuda.amp.autocast(enabled=False)
     def forward_unet(
@@ -335,9 +349,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             unet.class_embedding = class_embedding
 
     @contextmanager
-    def set_scheduler(
-        self, pipe: StableDiffusionPipeline, scheduler_class: Any, **kwargs
-    ):
+    def set_scheduler(self, pipe: Zero123Pipeline, scheduler_class: Any, **kwargs):
         scheduler_orig = pipe.scheduler
         pipe.scheduler = scheduler_class.from_config(scheduler_orig.config, **kwargs)
         yield pipe
@@ -347,72 +359,51 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         self,
         latents_noisy: Float[Tensor, "B 4 Hl Wl"],
         t: Int[Tensor, "B"],
-        prompt_utils: PromptProcessorOutput,
+        image_camera_embeddings: Float[Tensor, "B 1 D"],
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
     ) -> Float[Tensor, "B 4 Hl Wl"]:
         batch_size = latents_noisy.shape[0]
 
-        if prompt_utils.use_perp_neg:
-            (
-                text_embeddings,
-                neg_guidance_weights,
-            ) = prompt_utils.get_text_embeddings_perp_neg(
-                elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
-            )
-            with torch.no_grad():
-                with self.disable_unet_class_embedding(self.pipe.unet) as unet:
-                    noise_pred = self.forward_unet(
-                        unet,
-                        torch.cat([latents_noisy] * 4, dim=0),
-                        torch.cat([t] * 4, dim=0),
-                        encoder_hidden_states=text_embeddings,
-                        cross_attention_kwargs={"scale": 0.0}
-                        if self.vsd_share_model
-                        else None,
-                        velocity_to_epsilon=self.pipe.scheduler.config.prediction_type
-                        == "v_prediction",
-                    )  # (4B, 3, Hl, Wl)
+        with torch.no_grad():
+            with self.disable_unet_class_embedding(self.pipe.unet) as unet:
+                noise_pred = self.forward_unet(
+                    unet,
+                    torch.cat(
+                        [
+                            torch.cat([latents_noisy] * 2, dim=0),
+                            torch.cat(
+                                [
+                                    self.image_latents.repeat(batch_size, 1, 1, 1),
+                                    torch.zeros_like(self.image_latents).repeat(
+                                        batch_size, 1, 1, 1
+                                    ),
+                                ],
+                                dim=0,
+                            ),
+                        ],
+                        dim=1,
+                    ),
+                    torch.cat([t] * 2, dim=0),
+                    encoder_hidden_states=torch.cat(
+                        [
+                            image_camera_embeddings,
+                            torch.zeros_like(image_camera_embeddings),
+                        ],
+                        dim=0,
+                    ),
+                    cross_attention_kwargs={"scale": 0.0}
+                    if self.vsd_share_model
+                    else None,
+                    velocity_to_epsilon=self.pipe.scheduler.config.prediction_type
+                    == "v_prediction",
+                )
 
-            noise_pred_text = noise_pred[:batch_size]
-            noise_pred_uncond = noise_pred[batch_size : batch_size * 2]
-            noise_pred_neg = noise_pred[batch_size * 2 :]
-
-            e_pos = noise_pred_text - noise_pred_uncond
-            accum_grad = 0
-            n_negative_prompts = neg_guidance_weights.shape[-1]
-            for i in range(n_negative_prompts):
-                e_i_neg = noise_pred_neg[i::n_negative_prompts] - noise_pred_uncond
-                accum_grad += neg_guidance_weights[:, i].view(
-                    -1, 1, 1, 1
-                ) * perpendicular_component(e_i_neg, e_pos)
-
-            noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-                e_pos + accum_grad
-            )
-        else:
-            text_embeddings = prompt_utils.get_text_embeddings(
-                elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
-            )
-            with torch.no_grad():
-                with self.disable_unet_class_embedding(self.pipe.unet) as unet:
-                    noise_pred = self.forward_unet(
-                        unet,
-                        torch.cat([latents_noisy] * 2, dim=0),
-                        torch.cat([t] * 2, dim=0),
-                        encoder_hidden_states=text_embeddings,
-                        cross_attention_kwargs={"scale": 0.0}
-                        if self.vsd_share_model
-                        else None,
-                        velocity_to_epsilon=self.pipe.scheduler.config.prediction_type
-                        == "v_prediction",
-                    )
-
-            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-                noise_pred_text - noise_pred_uncond
-            )
+        noise_pred_image, noise_pred_uncond = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
+            noise_pred_image - noise_pred_uncond
+        )
 
         return noise_pred
 
@@ -420,7 +411,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         self,
         latents_noisy: Float[Tensor, "B 4 Hl Wl"],
         t: Int[Tensor, "B"],
-        prompt_utils: PromptProcessorOutput,
+        image_camera_embeddings: Float[Tensor, "B 1 D"],
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
@@ -428,16 +419,21 @@ class StableDiffusionUnifiedGuidance(BaseModule):
     ) -> Float[Tensor, "B 4 Hl Wl"]:
         batch_size = latents_noisy.shape[0]
 
-        # not using view-dependent prompting in LoRA
-        text_embeddings, _ = prompt_utils.get_text_embeddings(
-            elevation, azimuth, camera_distances, view_dependent_prompting=False
-        ).chunk(2)
         with torch.no_grad():
             noise_pred = self.forward_unet(
                 self.pipe_phi.unet,
-                torch.cat([latents_noisy] * 2, dim=0),
+                torch.cat(
+                    [
+                        torch.cat([latents_noisy] * 2, dim=0),
+                        torch.cat(
+                            [self.image_latents.repeat(batch_size, 1, 1, 1)] * 2,
+                            dim=0,
+                        ),
+                    ],
+                    dim=1,
+                ),
                 torch.cat([t] * 2, dim=0),
-                encoder_hidden_states=torch.cat([text_embeddings] * 2, dim=0),
+                encoder_hidden_states=torch.cat([image_camera_embeddings] * 2, dim=0),
                 class_labels=torch.cat(
                     [
                         camera_condition.view(batch_size, -1),
@@ -462,7 +458,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
     def train_phi(
         self,
         latents: Float[Tensor, "B 4 Hl Wl"],
-        prompt_utils: PromptProcessorOutput,
+        image_camera_embeddings: Float[Tensor, "B 1 D"],
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
@@ -493,11 +489,6 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                 f"Unknown prediction type {self.pipe_phi.scheduler.prediction_type}"
             )
 
-        # not using view-dependent prompting in LoRA
-        text_embeddings, _ = prompt_utils.get_text_embeddings(
-            elevation, azimuth, camera_distances, view_dependent_prompting=False
-        ).chunk(2)
-
         if (
             self.cfg.vsd_use_camera_condition
             and self.cfg.vsd_lora_cfg_training
@@ -507,9 +498,9 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
         noise_pred = self.forward_unet(
             self.pipe_phi.unet,
-            latents_noisy,
+            torch.cat([latents_noisy, self.image_latents.repeat(B, 1, 1, 1)], dim=1),
             t,
-            encoder_hidden_states=text_embeddings.repeat(
+            encoder_hidden_states=image_camera_embeddings.repeat(
                 self.cfg.vsd_lora_n_timestamp_samples, 1, 1
             ),
             class_labels=camera_condition.view(B, -1).repeat(
@@ -524,7 +515,6 @@ class StableDiffusionUnifiedGuidance(BaseModule):
     def forward(
         self,
         rgb: Float[Tensor, "B H W C"],
-        prompt_utils: PromptProcessorOutput,
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
@@ -537,18 +527,18 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         batch_size = rgb.shape[0]
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents: Float[Tensor, "B 4 Hl Wl"]
+        latents: Float[Tensor, "B 4 32 32"]
         if rgb_as_latents:
             # treat input rgb as latents
             # input rgb should be in range [-1, 1]
             latents = F.interpolate(
-                rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
+                rgb_BCHW, (32, 32), mode="bilinear", align_corners=False
             )
         else:
             # treat input rgb as rgb
             # input rgb should be in range [0, 1]
             rgb_BCHW = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+                rgb_BCHW, (256, 256), mode="bilinear", align_corners=False
             )
             # encode image into latents with vae
             latents = self.vae_encode(self.pipe.vae, rgb_BCHW * 2.0 - 1.0)
@@ -568,8 +558,18 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         noise = torch.randn_like(latents)
         latents_noisy = self.scheduler.add_noise(latents, noise, t)
 
+        # image-camera feature condition
+        image_camera_embeddings = self.get_image_camera_embeddings(
+            elevation, azimuth, camera_distances
+        )
+
         eps_pretrain = self.get_eps_pretrain(
-            latents_noisy, t, prompt_utils, elevation, azimuth, camera_distances
+            latents_noisy,
+            t,
+            image_camera_embeddings,
+            elevation,
+            azimuth,
+            camera_distances,
         )
 
         latents_1step_orig = (
@@ -602,7 +602,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             eps_phi = self.get_eps_phi(
                 latents_noisy,
                 t,
-                prompt_utils,
+                image_camera_embeddings,
                 elevation,
                 azimuth,
                 camera_distances,
@@ -611,7 +611,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
             loss_train_phi = self.train_phi(
                 latents,
-                prompt_utils,
+                image_camera_embeddings,
                 elevation,
                 azimuth,
                 camera_distances,
@@ -666,21 +666,16 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                 solver_order=1,
                 num_train_timesteps=int(t[0]),
             ) as pipe:
-                text_embeddings = prompt_utils.get_text_embeddings(
-                    elevation,
-                    azimuth,
-                    camera_distances,
-                    self.cfg.view_dependent_prompting,
-                )
-                text_embeddings_cond, text_embeddings_uncond = text_embeddings.chunk(2)
                 with torch.cuda.amp.autocast(enabled=False):
                     latents_multistep_orig = pipe(
                         num_inference_steps=self.cfg.n_rgb_multistep_orig_steps,
                         guidance_scale=self.cfg.guidance_scale,
                         eta=1.0,
                         latents=latents_noisy.to(pipe.unet.dtype),
-                        prompt_embeds=text_embeddings_cond.to(pipe.unet.dtype),
-                        negative_prompt_embeds=text_embeddings_uncond.to(
+                        image_camera_embeddings=image_camera_embeddings.to(
+                            pipe.unet.dtype
+                        ),
+                        image_latents=self.image_latents.repeat(batch_size, 1, 1, 1).to(
                             pipe.unet.dtype
                         ),
                         cross_attention_kwargs={"scale": 0.0}

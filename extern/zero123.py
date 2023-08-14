@@ -15,7 +15,7 @@
 import inspect
 import math
 import warnings
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import PIL
 import torch
@@ -226,36 +226,57 @@ class Zero123Pipeline(DiffusionPipeline):
         device,
         num_images_per_prompt,
         do_classifier_free_guidance,
+        clip_image_embeddings=None,
+        image_camera_embeddings=None,
     ):
         dtype = next(self.image_encoder.parameters()).dtype
 
-        if not isinstance(image, torch.Tensor):
-            image = self.feature_extractor(
-                images=image, return_tensors="pt"
-            ).pixel_values
+        if image_camera_embeddings is None:
+            if image is None:
+                assert clip_image_embeddings is not None
+                image_embeddings = clip_image_embeddings.to(device=device, dtype=dtype)
+            else:
+                if not isinstance(image, torch.Tensor):
+                    image = self.feature_extractor(
+                        images=image, return_tensors="pt"
+                    ).pixel_values
 
-        image = image.to(device=device, dtype=dtype)
-        image_embeddings = self.image_encoder(image).image_embeds
-        image_embeddings = image_embeddings.unsqueeze(1)
-        bs_embed, seq_len, _ = image_embeddings.shape
+                image = image.to(device=device, dtype=dtype)
+                image_embeddings = self.image_encoder(image).image_embeds
+                image_embeddings = image_embeddings.unsqueeze(1)
 
-        camera_embeddings = (
-            torch.as_tensor(
+            bs_embed, seq_len, _ = image_embeddings.shape
+
+            if isinstance(elevation, float):
+                elevation = torch.as_tensor(
+                    [elevation] * bs_embed, dtype=dtype, device=device
+                )
+            if isinstance(azimuth, float):
+                azimuth = torch.as_tensor(
+                    [azimuth] * bs_embed, dtype=dtype, device=device
+                )
+            if isinstance(distance, float):
+                distance = torch.as_tensor(
+                    [distance] * bs_embed, dtype=dtype, device=device
+                )
+
+            camera_embeddings = torch.stack(
                 [
-                    math.radians(elevation),
-                    math.sin(math.radians(azimuth)),
-                    math.cos(math.radians(azimuth)),
+                    torch.deg2rad(elevation),
+                    torch.sin(azimuth),
+                    torch.cos(azimuth),
                     distance,
-                ]
-            )
-            .to(image_embeddings)[None, None, :]
-            .repeat(bs_embed, 1, 1)
-        )
+                ],
+                dim=-1,
+            )[:, None, :]
 
-        image_embeddings = torch.cat([image_embeddings, camera_embeddings], dim=-1)
+            image_embeddings = torch.cat([image_embeddings, camera_embeddings], dim=-1)
 
-        # project (image, camera) embeddings to the same dimension as clip embeddings
-        image_embeddings = self.clip_camera_projection(image_embeddings)
+            # project (image, camera) embeddings to the same dimension as clip embeddings
+            image_embeddings = self.clip_camera_projection(image_embeddings)
+        else:
+            image_embeddings = image_camera_embeddings.to(device=device, dtype=dtype)
+            bs_embed, seq_len, _ = image_embeddings.shape
 
         # duplicate image embeddings for each generation per prompt, using mps friendly method
         image_embeddings = image_embeddings.repeat(1, num_images_per_prompt, 1)
@@ -329,16 +350,6 @@ class Zero123Pipeline(DiffusionPipeline):
         return extra_step_kwargs
 
     def check_inputs(self, image, height, width, callback_steps):
-        if (
-            not isinstance(image, torch.Tensor)
-            and not isinstance(image, PIL.Image.Image)
-            and not isinstance(image, list)
-        ):
-            raise ValueError(
-                "`image` has to be of type `torch.FloatTensor` or `PIL.Image.Image` or `List[PIL.Image.Image]` but is"
-                f" {type(image)}"
-            )
-
         # TODO: check image size or adjust image size to (height, width)
 
         if height % 8 != 0 or width % 8 != 0:
@@ -393,9 +404,12 @@ class Zero123Pipeline(DiffusionPipeline):
     def _get_latent_model_input(
         self,
         latents: torch.FloatTensor,
-        image: Union[PIL.Image.Image, List[PIL.Image.Image], torch.FloatTensor],
+        image: Optional[
+            Union[PIL.Image.Image, List[PIL.Image.Image], torch.FloatTensor]
+        ],
         num_images_per_prompt: int,
         do_classifier_free_guidance: bool,
+        image_latents: Optional[torch.FloatTensor] = None,
     ):
         if isinstance(image, PIL.Image.Image):
             image_pt = TF.to_tensor(image).unsqueeze(0).to(latents)
@@ -403,14 +417,20 @@ class Zero123Pipeline(DiffusionPipeline):
             image_pt = torch.stack([TF.to_tensor(img) for img in image], dim=0).to(
                 latents
             )
-        else:
+        elif isinstance(image, torch.Tensor):
             image_pt = image
+        else:
+            image_pt = None
 
-        image_pt = image_pt * 2.0 - 1.0  # scale to [-1, 1]
-        # FIXME: encoded latents should be multiplied with self.vae.config.scaling_factor
-        # but zero123 was not trained this way
-        image_pt = self.vae.encode(image_pt).latent_dist.mode()
-        image_pt = image_pt.repeat_interleave(num_images_per_prompt, dim=0)
+        if image_pt is None:
+            assert image_latents is not None
+            image_pt = image_latents.repeat_interleave(num_images_per_prompt, dim=0)
+        else:
+            image_pt = image_pt * 2.0 - 1.0  # scale to [-1, 1]
+            # FIXME: encoded latents should be multiplied with self.vae.config.scaling_factor
+            # but zero123 was not trained this way
+            image_pt = self.vae.encode(image_pt).latent_dist.mode()
+            image_pt = image_pt.repeat_interleave(num_images_per_prompt, dim=0)
         if do_classifier_free_guidance:
             latent_model_input = torch.cat(
                 [
@@ -427,22 +447,28 @@ class Zero123Pipeline(DiffusionPipeline):
     @torch.no_grad()
     def __call__(
         self,
-        image: Union[PIL.Image.Image, List[PIL.Image.Image], torch.FloatTensor],
-        elevation: torch.FloatTensor,
-        azimuth: torch.FloatTensor,
-        distance: torch.FloatTensor,
+        image: Optional[
+            Union[PIL.Image.Image, List[PIL.Image.Image], torch.FloatTensor]
+        ] = None,
+        elevation: Optional[Union[float, torch.FloatTensor]] = None,
+        azimuth: Optional[Union[float, torch.FloatTensor]] = None,
+        distance: Optional[Union[float, torch.FloatTensor]] = None,
         height: Optional[int] = None,
         width: Optional[int] = None,
         num_inference_steps: int = 50,
         guidance_scale: float = 3.0,
-        num_images_per_prompt: Optional[int] = 1,
+        num_images_per_prompt: int = 1,
         eta: float = 0.0,
         generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
         latents: Optional[torch.FloatTensor] = None,
+        clip_image_embeddings: Optional[torch.FloatTensor] = None,
+        image_camera_embeddings: Optional[torch.FloatTensor] = None,
+        image_latents: Optional[torch.FloatTensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         callback: Optional[Callable[[int, int, torch.FloatTensor], None]] = None,
         callback_steps: int = 1,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ):
         r"""
         Function invoked when calling the pipeline for generation.
@@ -503,6 +529,8 @@ class Zero123Pipeline(DiffusionPipeline):
         width = width or self.unet.config.sample_size * self.vae_scale_factor
 
         # 1. Check inputs. Raise error if not correct
+        # TODO: check input elevation, azimuth, and distance
+        # TODO: check image, clip_image_embeddings, image_latents
         self.check_inputs(image, height, width, callback_steps)
 
         # 2. Define call parameters
@@ -510,8 +538,15 @@ class Zero123Pipeline(DiffusionPipeline):
             batch_size = 1
         elif isinstance(image, list):
             batch_size = len(image)
-        else:
+        elif isinstance(image, torch.Tensor):
             batch_size = image.shape[0]
+        else:
+            assert image_latents is not None
+            assert (
+                clip_image_embeddings is not None or image_camera_embeddings is not None
+            )
+            batch_size = image_latents.shape[0]
+
         device = self._execution_device
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -521,8 +556,10 @@ class Zero123Pipeline(DiffusionPipeline):
         # 3. Encode input image
         if isinstance(image, PIL.Image.Image) or isinstance(image, list):
             pil_image = image
-        else:
+        elif isinstance(image, torch.Tensor):
             pil_image = [TF.to_pil_image(image[i]) for i in range(image.shape[0])]
+        else:
+            pil_image = None
         image_embeddings = self._encode_image(
             pil_image,
             elevation,
@@ -531,6 +568,8 @@ class Zero123Pipeline(DiffusionPipeline):
             device,
             num_images_per_prompt,
             do_classifier_free_guidance,
+            clip_image_embeddings,
+            image_camera_embeddings,
         )
 
         # 4. Prepare timesteps
@@ -560,7 +599,11 @@ class Zero123Pipeline(DiffusionPipeline):
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = self._get_latent_model_input(
-                    latents, image, num_images_per_prompt, do_classifier_free_guidance
+                    latents,
+                    image,
+                    num_images_per_prompt,
+                    do_classifier_free_guidance,
+                    image_latents,
                 )
                 latent_model_input = self.scheduler.scale_model_input(
                     latent_model_input, t
@@ -568,7 +611,10 @@ class Zero123Pipeline(DiffusionPipeline):
 
                 # predict the noise residual
                 noise_pred = self.unet(
-                    latent_model_input, t, encoder_hidden_states=image_embeddings
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=image_embeddings,
+                    cross_attention_kwargs=cross_attention_kwargs,
                 ).sample
 
                 # perform guidance
