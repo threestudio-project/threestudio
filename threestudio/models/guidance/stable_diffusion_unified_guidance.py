@@ -23,7 +23,7 @@ import threestudio
 from threestudio.models.networks import ToDTypeWrapper
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import C, cleanup, disable_gradient, parse_version
+from threestudio.utils.misc import C, cleanup, enable_gradient, parse_version
 from threestudio.utils.ops import perpendicular_component
 from threestudio.utils.typing import *
 
@@ -193,7 +193,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                 torch_dtype=self.weights_dtype,
             ).to(self.device)
             controlnet.eval()
-            disable_gradient(controlnet)
+            enable_gradient(controlnet, enabled=False)
 
             threestudio.info(f"Loaded ControlNet!")
 
@@ -261,8 +261,8 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         pipe.vae.eval()
         pipe.unet.eval()
 
-        disable_gradient(pipe.vae)
-        disable_gradient(pipe.unet)
+        enable_gradient(pipe.vae, enabled=False)
+        enable_gradient(pipe.unet, enabled=False)
 
         # disable progress bar
         pipe.set_progress_bar_config(disable=True)

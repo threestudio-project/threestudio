@@ -25,7 +25,7 @@ from extern.zero123 import Zero123Pipeline
 from threestudio.models.networks import ToDTypeWrapper
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
-from threestudio.utils.misc import C, cleanup, disable_gradient, parse_version
+from threestudio.utils.misc import C, cleanup, enable_gradient, parse_version
 from threestudio.utils.typing import *
 
 
@@ -210,10 +210,10 @@ class Zero123UnifiedGuidance(BaseModule):
         pipe.unet.eval()
         pipe.clip_camera_projection.eval()
 
-        disable_gradient(pipe.image_encoder)
-        disable_gradient(pipe.vae)
-        disable_gradient(pipe.unet)
-        disable_gradient(pipe.clip_camera_projection)
+        enable_gradient(pipe.image_encoder, enabled=False)
+        enable_gradient(pipe.vae, enabled=False)
+        enable_gradient(pipe.unet, enabled=False)
+        enable_gradient(pipe.clip_camera_projection, enabled=False)
 
         # disable progress bar
         pipe.set_progress_bar_config(disable=True)

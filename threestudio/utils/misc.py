@@ -120,6 +120,6 @@ def broadcast(tensor, src=0):
         return tensor
 
 
-def disable_gradient(model):
+def enable_gradient(model, enabled: bool = True) -> None:
     for param in model.parameters():
-        param.requires_grad_(False)
+        param.requires_grad_(enabled)
