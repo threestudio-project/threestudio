@@ -335,3 +335,13 @@ def create_network_with_input_encoding(
             network_config=config_to_primitive(network_config),
         )
     return network_with_input_encoding
+
+
+class ToDTypeWrapper(nn.Module):
+    def __init__(self, module: nn.Module, dtype: torch.dtype):
+        super().__init__()
+        self.module = module
+        self.dtype = dtype
+
+    def forward(self, x: Float[Tensor, "..."]) -> Float[Tensor, "..."]:
+        return self.module(x).to(self.dtype)

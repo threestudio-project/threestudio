@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -16,6 +17,7 @@ from threestudio.models.geometry.implicit_volume import ImplicitVolume
 from threestudio.models.isosurface import MarchingTetrahedraHelper
 from threestudio.models.mesh import Mesh
 from threestudio.models.networks import get_encoding, get_mlp
+from threestudio.utils.misc import broadcast
 from threestudio.utils.ops import scale_tensor
 from threestudio.utils.typing import *
 
@@ -52,6 +54,8 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         )
         shape_init: Optional[str] = None
         shape_init_params: Optional[Any] = None
+        shape_init_mesh_up: str = "+z"
+        shape_init_mesh_front: str = "+x"
         force_shape_init: bool = False
         geometry_only: bool = False
         fix_geometry: bool = False
@@ -121,7 +125,114 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         self.mesh: Optional[Mesh] = None
 
     def initialize_shape(self) -> None:
-        raise NotImplementedError
+        if self.cfg.shape_init is None and not self.cfg.force_shape_init:
+            return
+
+        # do not initialize shape if weights are provided
+        if self.cfg.weights is not None and not self.cfg.force_shape_init:
+            return
+
+        get_gt_sdf: Callable[[Float[Tensor, "N 3"]], Float[Tensor, "N 1"]]
+        assert isinstance(self.cfg.shape_init, str)
+        if self.cfg.shape_init == "ellipsoid":
+            assert (
+                isinstance(self.cfg.shape_init_params, Sized)
+                and len(self.cfg.shape_init_params) == 3
+            )
+            size = torch.as_tensor(self.cfg.shape_init_params).to(self.device)
+
+            def func(points_rand: Float[Tensor, "N 3"]) -> Float[Tensor, "N 1"]:
+                return ((points_rand / size) ** 2).sum(
+                    dim=-1, keepdim=True
+                ).sqrt() - 1.0  # pseudo signed distance of an ellipsoid
+
+            get_gt_sdf = func
+        elif self.cfg.shape_init == "sphere":
+            assert isinstance(self.cfg.shape_init_params, float)
+            radius = self.cfg.shape_init_params
+
+            def func(points_rand: Float[Tensor, "N 3"]) -> Float[Tensor, "N 1"]:
+                return (points_rand**2).sum(dim=-1, keepdim=True).sqrt() - radius
+
+            get_gt_sdf = func
+        elif self.cfg.shape_init.startswith("mesh:"):
+            assert isinstance(self.cfg.shape_init_params, float)
+            mesh_path = self.cfg.shape_init[5:]
+            if not os.path.exists(mesh_path):
+                raise ValueError(f"Mesh file {mesh_path} does not exist.")
+
+            import trimesh
+
+            mesh = trimesh.load(mesh_path)
+
+            # move to center
+            centroid = mesh.vertices.mean(0)
+            mesh.vertices = mesh.vertices - centroid
+
+            # align to up-z and front-x
+            dirs = ["+x", "+y", "+z", "-x", "-y", "-z"]
+            dir2vec = {
+                "+x": np.array([1, 0, 0]),
+                "+y": np.array([0, 1, 0]),
+                "+z": np.array([0, 0, 1]),
+                "-x": np.array([-1, 0, 0]),
+                "-y": np.array([0, -1, 0]),
+                "-z": np.array([0, 0, -1]),
+            }
+            if (
+                self.cfg.shape_init_mesh_up not in dirs
+                or self.cfg.shape_init_mesh_front not in dirs
+            ):
+                raise ValueError(
+                    f"shape_init_mesh_up and shape_init_mesh_front must be one of {dirs}."
+                )
+            if self.cfg.shape_init_mesh_up[1] == self.cfg.shape_init_mesh_front[1]:
+                raise ValueError(
+                    "shape_init_mesh_up and shape_init_mesh_front must be orthogonal."
+                )
+            z_, x_ = (
+                dir2vec[self.cfg.shape_init_mesh_up],
+                dir2vec[self.cfg.shape_init_mesh_front],
+            )
+            y_ = np.cross(z_, x_)
+            std2mesh = np.stack([x_, y_, z_], axis=0).T
+            mesh2std = np.linalg.inv(std2mesh)
+
+            # scaling
+            scale = np.abs(mesh.vertices).max()
+            mesh.vertices = mesh.vertices / scale * self.cfg.shape_init_params
+            mesh.vertices = np.dot(mesh2std, mesh.vertices.T).T
+
+            from pysdf import SDF
+
+            sdf = SDF(mesh.vertices, mesh.faces)
+
+            def func(points_rand: Float[Tensor, "N 3"]) -> Float[Tensor, "N 1"]:
+                # add a negative signed here
+                # as in pysdf the inside of the shape has positive signed distance
+                return torch.from_numpy(-sdf(points_rand.cpu().numpy())).to(
+                    points_rand
+                )[..., None]
+
+            get_gt_sdf = func
+
+        else:
+            raise ValueError(
+                f"Unknown shape initialization type: {self.cfg.shape_init}"
+            )
+
+        sdf_gt = get_gt_sdf(
+            scale_tensor(
+                self.isosurface_helper.grid_vertices,
+                self.isosurface_helper.points_range,
+                self.isosurface_bbox,
+            )
+        )
+        self.sdf.data = sdf_gt
+
+        # explicit broadcast to ensure param consistency across ranks
+        for param in self.parameters():
+            broadcast(param, src=0)
 
     def isosurface(self) -> Mesh:
         # return cached mesh if fix_geometry is True to save computation
