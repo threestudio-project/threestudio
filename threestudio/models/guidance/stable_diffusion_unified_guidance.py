@@ -68,7 +68,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         token_merging_params: Optional[dict] = field(default_factory=dict)
 
         # VSD configurations, only used when guidance_type is "vsd"
-        vsd_phi_model_name_or_path: Optional[str] = "stabilityai/stable-diffusion-2-1"
+        vsd_phi_model_name_or_path: Optional[str] = None
         vsd_guidance_scale_phi: float = 1.0
         vsd_use_lora: bool = True
         vsd_lora_cfg_training: bool = False

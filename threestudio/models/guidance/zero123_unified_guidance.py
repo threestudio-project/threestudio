@@ -10,7 +10,6 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 from diffusers import (
     AutoencoderKL,
-    ControlNetModel,
     DDPMScheduler,
     DPMSolverSinglestepScheduler,
     UNet2DConditionModel,
@@ -18,7 +17,6 @@ from diffusers import (
 from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.models.embeddings import TimestepEmbedding
-from diffusers.utils.import_utils import is_xformers_available
 from PIL import Image
 from tqdm import tqdm
 
@@ -28,7 +26,6 @@ from threestudio.models.networks import ToDTypeWrapper
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseModule
 from threestudio.utils.misc import C, cleanup, disable_gradient, parse_version
-from threestudio.utils.ops import perpendicular_component
 from threestudio.utils.typing import *
 
 
@@ -60,7 +57,7 @@ class Zero123UnifiedGuidance(BaseModule):
         half_precision_weights: bool = True
 
         # VSD configurations, only used when guidance_type is "vsd"
-        vsd_phi_model_name_or_path: Optional[str] = "bennyguo/zero123-diffusers"
+        vsd_phi_model_name_or_path: Optional[str] = None
         vsd_guidance_scale_phi: float = 1.0
         vsd_use_lora: bool = True
         vsd_lora_cfg_training: bool = False
