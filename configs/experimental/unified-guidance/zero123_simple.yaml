@@ -83,7 +83,7 @@ system:
   guidance_type: "zero123-unified-guidance"
   guidance:
     guidance_type: "sds"
-    pretrained_model_name_or_path: "/home/gyc/zero123-diffusers-hf"
+    pretrained_model_name_or_path: "bennyguo/zero123-diffusers"
     guidance_scale: 5.0
     min_step_percent: [0, 0.98, 0.1, 5000]
     max_step_percent: [0, 0.98, 0.1, 5000]
@@ -95,7 +95,7 @@ system:
 
     return_rgb_1step_orig: true
 
-    vsd_phi_model_name_or_path: "/home/gyc/zero123-diffusers-hf"
+    vsd_phi_model_name_or_path: null
     vsd_use_camera_condition: false
 
   loggers:
