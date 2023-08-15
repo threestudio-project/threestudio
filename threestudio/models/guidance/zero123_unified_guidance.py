@@ -518,7 +518,6 @@ class Zero123UnifiedGuidance(BaseModule):
         mvp_mtx: Float[Tensor, "B 4 4"],
         c2w: Float[Tensor, "B 4 4"],
         rgb_as_latents=False,
-        guidance_eval=False,
         **kwargs,
     ):
         batch_size = rgb.shape[0]
@@ -699,84 +698,6 @@ class Zero123UnifiedGuidance(BaseModule):
             )
 
         return guidance_out
-
-    @torch.cuda.amp.autocast(enabled=False)
-    @torch.no_grad()
-    def guidance_eval(
-        self,
-        t_orig,
-        text_embeddings,
-        latents_noisy,
-        noise_pred,
-        use_perp_neg=False,
-        neg_guidance_weights=None,
-    ):
-        # use only 50 timesteps, and find nearest of those to t
-        self.scheduler.set_timesteps(50)
-        self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
-        bs = (
-            min(self.cfg.max_items_eval, latents_noisy.shape[0])
-            if self.cfg.max_items_eval > 0
-            else latents_noisy.shape[0]
-        )  # batch size
-        large_enough_idxs = self.scheduler.timesteps_gpu.expand([bs, -1]) > t_orig[
-            :bs
-        ].unsqueeze(
-            -1
-        )  # sized [bs,50] > [bs,1]
-        idxs = torch.min(large_enough_idxs, dim=1)[1]
-        t = self.scheduler.timesteps_gpu[idxs]
-
-        fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
-        imgs_noisy = self.decode_latents(latents_noisy[:bs]).permute(0, 2, 3, 1)
-
-        # get prev latent
-        latents_1step = []
-        pred_1step_orig = []
-        for b in range(bs):
-            step_output = self.scheduler.step(
-                noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
-            )
-            latents_1step.append(step_output["prev_sample"])
-            pred_1step_orig.append(step_output["pred_original_sample"])
-        latents_1step = torch.cat(latents_1step)
-        pred_1step_orig = torch.cat(pred_1step_orig)
-        imgs_1step = self.decode_latents(latents_1step).permute(0, 2, 3, 1)
-        imgs_1step_orig = self.decode_latents(pred_1step_orig).permute(0, 2, 3, 1)
-
-        latents_final = []
-        for b, i in enumerate(idxs):
-            latents = latents_1step[b : b + 1]
-            text_emb = (
-                text_embeddings[
-                    [b, b + len(idxs), b + 2 * len(idxs), b + 3 * len(idxs)], ...
-                ]
-                if use_perp_neg
-                else text_embeddings[[b, b + len(idxs)], ...]
-            )
-            neg_guid = neg_guidance_weights[b : b + 1] if use_perp_neg else None
-            for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
-                # pred noise
-                noise_pred = self.get_noise_pred(
-                    latents, t, text_emb, use_perp_neg, neg_guid
-                )
-                # get prev latent
-                latents = self.scheduler.step(noise_pred, t, latents, eta=1)[
-                    "prev_sample"
-                ]
-            latents_final.append(latents)
-
-        latents_final = torch.cat(latents_final)
-        imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
-
-        return {
-            "bs": bs,
-            "noise_levels": fracs,
-            "imgs_noisy": imgs_noisy,
-            "imgs_1step": imgs_1step,
-            "imgs_1step_orig": imgs_1step_orig,
-            "imgs_final": imgs_final,
-        }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in
