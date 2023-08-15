@@ -146,7 +146,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                 self.camera_embedding = ToDTypeWrapper(
                     TimestepEmbedding(self.camera_embedding_dim, 1280),
                     self.weights_dtype,
-                )
+                ).to(self.device)
                 pipe_phi.unet.class_embedding = self.camera_embedding
 
             if self.cfg.vsd_use_lora:
@@ -175,7 +175,9 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
                 pipe_phi.unet.set_attn_processor(lora_attn_procs)
 
-                self.lora_layers = AttnProcsLayers(pipe_phi.unet.attn_processors)
+                self.lora_layers = AttnProcsLayers(pipe_phi.unet.attn_processors).to(
+                    self.device
+                )
                 self.lora_layers._load_state_dict_pre_hooks.clear()
                 self.lora_layers._state_dict_hooks.clear()
 
