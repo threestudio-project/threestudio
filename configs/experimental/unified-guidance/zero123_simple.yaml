@@ -10,7 +10,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   width: 256
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
-  default_camera_distance: 3.8
+  default_camera_distance: 5.0
   default_fovy_deg: 20.0
   random_camera: # threestudio/data/uncond.py -> RandomCameraDataModuleConfig
     height: 256
@@ -20,9 +20,9 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
     eval_height: 256
     eval_width: 256
     eval_batch_size: 1
-    elevation_range: [-10, 80]
+    elevation_range: [-80, 80]
     azimuth_range: [-180, 180]
-    camera_distance_range: [3.8, 3.8]
+    camera_distance_range: [5.0, 5.0]
     fovy_range: [20.0, 20.0] # Zero123 has fixed fovy
     progressive_until: 0
     camera_perturb: 0.0
@@ -43,14 +43,7 @@ system:
   geometry_type: "implicit-volume"
   geometry:
     radius: 2.0
-    normal_type: null
-
-    # the density initialization proposed in the DreamFusion paper
-    # does not work very well
-    # density_bias: "blob_dreamfusion"
-    # density_activation: exp
-    # density_blob_scale: 5.
-    # density_blob_std: 0.2
+    normal_type: analytic
 
     # use Magic3D density initialization instead
     density_bias: "blob_magic3d"
@@ -58,15 +51,16 @@ system:
     density_blob_scale: 10.
     density_blob_std: 0.5
 
-    # coarse to fine hash grid encoding
-    # to ensure smooth analytic normals
     pos_encoding_config:
-      otype: HashGrid
+      otype: ProgressiveBandHashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.447269237440378 # max resolution 4096
+      start_level: 8 # resolution ~200
+      start_step: 2000
+      update_steps: 500
     mlp_network_config:
       otype: "VanillaMLP"
       activation: "ReLU"
@@ -74,7 +68,10 @@ system:
       n_neurons: 64
       n_hidden_layers: 2
 
-  material_type: "no-material"
+  # material_type: "no-material"
+  material_type: "diffuse-with-point-light-material"
+  material:
+    ambient_only_steps: 10001
 
   background_type: "solid-color-background"
 
@@ -88,8 +85,8 @@ system:
     guidance_type: "sds"
     pretrained_model_name_or_path: "/home/gyc/zero123-diffusers-hf"
     guidance_scale: 5.0
-    min_step_percent: [0, 0.98, 0.2, 5000]
-    max_step_percent: [0, 0.98, 0.2, 5000]
+    min_step_percent: [0, 0.98, 0.1, 5000]
+    max_step_percent: [0, 0.98, 0.1, 5000]
 
     cond_image_path: ${data.image_path}
     cond_elevation_deg: ${data.default_elevation_deg}
@@ -110,8 +107,8 @@ system:
   loss:
     lambda_sd: 1.0
     lambda_train_phi: 1.0
-    lambda_orient: 0.
-    lambda_sparsity: 0.
+    lambda_orient: [0, 10., 1000., 5000]
+    lambda_sparsity: 1.
     lambda_opaque: 0.
 
   optimizer:
@@ -129,7 +126,7 @@ system:
 trainer:
   max_steps: 10000
   log_every_n_steps: 1
-  num_sanity_val_steps: 0
+  num_sanity_val_steps: 1
   val_check_interval: 100
   enable_progress_bar: true
   precision: 32
