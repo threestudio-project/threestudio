@@ -6,6 +6,8 @@ from . import (
     instructnerf2nerf,
     latentnerf,
     magic3d,
+    magic123,
+    magic123_normal,
     prolificdreamer,
     sjc,
     textmesh,
