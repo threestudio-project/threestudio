@@ -452,8 +452,8 @@ class ControlNetVSDGuidance(BaseModule):
                     ],
                     dim=0,
                 ),
-                down_block_additional_residuals=None,
-                mid_block_additional_residual=None,
+                down_block_additional_residuals=down_block_res_samples,
+                mid_block_additional_residual=mid_block_res_sample,
             )
 
         # perform classifier-free guidance
@@ -524,6 +524,17 @@ class ControlNetVSDGuidance(BaseModule):
         # use view-independent text embeddings in LoRA
         text_embeddings_cond, _ = text_embeddings.chunk(2)
 
+        down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
+            self.controlnet,
+            noisy_latents,
+            t,
+            encoder_hidden_states=text_embeddings_cond.repeat(
+                self.cfg.lora_n_timestamp_samples, 1, 1
+            ),
+            image_cond=image_cond,
+            condition_scale=self.cfg.condition_scale,
+        )
+
         noise_pred = self.forward_control_unet(
             self.unet_lora,
             noisy_latents,
@@ -535,8 +546,8 @@ class ControlNetVSDGuidance(BaseModule):
             class_labels=torch.ones(B, 4, 4, device=noisy_latents.device)
             .view(B, -1)
             .repeat(self.cfg.lora_n_timestamp_samples, 1),
-            down_block_additional_residuals=None,
-            mid_block_additional_residual=None,
+            down_block_additional_residuals=down_block_res_samples,
+            mid_block_additional_residual=mid_block_res_sample,
         )
         return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
 

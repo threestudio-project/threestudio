@@ -91,18 +91,18 @@ system:
   #   max_step_percent: 0.50
 
   # If using controlnet guidance:
-  # prompt_processor_type: "stable-diffusion-prompt-processor"
-  # prompt_processor:
-  #   pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+#   prompt_processor_type: "stable-diffusion-prompt-processor"
+#   prompt_processor:
+#     pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
 
-  # guidance_type: "stable-diffusion-controlnet-guidance"
-  # guidance:
-  #   control_type: "input_normal"
-  #   min_step_percent: 0.02
-  #   max_step_percent: 0.98
-  #   condition_scale: 1.5
-  #   guidance_scale: 20
-  #   use_sds: true
+#   guidance_type: "stable-diffusion-controlnet-guidance"
+#   guidance:
+#     control_type: "input_normal"
+#     min_step_percent: 0.02
+#     max_step_percent: 0.98
+#     condition_scale: 1.5
+#     guidance_scale: 20
+#     use_sds: true
 
   # If using controlnet vsd guidance:
   prompt_processor_type: "stable-diffusion-prompt-processor"
@@ -117,9 +117,9 @@ system:
     control_type: "input_normal"
     # control_type: "canny"
     min_step_percent: 0.02
-    max_step_percent: 0.98
-    condition_scale: 0.5
-    guidance_scale: 1.0
+    max_step_percent: 0.50
+    condition_scale: 2
+    guidance_scale: 7.5
     use_sds: true
 
 
