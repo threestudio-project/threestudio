@@ -39,14 +39,13 @@ class Magic123(BaseLift3DSystem):
         )
 
     def training_step(self, batch, batch_idx):
-        # out_input = self(batch)
+        out_input = self(batch)
         out = self(batch["random_camera"])
-        out_detail = self(batch["random_camera2"])
         prompt_utils = self.prompt_processor()
         guidance_out = self.guidance(
-            out_detail["comp_rgb"],
+            out["comp_rgb"],
             prompt_utils,
-            **batch["random_camera2"],
+            **batch["random_camera"],
             rgb_as_latents=False,
         )
         guidance_3d_out = self.guidance_3d(
@@ -57,20 +56,20 @@ class Magic123(BaseLift3DSystem):
 
         loss = 0.0
 
-        # loss_rgb = F.mse_loss(
-        #     out_input["comp_rgb"],
-        #     batch["rgb"] * batch["mask"].float()
-        #     + out_input["comp_rgb_bg"] * (1.0 - batch["mask"].float()),
-        # )
-        # self.log("train/loss_rgb", loss_rgb)
-        # loss += loss_rgb * self.C(self.cfg.loss.lambda_rgb)
+        loss_rgb = F.mse_loss(
+            out_input["comp_rgb"],
+            batch["rgb"] * batch["mask"].float()
+            + out_input["comp_rgb_bg"] * (1.0 - batch["mask"].float()),
+        )
+        self.log("train/loss_rgb", loss_rgb)
+        loss += loss_rgb * self.C(self.cfg.loss.lambda_rgb)
 
-        # loss_mask = F.mse_loss(
-        #     out_input["opacity"],
-        #     batch["mask"].float(),
-        # )
-        # self.log("train/loss_mask", loss_mask)
-        # loss += loss_mask * self.C(self.cfg.loss.lambda_mask)
+        loss_mask = F.binary_cross_entropy(
+            out_input["opacity"].clamp(1.0e-5, 1.0 - 1.0e-5),
+            batch["mask"].float(),
+        )
+        self.log("train/loss_mask", loss_mask)
+        loss += loss_mask * self.C(self.cfg.loss.lambda_mask)
 
         for name, value in guidance_out.items():
             if not (isinstance(value, torch.Tensor) and len(value.shape) > 0):
@@ -109,80 +108,6 @@ class Magic123(BaseLift3DSystem):
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
-
-        # if self.true_global_step % 50 == 0:
-        #     self.save_image_grid(
-        #         f"it{self.true_global_step}-train-t{int(guidance_out['timesteps'][0])}-2d.png",
-        #         (
-        #             [
-        #                 {
-        #                     "type": "rgb",
-        #                     "img": guidance_out["rgb"][0],
-        #                     "kwargs": {"data_format": "HWC"},
-        #                 },
-        #             ]
-        #             if "rgb" in guidance_out
-        #             else []
-        #         )
-        #         + (
-        #             [
-        #                 {
-        #                     "type": "rgb",
-        #                     "img": guidance_out["rgb_1step_orig"][0],
-        #                     "kwargs": {"data_format": "HWC"},
-        #                 }
-        #             ]
-        #             if "rgb_1step_orig" in guidance_out
-        #             else []
-        #         )
-        #         + (
-        #             [
-        #                 {
-        #                     "type": "rgb",
-        #                     "img": guidance_out["rgb_multistep_orig"][0],
-        #                     "kwargs": {"data_format": "HWC"},
-        #                 }
-        #             ]
-        #             if "rgb_multistep_orig" in guidance_out
-        #             else []
-        #         ),
-        #     )
-        #     self.save_image_grid(
-        #         f"it{self.true_global_step}-train-t{int(guidance_3d_out['timesteps'][0])}-3d.png",
-        #         (
-        #             [
-        #                 {
-        #                     "type": "rgb",
-        #                     "img": guidance_3d_out["rgb"][0],
-        #                     "kwargs": {"data_format": "HWC"},
-        #                 },
-        #             ]
-        #             if "rgb" in guidance_3d_out
-        #             else []
-        #         )
-        #         + (
-        #             [
-        #                 {
-        #                     "type": "rgb",
-        #                     "img": guidance_3d_out["rgb_1step_orig"][0],
-        #                     "kwargs": {"data_format": "HWC"},
-        #                 }
-        #             ]
-        #             if "rgb_1step_orig" in guidance_3d_out
-        #             else []
-        #         )
-        #         + (
-        #             [
-        #                 {
-        #                     "type": "rgb",
-        #                     "img": guidance_3d_out["rgb_multistep_orig"][0],
-        #                     "kwargs": {"data_format": "HWC"},
-        #                 }
-        #             ]
-        #             if "rgb_multistep_orig" in guidance_3d_out
-        #             else []
-        #         ),
-        #     )
 
         return {"loss": loss}
 
