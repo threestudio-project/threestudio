@@ -66,8 +66,8 @@ class Zero123(BaseLift3DSystem):
         elif guidance == "zero123":
             batch = batch["random_camera"]
             ambient_ratio = (
-                self.cfg.ambient_ratio_min
-                + (1 - self.cfg.ambient_ratio_min) * random.random()
+                self.C(self.cfg.ambient_ratio_min)
+                + (1 - self.C(self.cfg.ambient_ratio_min)) * random.random()
             )
 
         batch["bg_color"] = None
@@ -142,6 +142,9 @@ class Zero123(BaseLift3DSystem):
             )
             # claforte: TODO: rename the loss_terms keys
             set_loss("sds", guidance_out["loss_sds"])
+
+            self.log("train/mem_cpu", guidance_out["cpu_mem"], prog_bar=True)
+            self.log("train/mem_gpu", guidance_out["gpu_mem"], prog_bar=True)
 
         if self.C(self.cfg.loss.lambda_normal_smooth) > 0:
             if "comp_normal" not in out:

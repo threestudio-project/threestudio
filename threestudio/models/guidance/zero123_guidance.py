@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 import threestudio
 from threestudio.utils.base import BaseObject
-from threestudio.utils.misc import C, parse_version
+from threestudio.utils.misc import C, get_CPU_mem, get_GPU_mem, parse_version
 from threestudio.utils.typing import *
 
 
@@ -103,6 +103,8 @@ class Zero123Guidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
+
+        noises_per_item: Optional[Any] = None
 
         """Maximum number of batch items to evaluate guidance for (for debugging) and to save on disk. -1 means save all items."""
         max_items_eval: int = 4
@@ -231,7 +233,10 @@ class Zero123Guidance(BaseObject):
                 ),  # Zero123 polar is 90-elevation
                 torch.sin(torch.deg2rad(azimuth - self.cfg.cond_azimuth_deg)),
                 torch.cos(torch.deg2rad(azimuth - self.cfg.cond_azimuth_deg)),
-                camera_distances - self.cfg.cond_camera_distance,
+                # camera_distances - self.cfg.cond_camera_distance,
+                torch.deg2rad(
+                    90 - torch.full_like(elevation, self.cfg.cond_elevation_deg)
+                ),
             ],
             dim=-1,
         )[:, None, :].to(self.device)
@@ -275,8 +280,6 @@ class Zero123Guidance(BaseObject):
         guidance_eval=False,
         **kwargs,
     ):
-        batch_size = rgb.shape[0]
-
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
         if rgb_as_latents:
@@ -291,6 +294,14 @@ class Zero123Guidance(BaseObject):
             )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
+
+        latents = torch.repeat_interleave(latents, self.noises_per_item, 0)
+        elevation = torch.repeat_interleave(elevation, self.noises_per_item)
+        azimuth = torch.repeat_interleave(azimuth, self.noises_per_item)
+        camera_distances = torch.repeat_interleave(
+            camera_distances, self.noises_per_item
+        )
+        batch_size = latents.shape[0]
 
         cond = self.get_cond(elevation, azimuth, camera_distances)
 
@@ -337,6 +348,8 @@ class Zero123Guidance(BaseObject):
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,
+            "cpu_mem": get_CPU_mem(),
+            "gpu_mem": get_GPU_mem()[0],
         }
 
         if guidance_eval:
@@ -441,6 +454,13 @@ class Zero123Guidance(BaseObject):
             min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
             max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
         )
+
+        if self.cfg.noises_per_item is not None:
+            self.noises_per_item = np.floor(
+                C(self.cfg.noises_per_item, epoch, global_step)
+            ).astype(int)
+        else:
+            self.noises_per_item = 1
 
     # verification - requires `vram_O = False` in load_model_from_config
     @torch.no_grad()
