@@ -96,17 +96,17 @@ system:
       name: None
 
   loss:
-    lambda_rgb: 10.
-    lambda_mask: 1.
-    lambda_sd: 0.001
-    lambda_3d_sd: 0.01
-    lambda_normal_consistency: 100.
-    lambda_laplacian_smoothness: 100.
+    lambda_rgb: 1000.
+    lambda_mask: 100.
+    lambda_sd: 0.025
+    lambda_3d_sd: 1.
+    lambda_normal_consistency: 1000.
+    lambda_laplacian_smoothness: 0.
 
   optimizer:
     name: Adam
     args:
-      lr: 0.01
+      lr: 0.001
       betas: [0.9, 0.99]
       eps: 1.e-8
 

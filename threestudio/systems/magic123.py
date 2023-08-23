@@ -72,13 +72,6 @@ class Magic123(BaseLift3DSystem):
         self.log("train/loss_mask", loss_mask)
         loss += loss_mask * self.C(self.cfg.loss.lambda_mask)
 
-        # loss_mask_mse = F.mse_loss(
-        #     out_input["opacity"],
-        #     batch["mask"].float(),
-        # )
-        # self.log("train/loss_mask_mse", loss_mask_mse)
-        # loss += loss_mask_mse * self.C(self.cfg.loss.lambda_mask_mse)        
-
         for name, value in guidance_out.items():
             if not (isinstance(value, torch.Tensor) and len(value.shape) > 0):
                 self.log(f"train/{name}", value)
@@ -112,9 +105,15 @@ class Magic123(BaseLift3DSystem):
                         "comp_normal is required for 2D normal smoothness loss, no comp_normal is found in the output."
                     )
                 normal = out["comp_normal"]
-                loss_normal_smoothness_2d = (normal[:, 1:, :, :] - normal[:, :-1, :, :]).square().mean() + (normal[:, :, 1:, :] - normal[:, :, :-1, :]).square().mean()
-                self.log('trian/loss_normal_smoothness_2d', loss_normal_smoothness_2d)
-                loss += loss_normal_smoothness_2d * self.C(self.cfg.loss.lambda_normal_smoothness_2d)        
+                loss_normal_smoothness_2d = (
+                    normal[:, 1:, :, :] - normal[:, :-1, :, :]
+                ).square().mean() + (
+                    normal[:, :, 1:, :] - normal[:, :, :-1, :]
+                ).square().mean()
+                self.log("trian/loss_normal_smoothness_2d", loss_normal_smoothness_2d)
+                loss += loss_normal_smoothness_2d * self.C(
+                    self.cfg.loss.lambda_normal_smoothness_2d
+                )
 
             loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
             self.log("train/loss_sparsity", loss_sparsity)

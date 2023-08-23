@@ -1,4 +1,4 @@
-name: "magic123"
+name: "magic123-coarse-sd"
 tag: "${rmspace:${basename:${data.image_path}},_}-${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -6,16 +6,16 @@ seed: 0
 data_type: "single-image-datamodule"
 data:
   image_path: ???
-  height: 256
-  width: 256
+  height: 128
+  width: 128
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 2.5
   default_fovy_deg: 40.0
   random_camera:
     batch_size: 1
-    height: 256
-    width: 256
+    height: 128
+    width: 128
     elevation_range: [-45, 45]
     azimuth_range: [-180, 180]
     camera_distance_range: [2.5, 2.5]
@@ -23,8 +23,8 @@ data:
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
-    eval_height: 256
-    eval_width: 256
+    eval_height: 512
+    eval_width: 512
     eval_elevation_deg: ${data.default_elevation_deg}
     eval_camera_distance: ${data.default_camera_distance}
     eval_fovy_deg: ${data.default_fovy_deg}
@@ -36,7 +36,7 @@ system:
   geometry_type: "implicit-volume"
   geometry:
     radius: 1.0
-    normal_type: null
+    normal_type: analytic
 
     # use Magic3D density initialization
     density_bias: "blob_magic3d"
@@ -47,12 +47,15 @@ system:
     # coarse to fine hash grid encoding
     # to ensure smooth analytic normals
     pos_encoding_config:
-      otype: HashGrid
+      otype: ProgressiveBandHashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.447269237440378 # max resolution 4096
+      start_level: 8 # resolution ~200
+      start_step: 2000
+      update_steps: 300
     mlp_network_config:
       otype: "VanillaMLP"
       activation: "ReLU"
@@ -61,13 +64,17 @@ system:
       n_hidden_layers: 2
 
   material_type: "no-material"
+  material:
+    requires_normal: true
 
   background_type: "solid-color-background"
 
   renderer_type: "nerf-volume-renderer"
   renderer:
     radius: ${system.geometry.radius}
-    num_samples_per_ray: 512
+    estimator: occgrid
+    num_samples_per_ray: 256
+    return_comp_normal: true
 
   guidance_3d_type: "zero123-unified-guidance"
   guidance_3d:
@@ -101,11 +108,12 @@ system:
       name: None
 
   loss:
-    lambda_rgb: 10000.
-    lambda_mask: 1000.
-    lambda_sd: 1.
-    lambda_3d_sd: 40.
+    lambda_rgb: 1000.
+    lambda_mask: 100.
+    lambda_sd: 0.025
+    lambda_3d_sd: 1.
     lambda_orient: 0.
+    lambda_normal_smoothness_2d: 1000.
     lambda_sparsity: 0.
     lambda_opaque: 0.
 
