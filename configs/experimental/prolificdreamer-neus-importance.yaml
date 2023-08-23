@@ -59,9 +59,10 @@ system:
   renderer:
     radius: ${system.geometry.radius}
     use_volsdf: true
-    estimator: importance # should in ['occgrid', 'importance']
+
+    estimator: importance
     num_samples_per_ray: 64
-    num_samples_per_ray_proposal: 128
+    num_samples_per_ray_importance: 128
     near_plane: 0.1
     far_plane: 4.0
 
