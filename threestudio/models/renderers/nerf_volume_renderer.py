@@ -7,11 +7,11 @@ import torch.nn.functional as F
 
 import threestudio
 from threestudio.models.background.base import BaseBackground
+from threestudio.models.estimators import ImportanceEstimator
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.networks import create_network_with_input_encoding
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.models.estimators import ImportanceEstimator
 from threestudio.systems.utils import parse_optimizer, parse_scheduler_to_instance
 from threestudio.utils.ops import chunk_batch, get_activation, validate_empty_rays
 from threestudio.utils.typing import *

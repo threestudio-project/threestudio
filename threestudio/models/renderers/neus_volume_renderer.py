@@ -8,10 +8,10 @@ import torch.nn.functional as F
 
 import threestudio
 from threestudio.models.background.base import BaseBackground
+from threestudio.models.estimators import ImportanceEstimator
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.models.estimators import ImportanceEstimator
 from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
 
