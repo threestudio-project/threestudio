@@ -11,7 +11,7 @@ from threestudio.models.background.base import BaseBackground
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.models.renderers.importance_estimator import ImportanceEstimator
+from threestudio.models.estimators import ImportanceEstimator
 from threestudio.utils.ops import chunk_batch, validate_empty_rays
 from threestudio.utils.typing import *
 
@@ -48,9 +48,17 @@ class NeuSVolumeRenderer(VolumeRenderer):
         cos_anneal_end_steps: int = 0
         use_volsdf: bool = False
 
-        estimator: str = "importance"  # should in ['occgrid', 'importance']
+        near_plane: float = 0.0
+        far_plane: float = 1e10
+
+        # in ['occgrid', 'importance']
+        estimator: str = "occgrid"
+
+        # for occgrid
         grid_prune: bool = True
-        num_samples_per_ray_proposal: int = 64
+
+        # for importance
+        num_samples_per_ray_importance: int = 64
 
     cfg: Config
 
@@ -162,6 +170,8 @@ class NeuSVolumeRenderer(VolumeRenderer):
                         rays_o_flatten,
                         rays_d_flatten,
                         alpha_fn=None,
+                        near_plane=self.cfg.near_plane,
+                        far_plane=self.cfg.far_plane,
                         render_step_size=self.render_step_size,
                         alpha_thre=0.0,
                         stratified=self.randomized,
@@ -174,42 +184,48 @@ class NeuSVolumeRenderer(VolumeRenderer):
                         rays_o_flatten,
                         rays_d_flatten,
                         alpha_fn=alpha_fn if self.cfg.prune_alpha_threshold else None,
+                        near_plane=self.cfg.near_plane,
+                        far_plane=self.cfg.far_plane,
                         render_step_size=self.render_step_size,
                         alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
                         stratified=self.randomized,
                         cone_angle=0.0,
                     )
         elif self.cfg.estimator == "importance":
-            assert self.cfg.use_volsdf == True
 
             def prop_sigma_fn(
                 t_starts: Float[Tensor, "Nr Ns"],
                 t_ends: Float[Tensor, "Nr Ns"],
                 proposal_network,
             ):
-                t_origins: Float[Tensor, "Nr 1 3"] = rays_o_flatten.unsqueeze(-2)
-                t_dirs: Float[Tensor, "Nr 1 3"] = rays_d_flatten.unsqueeze(-2)
-                positions: Float[Tensor, "Nr Ns 3"] = (
-                    t_origins + t_dirs * (t_starts + t_ends)[..., None] / 2.0
-                )
-                with torch.no_grad():
-                    geo_out = chunk_batch(
-                        proposal_network,
-                        self.cfg.eval_chunk_size,
-                        positions.reshape(-1, 3),
-                        output_normal=False,
+                if self.cfg.use_volsdf:
+                    t_origins: Float[Tensor, "Nr 1 3"] = rays_o_flatten.unsqueeze(-2)
+                    t_dirs: Float[Tensor, "Nr 1 3"] = rays_d_flatten.unsqueeze(-2)
+                    positions: Float[Tensor, "Nr Ns 3"] = (
+                        t_origins + t_dirs * (t_starts + t_ends)[..., None] / 2.0
                     )
-                    inv_std = self.variance(geo_out["sdf"])
-                    density = volsdf_density(geo_out["sdf"], inv_std)
-                return density.reshape(positions.shape[:2])
+                    with torch.no_grad():
+                        geo_out = chunk_batch(
+                            proposal_network,
+                            self.cfg.eval_chunk_size,
+                            positions.reshape(-1, 3),
+                            output_normal=False,
+                        )
+                        inv_std = self.variance(geo_out["sdf"])
+                        density = volsdf_density(geo_out["sdf"], inv_std)
+                    return density.reshape(positions.shape[:2])
+                else:
+                    raise ValueError(
+                        "Currently only VolSDF supports importance sampling."
+                    )
 
             t_starts_, t_ends_ = self.estimator.sampling(
                 prop_sigma_fns=[partial(prop_sigma_fn, proposal_network=self.geometry)],
-                prop_samples=[self.cfg.num_samples_per_ray_proposal],
+                prop_samples=[self.cfg.num_samples_per_ray_importance],
                 num_samples=self.cfg.num_samples_per_ray,
                 n_rays=n_rays,
-                near_plane=1.0e-3,
-                far_plane=4,  # FIXME: tweak for different camera settings, camera_distance(1.5) + object_radius(sqrt(3)) < 4 now
+                near_plane=self.cfg.near_plane,
+                far_plane=self.cfg.far_plane,
                 sampling_type="uniform",
                 stratified=self.randomized,
             )

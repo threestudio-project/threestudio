@@ -1,4 +1,4 @@
-name: "textmesh-if-prop"
+name: "textmesh-if-importance"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -53,12 +53,13 @@ system:
     radius: ${system.geometry.radius}
     cos_anneal_end_steps: ${trainer.max_steps}
     use_volsdf: true
-    estimator: importance  # should in ['occgrid', 'proposal']
+    estimator: importance # should in ['occgrid', 'proposal']
 
     eval_chunk_size: 8192
     num_samples_per_ray: 64
     num_samples_per_ray_proposal: 128
-
+    near_plane: 0.1
+    far_plane: 4.0
 
   prompt_processor_type: "deep-floyd-prompt-processor"
   prompt_processor:

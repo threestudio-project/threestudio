@@ -11,7 +11,7 @@ from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.networks import create_network_with_input_encoding
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.models.renderers.importance_estimator import ImportanceEstimator
+from threestudio.models.estimators import ImportanceEstimator
 from threestudio.systems.utils import parse_optimizer, parse_scheduler_to_instance
 from threestudio.utils.ops import chunk_batch, get_activation, validate_empty_rays
 from threestudio.utils.typing import *
@@ -23,20 +23,29 @@ class NeRFVolumeRenderer(VolumeRenderer):
     class Config(VolumeRenderer.Config):
         num_samples_per_ray: int = 512
         eval_chunk_size: int = 160000
+        randomized: bool = True
+
+        near_plane: float = 0.0
+        far_plane: float = 1e10
 
         return_comp_normal: bool = False
         return_normal_perturb: bool = False
-        randomized: bool = True
 
-        estimator: str = "occgrid"  # should in ['occgrid', 'proposal']
+        # in ["occgrid", "proposal", "importance"]
+        estimator: str = "occgrid"
+
         # for occgrid
         grid_prune: bool = True
         prune_alpha_threshold: bool = True
 
+        # for proposal
         proposal_network_config: Optional[dict] = None
         prop_optimizer_config: Optional[dict] = None
         prop_scheduler_config: Optional[dict] = None
         num_samples_per_ray_proposal: int = 64
+
+        # for importance
+        num_samples_per_ray_importance: int = 64
 
     cfg: Config
 
@@ -100,9 +109,10 @@ class NeRFVolumeRenderer(VolumeRenderer):
             self.randomized = self.cfg.randomized
         else:
             raise NotImplementedError(
-                "unknown estimator, should be in ['occgrid', 'proposal']"
+                "Unknown estimator, should be one of ['occgrid', 'proposal', 'importance']."
             )
 
+        # for proposal
         self.vars_in_forward = {}
 
     def forward(
@@ -130,6 +140,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
                         rays_o_flatten,
                         rays_d_flatten,
                         sigma_fn=None,
+                        near_plane=self.cfg.near_plane,
+                        far_plane=self.cfg.far_plane,
                         render_step_size=self.render_step_size,
                         alpha_thre=0.0,
                         stratified=self.randomized,
@@ -159,6 +171,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
                         rays_o_flatten,
                         rays_d_flatten,
                         sigma_fn=sigma_fn if self.cfg.prune_alpha_threshold else None,
+                        near_plane=self.cfg.near_plane,
+                        far_plane=self.cfg.far_plane,
                         render_step_size=self.render_step_size,
                         alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
                         stratified=self.randomized,
@@ -195,8 +209,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 prop_samples=[self.cfg.num_samples_per_ray_proposal],
                 num_samples=self.cfg.num_samples_per_ray,
                 n_rays=n_rays,
-                near_plane=1.0e-3,
-                far_plane=4,  # FIXME: tweak for different camera settings, camera_distance(1.5) + object_radius(sqrt(3)) < 4 now
+                near_plane=self.cfg.near_plane,
+                far_plane=self.cfg.far_plane,
                 sampling_type="uniform",
                 stratified=self.randomized,
                 requires_grad=self.vars_in_forward["requires_grad"],
@@ -233,11 +247,11 @@ class NeRFVolumeRenderer(VolumeRenderer):
 
             t_starts_, t_ends_ = self.estimator.sampling(
                 prop_sigma_fns=[partial(prop_sigma_fn, proposal_network=self.geometry)],
-                prop_samples=[self.cfg.num_samples_per_ray_proposal],
+                prop_samples=[self.cfg.num_samples_per_ray_importance],
                 num_samples=self.cfg.num_samples_per_ray,
                 n_rays=n_rays,
-                near_plane=1.0e-3,
-                far_plane=4,  # FIXME: tweak for different camera settings, camera_distance(1.5) + object_radius(sqrt(3)) < 4 now
+                near_plane=self.cfg.near_plane,
+                far_plane=self.cfg.far_plane,
                 sampling_type="uniform",
                 stratified=self.randomized,
             )
