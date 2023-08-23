@@ -24,30 +24,30 @@
 
 ### random-camera-datamodule
 
-| name                   | type                  | description                                                                                                                                                                                                                                                                         |
-| ---------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| height                 | Union[int, List[int]] | Height of the rendered image in training, should be an integer or a list of integers. If a list of integers, the training height will change according to `resolution_milestones`. Default: 64                                                                                      |
-| width                  | Union[int, List[int]] | Width of the rendered image in training, should be an integer or a list of integers. If a list of integers, the training width will change according to `resolution_milestones`. Default: 64                                                                                        |
-| batch_size             | Union[int, List[int]] | Number of images per batch in training. If a list of integers, the batch_size will change according to `resolution_milestones`. Default: 1                                                                                                                                                                                                                                  |
-| resolution_milestones  | List[int]             | The steps where the training resolution will change, must be in ascending order and in the length of `len(height) - 1`. Default: []                                                                                                                                                 |
-| eval_height            | int                   | Height of the rendered image in validation/testing. Default: 512                                                                                                                                                                                                                    |
-| eval_width             | int                   | Width of the rendered image in validation/testing. Default: 512                                                                                                                                                                                                                     |
-| eval_batch_size        | int                   | Number of images per batch in validation/testing. DO NOT change this. Default: 1                                                                                                                                                                                                    |
-| elevation_range        | Tuple[float,float]    | Camera elevation angle range to sample from in training, in degrees. Default: (-10,90)                                                                                                                                                                                              |
-| azimuth_range          | Tuple[float,float]    | Camera azimuth angle range to sample from in training, in degrees. Default: (-180,180)                                                                                                                                                                                              |
-| camera_distance_range  | Tuple[float,float]    | Camera distance range to sample from in training. Default: (1,1.5)                                                                                                                                                                                                                  |
-| fovy_range             | Tuple[float,float]    | Camera field of view (FoV) range along the y direction (vertical direction) to sample from in training, in degrees. Default: (40,70)                                                                                                                                                |
-| camera_perturb         | float                 | Random perturbation ratio for the sampled camera positions in training. The sampled camera positions will be perturbed by `N(0,1) * camera_perturb`. Default: 0.1                                                                                                                   |
-| center_perturb         | float                 | Random perturbation ratio for the look-at point of the cameras in training. The look-at point wil be `N(0,1) * center_perturb`. Default: 0.2                                                                                                                                        |
-| up_perturb             | float                 | Random pertubation ratio for the up direction of the cameras in training. The up direction will be `[0,0,1] + N(0,1) * up_perturb`. Default: 0.02                                                                                                                                   |
-| light_position_perturb | float                 | Used to get random light directions from camera positions, only used when `light_sample_strategy="dreamfusion"`. The camera positions will be perturbed by `N(0,1) * light_position_perturb`, then the perturbed positions are used to determine the light directions. Default: 1.0 |
-| light_distance_range   | Tuple[float,float]    | Point light distance range to sample from in training. Default: (0.8,1.5)                                                                                                                                                                                                           |
-| eval_elevation_deg     | float                 | Camera elevation angle in validation/testing, in degrees. Default: 150                                                                                                                                                                                                              |
-| eval_camera_distance   | float                 | Camera distance in validation/testing. Default: 15                                                                                                                                                                                                                                  |
-| eval_fovy_deg          | float                 | Camera field of view (FoV) along the y direction (vertical direction) in validation/testing, in degrees. Default: 70                                                                                                                                                                |
-| light_sample_strategy  | str                   | Strategy to sample point light positions in training, in ["dreamfusion", "magic3d"]. "dreamfusion" uses strategy described in the DreamFusion paper; "magic3d" uses strategy decribed in the Magic3D paper. Default: "dreamfusion"                                                  |
-| batch_uniform_azimuth  | bool                  | Whether to ensure the uniformity of sampled azimuth angles in training as described in the Fantasia3D paper. If True, the `azimuth_range` is equally divided into `batch_size` bins and the azimuth angles are sampled from every bins. Default: True                               |
-| progressive_until  | int                  | Number of iterations until which to progressively (linearly) increase elevation_range and azimuth_range from [`eval_elevation_deg`, `eval_elevation_deg`] and `[0.0, 0.0]`, to those values specified in `elevation_range` and `azimuth_range`. 0 means the range does not linearly increase. Default: 0                               |
+| name                   | type                  | description                                                                                                                                                                                                                                                                                              |
+| ---------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| height                 | Union[int, List[int]] | Height of the rendered image in training, should be an integer or a list of integers. If a list of integers, the training height will change according to `resolution_milestones`. Default: 64                                                                                                           |
+| width                  | Union[int, List[int]] | Width of the rendered image in training, should be an integer or a list of integers. If a list of integers, the training width will change according to `resolution_milestones`. Default: 64                                                                                                             |
+| batch_size             | Union[int, List[int]] | Number of images per batch in training. If a list of integers, the batch_size will change according to `resolution_milestones`. Default: 1                                                                                                                                                               |
+| resolution_milestones  | List[int]             | The steps where the training resolution will change, must be in ascending order and in the length of `len(height) - 1`. Default: []                                                                                                                                                                      |
+| eval_height            | int                   | Height of the rendered image in validation/testing. Default: 512                                                                                                                                                                                                                                         |
+| eval_width             | int                   | Width of the rendered image in validation/testing. Default: 512                                                                                                                                                                                                                                          |
+| eval_batch_size        | int                   | Number of images per batch in validation/testing. DO NOT change this. Default: 1                                                                                                                                                                                                                         |
+| elevation_range        | Tuple[float,float]    | Camera elevation angle range to sample from in training, in degrees. Default: (-10,90)                                                                                                                                                                                                                   |
+| azimuth_range          | Tuple[float,float]    | Camera azimuth angle range to sample from in training, in degrees. Default: (-180,180)                                                                                                                                                                                                                   |
+| camera_distance_range  | Tuple[float,float]    | Camera distance range to sample from in training. Default: (1,1.5)                                                                                                                                                                                                                                       |
+| fovy_range             | Tuple[float,float]    | Camera field of view (FoV) range along the y direction (vertical direction) to sample from in training, in degrees. Default: (40,70)                                                                                                                                                                     |
+| camera_perturb         | float                 | Random perturbation ratio for the sampled camera positions in training. The sampled camera positions will be perturbed by `N(0,1) * camera_perturb`. Default: 0.1                                                                                                                                        |
+| center_perturb         | float                 | Random perturbation ratio for the look-at point of the cameras in training. The look-at point wil be `N(0,1) * center_perturb`. Default: 0.2                                                                                                                                                             |
+| up_perturb             | float                 | Random pertubation ratio for the up direction of the cameras in training. The up direction will be `[0,0,1] + N(0,1) * up_perturb`. Default: 0.02                                                                                                                                                        |
+| light_position_perturb | float                 | Used to get random light directions from camera positions, only used when `light_sample_strategy="dreamfusion"`. The camera positions will be perturbed by `N(0,1) * light_position_perturb`, then the perturbed positions are used to determine the light directions. Default: 1.0                      |
+| light_distance_range   | Tuple[float,float]    | Point light distance range to sample from in training. Default: (0.8,1.5)                                                                                                                                                                                                                                |
+| eval_elevation_deg     | float                 | Camera elevation angle in validation/testing, in degrees. Default: 150                                                                                                                                                                                                                                   |
+| eval_camera_distance   | float                 | Camera distance in validation/testing. Default: 15                                                                                                                                                                                                                                                       |
+| eval_fovy_deg          | float                 | Camera field of view (FoV) along the y direction (vertical direction) in validation/testing, in degrees. Default: 70                                                                                                                                                                                     |
+| light_sample_strategy  | str                   | Strategy to sample point light positions in training, in ["dreamfusion", "magic3d"]. "dreamfusion" uses strategy described in the DreamFusion paper; "magic3d" uses strategy decribed in the Magic3D paper. Default: "dreamfusion"                                                                       |
+| batch_uniform_azimuth  | bool                  | Whether to ensure the uniformity of sampled azimuth angles in training as described in the Fantasia3D paper. If True, the `azimuth_range` is equally divided into `batch_size` bins and the azimuth angles are sampled from every bins. Default: True                                                    |
+| progressive_until      | int                   | Number of iterations until which to progressively (linearly) increase elevation_range and azimuth_range from [`eval_elevation_deg`, `eval_elevation_deg`] and `[0.0, 0.0]`, to those values specified in `elevation_range` and `azimuth_range`. 0 means the range does not linearly increase. Default: 0 |
 
 ## Systems
 
@@ -102,7 +102,7 @@ This system has all the common configurations, along with the following unique c
 ### sjc-system
 
 This system has all the common configurations, along with the following unique configurations:
-| name | type | description |
+| name               | type | description                                                                                                                                 |
 | ------------------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | subpixel_rendering | bool | Whether to perform subpixel rendering in validation/testing, which decodes a `128x128` latent feature map instead of `64x64`. Default: True |
 
@@ -201,10 +201,10 @@ An explicit geometry parameterized with a feature volume. The feature volume has
 
 **Common configurations for explicit geometry**
 
-| name | type | description |
-| ---- | ---- | ----------- |
-| pos_encoding_config                  | dict              | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}                                                                                                               |
-| mlp_network_config                   | dict              | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {}                                                                                                                                                                                                                                                     |
+| name                | type | description                                                                                                                                                                   |
+| ------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pos_encoding_config | dict | Configurations for the positional encoding. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#encodings for supported arguments. Default: {}            |
+| mlp_network_config  | dict | Configurations for the MLP head for feature prediction. See https://github.com/NVlabs/tiny-cuda-nn/blob/master/DOCUMENTATION.md#networks for supported arguments. Default: {} |
 ### tetrahedra-sdf-grid
 
 | name                                 | type              | description                                                                                                                                                                                                                                                                      |
@@ -333,26 +333,38 @@ Renderers takes geometry, material, and background to produce images given camer
 
 ### nerf-volume-renderer
 
-| name                  | type  | description                                                                                               |
-| --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
-| num_samples_per_ray   | float | Number of sample points along each ray. Default: 1.0                                                      |
-| randomized            | bool  | Whether to randomly perturb the sample points in training. Default: True                                  |
-| eval_chunk_size       | int   | Number of sample points per chunk in validation/testing, to prevent OOM. Default: 160000                  |
-| grid_prune            | bool  | Whether to maintain an occupancy grid and prune sample points in empty space using NeRFAcc. Default: True |
-| prune_alpha_threshold | bool  | Whether to prune sample points with lower density, only effective when `grid_prune=true`. Default: True   |
+| name                                                              | type  | description                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| num_samples_per_ray                                               | float | Number of sample points along each ray. Default: 1.0                                                                                                                                                                          |
+| randomized                                                        | bool  | Whether to randomly perturb the sample points in training. Default: True                                                                                                                                                      |
+| eval_chunk_size                                                   | int   | Number of sample points per chunk in validation/testing, to prevent OOM. Default: 160000                                                                                                                                      |
+| estimator                                                         | str   | The type of sampling estimator. Shoule be one of [occgrid, proposal, importance]. Default: occgrid.                                                                                                                           |
+| grid_prune (applicable when using occgrid)                        | bool  | Whether to maintain an occupancy grid and prune sample points in empty space using NeRFAcc. Default: True                                                                                                                     |
+| prune_alpha_threshold (applicable when using occgrid)             | bool  | Whether to prune sample points with lower density, only effective when `grid_prune=true`. Default: True                                                                                                                       |
+| proposal_network_config (applicable when using proposal)          | dict  | The proposal network configuration, used for density estimation. Default: None                                                                                                                                                |
+| prop_optimizer_config (applicable when using proposal)            | dict  | The optimizer configuration for the proposal network. Note that the renderer is not a part of the system's trainable parameters. So the optimizer should be manually specified here, and the optimization is take by Nerfacc. |
+| prop_scheduler_config (applicable when using proposal)            | dict  | The learning scheduler for the above optimizer. Default: None                                                                                                                                                                 |
+| num_samples_per_ray_proposal (applicable when using proposal)     | int   | Number of sample points along each ray for proposal network. Will sample `num_samples_per_ray` points according to the proposal sampling. Default: 64                                                                         |
+| num_samples_per_ray_importance (applicable when using importance) | int   | Number of sample points in NeRF coarse sampling and `num_samples_per_ray` is for fine sampling Default: 64                                                                                                                    |
+
+
 
 ### neus-volume-renderer
 
-| name                  | type  | description                                                                                               |
-| --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
-| num_samples_per_ray   | float | Number of sample points along each ray. Default: 1.0                                                      |
-| randomized            | bool  | Whether to randomly perturb the sample points in training. Default: True                                  |
-| eval_chunk_size       | int   | Number of sample points per chunk in validation/testing, to prevent OOM. Default: 160000                  |
-| grid_prune            | bool  | Whether to maintain an occupancy grid and prune sample points in empty space using NeRFAcc. Default: True |
-| prune_alpha_threshold | bool  | Whether to prune sample points with lower density, only effective when `grid_prune=true`. Default: True   |
-| learned_variance_init | float | Initialized value for the learned surface variance. Default: 0.3                                          |
-| cos_anneal_end_steps  | int   | End steps for the linear cosine annealing technique proposed in the NeuS paper. Default: 0                |
-| use_volsdf            | bool  | Whether to use the VolSDF formulation for SDF-to-alpha conversion. Default: False                         |
+| name                                                              | type  | description                                                                                                |
+| ----------------------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------- |
+| num_samples_per_ray                                               | float | Number of sample points along each ray. Default: 1.0                                                       |
+| randomized                                                        | bool  | Whether to randomly perturb the sample points in training. Default: True                                   |
+| eval_chunk_size                                                   | int   | Number of sample points per chunk in validation/testing, to prevent OOM. Default: 160000                   |
+| estimator                                                         | str   | The type of sampling estimator. Shoule be one of [occgrid, importance]. Default: occgrid.                  |
+| grid_prune (applicable when using occgrid)                        | bool  | Whether to maintain an occupancy grid and prune sample points in empty space using NeRFAcc. Default: True  |
+| prune_alpha_threshold (applicable when using occgrid)             | bool  | Whether to prune sample points with lower density, only effective when `grid_prune=true`. Default: True    |
+| num_samples_per_ray_importance (applicable when using importance) | int   | Number of sample points in NeRF coarse sampling and `num_samples_per_ray` is for fine sampling Default: 64 |
+| learned_variance_init                                             | float | Initialized value for the learned surface variance. Default: 0.3                                           |
+| cos_anneal_end_steps                                              | int   | End steps for the linear cosine annealing technique proposed in the NeuS paper. Default: 0                 |
+| use_volsdf                                                        | bool  | Whether to use the VolSDF formulation for SDF-to-alpha conversion. Default: False                          |
+| near_plane                                                        | float | Distance from camera to the near plane. Default: 0.0                                                       |
+| far_plane                                                         | float | Distance from camera to the far plane. Default: 1e10                                                       |
 
 ### nvdiff-rasterizer
 
@@ -363,13 +375,13 @@ Renderers takes geometry, material, and background to produce images given camer
 ### patch-renderer
 
 The patch-renderer first renders a full low-resolution downsampled image and then randomly renders a local patch at the original resolution level, which can significantly reduce memory usage during high-resolution training.
-| name | type | description |
-| --------------------- | ----- | --------------------------------------------------------------------------------------------------------- |
-| patch_size | int | The size of the local patch. Default: 128 |
-| global_downsample | int | Downsample scale of the original rendering size. Default: 4 |
-| global_detach | bool | Whether to detach the gradient of the downsampled image. Default: False |
-| base_renderer_type | str | The type of base renderer. |
-| base_renderer | VolumeRenderer.Config | The configuration of the base renderer. |
+| name               | type                  | description                                                             |
+| ------------------ | --------------------- | ----------------------------------------------------------------------- |
+| patch_size         | int                   | The size of the local patch. Default: 128                               |
+| global_downsample  | int                   | Downsample scale of the original rendering size. Default: 4             |
+| global_detach      | bool                  | Whether to detach the gradient of the downsampled image. Default: False |
+| base_renderer_type | str                   | The type of base renderer.                                              |
+| base_renderer      | VolumeRenderer.Config | The configuration of the base renderer.                                 |
 
 ## Guidance
 

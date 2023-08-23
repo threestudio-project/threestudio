@@ -187,3 +187,5 @@ outputs-gradio/
 
 # wandb
 wandb/
+
+load/tets/256_tets.npz

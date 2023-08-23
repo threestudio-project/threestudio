@@ -87,9 +87,20 @@ class ProlificDreamer(BaseLift3DSystem):
 
             # z variance loss proposed in HiFA: http://arxiv.org/abs/2305.18766
             # helps reduce floaters and produce solid geometry
-            loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
-            self.log("train/loss_z_variance", loss_z_variance)
-            loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
+            if "z_variance" in out:
+                loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
+                self.log("train/loss_z_variance", loss_z_variance)
+                loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
+
+            # sdf loss
+            if "sdf_grad" in out:
+                loss_eikonal = (
+                    (torch.linalg.norm(out["sdf_grad"], ord=2, dim=-1) - 1.0) ** 2
+                ).mean()
+                self.log("train/loss_eikonal", loss_eikonal)
+                loss += loss_eikonal * self.C(self.cfg.loss.lambda_eikonal)
+                self.log("train/inv_std", out["inv_std"], prog_bar=True)
+
         elif self.cfg.stage == "geometry":
             loss_normal_consistency = out["mesh"].normal_consistency()
             self.log("train/loss_normal_consistency", loss_normal_consistency)
