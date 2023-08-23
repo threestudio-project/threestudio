@@ -56,6 +56,7 @@ class NeuSVolumeRenderer(VolumeRenderer):
 
         # for occgrid
         grid_prune: bool = True
+        prune_alpha_threshold: bool = True
 
         # for importance
         num_samples_per_ray_importance: int = 64
