@@ -465,6 +465,42 @@ Download the data sample of InstructNeRF2NeRF using this [link](https://mailstsi
 python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 0 data.dataroot="YOUR_DATAROOT/face" data.camera_layout="front" data.camera_distance=1 data.eval_interpolation=[1,3,50] system.prompt_processor.prompt="Turn him into Albert Einstein"
 ```
 
+### Magic123 [![arXiv](https://img.shields.io/badge/arXiv-2306.17843-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2306.17843)
+
+**Results obtained by threestudio (Zero123 + Stable Diffusion)**
+
+**Notable differences from the paper**
+- This is an unofficial re-implementation which shares the same overall idea with the [official implementation](https://github.com/guochengqian/Magic123) but differs in some aspects like hyperparameters.
+- Textual Inversion is not supported, which means a text prompt is needed for training.
+
+**Example running commands**
+
+First train the coarse stage NeRF:
+
+```sh
+# Zero123 + Stable Diffusion, ~12GB VRAM
+# data.image_path must point to a 4-channel RGBA image
+# system.prompt_proessor.prompt must be specified
+python launch.py --config configs/magic123-coarse-sd.yaml --train --gpu 0 data.image_path=load/images/hamburger_rgba.png system.prompt_processor.prompt="a delicious hamburger"
+```
+
+Then convert the NeRF from the coarse stage to DMTet and train with differentiable rasterization:
+
+```sh
+# Zero123 + Stable Diffusion, ~10GB VRAM
+# data.image_path must point to a 4-channel RGBA image
+# system.prompt_proessor.prompt must be specified
+python launch.py --config configs/magic123-refine-sd.yaml --train --gpu 0 data.image_path=load/images/hamburger_rgba.png system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/dir/ckpts/last.ckpt
+# if you're unsatisfied with the surface extracted using the default threshold (25)
+# you can specify a threshold value using `system.geometry_convert_override`
+# decrease the value if the extracted surface is incomplete, increase if it is extruded
+python launch.py --config configs/magic123-refine-sd.yaml --train --gpu 0 data.image_path=load/images/hamburger_rgba.png system.prompt_processor.prompt="a delicious hamburger" system.geometry_convert_from=path/to/coarse/stage/trial/dir/ckpts/last.ckpt system.geometry_convert_override.isosurface_threshold=10.
+```
+
+**Tips**
+
+- If the image contains non-front-facing objects, specifying the approximate elevation and azimuth angle by setting `data.default_elevation_deg` and `data.default_azimuth_deg` can be helpful. In threestudio, top is elevation +90 and bottom is elevation -90; left is azimuth -90 and right is azimuth +90.
+
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
 
 **Installation**
