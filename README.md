@@ -13,17 +13,22 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
 <br/>
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/e27cb946-ed34-4b8f-87aa-86b689337b0e.gif" width="68%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/22424247/0783ad8c-02ba-419b-aea1-9f5ecb16ac1b.gif" width="29%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/1dbdebab-43d5-4830-872c-66b38d9fda92" width="60%">
 <br/>
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/22424247/82df7872-7bfb-4508-a045-414b45f0f745.png" width="97%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/437b4044-142c-4e5d-a406-4d9bad0205e1" width="60%">
+<br/>
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/4f4d62c5-2304-4e20-b632-afe6d144a203" width="68%">
+<br/>
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2f36ddbd-e3cf-4431-b269-47a9cb3d6e6e" width="68%">
 </p>
 
 <p align="center"><b>
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
 | <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> |
 <br/>
-| <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> | <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> |
+| <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> | <a href="https://guochengqian.github.io/project/magic123/">Magic123</a> |
+<br />
+| <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
 </b></p>
 
 <p align="center">
