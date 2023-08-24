@@ -65,10 +65,11 @@ class Zero123(BaseLift3DSystem):
             batch["shading"] = shading
         elif guidance == "zero123":
             batch = batch["random_camera"]
-            ambient_ratio = (
-                self.C(self.cfg.ambient_ratio_min)
-                + (1 - self.C(self.cfg.ambient_ratio_min)) * random.random()
-            )
+            # ambient_ratio = (
+            #     self.C(self.cfg.ambient_ratio_min)
+            #     + (1 - self.C(self.cfg.ambient_ratio_min)) * random.random()
+            # )
+            ambient_ratio = self.C(self.cfg.ambient_ratio_min)
 
         batch["bg_color"] = None
         batch["ambient_ratio"] = ambient_ratio

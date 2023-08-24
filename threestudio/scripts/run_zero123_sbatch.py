@@ -81,8 +81,8 @@ files = [
     ["~/git/threestudio/load/images/bollywood_actress_rgba.png", 5.0],
     ["~/git/threestudio/load/images/boy2_rgba.png", 5.0],
     ["~/git/threestudio/load/images/bull2_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/castle1_rgba.png", 5.0],
-    ["~/git/threestudio/load/images/castle2_rgba.png", 20.0],
+    ["~/git/threestudio/load/images/castle1_rgba.png", 0.0],
+    ["~/git/threestudio/load/images/castle2_rgba.png", 15.0],
     ["~/git/threestudio/load/images/church_ruins_rgba.png", -5.0],
     ["~/git/threestudio/load/images/corgi_rgba.png", 5.0],
     ["~/git/threestudio/load/images/crystalpiano_rgba.png", 15.0],
@@ -142,7 +142,8 @@ files = [
 ]
 
 files = [
-    ["~/git/threestudio/load/images/anya_front_rgba.png", 5.0],
+    ["~/git/threestudio/load/images/castle1_rgba.png", 0.0],
+    ["~/git/threestudio/load/images/castle2_rgba.png", 20.0],
 ]
 
 CONFIG = sai_multinoise
@@ -170,6 +171,18 @@ tag = "mn234"
 project = "MULTINOISE"
 wandb = "False"
 
+config = "sai_multinoise_amb"
+model = "comb1"
+tag = "mn134_minAmb_0.1to0.5"
+project = "AMB"
+wandb = "True"
+
+config = "sai_multinoise_amb_fast"
+model = "comb1"
+tag = "mn14_AMB_fast"
+project = "AMB"
+wandb = "True"
+
 for fileelev in files:
     # for model in ["xl", "sai", "elevcond", "diffcolors", "nobottom"]:
     file, elev = fileelev
@@ -195,7 +208,7 @@ for fileelev in files:
         f.write(f"WANDB={wandb}\n")
         # Phase 1
         f.write(
-            "python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/zero123-${MODEL}.ckpt use_timestamp=false name=${PROJECT}/${NAME} tag=Phase1_${CONFIG}config_${MODEL}model_${ELEV}elev_${TAG} data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=${WANDB} system.loggers.wandb.project=${PROJECT} system.loggers.wandb.name=${NAME}_${CONFIG}config_${MODEL}FIXmodel_${ELEV}elev_amb\n"
+            "python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/zero123-${MODEL}.ckpt use_timestamp=false name=${PROJECT}/${NAME} tag=Phase1_${CONFIG}config_${MODEL}model_${ELEV}elev_${TAG} data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=${WANDB} system.loggers.wandb.project=${PROJECT} system.loggers.wandb.name=${NAME}_${CONFIG}config_${MODEL}model_${ELEV}elev_${TAG}\n"
         )
     os.system("sbatch ~/git/threestudio/threestudio/scripts/zero123_sbatch.sh")
     time.sleep(1)
