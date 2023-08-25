@@ -1,0 +1,124 @@
+name: "magic123-refine-sd"
+tag: "${rmspace:${basename:${data.image_path}},_}-${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "single-image-datamodule"
+data:
+  image_path: ???
+  height: 512
+  width: 512
+  default_elevation_deg: 0.0
+  default_azimuth_deg: 0.0
+  default_camera_distance: 2.5
+  default_fovy_deg: 40.0
+  random_camera:
+    batch_size: 1
+    height: 512
+    width: 512
+    elevation_range: [-45, 45]
+    azimuth_range: [-180, 180]
+    camera_distance_range: [2.5, 2.5]
+    fovy_range: [40.0, 40.0]
+    camera_perturb: 0.0
+    center_perturb: 0.0
+    up_perturb: 0.0
+    eval_height: 512
+    eval_width: 512
+    eval_elevation_deg: ${data.default_elevation_deg}
+    eval_camera_distance: ${data.default_camera_distance}
+    eval_fovy_deg: ${data.default_fovy_deg}
+    n_val_views: 4
+    n_test_views: 120
+
+system_type: "magic123-system"
+system:
+  refinement: true
+  geometry_convert_from: ???
+  geometry_convert_inherit_texture: true
+  geometry_type: "tetrahedra-sdf-grid"
+  geometry:
+    radius: 1.0 # consistent with coarse
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
+    pos_encoding_config:
+      otype: HashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.447269237440378 # max resolution 4096
+    mlp_network_config:
+      otype: "VanillaMLP"
+      activation: "ReLU"
+      output_activation: "none"
+      n_neurons: 64
+      n_hidden_layers: 2
+    fix_geometry: false # optimize grid sdf and deformation
+
+  material_type: "no-material"
+
+  background_type: "solid-color-background"
+
+  renderer_type: "nvdiff-rasterizer"
+  renderer:
+    context_type: gl
+
+  guidance_3d_type: "zero123-unified-guidance"
+  guidance_3d:
+    guidance_type: "sds"
+    guidance_scale: 5.0
+    min_step_percent: 0.2
+    max_step_percent: 0.6
+
+    cond_image_path: ${data.image_path}
+    cond_elevation_deg: ${data.default_elevation_deg}
+    cond_azimuth_deg: ${data.default_azimuth_deg}
+    cond_camera_distance: ${data.default_camera_distance}
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: ???
+
+  guidance_type: "stable-diffusion-unified-guidance"
+  guidance:
+    guidance_type: "sds"
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    guidance_scale: 100.
+    min_step_percent: 0.2
+    max_step_percent: 0.6
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+      name: None
+
+  loss:
+    lambda_rgb: 1000.
+    lambda_mask: 100.
+    lambda_sd: 0.025
+    lambda_3d_sd: 1.
+    lambda_normal_consistency: 1000.
+    lambda_laplacian_smoothness: 0.
+
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.001
+      betas: [0.9, 0.99]
+      eps: 1.e-8
+
+trainer:
+  max_steps: 10000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 1
+  val_check_interval: 100
+  enable_progress_bar: true
+  precision: 32
+
+checkpoint:
+  save_last: true # save at each validation time
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

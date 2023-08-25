@@ -58,6 +58,22 @@ class Zero123Simple(BaseLift3DSystem):
             self.log("train/loss_orient", loss_orient)
             loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
 
+        if self.C(self.cfg.loss.lambda_normal_smoothness_2d) > 0:
+            if "comp_normal" not in out:
+                raise ValueError(
+                    "comp_normal is required for 2D normal smoothness loss, no comp_normal is found in the output."
+                )
+            normal = out["comp_normal"]
+            loss_normal_smoothness_2d = (
+                normal[:, 1:, :, :] - normal[:, :-1, :, :]
+            ).square().mean() + (
+                normal[:, :, 1:, :] - normal[:, :, :-1, :]
+            ).square().mean()
+            self.log("trian/loss_normal_smoothness_2d", loss_normal_smoothness_2d)
+            loss += loss_normal_smoothness_2d * self.C(
+                self.cfg.loss.lambda_normal_smoothness_2d
+            )
+
         loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
         self.log("train/loss_sparsity", loss_sparsity)
         loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
