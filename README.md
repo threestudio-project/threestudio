@@ -46,6 +46,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 ## News
 
+- 08/25/2023: Implementation of [Magic123](https://guochengqian.github.io/project/magic123/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#magic123-) to give it a try.
 - 07/06/2023: Join our [Discord server](https://discord.gg/ejer2MAB8N) for lively discussions!
 - 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
 - 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-) to give it a try.
@@ -473,6 +474,8 @@ python launch.py --config configs/instructnerf2nerf.yaml --train --gpu 0 data.da
 ### Magic123 [![arXiv](https://img.shields.io/badge/arXiv-2306.17843-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2306.17843)
 
 **Results obtained by threestudio (Zero123 + Stable Diffusion)**
+
+https://github.com/threestudio-project/threestudio/assets/19284678/335a58a8-8fee-485b-ac27-c55a16f4a673
 
 **Notable differences from the paper**
 - This is an unofficial re-implementation which shares the same overall idea with the [official implementation](https://github.com/guochengqian/Magic123) but differs in some aspects like hyperparameters.
