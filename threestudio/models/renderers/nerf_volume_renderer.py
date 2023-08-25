@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import partial
 
 import nerfacc
 import torch
@@ -6,10 +7,13 @@ import torch.nn.functional as F
 
 import threestudio
 from threestudio.models.background.base import BaseBackground
+from threestudio.models.estimators import ImportanceEstimator
 from threestudio.models.geometry.base import BaseImplicitGeometry
 from threestudio.models.materials.base import BaseMaterial
+from threestudio.models.networks import create_network_with_input_encoding
 from threestudio.models.renderers.base import VolumeRenderer
-from threestudio.utils.ops import chunk_batch, validate_empty_rays
+from threestudio.systems.utils import parse_optimizer, parse_scheduler_to_instance
+from threestudio.utils.ops import chunk_batch, get_activation, validate_empty_rays
 from threestudio.utils.typing import *
 
 
@@ -18,12 +22,30 @@ class NeRFVolumeRenderer(VolumeRenderer):
     @dataclass
     class Config(VolumeRenderer.Config):
         num_samples_per_ray: int = 512
-        randomized: bool = True
         eval_chunk_size: int = 160000
-        grid_prune: bool = True
-        prune_alpha_threshold: bool = True
+        randomized: bool = True
+
+        near_plane: float = 0.0
+        far_plane: float = 1e10
+
         return_comp_normal: bool = False
         return_normal_perturb: bool = False
+
+        # in ["occgrid", "proposal", "importance"]
+        estimator: str = "occgrid"
+
+        # for occgrid
+        grid_prune: bool = True
+        prune_alpha_threshold: bool = True
+
+        # for proposal
+        proposal_network_config: Optional[dict] = None
+        prop_optimizer_config: Optional[dict] = None
+        prop_scheduler_config: Optional[dict] = None
+        num_samples_per_ray_proposal: int = 64
+
+        # for importance
+        num_samples_per_ray_importance: int = 64
 
     cfg: Config
 
@@ -34,16 +56,64 @@ class NeRFVolumeRenderer(VolumeRenderer):
         background: BaseBackground,
     ) -> None:
         super().configure(geometry, material, background)
-        self.estimator = nerfacc.OccGridEstimator(
-            roi_aabb=self.bbox.view(-1), resolution=32, levels=1
-        )
-        if not self.cfg.grid_prune:
-            self.estimator.occs.fill_(True)
-            self.estimator.binaries.fill_(True)
-        self.render_step_size = (
-            1.732 * 2 * self.cfg.radius / self.cfg.num_samples_per_ray
-        )
-        self.randomized = self.cfg.randomized
+        if self.cfg.estimator == "occgrid":
+            self.estimator = nerfacc.OccGridEstimator(
+                roi_aabb=self.bbox.view(-1), resolution=32, levels=1
+            )
+            if not self.cfg.grid_prune:
+                self.estimator.occs.fill_(True)
+                self.estimator.binaries.fill_(True)
+            self.render_step_size = (
+                1.732 * 2 * self.cfg.radius / self.cfg.num_samples_per_ray
+            )
+            self.randomized = self.cfg.randomized
+        elif self.cfg.estimator == "importance":
+            self.estimator = ImportanceEstimator()
+        elif self.cfg.estimator == "proposal":
+            self.prop_net = create_network_with_input_encoding(
+                **self.cfg.proposal_network_config
+            )
+            self.prop_optim = parse_optimizer(
+                self.cfg.prop_optimizer_config, self.prop_net
+            )
+            self.prop_scheduler = (
+                parse_scheduler_to_instance(
+                    self.cfg.prop_scheduler_config, self.prop_optim
+                )
+                if self.cfg.prop_scheduler_config is not None
+                else None
+            )
+            self.estimator = nerfacc.PropNetEstimator(
+                self.prop_optim, self.prop_scheduler
+            )
+
+            def get_proposal_requires_grad_fn(
+                target: float = 5.0, num_steps: int = 1000
+            ):
+                schedule = lambda s: min(s / num_steps, 1.0) * target
+
+                steps_since_last_grad = 0
+
+                def proposal_requires_grad_fn(step: int) -> bool:
+                    nonlocal steps_since_last_grad
+                    target_steps_since_last_grad = schedule(step)
+                    requires_grad = steps_since_last_grad > target_steps_since_last_grad
+                    if requires_grad:
+                        steps_since_last_grad = 0
+                    steps_since_last_grad += 1
+                    return requires_grad
+
+                return proposal_requires_grad_fn
+
+            self.proposal_requires_grad_fn = get_proposal_requires_grad_fn()
+            self.randomized = self.cfg.randomized
+        else:
+            raise NotImplementedError(
+                "Unknown estimator, should be one of ['occgrid', 'proposal', 'importance']."
+            )
+
+        # for proposal
+        self.vars_in_forward = {}
 
     def forward(
         self,
@@ -63,45 +133,138 @@ class NeRFVolumeRenderer(VolumeRenderer):
         )
         n_rays = rays_o_flatten.shape[0]
 
-        def sigma_fn(t_starts, t_ends, ray_indices):
-            t_starts, t_ends = t_starts[..., None], t_ends[..., None]
-            t_origins = rays_o_flatten[ray_indices]
-            t_positions = (t_starts + t_ends) / 2.0
-            t_dirs = rays_d_flatten[ray_indices]
-            positions = t_origins + t_dirs * t_positions
-            if self.training:
-                sigma = self.geometry.forward_density(positions)[..., 0]
+        if self.cfg.estimator == "occgrid":
+            if not self.cfg.grid_prune:
+                with torch.no_grad():
+                    ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
+                        rays_o_flatten,
+                        rays_d_flatten,
+                        sigma_fn=None,
+                        near_plane=self.cfg.near_plane,
+                        far_plane=self.cfg.far_plane,
+                        render_step_size=self.render_step_size,
+                        alpha_thre=0.0,
+                        stratified=self.randomized,
+                        cone_angle=0.0,
+                        early_stop_eps=0,
+                    )
             else:
-                sigma = chunk_batch(
-                    self.geometry.forward_density,
-                    self.cfg.eval_chunk_size,
-                    positions,
-                )[..., 0]
-            return sigma
 
-        if not self.cfg.grid_prune:
-            with torch.no_grad():
-                ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
-                    rays_o_flatten,
-                    rays_d_flatten,
-                    sigma_fn=None,
-                    render_step_size=self.render_step_size,
-                    alpha_thre=0.0,
-                    stratified=self.randomized,
-                    cone_angle=0.0,
-                    early_stop_eps=0,
+                def sigma_fn(t_starts, t_ends, ray_indices):
+                    t_starts, t_ends = t_starts[..., None], t_ends[..., None]
+                    t_origins = rays_o_flatten[ray_indices]
+                    t_positions = (t_starts + t_ends) / 2.0
+                    t_dirs = rays_d_flatten[ray_indices]
+                    positions = t_origins + t_dirs * t_positions
+                    if self.training:
+                        sigma = self.geometry.forward_density(positions)[..., 0]
+                    else:
+                        sigma = chunk_batch(
+                            self.geometry.forward_density,
+                            self.cfg.eval_chunk_size,
+                            positions,
+                        )[..., 0]
+                    return sigma
+
+                with torch.no_grad():
+                    ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
+                        rays_o_flatten,
+                        rays_d_flatten,
+                        sigma_fn=sigma_fn if self.cfg.prune_alpha_threshold else None,
+                        near_plane=self.cfg.near_plane,
+                        far_plane=self.cfg.far_plane,
+                        render_step_size=self.render_step_size,
+                        alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
+                        stratified=self.randomized,
+                        cone_angle=0.0,
+                    )
+        elif self.cfg.estimator == "proposal":
+
+            def prop_sigma_fn(
+                t_starts: Float[Tensor, "Nr Ns"],
+                t_ends: Float[Tensor, "Nr Ns"],
+                proposal_network,
+            ):
+                t_origins: Float[Tensor, "Nr 1 3"] = rays_o_flatten.unsqueeze(-2)
+                t_dirs: Float[Tensor, "Nr 1 3"] = rays_d_flatten.unsqueeze(-2)
+                positions: Float[Tensor, "Nr Ns 3"] = (
+                    t_origins + t_dirs * (t_starts + t_ends)[..., None] / 2.0
                 )
+                aabb_min, aabb_max = self.bbox[0], self.bbox[1]
+                positions = (positions - aabb_min) / (aabb_max - aabb_min)
+                selector = ((positions > 0.0) & (positions < 1.0)).all(dim=-1)
+                density_before_activation = (
+                    proposal_network(positions.view(-1, 3))
+                    .view(*positions.shape[:-1], 1)
+                    .to(positions)
+                )
+                density: Float[Tensor, "Nr Ns 1"] = (
+                    get_activation("shifted_trunc_exp")(density_before_activation)
+                    * selector[..., None]
+                )
+                return density.squeeze(-1)
+
+            t_starts_, t_ends_ = self.estimator.sampling(
+                prop_sigma_fns=[partial(prop_sigma_fn, proposal_network=self.prop_net)],
+                prop_samples=[self.cfg.num_samples_per_ray_proposal],
+                num_samples=self.cfg.num_samples_per_ray,
+                n_rays=n_rays,
+                near_plane=self.cfg.near_plane,
+                far_plane=self.cfg.far_plane,
+                sampling_type="uniform",
+                stratified=self.randomized,
+                requires_grad=self.vars_in_forward["requires_grad"],
+            )
+            ray_indices = (
+                torch.arange(n_rays, device=rays_o_flatten.device)
+                .unsqueeze(-1)
+                .expand(-1, t_starts_.shape[1])
+            )
+            ray_indices = ray_indices.flatten()
+            t_starts_ = t_starts_.flatten()
+            t_ends_ = t_ends_.flatten()
+        elif self.cfg.estimator == "importance":
+
+            def prop_sigma_fn(
+                t_starts: Float[Tensor, "Nr Ns"],
+                t_ends: Float[Tensor, "Nr Ns"],
+                proposal_network,
+            ):
+                t_origins: Float[Tensor, "Nr 1 3"] = rays_o_flatten.unsqueeze(-2)
+                t_dirs: Float[Tensor, "Nr 1 3"] = rays_d_flatten.unsqueeze(-2)
+                positions: Float[Tensor, "Nr Ns 3"] = (
+                    t_origins + t_dirs * (t_starts + t_ends)[..., None] / 2.0
+                )
+                with torch.no_grad():
+                    geo_out = chunk_batch(
+                        proposal_network,
+                        self.cfg.eval_chunk_size,
+                        positions.reshape(-1, 3),
+                        output_normal=False,
+                    )
+                    density = geo_out["density"]
+                return density.reshape(positions.shape[:2])
+
+            t_starts_, t_ends_ = self.estimator.sampling(
+                prop_sigma_fns=[partial(prop_sigma_fn, proposal_network=self.geometry)],
+                prop_samples=[self.cfg.num_samples_per_ray_importance],
+                num_samples=self.cfg.num_samples_per_ray,
+                n_rays=n_rays,
+                near_plane=self.cfg.near_plane,
+                far_plane=self.cfg.far_plane,
+                sampling_type="uniform",
+                stratified=self.randomized,
+            )
+            ray_indices = (
+                torch.arange(n_rays, device=rays_o_flatten.device)
+                .unsqueeze(-1)
+                .expand(-1, t_starts_.shape[1])
+            )
+            ray_indices = ray_indices.flatten()
+            t_starts_ = t_starts_.flatten()
+            t_ends_ = t_ends_.flatten()
         else:
-            with torch.no_grad():
-                ray_indices, t_starts_, t_ends_ = self.estimator.sampling(
-                    rays_o_flatten,
-                    rays_d_flatten,
-                    sigma_fn=sigma_fn if self.cfg.prune_alpha_threshold else None,
-                    render_step_size=self.render_step_size,
-                    alpha_thre=0.01 if self.cfg.prune_alpha_threshold else 0.0,
-                    stratified=self.randomized,
-                    cone_angle=0.0,
-                )
+            raise NotImplementedError
 
         ray_indices, t_starts_, t_ends_ = validate_empty_rays(
             ray_indices, t_starts_, t_ends_
@@ -147,13 +310,16 @@ class NeRFVolumeRenderer(VolumeRenderer):
             )
 
         weights: Float[Tensor, "Nr 1"]
-        weights_, _, _ = nerfacc.render_weight_from_density(
+        weights_, trans_, _ = nerfacc.render_weight_from_density(
             t_starts[..., 0],
             t_ends[..., 0],
             geo_out["density"][..., 0],
             ray_indices=ray_indices,
             n_rays=n_rays,
         )
+        if self.training and self.cfg.estimator == "proposal":
+            self.vars_in_forward["trans"] = trans_.reshape(n_rays, -1)
+
         weights = weights_[..., None]
         opacity: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(
             weights[..., 0], values=None, ray_indices=ray_indices, n_rays=n_rays
@@ -256,22 +422,41 @@ class NeRFVolumeRenderer(VolumeRenderer):
     def update_step(
         self, epoch: int, global_step: int, on_load_weights: bool = False
     ) -> None:
-        if self.cfg.grid_prune:
+        if self.cfg.estimator == "occgrid":
+            if self.cfg.grid_prune:
 
-            def occ_eval_fn(x):
-                density = self.geometry.forward_density(x)
-                # approximate for 1 - torch.exp(-density * self.render_step_size) based on taylor series
-                return density * self.render_step_size
+                def occ_eval_fn(x):
+                    density = self.geometry.forward_density(x)
+                    # approximate for 1 - torch.exp(-density * self.render_step_size) based on taylor series
+                    return density * self.render_step_size
 
-            if self.training and not on_load_weights:
-                self.estimator.update_every_n_steps(
-                    step=global_step, occ_eval_fn=occ_eval_fn
-                )
+                if self.training and not on_load_weights:
+                    self.estimator.update_every_n_steps(
+                        step=global_step, occ_eval_fn=occ_eval_fn
+                    )
+        elif self.cfg.estimator == "proposal":
+            if self.training:
+                requires_grad = self.proposal_requires_grad_fn(global_step)
+                self.vars_in_forward["requires_grad"] = requires_grad
+            else:
+                self.vars_in_forward["requires_grad"] = False
+
+    def update_step_end(self, epoch: int, global_step: int) -> None:
+        if self.cfg.estimator == "proposal" and self.training:
+            self.estimator.update_every_n_steps(
+                self.vars_in_forward["trans"],
+                self.vars_in_forward["requires_grad"],
+                loss_scaler=1.0,
+            )
 
     def train(self, mode=True):
         self.randomized = mode and self.cfg.randomized
+        if self.cfg.estimator == "proposal":
+            self.prop_net.train()
         return super().train(mode=mode)
 
     def eval(self):
         self.randomized = False
+        if self.cfg.estimator == "proposal":
+            self.prop_net.eval()
         return super().eval()
