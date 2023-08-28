@@ -212,6 +212,8 @@ class BaseLift3DSystem(BaseSystem):
         exporter_type: str = "mesh-exporter"
         exporter: dict = field(default_factory=dict)
 
+        renderer_convert_from: Optional[str] = None
+
     cfg: Config
 
     def configure(self) -> None:
@@ -261,12 +263,56 @@ class BaseLift3DSystem(BaseSystem):
         self.background = threestudio.find(self.cfg.background_type)(
             self.cfg.background
         )
-        self.renderer = threestudio.find(self.cfg.renderer_type)(
-            self.cfg.renderer,
-            geometry=self.geometry,
-            material=self.material,
-            background=self.background,
-        )
+
+        if (
+            self.cfg.renderer_convert_from  # from_coarse must be specified
+            and not self.cfg.weights  # not initialized from coarse when weights are specified
+            and not self.resumed  # not initialized from coarse when resumed from checkpoints
+        ):
+            threestudio.info("Initializing renderer from a given checkpoint ...")
+            from threestudio.utils.config import load_config, parse_structured
+
+            prev_cfg = load_config(
+                os.path.join(
+                    os.path.dirname(self.cfg.renderer_convert_from),
+                    "../configs/parsed.yaml",
+                )
+            )  # TODO: hard-coded relative path
+            prev_system_cfg: BaseLift3DSystem.Config = parse_structured(
+                self.Config, prev_cfg.system
+            )
+            prev_renderer_cfg = prev_system_cfg.renderer
+            prev_renderer = threestudio.find(prev_system_cfg.renderer_type)(
+                prev_renderer_cfg,
+                geometry=self.geometry,
+                material=self.material,
+                background=self.background,
+            )
+            state_dict, epoch, global_step = load_module_weights(
+                self.cfg.renderer_convert_from,
+                module_name="renderer",
+                map_location="cpu",
+            )
+            prev_renderer.load_state_dict(state_dict, strict=False)
+            # restore step-dependent states
+            prev_renderer.do_update_step(epoch, global_step, on_load_weights=True)
+            # convert from coarse stage geometry
+            prev_renderer = prev_renderer.to(get_device())
+            self.renderer = prev_renderer
+            # self.geometry = threestudio.find(self.cfg.geometry_type).create_from(
+            #     prev_geometry,
+            #     self.cfg.geometry,
+            #     copy_net=self.cfg.geometry_convert_inherit_texture,
+            # )
+            # del prev_geometry
+            cleanup()
+        else:
+            self.renderer = threestudio.find(self.cfg.renderer_type)(
+                self.cfg.renderer,
+                geometry=self.geometry,
+                material=self.material,
+                background=self.background,
+            )
 
     def on_fit_start(self) -> None:
         if self._save_dir is not None:
