@@ -5,7 +5,7 @@ seed: 0
 
 data_type: "single-image-datamodule"
 data:
-  image_path: ???
+  image_path: ${data.image_path}
   height: 128
   width: 128
   default_elevation_deg: 0.0
@@ -78,7 +78,7 @@ system:
 
   guidance_3d_type: "zero123-unified-guidance"
   guidance_3d:
-    guidance_type: "sds"
+    guidance_type: "vsd"
     guidance_scale: 5.0
     min_step_percent: 0.2
     max_step_percent: 0.6
@@ -90,13 +90,15 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    prompt: ???
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: "the thin medal not ball bat coin and Anime character face of luffy from Onepiece with red cloth and strawhat"
+    prompt_back: "the thin medal not ball bat coin and Anime character face of luffy from Onepiece with red cloth and strawhat"
+
 
   guidance_type: "stable-diffusion-unified-guidance"
   guidance:
-    guidance_type: "sds"
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    guidance_type: "vsd"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 100.
     min_step_percent: 0.2
     max_step_percent: 0.6
@@ -108,6 +110,8 @@ system:
       name: None
 
   loss:
+    lambda_3d_train_phi: 1.0 # for vsd zero123, maybe only magic123
+    lambda_train_phi: 1.0 # for vsd
     lambda_rgb: 1000.
     lambda_mask: 100.
     lambda_sd: 0.025

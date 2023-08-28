@@ -14,7 +14,16 @@ python launch.py --config configs/experimental/imagecondition_zero123nerf.yaml -
 python launch.py --config configs/experimental/imagecondition_zero123nerf_refine.yaml --train --gpu 5 data.image_path=./load/images/${NAME}_rgba.png system.prompt_processor.prompt=${PROMPT} system.geometry_convert_from="/admin/home-vikram/git/threestudio/outputs/${NAME}/Phase1/ckpts/last.ckpt" name=${NAME} tag=Phase2_refine # system.freq.guidance_eval=0 system.loggers.wandb.enable=false system.loggers.wandb.project="zero123" system.loggers.wandb.name=${NAME}_Phase2_refine
 
 
+
+
+
 NAME="luffy_front"
+PROMPT="the thin medal not ball bat coin and Anime character face of luffy from Onepiece with red cloth and strawhat"
+
+# first Phase
+python launch.py --config configs/magic123-coarse-sd.yaml --train --gpu 0,1 data.image_path=./load/images/${NAME}_rgba.png name=${NAME}_v1_coarse tag=Phase1_vsd # system.freq.guidance_eval=0 system.loggers.wandb.enable=false  system.loggers.wandb.name=${NAME}_Phase1_vsd
+
+
 # Phase 2 - SDF + dreamfusion
 python launch.py --config configs/magic123-refine-sd.yaml --train --gpu 0,1 data.image_path=./load/images/${NAME}_rgba.png system.prompt_processor.prompt=${PROMPT} name=${NAME}_v2_refine tag=Phase2_refine # system.freq.guidance_eval=0 system.loggers.wandb.enable=false system.loggers.wandb.project="zero123" system.loggers.wandb.name=${NAME}_Phase2_refine
 
