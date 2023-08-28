@@ -124,7 +124,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 positions=positions,
                 light_positions=t_light_positions,
                 **geo_out,
-                **kwargs
+                **kwargs,
             )
             comp_rgb_bg = self.background(dirs=rays_d)
         else:
@@ -140,7 +140,8 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 viewdirs=t_dirs,
                 positions=positions,
                 light_positions=t_light_positions,
-                **geo_out
+                **geo_out,
+                **kwargs,
             )
             comp_rgb_bg = chunk_batch(
                 self.background, self.cfg.eval_chunk_size, dirs=rays_d

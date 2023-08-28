@@ -20,8 +20,8 @@ class DreamFusion(BaseLift3DSystem):
         # create geometry, material, background, renderer
         super().configure()
 
-    def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        render_out = self.renderer(**batch)
+    def forward(self, batch: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        render_out = self.renderer(**batch, **kwargs)
         return {
             **render_out,
         }
@@ -111,7 +111,7 @@ class DreamFusion(BaseLift3DSystem):
         pass
 
     def test_step(self, batch, batch_idx):
-        out = self(batch)
+        out = self(batch, shading="textureless")
         self.save_image_grid(
             f"it{self.true_global_step}-test/{batch['index'][0]}.png",
             [
