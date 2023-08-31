@@ -1,3 +1,5 @@
+import os
+import shutil
 from dataclasses import dataclass, field
 
 import torch
@@ -5,6 +7,7 @@ import torch.nn.functional as F
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
+from threestudio.utils.misc import get_CPU_mem, get_GPU_mem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
 
@@ -140,12 +143,15 @@ class Magic123(BaseLift3DSystem):
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
+        self.log("train/mem_cpu", get_CPU_mem(), prog_bar=True)
+        self.log("train/mem_gpu", get_GPU_mem()[0], prog_bar=True)
+
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.true_global_step}-{batch['index'][0]}.png",
+            f"it{self.true_global_step}-val/{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
@@ -171,12 +177,24 @@ class Magic123(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
-            name="validation_step",
+            name=None,
             step=self.true_global_step,
         )
 
     def on_validation_epoch_end(self):
-        pass
+        filestem = f"it{self.true_global_step}-val"
+        self.save_img_sequence(
+            filestem,
+            filestem,
+            "(\d+)\.png",
+            save_format="mp4",
+            fps=30,
+            name="validation_epoch_end",
+            step=self.true_global_step,
+        )
+        shutil.rmtree(
+            os.path.join(self.get_save_dir(), f"it{self.true_global_step}-val")
+        )
 
     def test_step(self, batch, batch_idx):
         out = self(batch)
@@ -220,4 +238,7 @@ class Magic123(BaseLift3DSystem):
             fps=30,
             name="test",
             step=self.true_global_step,
+        )
+        shutil.rmtree(
+            os.path.join(self.get_save_dir(), f"it{self.true_global_step}-test")
         )
