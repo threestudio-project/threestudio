@@ -154,10 +154,10 @@ ELEV = 5.0
 WANDB = False
 
 config = "sai"
-model = "comb1"
+model = "elevcond2"
+tag = ""
 project = "Zero123_Dmitry_comp"
 wandb = "true"
-
 
 config = "sai_amb"
 model = "comb1"
@@ -212,70 +212,97 @@ for fileelev in files:
         )
     os.system("sbatch ~/git/threestudio/threestudio/scripts/zero123_sbatch.sh")
     time.sleep(1)
-    # ###########################
-    # config = "sai"
-    # model = "xl"
-    # name = os.path.basename(file).split("_rgba.png")[0]
-    # with open(
-    #     os.path.expanduser("~/git/threestudio/threestudio/scripts/zero123_sbatch.sh"),
-    #     "w",
-    # ) as f:
-    #     f.write("#!/bin/bash\n")
-    #     f.write(f"#SBATCH --job-name=vikky_{name}\n")
-    #     f.write("#SBATCH --account=mod3d\n")
-    #     f.write("#SBATCH --partition=g40\n")
-    #     f.write("#SBATCH --gpus=1\n")
-    #     f.write("#SBATCH --time=0-00:15:00\n")
-    #     f.write("conda activate three\n")
-    #     f.write("cd ~/git/threestudio/\n")
-    #     f.write(f"NAME={name}\n")
-    #     f.write(f"CONFIG={config}\n")
-    #     f.write(f"MODEL={model}\n")
-    #     f.write(f"ELEV={elev}\n")
-    #     # Phase 1
-    #     f.write(
-    #         "python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/zero123-${MODEL}.ckpt use_timestamp=false name=SAI/${NAME} tag=Phase1_${CONFIG}config_${MODEL}model_${ELEV}elev data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=true system.loggers.wandb.project='zero123_SAIconfig_comp' system.loggers.wandb.name=${NAME}_${CONFIG}config_${MODEL}model_${ELEV}elev\n"
-    #     )
-    # os.system("sbatch ~/git/threestudio/threestudio/scripts/zero123_sbatch.sh")
-    # time.sleep(1)
-    # ###########################
-    # config = "sai"
-    # model = "orig"
-    # name = os.path.basename(file).split("_rgba.png")[0]
-    # with open(
-    #     os.path.expanduser("~/git/threestudio/threestudio/scripts/zero123_sbatch.sh"),
-    #     "w",
-    # ) as f:
-    #     f.write("#!/bin/bash\n")
-    #     f.write(f"#SBATCH --job-name=vikky_{name}\n")
-    #     f.write("#SBATCH --account=mod3d\n")
-    #     f.write("#SBATCH --partition=g40\n")
-    #     f.write("#SBATCH --gpus=1\n")
-    #     f.write("#SBATCH --time=0-00:15:00\n")
-    #     f.write("conda activate three\n")
-    #     f.write("cd ~/git/threestudio/\n")
-    #     f.write(f"NAME={name}\n")
-    #     f.write(f"CONFIG={config}\n")
-    #     f.write(f"MODEL={model}\n")
-    #     f.write(f"ELEV={elev}\n")
-    #     # Phase 1
-    #     f.write(
-    #         "python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/zero123-${MODEL}.ckpt use_timestamp=false name=SAI/${NAME} tag=Phase1_${CONFIG}config_${MODEL}model_${ELEV}elev data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=true system.loggers.wandb.project='zero123_SAIconfig_comp' system.loggers.wandb.name=${NAME}_${CONFIG}config_${MODEL}model_${ELEV}elev\n"
-    #     )
-    # os.system("sbatch ~/git/threestudio/threestudio/scripts/zero123_sbatch.sh")
-    # time.sleep(1)
-    # ###########################
 
-    # /admin/home-vikram/git/threestudio/outputs/SAI/temple2/Phase1_SAI_new_elev5_EXP9_lr0.01_dmitryFix_new/configs/raw.yaml
-    # new, elev 10
-    # f.write(
-    #     "python launch.py --config configs/zero123_sai.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png data.default_elevation_deg=-10.0 use_timestamp=false name=SAI/${NAME} tag=Phase1_SAI_new_elev5_EXP2_lr0.001 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
-    # )
-    # original, elev 5
-    # f.write(
-    #     "python launch.py --config configs/zero123_orig.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png data.default_elevation_deg=5.0 use_timestamp=false name=${NAME} tag=Phase1_orig_elev5 system.loggers.wandb.enable=false system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1\n"
-    # )
-    # # Phase 1.5
-    # f.write(
-    #     "python launch.py --config configs/zero123-geometry.yaml --train data.image_path=./load/images/${NAME}_rgba.png system.geometry_convert_from=./outputs/${NAME}/Phase1/ckpts/last.ckpt use_timestamp=False name=${NAME} tag=Phase1p5 system.loggers.wandb.enable=true system.loggers.wandb.project='zero123' system.loggers.wandb.name=${NAME}_Phase1p5\n"
-    # )
+#######################################################
+# 0.18215
+
+config = "sai"
+model = "sai2"
+tag = ""
+project = "Zero123_Dmitry_comp"
+wandb = "true"
+
+for fileelev in files[1:]:
+    # for model in ["xl", "sai", "elevcond", "diffcolors", "nobottom"]:
+    file, elev = fileelev
+    name = os.path.basename(file).split("_rgba.png")[0]
+    with open(
+        os.path.expanduser(
+            "~/git/threestudio_0.18215/threestudio/threestudio/scripts/zero123_sbatch.sh"
+        ),
+        "w",
+    ) as f:
+        f.write("#!/bin/bash\n")
+        f.write(f"#SBATCH --job-name=vikky_{name}\n")
+        f.write("#SBATCH --account=mod3d\n")
+        f.write("#SBATCH --partition=g40\n")
+        f.write("#SBATCH --gpus=1\n")
+        f.write("#SBATCH --time=0-00:30:00\n")
+        f.write("conda activate three\n")
+        f.write("cd ~/git/threestudio_0.18215/threestudio/\n")
+        f.write(f"NAME={name}\n")
+        f.write(f"CONFIG={config}\n")
+        f.write(f"MODEL={model}\n")
+        f.write(f"ELEV={elev}\n")
+        f.write(f"PROJECT={project}\n")
+        f.write(f"TAG={tag}\n")
+        f.write(f"WANDB={wandb}\n")
+        # Phase 1
+        f.write(
+            "python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.guidance.pretrained_model_name_or_path=./load/zero123/zero123-${MODEL}.ckpt use_timestamp=false name=${PROJECT}/${NAME} tag=Phase1_${CONFIG}config_${MODEL}model_${ELEV}elev_${TAG} data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=${WANDB} system.loggers.wandb.project=${PROJECT} system.loggers.wandb.name=${NAME}_${CONFIG}config_${MODEL}model_${ELEV}elev_${TAG}\n"
+        )
+    os.system(
+        "sbatch ~/git/threestudio_0.18215/threestudio/threestudio/scripts/zero123_sbatch.sh"
+    )
+    time.sleep(1)
+
+
+#######################################################
+# Phase2
+
+files = [
+    [
+        "~/git/threestudio/load/images/anya_front_rgba.png",
+        5.0,
+        "A DSLR 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )",
+    ],
+]
+
+# Phase 2
+phase1 = "/admin/home-vikram/git/threestudio/outputs/MAGIC123Zero123/anya_front/Phase1_sai_multinoise_ambconfig_comb1model_5.0elev_Phase1"
+config = "magic123refine"
+model = "comb1"
+tag = "Phase2"
+project = "MAGIC123Zero123"
+wandb = "True"
+
+for fileelevprompt in files:
+    # for model in ["xl", "sai", "elevcond", "diffcolors", "nobottom"]:
+    file, elev, prompt = fileelevprompt
+    name = os.path.basename(file).split("_rgba.png")[0]
+    with open(
+        os.path.expanduser("~/git/threestudio/threestudio/scripts/zero123_sbatch.sh"),
+        "w",
+    ) as f:
+        f.write("#!/bin/bash\n")
+        f.write(f"#SBATCH --job-name=vikky_{name}\n")
+        f.write("#SBATCH --account=mod3d\n")
+        f.write("#SBATCH --partition=g40\n")
+        f.write("#SBATCH --gpus=1\n")
+        f.write("#SBATCH --time=0-00:30:00\n")
+        f.write("conda activate three\n")
+        f.write("cd ~/git/threestudio/\n")
+        f.write(f"NAME={name}\n")
+        f.write(f"CONFIG={config}\n")
+        f.write(f"ELEV={elev}\n")
+        f.write(f"PROJECT={project}\n")
+        f.write(f"TAG={tag}\n")
+        f.write(f"WANDB={wandb}\n")
+        # Phase 2
+        f.write(f"PROMPT={prompt}\n")
+        f.write(f"PHASE1={phase1}\n")
+        f.write(
+            'python launch.py --config configs/zero123_${CONFIG}.yaml --train data.image_path=./load/images/fsx/${NAME}_rgba.png system.prompt_processor.prompt="${PROMPT}" system.geometry_convert_from=${PHASE1}/ckpts/last.ckpt use_timestamp=false name=${PROJECT}/${NAME} tag=Phase2_${CONFIG}config_${ELEV}elev_${TAG} data.default_elevation_deg=${ELEV} system.loggers.wandb.enable=${WANDB} system.loggers.wandb.project=${PROJECT} system.loggers.wandb.name=${NAME}_${CONFIG}config_${ELEV}elev_${TAG}\n'
+        )
+    os.system("sbatch ~/git/threestudio/threestudio/scripts/zero123_sbatch.sh")
+    time.sleep(1)

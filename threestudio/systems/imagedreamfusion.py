@@ -230,7 +230,7 @@ class ImageConditionDreamFusion(BaseLift3DSystem):
         total_loss = 0.0
 
         # guidance
-        if self.true_global_step > self.cfg.freq.ref_only_steps:
+        if self.true_global_step > getattr(self.cfg.freq, "ref_only_steps", 0):
             out = self.training_substep(batch, batch_idx, guidance="guidance")
             total_loss += out["loss"]
 

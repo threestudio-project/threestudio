@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 
 import torch
 import torch.nn.functional as F
-from PIL import Image, ImageDraw
 from torchmetrics import PearsonCorrCoef
 
 import threestudio
@@ -84,8 +83,8 @@ class Zero123(BaseLift3DSystem):
 
         guidance_eval = (
             guidance == "zero123"
-            and self.cfg.freq.guidance_eval > 0
-            and self.true_global_step % self.cfg.freq.guidance_eval == 0
+            and getattr(self.cfg.freq, "guidance_eval", 0) > 0
+            and self.true_global_step % getattr(self.cfg.freq, "guidance_eval", 0) == 0
         )
 
         if guidance == "ref":
@@ -225,29 +224,17 @@ class Zero123(BaseLift3DSystem):
         return {"loss": loss}
 
     def training_step(self, batch, batch_idx):
-        if self.cfg.freq.get("ref_or_zero123", "accumulate") == "accumulate":
-            do_ref = True
-            do_zero123 = True
-        elif self.cfg.freq.get("ref_or_zero123", "accumulate") == "alternate":
-            do_ref = (
-                self.true_global_step < self.cfg.freq.ref_only_steps
-                or self.true_global_step % self.cfg.freq.n_ref == 0
-            )
-            do_zero123 = not do_ref
-
         total_loss = 0.0
-        if do_zero123:
-            out = self.training_substep(batch, batch_idx, guidance="zero123")
-            total_loss += out["loss"]
 
-        if do_ref:
-            out = self.training_substep(batch, batch_idx, guidance="ref")
-            total_loss += out["loss"]
+        # ZERO123
+        out = self.training_substep(batch, batch_idx, guidance="zero123")
+        total_loss += out["loss"]
+
+        # REF
+        out = self.training_substep(batch, batch_idx, guidance="ref")
+        total_loss += out["loss"]
 
         self.log("train/loss", total_loss, prog_bar=True)
-
-        # sch = self.lr_schedulers()
-        # sch.step()
 
         return {"loss": total_loss}
 
@@ -255,18 +242,19 @@ class Zero123(BaseLift3DSystem):
         out = self(batch)
         self.save_image_grid(
             f"it{self.true_global_step}-val/{batch['index'][0]}.png",
-            (
-                [
-                    {
-                        "type": "rgb",
-                        "img": batch["rgb"][0],
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-                if "rgb" in batch
-                else []
-            )
-            + [
+            # (
+            #     [
+            #         {
+            #             "type": "rgb",
+            #             "img": batch["rgb"][0],
+            #             "kwargs": {"data_format": "HWC"},
+            #         }
+            #     ]
+            #     if "rgb" in batch
+            #     else []
+            # )
+            # +
+            [
                 {
                     "type": "rgb",
                     "img": out["comp_rgb"][0],
@@ -302,10 +290,7 @@ class Zero123(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ],
-            # claforte: TODO: don't hardcode the frame numbers to record... read them from cfg instead.
-            name=f"validation_step_batchidx_{batch_idx}"
-            if batch_idx in [0, 7, 15, 23, 29]
-            else None,
+            name=None,
             step=self.true_global_step,
         )
 
@@ -328,18 +313,7 @@ class Zero123(BaseLift3DSystem):
         out = self(batch)
         self.save_image_grid(
             f"it{self.true_global_step}-test/{batch['index'][0]}.png",
-            (
-                [
-                    {
-                        "type": "rgb",
-                        "img": batch["rgb"][0],
-                        "kwargs": {"data_format": "HWC"},
-                    }
-                ]
-                if "rgb" in batch
-                else []
-            )
-            + [
+            [
                 {
                     "type": "rgb",
                     "img": out["comp_rgb"][0],

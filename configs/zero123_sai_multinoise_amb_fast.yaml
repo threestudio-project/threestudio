@@ -1,11 +1,11 @@
 name: "zero123"
-tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_prog${data.random_camera.progressive_until}"
+tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}"
 exp_root_dir: "outputs"
 seed: 0
 
 data_type: "single-image-datamodule"
 data: # threestudio/data/image.py -> SingleImageDataModuleConfig
-  image_path: ./load/images/hamburger_rgba.png
+  image_path: ???   # ./load/images/hamburger_rgba.png
   height: [128, 512]
   width: [128, 512]
   resolution_milestones: [200]
@@ -48,13 +48,6 @@ system:
     radius: 2.0
     normal_type: "analytic"
 
-    # the density initialization proposed in the DreamFusion paper
-    # does not work very well
-    # density_bias: "blob_dreamfusion"
-    # density_activation: exp
-    # density_blob_scale: 5.
-    # density_blob_std: 0.2
-
     # use Magic3D density initialization instead
     density_bias: "blob_magic3d"
     density_activation: softplus
@@ -83,11 +76,7 @@ system:
     textureless_prob: 0.05
     albedo_activation: sigmoid
 
-  # background_type: "neural-environment-map-background"
-  # background:
-  #   color_activation: sigmoid
-
-  background_type: "solid-color-background" # unused
+  background_type: "solid-color-background"
 
   renderer_type: "nerf-volume-renderer"
   renderer:
@@ -116,10 +105,6 @@ system:
     min_step_percent: [50, 0.7, 0.3, 200]  # (start_iter, start_val, end_val, end_iter)
     max_step_percent: [50, 0.98, 0.7, 200]
     noises_per_item: [200, 1, 4, 201]
-
-  freq:
-    ref_only_steps: 0
-    guidance_eval: 0
 
   ambient_ratio_min: [0, 0.1, 0.5, 350, 0.9, 351]
 
@@ -155,7 +140,7 @@ trainer:
   num_sanity_val_steps: 0
   val_check_interval: 50
   enable_progress_bar: true
-  precision: 16-mixed
+  precision: 32
 
 checkpoint:
   save_last: true # save at each validation time
