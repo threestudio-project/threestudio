@@ -263,8 +263,8 @@ class Zero123Pipeline(DiffusionPipeline):
             camera_embeddings = torch.stack(
                 [
                     torch.deg2rad(elevation),
-                    torch.sin(azimuth),
-                    torch.cos(azimuth),
+                    torch.sin(torch.deg2rad(azimuth)),
+                    torch.cos(torch.deg2rad(azimuth)),
                     distance,
                 ],
                 dim=-1,
