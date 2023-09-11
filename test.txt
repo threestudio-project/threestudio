@@ -35,6 +35,8 @@ NAME="luffy_front"
 python launch.py --config configs/magic123-refine-sd-geometry.yaml --train --gpu 0,1 --export data.image_path=./load/images/${NAME}_rgba.png  name=${NAME}_v2_refine_1024geometry tag=Phase2_refine_1024geometr # system.freq.guidance_eval=0 system.loggers.wandb.enable=false system.loggers.wandb.project="zero123" system.loggers.wandb.name=${NAME}_Phase2_refine_1024eq.guidance_eval=0 system.loggers.wandb.enable=false system.loggers.wandb.project="zero123" system.loggers.wand
 
 
+python launch.py --config test_configs/raw.yaml --train --gpu 0,1 data.image_path=./load/images/${NAME}_rgba.png name=${NAME}_v1_coarse_vsd_better tag=Phase1_vsd # system.freq.guidance_eval=0 system.loggers.wandb.enable=false 
+
 Anya
 NAME="anya_front"
 PROMPT='A 3D photo of a cute anime schoolgirl stands proudly with her arms in the air, pink hair ( unreal engine 5 trending on Artstation Ghibli 4k )'
