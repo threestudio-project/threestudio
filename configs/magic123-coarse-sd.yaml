@@ -5,13 +5,15 @@ seed: 0
 
 data_type: "single-image-datamodule"
 data:
-  image_path: ${data.image_path}
+  image_path: ???
   height: 128
   width: 128
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 2.5
   default_fovy_deg: 40.0
+  requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera:
     batch_size: 1
     height: 128
@@ -61,7 +63,7 @@ system:
       activation: "ReLU"
       output_activation: "none"
       n_neurons: 64
-      n_hidden_layers: 2
+      n_hidden_layers: 3
 
   material_type: "no-material"
   material:
@@ -78,7 +80,7 @@ system:
 
   guidance_3d_type: "zero123-unified-guidance"
   guidance_3d:
-    guidance_type: "vsd"
+    guidance_type: "sds"
     guidance_scale: 5.0
     min_step_percent: 0.2
     max_step_percent: 0.6
@@ -90,16 +92,13 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-    prompt: "the thin medal not ball bat coin and Anime character face of luffy from Onepiece"
-    prompt_side: "side view of quite thin goleden medal not ball"
-    prompt_back: "flat surface medal, back side and no any illustration, without any image"
-
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: ???
 
   guidance_type: "stable-diffusion-unified-guidance"
   guidance:
-    guidance_type: "vsd"
-    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    guidance_type: "sds"
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
     guidance_scale: 100.
     min_step_percent: 0.2
     max_step_percent: 0.6
@@ -111,8 +110,6 @@ system:
       name: None
 
   loss:
-    lambda_3d_train_phi: 1.0 # for vsd zero123, maybe only magic123
-    lambda_train_phi: 1.0 # for vsd
     lambda_rgb: 1000.
     lambda_mask: 100.
     lambda_sd: 0.025
@@ -121,6 +118,9 @@ system:
     lambda_normal_smoothness_2d: 1000.
     lambda_sparsity: 0.
     lambda_opaque: 0.
+    lambda_depth: 0.
+    lambda_depth_rel: 0.2
+    lambda_normal: 0.
 
   optimizer:
     name: Adam
@@ -137,7 +137,7 @@ system:
         lr: 0.001
 
 trainer:
-  max_steps: 10000
+  max_steps: 5000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100

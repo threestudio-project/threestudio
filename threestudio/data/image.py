@@ -2,7 +2,7 @@ import bisect
 import math
 import os
 from dataclasses import dataclass, field
-
+import pdb
 import cv2
 import numpy as np
 import pytorch_lightning as pl
@@ -152,6 +152,49 @@ class SingleImageDataBase:
         self.rays_o, self.rays_d = rays_o, rays_d
         self.mvp_mtx = mvp_mtx
 
+    # Convert depth image from RGB to greyscale
+    def depth_rgb_to_grey(self, depth_filename):
+        # depth_filename = "image_depth.png"
+
+        # import shutil
+        # shutil.copyfile(depth_filename,  depth_filename.replace("_depth", "_depth_orig"))
+        depth = cv2.imread(depth_filename)
+        depth = cv2.cvtColor(depth, cv2.COLOR_BGR2GRAY)
+        mask = (
+            cv2.resize(
+                cv2.imread(depth_filename.replace("_depth", "_rgba"), cv2.IMREAD_UNCHANGED)[
+                    :, :, -1
+                ],
+                depth.shape,
+            )
+            > 0
+        )
+        # depth[mask] = (depth[mask] - depth.min()) / (depth.max() - depth.min() + 1e-9)
+        depth = (depth - depth.min()) / (depth.max() - depth.min() + 1e-9)
+        depth[~mask] = 0
+        depth = (depth * 255).astype(np.uint8)
+        cv2.imwrite(depth_filename, depth)
+
+    # Mask normal
+    def normal_mask(self, normal_filename):
+        # filename = "image_normal.png"
+        import cv2
+
+        # import shutil
+        # shutil.copyfile(normal_filename, normal_filename.replace("_normal", "_normal_orig"))
+        normal = cv2.imread(normal_filename)
+        mask = (
+            cv2.resize(
+                cv2.imread(
+                    normal_filename.replace("_normal", "_rgba"), cv2.IMREAD_UNCHANGED
+                )[:, :, -1],
+                normal.shape[:2],
+            )
+            > 0
+        )
+        normal[~mask] = 0
+        cv2.imwrite(normal_filename, normal)
+
     def load_images(self):
         # load image
         assert os.path.exists(
@@ -178,9 +221,11 @@ class SingleImageDataBase:
         )
 
         # load depth
+        # pdb.set_trace()
         if self.cfg.requires_depth:
             depth_path = self.cfg.image_path.replace("_rgba.png", "_depth.png")
             assert os.path.exists(depth_path)
+            self.depth_rgb_to_grey(depth_path)
             depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
             depth = cv2.resize(
                 depth, (self.width, self.height), interpolation=cv2.INTER_AREA
@@ -197,9 +242,11 @@ class SingleImageDataBase:
             self.depth = None
 
         # load normal
+        # pdb.set_trace()
         if self.cfg.requires_normal:
             normal_path = self.cfg.image_path.replace("_rgba.png", "_normal.png")
             assert os.path.exists(normal_path)
+            self.normal_mask(normal_path)
             normal = cv2.imread(normal_path, cv2.IMREAD_UNCHANGED)
             normal = cv2.resize(
                 normal, (self.width, self.height), interpolation=cv2.INTER_AREA

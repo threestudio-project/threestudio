@@ -12,6 +12,8 @@ data:
   default_azimuth_deg: 0.0
   default_camera_distance: 2.5
   default_fovy_deg: 40.0
+  requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
+  requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera:
     batch_size: 1
     height: 512
@@ -53,7 +55,7 @@ system:
       activation: "ReLU"
       output_activation: "none"
       n_neurons: 64
-      n_hidden_layers: 2
+      n_hidden_layers: 3
     fix_geometry: false # optimize grid sdf and deformation
 
   material_type: "no-material"
@@ -102,6 +104,9 @@ system:
     lambda_3d_sd: 1.
     lambda_normal_consistency: 1000.
     lambda_laplacian_smoothness: 0.
+    lambda_depth: 0.
+    lambda_depth_rel: 0.
+    lambda_normal: 0.
 
   optimizer:
     name: Adam
@@ -111,7 +116,7 @@ system:
       eps: 1.e-8
 
 trainer:
-  max_steps: 10000
+  max_steps: 5000
   log_every_n_steps: 1
   num_sanity_val_steps: 1
   val_check_interval: 100
