@@ -78,7 +78,7 @@ class Magic123(BaseLift3DSystem):
         # depth loss
         if self.C(self.cfg.loss.lambda_depth) > 0:
             valid_gt_depth = batch["ref_depth"][gt_mask.squeeze(-1)].unsqueeze(1)
-            valid_pred_depth = out["depth"][gt_mask].unsqueeze(1)
+            valid_pred_depth = out_input["depth"][gt_mask].unsqueeze(1)
             with torch.no_grad():
                 A = torch.cat(
                     [valid_gt_depth, torch.ones_like(valid_gt_depth)], dim=-1
@@ -93,7 +93,7 @@ class Magic123(BaseLift3DSystem):
         # pdb.set_trace()
         if self.C(self.cfg.loss.lambda_depth_rel) > 0:
             valid_gt_depth = batch["ref_depth"][gt_mask.squeeze(-1)]  # [B,]
-            valid_pred_depth = out["depth"][gt_mask]  # [B,]
+            valid_pred_depth = out_input["depth"][gt_mask]  # [B,]
             loss_depth_rel = (1 - self.pearson(valid_pred_depth, valid_gt_depth)) / 2.0
             self.log("train/loss_depth_rel", loss_depth_rel)
             loss += loss_depth_rel * self.C(self.cfg.loss.lambda_depth_rel)
@@ -105,10 +105,10 @@ class Magic123(BaseLift3DSystem):
                 1 - 2 * batch["ref_normal"][gt_mask.squeeze(-1)]
             )  # [B, 3]
             valid_pred_normal = (
-                2 * out["comp_normal"][gt_mask.squeeze(-1)] - 1
+                2 * out_input["comp_normal"][gt_mask.squeeze(-1)] - 1
             )  # [B, 3]
             # valid_pred_normal = (
-            #     1 - 2 * out["comp_normal"][gt_mask.squeeze(-1)]
+            #     1 - 2 * out_input["comp_normal"][gt_mask.squeeze(-1)]
             # )  # [B, 3]
             loss_normal = (1 - F.cosine_similarity(valid_pred_normal, valid_gt_normal).mean())
             self.log("train/loss_normal", loss_normal)
