@@ -2,12 +2,12 @@ from dataclasses import dataclass, field
 
 import torch
 import torch.nn.functional as F
-
+import pdb
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-
+from torchmetrics import PearsonCorrCoef
 
 @threestudio.register("magic123-system")
 class Magic123(BaseLift3DSystem):
@@ -38,10 +38,13 @@ class Magic123(BaseLift3DSystem):
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
+        self.pearson = PearsonCorrCoef().to(self.device)
 
     def training_step(self, batch, batch_idx):
+        # pdb.set_trace()
         out_input = self(batch)
         out = self(batch["random_camera"])
+        gt_mask = batch["mask"]
         prompt_utils = self.prompt_processor()
         guidance_out = self.guidance(
             out["comp_rgb"],
@@ -71,6 +74,45 @@ class Magic123(BaseLift3DSystem):
         )
         self.log("train/loss_mask", loss_mask)
         loss += loss_mask * self.C(self.cfg.loss.lambda_mask)
+
+        # depth loss
+        if self.C(self.cfg.loss.lambda_depth) > 0:
+            valid_gt_depth = batch["ref_depth"][gt_mask.squeeze(-1)].unsqueeze(1)
+            valid_pred_depth = out_input["depth"][gt_mask].unsqueeze(1)
+            with torch.no_grad():
+                A = torch.cat(
+                    [valid_gt_depth, torch.ones_like(valid_gt_depth)], dim=-1
+                )  # [B, 2]
+                X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
+                valid_gt_depth = A @ X  # [B, 1]
+            loss_depth = F.mse_loss(valid_gt_depth, valid_pred_depth)
+            self.log("train/loss_depth", loss_depth)
+            loss += loss_depth * self.C(self.cfg.loss.lambda_depth)
+
+        # relative depth loss
+        # pdb.set_trace()
+        if self.C(self.cfg.loss.lambda_depth_rel) > 0:
+            valid_gt_depth = batch["ref_depth"][gt_mask.squeeze(-1)]  # [B,]
+            valid_pred_depth = out_input["depth"][gt_mask]  # [B,]
+            loss_depth_rel = (1 - self.pearson(valid_pred_depth, valid_gt_depth)) / 2.0
+            self.log("train/loss_depth_rel", loss_depth_rel)
+            loss += loss_depth_rel * self.C(self.cfg.loss.lambda_depth_rel)
+        
+        # pdb.set_trace()
+        # normal loss
+        if self.C(self.cfg.loss.lambda_normal) > 0:
+            valid_gt_normal = (
+                1 - 2 * batch["ref_normal"][gt_mask.squeeze(-1)]
+            )  # [B, 3]
+            valid_pred_normal = (
+                2 * out_input["comp_normal"][gt_mask.squeeze(-1)] - 1
+            )  # [B, 3]
+            # valid_pred_normal = (
+            #     1 - 2 * out_input["comp_normal"][gt_mask.squeeze(-1)]
+            # )  # [B, 3]
+            loss_normal = (1 - F.cosine_similarity(valid_pred_normal, valid_gt_normal).mean())
+            self.log("train/loss_normal", loss_normal)
+            loss += loss_normal * self.C(self.cfg.loss.lambda_normal)
 
         for name, value in guidance_out.items():
             if not (isinstance(value, torch.Tensor) and len(value.shape) > 0):

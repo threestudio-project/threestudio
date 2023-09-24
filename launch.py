@@ -3,7 +3,7 @@ import contextlib
 import logging
 import os
 import sys
-
+import pdb
 
 class ColoredFilter(logging.Filter):
     """
@@ -177,6 +177,7 @@ def main(args, extras) -> None:
         system.set_resume_status(ckpt["epoch"], ckpt["global_step"])
 
     if args.train:
+        # pdb.set_trace()
         trainer.fit(system, datamodule=dm, ckpt_path=cfg.resume)
         trainer.test(system, datamodule=dm)
         if args.gradio:
@@ -235,3 +236,4 @@ if __name__ == "__main__":
             main(args, extras)
     else:
         main(args, extras)
+

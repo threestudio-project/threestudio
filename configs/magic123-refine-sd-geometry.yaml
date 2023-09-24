@@ -1,4 +1,4 @@
-name: "magic123-coarse-sd"
+name: "magic123-refine-sd"
 tag: "${rmspace:${basename:${data.image_path}},_}-${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -6,18 +6,16 @@ seed: 0
 data_type: "single-image-datamodule"
 data:
   image_path: ???
-  height: 128
-  width: 128
+  height: 1024
+  width: 1024
   default_elevation_deg: 0.0
   default_azimuth_deg: 0.0
   default_camera_distance: 2.5
   default_fovy_deg: 40.0
-  requires_depth: ${cmaxgt0orcmaxgt0:${system.loss.lambda_depth},${system.loss.lambda_depth_rel}}
-  requires_normal: ${cmaxgt0:${system.loss.lambda_normal}}
   random_camera:
-    batch_size: 1
-    height: 128
-    width: 128
+    batch_size: 4
+    height: 1024
+    width: 1024
     elevation_range: [-45, 45]
     azimuth_range: [-180, 180]
     camera_distance_range: [2.5, 2.5]
@@ -25,8 +23,8 @@ data:
     camera_perturb: 0.0
     center_perturb: 0.0
     up_perturb: 0.0
-    eval_height: 512
-    eval_width: 512
+    eval_height: 1024
+    eval_width: 1024
     eval_elevation_deg: ${data.default_elevation_deg}
     eval_camera_distance: ${data.default_camera_distance}
     eval_fovy_deg: ${data.default_fovy_deg}
@@ -35,48 +33,39 @@ data:
 
 system_type: "magic123-system"
 system:
-  geometry_type: "implicit-volume"
+  exporter:
+    fmt: obj-mtl
+    context_type: cuda
+  refinement: true
+  geometry_convert_from: "/home/asset/threestudio/outputs/luffy_front_v2_refine_1024/Phase2_refine_1024/ckpts/last-v4.ckpt"
+  geometry_convert_inherit_texture: true
+  geometry_type: "tetrahedra-sdf-grid"
   geometry:
-    radius: 1.0
-    normal_type: analytic
-
-    # use Magic3D density initialization
-    density_bias: "blob_magic3d"
-    density_activation: softplus
-    density_blob_scale: 10.
-    density_blob_std: 0.5
-
-    # coarse to fine hash grid encoding
-    # to ensure smooth analytic normals
+    radius: 1.0 # consistent with coarse
+    isosurface_resolution: 128
+    isosurface_deformable_grid: true
     pos_encoding_config:
-      otype: ProgressiveBandHashGrid
+      otype: HashGrid
       n_levels: 16
       n_features_per_level: 2
       log2_hashmap_size: 19
       base_resolution: 16
       per_level_scale: 1.447269237440378 # max resolution 4096
-      start_level: 8 # resolution ~200
-      start_step: 2000
-      update_steps: 300
     mlp_network_config:
       otype: "VanillaMLP"
       activation: "ReLU"
       output_activation: "none"
       n_neurons: 64
-      n_hidden_layers: 3
+      n_hidden_layers: 2
+    fix_geometry: false # optimize grid sdf and deformation
 
   material_type: "no-material"
-  material:
-    requires_normal: true
 
   background_type: "solid-color-background"
 
-  renderer_type: "nerf-volume-renderer"
+  renderer_type: "nvdiff-rasterizer"
   renderer:
-    radius: ${system.geometry.radius}
-    estimator: occgrid
-    num_samples_per_ray: 256
-    return_comp_normal: true
+    context_type: cuda
 
   guidance_3d_type: "zero123-unified-guidance"
   guidance_3d:
@@ -92,13 +81,13 @@ system:
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    prompt: ???
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
+    prompt: "the thin medal not ball bat coin and Anime character face of luffy from Onepiece with red cloth and strawhat"
 
   guidance_type: "stable-diffusion-unified-guidance"
   guidance:
     guidance_type: "sds"
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 100.
     min_step_percent: 0.2
     max_step_percent: 0.6
@@ -110,17 +99,12 @@ system:
       name: None
 
   loss:
-    lambda_rgb: 1000.
-    lambda_mask: 100.
-    lambda_sd: 0.025
-    lambda_3d_sd: 1.
-    lambda_orient: 0.
-    lambda_normal_smoothness_2d: 1000.
-    lambda_sparsity: 0.
-    lambda_opaque: 0.
-    lambda_depth: 0.
-    lambda_depth_rel: 0.2
-    lambda_normal: 0.
+    lambda_rgb: 10.
+    lambda_mask: 1.
+    lambda_sd: 0.001
+    lambda_3d_sd: 0.01
+    lambda_normal_consistency: 100.
+    lambda_laplacian_smoothness: 100.
 
   optimizer:
     name: Adam
@@ -128,18 +112,11 @@ system:
       lr: 0.01
       betas: [0.9, 0.99]
       eps: 1.e-8
-    params:
-      geometry.encoding:
-        lr: 0.01
-      geometry.density_network:
-        lr: 0.001
-      geometry.feature_network:
-        lr: 0.001
 
 trainer:
-  max_steps: 5000
+  max_steps: 100
   log_every_n_steps: 1
-  num_sanity_val_steps: 0
+  num_sanity_val_steps: 1
   val_check_interval: 100
   enable_progress_bar: true
   precision: 32
