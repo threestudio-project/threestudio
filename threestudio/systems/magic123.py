@@ -19,6 +19,7 @@ class Magic123(BaseLift3DSystem):
         refinement: bool = False
         guidance_3d_type: str = ""
         guidance_3d: dict = field(default_factory=dict)
+        ambient_ratio_min: float = 0.5
 
     cfg: Config
 
