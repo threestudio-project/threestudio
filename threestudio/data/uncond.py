@@ -315,9 +315,10 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
 
         proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.width / self.height, 0.1, 1000.0
+            fovy, self.width / self.height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
+        self.fovy = fovy
 
         return {
             "rays_o": rays_o,
@@ -331,6 +332,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             "camera_distances": camera_distances,
             "height": self.height,
             "width": self.width,
+            "fovy": self.fovy,
         }
 
 
@@ -426,6 +428,7 @@ class RandomCameraDataset(Dataset):
         self.elevation, self.azimuth = elevation, azimuth
         self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
         self.camera_distances = camera_distances
+        self.fovy = fovy
 
     def __len__(self):
         return self.n_views
@@ -444,6 +447,7 @@ class RandomCameraDataset(Dataset):
             "camera_distances": self.camera_distances[index],
             "height": self.cfg.eval_height,
             "width": self.cfg.eval_width,
+            "fovy": self.fovy,
         }
 
     def collate(self, batch):
