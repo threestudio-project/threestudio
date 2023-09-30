@@ -263,45 +263,19 @@ def get_rays(
     return rays_o, rays_d
 
 
-# def get_projection_matrix(
-#     fovy: Float[Tensor, "B"], aspect_wh: float, near: float, far: float
-# ) -> Float[Tensor, "B 4 4"]:
-#     batch_size = fovy.shape[0]
-#     proj_mtx = torch.zeros(batch_size, 4, 4, dtype=torch.float32)
-#     proj_mtx[:, 0, 0] = 1.0 / (torch.tan(fovy / 2.0) * aspect_wh)
-#     proj_mtx[:, 1, 1] = -1.0 / torch.tan(
-#         fovy / 2.0
-#     )  # add a negative sign here as the y axis is flipped in nvdiffrast output
-#     proj_mtx[:, 2, 2] = -(far + near) / (far - near)
-#     proj_mtx[:, 2, 3] = -2.0 * far * near / (far - near)
-#     proj_mtx[:, 3, 2] = -1.0
-#     return proj_mtx
-
 def get_projection_matrix(
     fovy: Float[Tensor, "B"], aspect_wh: float, near: float, far: float
 ) -> Float[Tensor, "B 4 4"]:
-    tanHalfFovY = torch.tan((fovy / 2))
-    tanHalfFovX = torch.tan((fovy / 2))
     batch_size = fovy.shape[0]
-
-    top = tanHalfFovY * near
-    bottom = -top
-    right = tanHalfFovX * near
-    left = -right
-
-    P = torch.zeros(batch_size, 4, 4, dtype=torch.float32)
-
-    z_sign = 1.0
-
-    P[:, 0, 0] = 2.0 * near / (right - left)
-    P[:,1, 1] = 2.0 * near / (top - bottom)
-    P[:,0, 2] = (right + left) / (right - left)
-    P[:,1, 2] = (top + bottom) / (top - bottom)
-    P[:,3, 2] = z_sign
-    P[:,2, 2] = z_sign * far / (far - near)
-    P[:,2, 3] = -(far * near) / (far - near)
-    
-    return P
+    proj_mtx = torch.zeros(batch_size, 4, 4, dtype=torch.float32)
+    proj_mtx[:, 0, 0] = 1.0 / (torch.tan(fovy / 2.0) * aspect_wh)
+    proj_mtx[:, 1, 1] = -1.0 / torch.tan(
+        fovy / 2.0
+    )  # add a negative sign here as the y axis is flipped in nvdiffrast output
+    proj_mtx[:, 2, 2] = -(far + near) / (far - near)
+    proj_mtx[:, 2, 3] = -2.0 * far * near / (far - near)
+    proj_mtx[:, 3, 2] = -1.0
+    return proj_mtx
 
 def get_mvp_matrix(
     c2w: Float[Tensor, "B 4 4"], proj_mtx: Float[Tensor, "B 4 4"]
@@ -315,6 +289,11 @@ def get_mvp_matrix(
     # calculate mvp matrix by proj_mtx @ w2c (mv_mtx)
     mvp_mtx = proj_mtx @ w2c
     return mvp_mtx
+
+def get_full_projection_matrix(
+    c2w: Float[Tensor, "B 4 4"], proj_mtx: Float[Tensor, "B 4 4"]
+) -> Float[Tensor, "B 4 4"]:
+    return (c2w.unsqueeze(0).bmm(proj_mtx.unsqueeze(0))).squeeze(0)
 
 
 def binary_cross_entropy(input, target):

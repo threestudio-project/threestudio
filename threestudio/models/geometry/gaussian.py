@@ -20,93 +20,18 @@ import sys
 from datetime import datetime
 import random
 
+from dataclasses import dataclass
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+import threestudio
+from threestudio.models.geometry.base import BaseGeometry
+from threestudio.utils.typing import *
+
 C0 = 0.28209479177387814
-C1 = 0.4886025119029199
-C2 = [
-    1.0925484305920792,
-    -1.0925484305920792,
-    0.31539156525252005,
-    -1.0925484305920792,
-    0.5462742152960396
-]
-C3 = [
-    -0.5900435899266435,
-    2.890611442640554,
-    -0.4570457994644658,
-    0.3731763325901154,
-    -0.4570457994644658,
-    1.445305721320277,
-    -0.5900435899266435
-]
-C4 = [
-    2.5033429417967046,
-    -1.7701307697799304,
-    0.9461746957575601,
-    -0.6690465435572892,
-    0.10578554691520431,
-    -0.6690465435572892,
-    0.47308734787878004,
-    -1.7701307697799304,
-    0.6258357354491761,
-]   
-
-
-def eval_sh(deg, sh, dirs):
-    """
-    Evaluate spherical harmonics at unit directions
-    using hardcoded SH polynomials.
-    Works with torch/np/jnp.
-    ... Can be 0 or more batch dimensions.
-    Args:
-        deg: int SH deg. Currently, 0-3 supported
-        sh: jnp.ndarray SH coeffs [..., C, (deg + 1) ** 2]
-        dirs: jnp.ndarray unit directions [..., 3]
-    Returns:
-        [..., C]
-    """
-    assert deg <= 4 and deg >= 0
-    coeff = (deg + 1) ** 2
-    assert sh.shape[-1] >= coeff
-
-    result = C0 * sh[..., 0]
-    if deg > 0:
-        x, y, z = dirs[..., 0:1], dirs[..., 1:2], dirs[..., 2:3]
-        result = (result -
-                C1 * y * sh[..., 1] +
-                C1 * z * sh[..., 2] -
-                C1 * x * sh[..., 3])
-
-        if deg > 1:
-            xx, yy, zz = x * x, y * y, z * z
-            xy, yz, xz = x * y, y * z, x * z
-            result = (result +
-                    C2[0] * xy * sh[..., 4] +
-                    C2[1] * yz * sh[..., 5] +
-                    C2[2] * (2.0 * zz - xx - yy) * sh[..., 6] +
-                    C2[3] * xz * sh[..., 7] +
-                    C2[4] * (xx - yy) * sh[..., 8])
-
-            if deg > 2:
-                result = (result +
-                C3[0] * y * (3 * xx - yy) * sh[..., 9] +
-                C3[1] * xy * z * sh[..., 10] +
-                C3[2] * y * (4 * zz - xx - yy)* sh[..., 11] +
-                C3[3] * z * (2 * zz - 3 * xx - 3 * yy) * sh[..., 12] +
-                C3[4] * x * (4 * zz - xx - yy) * sh[..., 13] +
-                C3[5] * z * (xx - yy) * sh[..., 14] +
-                C3[6] * x * (xx - 3 * yy) * sh[..., 15])
-
-                if deg > 3:
-                    result = (result + C4[0] * xy * (xx - yy) * sh[..., 16] +
-                            C4[1] * yz * (3 * xx - yy) * sh[..., 17] +
-                            C4[2] * xy * (7 * zz - 1) * sh[..., 18] +
-                            C4[3] * yz * (7 * zz - 3) * sh[..., 19] +
-                            C4[4] * (zz * (35 * zz - 30) + 3) * sh[..., 20] +
-                            C4[5] * xz * (7 * zz - 3) * sh[..., 21] +
-                            C4[6] * (xx - yy) * (7 * zz - 1) * sh[..., 22] +
-                            C4[7] * xz * (xx - 3 * yy) * sh[..., 23] +
-                            C4[8] * (xx * (xx - 3 * yy) - yy * (3 * xx - yy)) * sh[..., 24])
-    return result
 
 def RGB2SH(rgb):
     return (rgb - 0.5) / C0
@@ -116,14 +41,6 @@ def SH2RGB(sh):
 
 def inverse_sigmoid(x):
     return torch.log(x/(1-x))
-
-def PILtoTorch(pil_image, resolution):
-    resized_image_PIL = pil_image.resize(resolution)
-    resized_image = torch.from_numpy(np.array(resized_image_PIL)) / 255.0
-    if len(resized_image.shape) == 3:
-        return resized_image.permute(2, 0, 1)
-    else:
-        return resized_image.unsqueeze(dim=-1).permute(2, 0, 1)
 
 def get_expon_lr_func(
     lr_init, lr_final, lr_delay_steps=0, lr_delay_mult=1.0, max_steps=1000000
@@ -237,7 +154,31 @@ class BasicPointCloud(NamedTuple):
     colors : np.array
     normals : np.array
 
-class GaussianModel:
+
+@threestudio.register("gaussian")
+class GaussianModel(BaseGeometry):
+    
+    @dataclass
+    class Config(BaseGeometry.Config):
+        sh_degree: int = 0
+        position_lr_init: float = 0.0001
+        position_lr_final: float = 0.00001
+        position_lr_delay_mult: float = 0.02
+        position_lr_max_steps: int = 4000
+        feature_lr: float = 0.01
+        opacity_lr: float = 0.05
+        scaling_lr: float = 0.005
+        rotation_lr: float = 0.005
+        percent_dense: float = 0.1
+        densification_interval: int = 50
+        prune_interval: int = 50
+        opacity_reset_interval: int = 100000
+        densify_from_iter: int = 100
+        densify_until_iter: int = 2000
+        densify_grad_threshold: float = 0.01
+        min_opac_prune: float = 0.05
+
+    cfg: Config
 
     def setup_functions(self):
         def build_covariance_from_scaling_rotation(scaling, scaling_modifier, rotation):
@@ -257,9 +198,10 @@ class GaussianModel:
         self.rotation_activation = torch.nn.functional.normalize
 
 
-    def __init__(self, sh_degree : int):
+    def configure(self) -> None:
+        super().configure()
         self.active_sh_degree = 0
-        self.max_sh_degree = sh_degree  
+        self.max_sh_degree = self.cfg.sh_degree  
         self._xyz = torch.empty(0)
         self._features_dc = torch.empty(0)
         self._features_rest = torch.empty(0)
@@ -273,42 +215,6 @@ class GaussianModel:
         self.percent_dense = 0
         self.spatial_lr_scale = 0
         self.setup_functions()
-
-    def capture(self):
-        return (
-            self.active_sh_degree,
-            self._xyz,
-            self._features_dc,
-            self._features_rest,
-            self._scaling,
-            self._rotation,
-            self._opacity,
-            self.max_radii2D,
-            self.xyz_gradient_accum,
-            self.denom,
-            self.optimizer.state_dict(),
-            self.spatial_lr_scale,
-        ) 
-    
-    
-    def restore(self, model_args, training_args):
-        # import pdb; pdb.set_trace()
-        (self.active_sh_degree, 
-        self._xyz, 
-        self._features_dc, 
-        self._features_rest,
-        self._scaling, 
-        self._rotation, 
-        self._opacity,
-        self.max_radii2D, 
-        xyz_gradient_accum, 
-        denom,
-        opt_dict, 
-        self.spatial_lr_scale) = model_args
-        self.training_setup(training_args)
-        self.xyz_gradient_accum = xyz_gradient_accum
-        self.denom = denom
-        self.optimizer.load_state_dict(opt_dict)
 
     @property
     def get_scaling(self):
@@ -369,18 +275,9 @@ class GaussianModel:
         self.scales = scales.cpu().clone().detach()
         self.rots = rots.cpu().clone().detach()
         self.opacities = opacities.cpu().clone().detach()
-        
-    def reset_state(self):
-        self._xyz = nn.Parameter(self.fused_point_cloud.clone().requires_grad_(True).to("cuda"))
-        self._features_dc = nn.Parameter(self.features[:,:,0:1].clone().transpose(1, 2).contiguous().requires_grad_(True).to("cuda"))
-        self._features_rest = nn.Parameter(self.features[:,:,1:].clone().transpose(1, 2).contiguous().requires_grad_(True).to("cuda"))
-        self._scaling = nn.Parameter(self.scales.clone().requires_grad_(True).to("cuda"))
-        self._rotation = nn.Parameter(self.rots.clone().requires_grad_(True).to("cuda"))
-        self._opacity = nn.Parameter(self.opacities.clone().requires_grad_(True).to("cuda"))
-        self.max_radii2D = torch.zeros((self._xyz.shape[0]), device="cuda")
-        
 
-    def training_setup(self, training_args):
+    def training_setup(self):
+        training_args = self.cfg
         self.percent_dense = training_args.percent_dense
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
@@ -395,16 +292,33 @@ class GaussianModel:
         ]
 
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
-        self.xyz_scheduler_args = get_expon_lr_func(lr_init=training_args.position_lr_init*self.spatial_lr_scale,
-                                                    lr_final=training_args.position_lr_final*self.spatial_lr_scale,
-                                                    lr_delay_mult=training_args.position_lr_delay_mult,
-                                                    max_steps=training_args.position_lr_max_steps)
+        self.xyz_scheduler_args = get_expon_lr_func(
+            lr_init=training_args.position_lr_init*self.spatial_lr_scale,
+            lr_final=training_args.position_lr_final*self.spatial_lr_scale,
+            lr_delay_mult=training_args.position_lr_delay_mult,
+            max_steps=training_args.position_lr_max_steps
+        )
+        
+        self.fine_xyz_scheduler_args = get_expon_lr_func(
+            lr_init=training_args.position_lr_init*self.spatial_lr_scale,
+            lr_final=training_args.position_lr_final*self.spatial_lr_scale,
+            lr_delay_mult=training_args.position_lr_delay_mult,
+            max_steps=training_args.position_lr_max_steps
+        )
 
     def update_learning_rate(self, iteration):
         ''' Learning rate scheduling per step '''
         for param_group in self.optimizer.param_groups:
             if param_group["name"] == "xyz":
                 lr = self.xyz_scheduler_args(iteration)
+                param_group['lr'] = lr
+                return lr
+
+    def update_learning_rate_fine(self, iteration):
+        ''' Learning rate scheduling per step '''
+        for param_group in self.optimizer.param_groups:
+            if param_group["name"] == "xyz":
+                lr = self.fine_xyz_scheduler_args(iteration)
                 param_group['lr'] = lr
                 return lr
 
@@ -422,7 +336,6 @@ class GaussianModel:
             l.append('rot_{}'.format(i))
         return l
 
-            
     def reset_opacity(self):
         opacities_new = inverse_sigmoid(torch.min(self.get_opacity, torch.ones_like(self.get_opacity)*0.01))
         optimizable_tensors = self.replace_tensor_to_optimizer(opacities_new, "opacity")
@@ -508,7 +421,7 @@ class GaussianModel:
 
         return optimizable_tensors
 
-    def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation, new_xyz_poly_params=None, new_rot_poly_params=None):
+    def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation):
         d = {"xyz": new_xyz,
         "f_dc": new_features_dc,
         "f_rest": new_features_rest,
@@ -568,13 +481,14 @@ class GaussianModel:
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation)
 
-    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
+    def densify(self, max_grad, extent):
         grads = self.xyz_gradient_accum / self.denom
         grads[grads.isnan()] = 0.0
 
         self.densify_and_clone(grads, max_grad, extent)
         self.densify_and_split(grads, max_grad, extent)
-
+        
+    def prune(self, min_opacity, extent, max_screen_size):
         prune_mask = (self.get_opacity < min_opacity).squeeze()
         if max_screen_size:
             big_points_vs = self.max_radii2D > max_screen_size
@@ -587,4 +501,31 @@ class GaussianModel:
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
         self.denom[update_filter] += 1
-        
+      
+    @torch.no_grad()  
+    def update_states(
+        self, 
+        iteration, 
+        visibility_filter,
+        radii,
+        viewspace_point_tensor,
+        extent,
+    ):
+        # Densification
+        if (iteration < self.cfg.densify_until_iter):
+            # Keep track of max radii in image-space for pruning
+            self.max_radii2D[visibility_filter] = torch.max(self.max_radii2D[visibility_filter], radii[visibility_filter])
+            self.add_densification_stats(viewspace_point_tensor, visibility_filter)
+
+            # if iteration > self.opt.densify_from_iter and iteration % self.opt.densification_interval == 0:
+            #     size_threshold = 20 if iteration > self.opt.opacity_reset_interval else None
+            #     self.gaussians.densify_and_prune(self.opt.densify_grad_threshold, 0.005, 1.0, size_threshold)
+                
+            if iteration > self.cfg.densify_from_iter and iteration % self.cfg.densification_interval == 0:
+                self.densify(self.cfg.densify_grad_threshold, extent)
+                
+            if iteration > self.cfg.densify_from_iter and iteration % self.cfg.prune_interval == 0:
+                self.prune(self.cfg.min_opac_prune, extent, None)
+            
+            if iteration % self.cfg.opacity_reset_interval == 0:
+                self.reset_opacity()

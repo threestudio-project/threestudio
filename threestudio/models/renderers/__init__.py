@@ -6,4 +6,5 @@ from . import (
     neus_volume_renderer,
     nvdiff_rasterizer,
     patch_renderer,
+    diff_gaussian_rasterizer,
 )

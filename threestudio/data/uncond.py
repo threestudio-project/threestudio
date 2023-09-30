@@ -18,9 +18,11 @@ from threestudio.utils.ops import (
     get_projection_matrix,
     get_ray_directions,
     get_rays,
+    get_full_projection_matrix
 )
 from threestudio.utils.typing import *
 
+import numpy as np
 
 @dataclass
 class RandomCameraDataModuleConfig:
@@ -314,10 +316,10 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         # Importance note: the returned rays_d MUST be normalized!
         rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
 
-        proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.width / self.height, 0.01, 100.0
+        self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
+            fovy, self.width / self.height, 0.1, 1000.0
         )  # FIXME: hard-coded near and far
-        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
+        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, self.proj_mtx)
         self.fovy = fovy
 
         return {
@@ -333,6 +335,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             "height": self.height,
             "width": self.width,
             "fovy": self.fovy,
+            "proj_mtx": self.proj_mtx,
         }
 
 
@@ -399,6 +402,7 @@ class RandomCameraDataset(Dataset):
             [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
         )
         c2w[:, 3, 3] = 1.0
+        
 
         # get directions by dividing directions_unit_focal by focal length
         focal_length: Float[Tensor, "B"] = (
@@ -415,10 +419,10 @@ class RandomCameraDataset(Dataset):
         )
 
         rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
-        proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.1, 1000.0
+        self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
+            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
-        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
+        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, self.proj_mtx)
 
         self.rays_o, self.rays_d = rays_o, rays_d
         self.mvp_mtx = mvp_mtx
@@ -447,7 +451,8 @@ class RandomCameraDataset(Dataset):
             "camera_distances": self.camera_distances[index],
             "height": self.cfg.eval_height,
             "width": self.cfg.eval_width,
-            "fovy": self.fovy,
+            "fovy": self.fovy[index],
+            "proj_mtx": self.proj_mtx[index],
         }
 
     def collate(self, batch):
