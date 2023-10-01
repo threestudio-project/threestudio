@@ -162,9 +162,12 @@ class GaussianModel(BaseGeometry):
     class Config(BaseGeometry.Config):
         sh_degree: int = 0
         position_lr_init: float = 0.0001
+        position_lr_init_fine: float = 0.0001
         position_lr_final: float = 0.00001
+        position_lr_final_fine: float = 0.00001
         position_lr_delay_mult: float = 0.02
-        position_lr_max_steps: int = 4000
+        position_lr_max_steps: int = 3000
+        position_lr_max_steps_fine: int = 1000
         feature_lr: float = 0.01
         opacity_lr: float = 0.05
         scaling_lr: float = 0.005
@@ -300,10 +303,10 @@ class GaussianModel(BaseGeometry):
         )
         
         self.fine_xyz_scheduler_args = get_expon_lr_func(
-            lr_init=training_args.position_lr_init*self.spatial_lr_scale,
-            lr_final=training_args.position_lr_final*self.spatial_lr_scale,
+            lr_init=training_args.position_lr_init_fine*self.spatial_lr_scale,
+            lr_final=training_args.position_lr_final_fine*self.spatial_lr_scale,
             lr_delay_mult=training_args.position_lr_delay_mult,
-            max_steps=training_args.position_lr_max_steps
+            max_steps=training_args.position_lr_max_steps_fine
         )
 
     def update_learning_rate(self, iteration):
@@ -511,11 +514,11 @@ class GaussianModel(BaseGeometry):
         viewspace_point_tensor,
         extent,
     ):
+        # Keep track of max radii in image-space for pruning
+        self.max_radii2D[visibility_filter] = torch.max(self.max_radii2D[visibility_filter], radii[visibility_filter])
+        self.add_densification_stats(viewspace_point_tensor, visibility_filter)
         # Densification
         if (iteration < self.cfg.densify_until_iter):
-            # Keep track of max radii in image-space for pruning
-            self.max_radii2D[visibility_filter] = torch.max(self.max_radii2D[visibility_filter], radii[visibility_filter])
-            self.add_densification_stats(viewspace_point_tensor, visibility_filter)
 
             # if iteration > self.opt.densify_from_iter and iteration % self.opt.densification_interval == 0:
             #     size_threshold = 20 if iteration > self.opt.opacity_reset_interval else None
@@ -526,6 +529,13 @@ class GaussianModel(BaseGeometry):
                 
             if iteration > self.cfg.densify_from_iter and iteration % self.cfg.prune_interval == 0:
                 self.prune(self.cfg.min_opac_prune, extent, None)
+                
+        # else:
+            # if iteration % 1000 == 0:
+            #     self.densify(5.0, 10)
+                
+            # if iteration % 500 == 0:
+            #     self.prune(0.0001, 10, 20)
             
-            if iteration % self.cfg.opacity_reset_interval == 0:
-                self.reset_opacity()
+        # if iteration == self.cfg.position_lr_max_steps:
+        #     self.reset_opacity()
