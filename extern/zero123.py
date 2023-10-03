@@ -30,7 +30,8 @@ from diffusers.pipelines.stable_diffusion.safety_checker import (
     StableDiffusionSafetyChecker,
 )
 from diffusers.schedulers import KarrasDiffusionSchedulers
-from diffusers.utils import deprecate, is_accelerate_available, logging, randn_tensor
+from diffusers.utils import deprecate, is_accelerate_available, logging
+from diffusers.utils.torch_utils import randn_tensor
 from packaging import version
 from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
 
