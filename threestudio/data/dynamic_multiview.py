@@ -58,7 +58,7 @@ def inter_pose(pose_0, pose_1, ratio):
 
 
 @dataclass
-class MultiviewsDataModuleConfig:
+class DynamicMultiviewsDataModuleConfig:
     dataroot: str = ""
     train_downsample_resolution: int = 4
     eval_downsample_resolution: int = 4
@@ -69,12 +69,13 @@ class MultiviewsDataModuleConfig:
     camera_layout: str = "around"
     camera_distance: float = -1
     eval_interpolation: Optional[Tuple[int, int, int]] = None  # (0, 1, 30)
+    eval_time_interpolation: Optional[Tuple[float, float]] = None # (t0, t1)
 
 
-class MultiviewIterableDataset(IterableDataset):
+class DynamicMultiviewIterableDataset(IterableDataset):
     def __init__(self, cfg: Any) -> None:
         super().__init__()
-        self.cfg: MultiviewsDataModuleConfig = cfg
+        self.cfg: DynamicMultiviewsDataModuleConfig = cfg
 
         assert self.cfg.batch_size == 1
         scale = self.cfg.train_downsample_resolution
@@ -91,6 +92,7 @@ class MultiviewIterableDataset(IterableDataset):
         frames_position = []
         frames_direction = []
         frames_img = []
+        frames_moment = []
 
         self.frame_w = frames[0]["w"] // scale
         self.frame_h = frames[0]["h"] // scale
@@ -149,10 +151,15 @@ class MultiviewIterableDataset(IterableDataset):
             far = 100.0
             proj = convert_proj(intrinsic, self.frame_h, self.frame_w, near, far)
             proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
+
+            moment: Float[Tensor, "1"] = torch.zeros(1)
+            moment[0] = frame["moment"]
+
             frames_proj.append(proj)
             frames_c2w.append(c2w)
             frames_position.append(camera_position)
             frames_direction.append(direction)
+            frames_moment.append(moment)
         threestudio.info("Loaded frames.")
 
         self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
@@ -162,6 +169,7 @@ class MultiviewIterableDataset(IterableDataset):
             frames_direction, dim=0
         )
         self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
+        self.frames_moment: Float[Tensor, "B 1"] = torch.stack(frames_moment, dim=0)
 
         self.rays_o, self.rays_d = get_rays(
             self.frames_direction, self.frames_c2w, keepdim=True
@@ -191,13 +199,14 @@ class MultiviewIterableDataset(IterableDataset):
             "gt_rgb": self.frames_img[index : index + 1],
             "height": self.frame_h,
             "width": self.frame_w,
+            "moment": self.frames_moment[index: index + 1],
         }
 
 
-class MultiviewDataset(Dataset):
+class DynamicMultiviewDataset(Dataset):
     def __init__(self, cfg: Any, split: str) -> None:
         super().__init__()
-        self.cfg: MultiviewsDataModuleConfig = cfg
+        self.cfg: DynamicMultiviewsDataModuleConfig = cfg
 
         assert self.cfg.eval_batch_size == 1
         scale = self.cfg.eval_downsample_resolution
@@ -214,6 +223,7 @@ class MultiviewDataset(Dataset):
         frames_position = []
         frames_direction = []
         frames_img = []
+        frames_moment = []
 
         self.frame_w = frames[0]["w"] // scale
         self.frame_h = frames[0]["h"] // scale
@@ -247,6 +257,8 @@ class MultiviewDataset(Dataset):
         if not (self.cfg.eval_interpolation is None):
             idx0 = self.cfg.eval_interpolation[0]
             idx1 = self.cfg.eval_interpolation[1]
+            moment0 = self.cfg.eval_time_interpolation[0]
+            moment1 = self.cfg.eval_time_interpolation[1]
             eval_nums = self.cfg.eval_interpolation[2]
             frame = frames[idx0]
             intrinsic: Float[Tensor, "4 4"] = torch.eye(4)
@@ -276,10 +288,15 @@ class MultiviewDataset(Dataset):
                 far = 1000.0
                 proj = convert_proj(intrinsic, self.frame_h, self.frame_w, near, far)
                 proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
+
+                moment: Float[Tensor, "1"] = torch.zeros(1)
+                moment[0] = moment0 * (1-ratio) + moment1 * ratio
+                
                 frames_proj.append(proj)
                 frames_c2w.append(c2w)
                 frames_position.append(camera_position)
                 frames_direction.append(direction)
+                frames_moment.append(moment)
         else:
             for idx, frame in tqdm(enumerate(frames)):
                 intrinsic: Float[Tensor, "4 4"] = torch.eye(4)
@@ -310,10 +327,15 @@ class MultiviewDataset(Dataset):
                 K = intrinsic
                 proj = convert_proj(intrinsic, self.frame_h, self.frame_w, near, far)
                 proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
+
+                moment: Float[Tensor, "1"] = torch.zeros(1)
+                moment[0] = frame["moment"]
+
                 frames_proj.append(proj)
                 frames_c2w.append(c2w)
                 frames_position.append(camera_position)
                 frames_direction.append(direction)
+                frames_moment.append(moment)
         threestudio.info("Loaded frames.")
 
         self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
@@ -323,6 +345,7 @@ class MultiviewDataset(Dataset):
             frames_direction, dim=0
         )
         self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
+        self.frames_moment: Float[Tensor, "B 1"] = torch.stack(frames_moment, dim=0)
 
         self.rays_o, self.rays_d = get_rays(
             self.frames_direction, self.frames_c2w, keepdim=True
@@ -348,6 +371,7 @@ class MultiviewDataset(Dataset):
             "camera_positions": self.frames_position[index],
             "light_positions": self.light_positions[index],
             "gt_rgb": self.frames_img[index],
+            "moment": self.frames_moment[index]
         }
 
     def __iter__(self):
@@ -360,21 +384,21 @@ class MultiviewDataset(Dataset):
         return batch
 
 
-@register("multiview-camera-datamodule")
-class MultiviewDataModule(pl.LightningDataModule):
-    cfg: MultiviewsDataModuleConfig
+@register("dynamic-multiview-camera-datamodule")
+class DynamicMultiviewDataModule(pl.LightningDataModule):
+    cfg: DynamicMultiviewsDataModuleConfig
 
     def __init__(self, cfg: Optional[Union[dict, DictConfig]] = None) -> None:
         super().__init__()
-        self.cfg = parse_structured(MultiviewsDataModuleConfig, cfg)
+        self.cfg = parse_structured(DynamicMultiviewsDataModuleConfig, cfg)
 
     def setup(self, stage=None) -> None:
         if stage in [None, "fit"]:
-            self.train_dataset = MultiviewIterableDataset(self.cfg)
+            self.train_dataset = DynamicMultiviewIterableDataset(self.cfg)
         if stage in [None, "fit", "validate"]:
-            self.val_dataset = MultiviewDataset(self.cfg, "val")
+            self.val_dataset = DynamicMultiviewDataset(self.cfg, "val")
         if stage in [None, "test", "predict"]:
-            self.test_dataset = MultiviewDataset(self.cfg, "test")
+            self.test_dataset = DynamicMultiviewDataset(self.cfg, "test")
 
     def prepare_data(self):
         pass

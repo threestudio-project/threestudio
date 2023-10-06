@@ -1,0 +1,96 @@
+name: "dreamfusion-if"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "multiview-camera-datamodule"
+data:
+  train_downsample_resolution: 2
+  eval_downsample_resolution: 2
+  eval_data_interval: 8
+  dataroot: ???
+
+system_type: "gaussian-splatting-editing-system"
+system:
+  extent: 1.0
+  num_pts: 5000
+  invert_bg_prob: 0.0
+
+  geometry_type: "gaussian"
+  geometry:
+    position_lr_init: 0.00016
+    position_lr_final:  0.0000016
+    position_lr_delay_mult: 0.01
+    feature_lr: 0.0025
+    opacity_lr: 0.05
+    scaling_lr: 0.005
+    rotation_lr: 0.001
+    percent_dense: 0.01
+    densification_interval: 100
+    opacity_reset_interval: 3000000
+    densify_from_iter: 500
+    densify_until_iter: 15000
+    densify_grad_threshold: 0.0002
+
+    # position_lr_init: 0.0001
+    # position_lr_init_fine: 0.0001
+    # position_lr_final: 0.00002
+    # position_lr_final_fine: 0.00002
+    # position_lr_delay_mult: 0.02
+    # position_lr_max_steps: 3000
+    # position_lr_max_steps_fine: 11000
+    # feature_lr: 0.01
+    # opacity_lr: 0.003
+    # scaling_lr: 0.003
+    # rotation_lr: 0.003
+    # percent_dense: 0.1
+    # densification_interval: 400
+    # prune_interval: 200
+    # opacity_reset_interval: 1000000
+    # densify_from_iter: 100
+    # densify_until_iter: 3000
+    # densify_grad_threshold: 0.02
+    # min_opac_prune: 0.05
+
+  renderer_type: "diff-gaussian-rasterizer"
+  renderer:
+    debug: false
+
+  material_type: "no-material" # unused
+  material:
+    n_output_dims: 0
+
+  background_type: "solid-color-background" # unused
+
+  guidance_type: "stable-diffusion-instructpix2pix-guidance"
+  guidance:
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: "Turn him into Elon Musk"
+
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+      name: None
+
+  loss:
+    lambda_l1: 1.0
+    lambda_p: 1.0
+
+trainer:
+  max_steps: 15000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 100
+  enable_progress_bar: true
+  precision: 32-true
+
+checkpoint:
+  save_last: true # save at each validation time
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

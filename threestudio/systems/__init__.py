@@ -13,4 +13,6 @@ from . import (
     zero123,
     zero123_simple,
     gaussian_splatting,
+    gs_editing,
+    dynamic_gaussian,
 )

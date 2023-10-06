@@ -7,4 +7,5 @@ from . import (
     nvdiff_rasterizer,
     patch_renderer,
     diff_gaussian_rasterizer,
+    dynamic_gaussian_rasterizer,
 )

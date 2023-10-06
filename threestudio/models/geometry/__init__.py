@@ -6,4 +6,6 @@ from . import (
     tetrahedra_sdf_grid,
     volume_grid,
     gaussian,
+    dynamic_gaussian,
+    dynamic_implicit_volume,
 )

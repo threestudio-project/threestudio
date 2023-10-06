@@ -302,12 +302,12 @@ class GaussianModel(BaseGeometry):
             max_steps=training_args.position_lr_max_steps
         )
         
-        self.fine_xyz_scheduler_args = get_expon_lr_func(
-            lr_init=training_args.position_lr_init_fine*self.spatial_lr_scale,
-            lr_final=training_args.position_lr_final_fine*self.spatial_lr_scale,
-            lr_delay_mult=training_args.position_lr_delay_mult,
-            max_steps=training_args.position_lr_max_steps_fine
-        )
+        # self.fine_xyz_scheduler_args = get_expon_lr_func(
+        #     lr_init=training_args.position_lr_init_fine*self.spatial_lr_scale,
+        #     lr_final=training_args.position_lr_final_fine*self.spatial_lr_scale,
+        #     lr_delay_mult=training_args.position_lr_delay_mult,
+        #     max_steps=training_args.position_lr_max_steps_fine
+        # )
 
     def update_learning_rate(self, iteration):
         ''' Learning rate scheduling per step '''
@@ -321,7 +321,7 @@ class GaussianModel(BaseGeometry):
         ''' Learning rate scheduling per step '''
         for param_group in self.optimizer.param_groups:
             if param_group["name"] == "xyz":
-                lr = self.fine_xyz_scheduler_args(iteration)
+                lr = self.xyz_scheduler_args(iteration)
                 param_group['lr'] = lr
                 return lr
 
