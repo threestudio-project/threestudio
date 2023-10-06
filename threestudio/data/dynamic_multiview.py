@@ -69,7 +69,7 @@ class DynamicMultiviewsDataModuleConfig:
     camera_layout: str = "around"
     camera_distance: float = -1
     eval_interpolation: Optional[Tuple[int, int, int]] = None  # (0, 1, 30)
-    eval_time_interpolation: Optional[Tuple[float, float]] = None # (t0, t1)
+    eval_time_interpolation: Optional[Tuple[float, float]] = None  # (t0, t1)
 
 
 class DynamicMultiviewIterableDataset(IterableDataset):
@@ -192,14 +192,14 @@ class DynamicMultiviewIterableDataset(IterableDataset):
             "rays_o": self.rays_o[index : index + 1],
             "rays_d": self.rays_d[index : index + 1],
             "mvp_mtx": self.mvp_mtx[index : index + 1],
-            "proj": self.frames_proj[index:index+1],
+            "proj": self.frames_proj[index : index + 1],
             "c2w": self.frames_c2w[index : index + 1],
             "camera_positions": self.frames_position[index : index + 1],
             "light_positions": self.light_positions[index : index + 1],
             "gt_rgb": self.frames_img[index : index + 1],
             "height": self.frame_h,
             "width": self.frame_w,
-            "moment": self.frames_moment[index: index + 1],
+            "moment": self.frames_moment[index : index + 1],
         }
 
 
@@ -290,8 +290,8 @@ class DynamicMultiviewDataset(Dataset):
                 proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
 
                 moment: Float[Tensor, "1"] = torch.zeros(1)
-                moment[0] = moment0 * (1-ratio) + moment1 * ratio
-                
+                moment[0] = moment0 * (1 - ratio) + moment1 * ratio
+
                 frames_proj.append(proj)
                 frames_c2w.append(c2w)
                 frames_position.append(camera_position)
@@ -371,7 +371,7 @@ class DynamicMultiviewDataset(Dataset):
             "camera_positions": self.frames_position[index],
             "light_positions": self.light_positions[index],
             "gt_rgb": self.frames_img[index],
-            "moment": self.frames_moment[index]
+            "moment": self.frames_moment[index],
         }
 
     def __iter__(self):

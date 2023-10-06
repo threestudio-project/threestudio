@@ -1,7 +1,10 @@
 from . import (
     control4d_multiview,
     dreamfusion,
+    dynamic_gaussian,
     fantasia3d,
+    gaussian_splatting,
+    gs_editing,
     imagedreamfusion,
     instructnerf2nerf,
     latentnerf,
@@ -12,7 +15,4 @@ from . import (
     textmesh,
     zero123,
     zero123_simple,
-    gaussian_splatting,
-    gs_editing,
-    dynamic_gaussian,
 )

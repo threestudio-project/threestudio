@@ -277,6 +277,7 @@ def get_projection_matrix(
     proj_mtx[:, 3, 2] = -1.0
     return proj_mtx
 
+
 def get_mvp_matrix(
     c2w: Float[Tensor, "B 4 4"], proj_mtx: Float[Tensor, "B 4 4"]
 ) -> Float[Tensor, "B 4 4"]:
@@ -289,6 +290,7 @@ def get_mvp_matrix(
     # calculate mvp matrix by proj_mtx @ w2c (mv_mtx)
     mvp_mtx = proj_mtx @ w2c
     return mvp_mtx
+
 
 def get_full_projection_matrix(
     c2w: Float[Tensor, "B 4 4"], proj_mtx: Float[Tensor, "B 4 4"]

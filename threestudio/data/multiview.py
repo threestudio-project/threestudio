@@ -184,7 +184,7 @@ class MultiviewIterableDataset(IterableDataset):
             "rays_o": self.rays_o[index : index + 1],
             "rays_d": self.rays_d[index : index + 1],
             "mvp_mtx": self.mvp_mtx[index : index + 1],
-            "proj": self.frames_proj[index:index+1],
+            "proj": self.frames_proj[index : index + 1],
             "c2w": self.frames_c2w[index : index + 1],
             "camera_positions": self.frames_position[index : index + 1],
             "light_positions": self.light_positions[index : index + 1],

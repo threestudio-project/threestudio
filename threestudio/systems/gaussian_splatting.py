@@ -1,16 +1,17 @@
-import os
 import math
+import os
 from dataclasses import dataclass
 
-import torch
 import numpy as np
+import torch
 
 import threestudio
-from threestudio.systems.base import BaseLift3DSystem
 from threestudio.models.geometry.gaussian import BasicPointCloud
+from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.typing import *
 
-def getWorld2View2(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
+
+def getWorld2View2(R, t, translate=np.array([0.0, 0.0, 0.0]), scale=1.0):
     Rt = np.zeros((4, 4))
     Rt[:3, :3] = R.transpose()
     Rt[:3, 3] = t
@@ -22,6 +23,7 @@ def getWorld2View2(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
     C2W[:3, 3] = cam_center
     Rt = np.linalg.inv(C2W)
     return np.float32(Rt)
+
 
 def getProjectionMatrix(znear, zfar, fovX, fovY):
     tanHalfFovY = math.tan((fovY / 2))
@@ -45,18 +47,26 @@ def getProjectionMatrix(znear, zfar, fovX, fovY):
     P[2, 3] = -(zfar * znear) / (zfar - znear)
     return P
 
+
 def get_cam_info(c2w, fovy):
     matrix = np.linalg.inv(c2w[0].cpu().numpy())
-    R = np.transpose(matrix[:3,:3])
-    R[:,0] = -R[:,0]
+    R = np.transpose(matrix[:3, :3])
+    R[:, 0] = -R[:, 0]
     T = -matrix[:3, 3]
-    
+
     world_view_transform = torch.tensor(getWorld2View2(R, T)).transpose(0, 1).cuda()
-    projection_matrix = getProjectionMatrix(znear=0.01, zfar=100, fovX=fovy, fovY=fovy).transpose(0,1).cuda()
-    full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
+    projection_matrix = (
+        getProjectionMatrix(znear=0.01, zfar=100, fovX=fovy, fovY=fovy)
+        .transpose(0, 1)
+        .cuda()
+    )
+    full_proj_transform = (
+        world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))
+    ).squeeze(0)
     camera_center = world_view_transform.inverse()[3, :3]
-    
+
     return world_view_transform, full_proj_transform, camera_center
+
 
 class Camera(NamedTuple):
     FoVx: torch.Tensor
@@ -66,7 +76,8 @@ class Camera(NamedTuple):
     image_height: int
     world_view_transform: torch.Tensor
     full_proj_transform: torch.Tensor
-        
+
+
 @threestudio.register("gaussian-splatting-system")
 class GaussianSplatting(BaseLift3DSystem):
     @dataclass
@@ -80,12 +91,10 @@ class GaussianSplatting(BaseLift3DSystem):
     def configure(self) -> None:
         # set up geometry, material, background, renderer
         super().configure()
-        self.automatic_optimization=False
-        
+        self.automatic_optimization = False
+
         self.background_tensor = torch.tensor(
-            [1, 1, 1], 
-            dtype=torch.float32, 
-            device="cuda"
+            [1, 1, 1], dtype=torch.float32, device="cuda"
         )
         # Since this data set has no colmap data, we start with random points
         num_pts = self.cfg.num_pts
@@ -104,10 +113,8 @@ class GaussianSplatting(BaseLift3DSystem):
         shs = np.random.random((num_pts, 3)) / 255.0
         C0 = 0.28209479177387814
         color = shs * C0 + 0.5
-        pcd = BasicPointCloud(
-            points=xyz, colors=color, normals=np.zeros((num_pts, 3))
-        )
-        
+        pcd = BasicPointCloud(points=xyz, colors=color, normals=np.zeros((num_pts, 3)))
+
         self.geometry.create_from_pcd(pcd, 10)
         self.geometry.training_setup()
 
@@ -117,7 +124,7 @@ class GaussianSplatting(BaseLift3DSystem):
         )
         self.prompt_utils = self.prompt_processor()
         self.gaussians_step = 0
-        
+
     def configure_optimizers(self):
         optim = self.geometry.optimizer
         ret = {
@@ -127,32 +134,32 @@ class GaussianSplatting(BaseLift3DSystem):
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         lr_max_step = self.geometry.cfg.position_lr_max_steps
-        
+
         # self.geometry.update_learning_rate(self.gaussians_step)
         if self.gaussians_step < lr_max_step:
             self.geometry.update_learning_rate(self.gaussians_step)
         else:
             self.geometry.update_learning_rate_fine(self.gaussians_step - lr_max_step)
-        
+
         # Every 1000 its we increase the levels of SH up to a maximum degree
         # if (self.gaussians_step) >= self.opt.position_lr_max_steps:
         #     self.gaussians.oneupSHdegree()
-        fovy = batch['fovy'][0]
-        w2c, proj, cam_p = get_cam_info(c2w=batch['c2w'], fovy=fovy)
-            
+        fovy = batch["fovy"][0]
+        w2c, proj, cam_p = get_cam_info(c2w=batch["c2w"], fovy=fovy)
+
         # import pdb; pdb.set_trace()
         viewpoint_cam = Camera(
-            FoVx=fovy, 
-            FoVy=fovy, 
-            image_width=batch['width'], 
-            image_height=batch['height'],
+            FoVx=fovy,
+            FoVy=fovy,
+            image_width=batch["width"],
+            image_height=batch["height"],
             world_view_transform=w2c,
             full_proj_transform=proj,
             camera_center=cam_p,
         )
-        
+
         render_pkg = self.renderer(
-            viewpoint_cam, 
+            viewpoint_cam,
             self.background_tensor,
         )
         # image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
@@ -172,9 +179,9 @@ class GaussianSplatting(BaseLift3DSystem):
         self.gaussians_step += 1
         out = self(batch)
 
-        visibility_filter = out['visibility_filter']
+        visibility_filter = out["visibility_filter"]
         radii = out["radii"]
-        guidance_inp = out["render"].unsqueeze(0).permute(0, 2, 3, 1)  
+        guidance_inp = out["render"].unsqueeze(0).permute(0, 2, 3, 1)
         # import pdb; pdb.set_trace()
         viewspace_point_tensor = out["viewspace_points"]
         guidance_out = self.guidance(
@@ -182,19 +189,24 @@ class GaussianSplatting(BaseLift3DSystem):
         )
 
         loss = 0.0
-        
-        self.log("gauss_num", int(self.geometry.get_xyz.shape[0]), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+
+        self.log(
+            "gauss_num",
+            int(self.geometry.get_xyz.shape[0]),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
 
         for name, value in guidance_out.items():
             self.log(f"train/{name}", value)
             if name.startswith("loss_"):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
-                
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
-            
-            
+
         loss.backward()
         iteration = self.gaussians_step
         self.geometry.update_states(
@@ -205,7 +217,7 @@ class GaussianSplatting(BaseLift3DSystem):
             self.extent,
         )
         opt.step()
-        opt.zero_grad(set_to_none = True)
+        opt.zero_grad(set_to_none=True)
 
         return {"loss": loss}
 
@@ -224,7 +236,6 @@ class GaussianSplatting(BaseLift3DSystem):
             name="validation_step",
             step=self.global_step,
         )
-
 
     def on_validation_epoch_end(self):
         pass

@@ -3,6 +3,7 @@ import math
 import random
 from dataclasses import dataclass, field
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -14,15 +15,14 @@ from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_device
 from threestudio.utils.ops import (
+    get_full_projection_matrix,
     get_mvp_matrix,
     get_projection_matrix,
     get_ray_directions,
     get_rays,
-    get_full_projection_matrix
 )
 from threestudio.utils.typing import *
 
-import numpy as np
 
 @dataclass
 class RandomCameraDataModuleConfig:
@@ -402,7 +402,6 @@ class RandomCameraDataset(Dataset):
             [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
         )
         c2w[:, 3, 3] = 1.0
-        
 
         # get directions by dividing directions_unit_focal by focal length
         focal_length: Float[Tensor, "B"] = (

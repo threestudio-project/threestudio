@@ -1,29 +1,31 @@
+import math
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+from diff_gaussian_rasterization import (
+    GaussianRasterizationSettings,
+    GaussianRasterizer,
+)
 
 import threestudio
-from threestudio.models.geometry.base import BaseGeometry
-from threestudio.models.renderers.base import Rasterizer
-from threestudio.models.materials.base import BaseMaterial
 from threestudio.models.background.base import BaseBackground
+from threestudio.models.geometry.base import BaseGeometry
+from threestudio.models.materials.base import BaseMaterial
+from threestudio.models.renderers.base import Rasterizer
 from threestudio.utils.typing import *
 
-import math
-import numpy as np
-from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 
 @threestudio.register("dynamic-gaussian-rasterizer")
 class DynamicGaussianRasterizer(Rasterizer):
-    
     @dataclass
     class Config(Rasterizer.Config):
         debug: bool = False
         invert_bg_prob: bool = True
-        
+
     cfg: Config
-    
+
     def configure(
         self,
         geometry: BaseGeometry,
@@ -31,33 +33,38 @@ class DynamicGaussianRasterizer(Rasterizer):
         background: BaseBackground,
     ) -> None:
         super().configure(geometry, material, background)
-        
+
     def forward(
-        self, 
-        viewpoint_camera, 
-        moment, 
-        bg_color : torch.Tensor, 
-        scaling_modifier = 1.0, 
-        override_color = None
+        self,
+        viewpoint_camera,
+        moment,
+        bg_color: torch.Tensor,
+        scaling_modifier=1.0,
+        override_color=None,
     ) -> Dict[str, Any]:
         """
-        Render the scene. 
-        
+        Render the scene.
+
         Background tensor (bg_color) must be on GPU!
         """
-        
+
         if self.training:
             invert_bg_color = np.random.rand() > self.cfg.invert_bg_prob
         else:
             invert_bg_color = True
-            
+
         bg_color = bg_color if not invert_bg_color else (1.0 - bg_color)
 
         dynamic_gaussian = self.geometry.dynamic_geo
 
         pc = self.geometry.gaussian
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
-        screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
+        screenspace_points = (
+            torch.zeros_like(
+                pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda"
+            )
+            + 0
+        )
         try:
             screenspace_points.retain_grad()
         except:
@@ -98,14 +105,17 @@ class DynamicGaussianRasterizer(Rasterizer):
 
         print(moment)
         if moment.item() > 1e-6:
-
-            dynamic_feature = dynamic_gaussian(torch.cat([means3D, moment.expand(*means3D.shape[:-1], 1)], dim=-1))
+            dynamic_feature = dynamic_gaussian(
+                torch.cat([means3D, moment.expand(*means3D.shape[:-1], 1)], dim=-1)
+            )
             dynamic_means3D = dynamic_feature["features"][..., :3]
             dynamic_rotations = dynamic_feature["features"][..., 3:]
         else:
             dynamic_means3D = torch.zeros_like(means3D)
             dynamic_rotations = torch.zeros_like(rotations)
-        rotations = self.geometry.gaussian.rotation_activation(rotations + dynamic_rotations)
+        rotations = self.geometry.gaussian.rotation_activation(
+            rotations + dynamic_rotations
+        )
         means3D = means3D + dynamic_means3D
 
         # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
@@ -117,20 +127,23 @@ class DynamicGaussianRasterizer(Rasterizer):
         else:
             colors_precomp = override_color
 
-        # Rasterize visible Gaussians to image, obtain their radii (on screen). 
+        # Rasterize visible Gaussians to image, obtain their radii (on screen).
         rendered_image, radii = rasterizer(
-            means3D = means3D,
-            means2D = means2D,
-            shs = shs,
-            colors_precomp = colors_precomp,
-            opacities = opacity,
-            scales = scales,
-            rotations = rotations,
-            cov3D_precomp = cov3D_precomp)
+            means3D=means3D,
+            means2D=means2D,
+            shs=shs,
+            colors_precomp=colors_precomp,
+            opacities=opacity,
+            scales=scales,
+            rotations=rotations,
+            cov3D_precomp=cov3D_precomp,
+        )
 
         # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
         # They will be excluded from value updates used in the splitting criteria.
-        return {"render": rendered_image,
-                "viewspace_points": screenspace_points,
-                "visibility_filter" : radii > 0,
-                "radii": radii}
+        return {
+            "render": rendered_image,
+            "viewspace_points": screenspace_points,
+            "visibility_filter": radii > 0,
+            "radii": radii,
+        }

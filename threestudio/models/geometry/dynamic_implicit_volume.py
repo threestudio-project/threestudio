@@ -47,7 +47,7 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
                 "n_hidden_layers": 1,
             }
         )
-        
+
     cfg: Config
 
     def configure(self) -> None:
@@ -55,27 +55,26 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
         self.pos_encoding = get_encoding(
             self.cfg.n_input_dims - 1, self.cfg.pos_encoding_config
         )
-        self.time_encoding = get_encoding(
-            1, self.cfg.time_encoding_config
-        )
+        self.time_encoding = get_encoding(1, self.cfg.time_encoding_config)
         self.flow_network = get_mlp(
-            self.pos_encoding.n_output_dims + self.time_encoding.n_output_dims, 
+            self.pos_encoding.n_output_dims + self.time_encoding.n_output_dims,
             self.cfg.n_feature_dims,
-            self.cfg.mlp_network_config
+            self.cfg.mlp_network_config,
         )
 
     def forward(
         self, points_4d: Float[Tensor, "*N Di"]
     ) -> Dict[str, Float[Tensor, "..."]]:
-
         # points 4D
-        points_unscaled = points_4d[..., :self.cfg.n_input_dims-1]  # points in the original scale
+        points_unscaled = points_4d[
+            ..., : self.cfg.n_input_dims - 1
+        ]  # points in the original scale
         points = contract_to_unisphere(
-            points_4d[..., :self.cfg.n_input_dims-1], self.bbox, self.unbounded
+            points_4d[..., : self.cfg.n_input_dims - 1], self.bbox, self.unbounded
         )  # points normalized to (0, 1)
         points_time = points_4d[..., -1:]
 
-        pos_enc = self.pos_encoding(points.view(-1, self.cfg.n_input_dims-1))
+        pos_enc = self.pos_encoding(points.view(-1, self.cfg.n_input_dims - 1))
         time_enc = self.time_encoding(points_time.view(-1, 1))
         enc = torch.cat([pos_enc, time_enc], dim=-1)
         features = self.flow_network(enc).view(
