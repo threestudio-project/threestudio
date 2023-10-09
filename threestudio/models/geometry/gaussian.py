@@ -617,6 +617,24 @@ class GaussianModel(BaseGeometry):
 
         torch.cuda.empty_cache()
 
+    def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
+        grads = self.xyz_gradient_accum / self.denom
+        grads[grads.isnan()] = 0.0
+
+        self.densify_and_clone(grads, max_grad, extent)
+        self.densify_and_split(grads, max_grad, extent)
+
+        prune_mask = (self.get_opacity < min_opacity).squeeze()
+        if max_screen_size:
+            big_points_vs = self.max_radii2D > max_screen_size
+            big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
+            prune_mask = torch.logical_or(
+                torch.logical_or(prune_mask, big_points_vs), big_points_ws
+            )
+        self.prune_points(prune_mask)
+
+        torch.cuda.empty_cache()
+
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(
             viewspace_point_tensor.grad[update_filter, :2], dim=-1, keepdim=True
@@ -632,35 +650,23 @@ class GaussianModel(BaseGeometry):
         viewspace_point_tensor,
         extent,
     ):
-        # Keep track of max radii in image-space for pruning
-        self.max_radii2D[visibility_filter] = torch.max(
-            self.max_radii2D[visibility_filter], radii[visibility_filter]
-        )
-        self.add_densification_stats(viewspace_point_tensor, visibility_filter)
-        # Densification
         if iteration < self.cfg.densify_until_iter:
-            # if iteration > self.opt.densify_from_iter and iteration % self.opt.densification_interval == 0:
-            #     size_threshold = 20 if iteration > self.opt.opacity_reset_interval else None
-            #     self.gaussians.densify_and_prune(self.opt.densify_grad_threshold, 0.005, 1.0, size_threshold)
+            # Keep track of max radii in image-space for pruning
+            self.max_radii2D[visibility_filter] = torch.max(
+                self.max_radii2D[visibility_filter], radii[visibility_filter]
+            )
+            self.add_densification_stats(viewspace_point_tensor, visibility_filter)
 
             if (
                 iteration > self.cfg.densify_from_iter
                 and iteration % self.cfg.densification_interval == 0
             ):
-                self.densify(self.cfg.densify_grad_threshold, extent)
+                size_threshold = (
+                    20 if iteration > self.cfg.opacity_reset_interval else None
+                )
+                self.densify_and_prune(
+                    self.cfg.densify_grad_threshold, 0.005, 1.0, size_threshold
+                )
 
-            if (
-                iteration > self.cfg.densify_from_iter
-                and iteration % self.cfg.prune_interval == 0
-            ):
-                self.prune(self.cfg.min_opac_prune, extent, None)
-
-        # else:
-        # if iteration % 1000 == 0:
-        #     self.densify(5.0, 10)
-
-        # if iteration % 500 == 0:
-        #     self.prune(0.0001, 10, 20)
-
-        # if iteration == self.cfg.position_lr_max_steps:
-        #     self.reset_opacity()
+            if iteration % self.cfg.opacity_reset_interval == 0:
+                self.reset_opacity()

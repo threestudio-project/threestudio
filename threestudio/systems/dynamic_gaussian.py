@@ -213,16 +213,6 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
         B, H, W, C = origin_gt_rgb.shape
         gt_rgb = origin_gt_rgb
 
-        # for key in out:
-        #     print(key)
-        # exit(0)
-        # print(gt_rgb)
-        # print(out["render"])
-        # import numpy as np
-        # import cv2
-        # show = (out["render"].detach().cpu().permute(1, 2, 0).numpy()*255).astype(np.uint8)
-        # cv2.imwrite("test.jpg", show)
-        # exit(0)
         guidance_out = {
             "loss_l1": torch.nn.functional.l1_loss(
                 out["render"], gt_rgb.permute(0, 3, 1, 2)[0]
