@@ -1,0 +1,38 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/systems/latent*": true,
+        "**/systems/magic*": true,
+        "**/systems/sjc*": true,
+        "**/systems/textmesh*": true,
+        "**/systems/zero123*": true,
+        "**/systems/fantasia*": true,
+        "**/systems/image*": true,
+        "**/systems/prolific*": true,
+        "**/systems/dreamfusion*": true,
+
+        "**/renderers/deferred*": true,
+        "**/renderers/neus*": true,
+        "**/renderers/patch*": true,
+        "**/renderers/nvdiff*": true,
+        // "**/renderers/nerf*": true,
+
+        "**/geometry/custom_mesh*": true,
+        "**/geometry/implicit_sdf*": true,
+        // "**/geometry/implicit_volume*": true,
+        "**/geometry/tetrahedra*": true,
+        "**/geometry/volume*": true,
+
+        "**/exporters": true,
+        "**/prompt_processors": true,
+
+        "**/configs/[^gi]*": true,
+
+        "**/scripts/run_[^g]*": true,
+        "**/scripts/[^r]*": true,
+
+        "**/docker": true,
+        "**/docs": true,
+        "**/extern":true,
+    }
+}
