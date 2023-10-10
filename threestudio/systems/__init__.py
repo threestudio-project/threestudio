@@ -7,6 +7,7 @@ from . import (
     latentnerf,
     magic3d,
     magic123,
+    mvdream,
     prolificdreamer,
     sjc,
     textmesh,

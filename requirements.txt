@@ -39,3 +39,7 @@ git+https://github.com/openai/CLIP.git
 
 #controlnet
 controlnet_aux
+
+# mvdream
+open-clip-torch==2.7.0
+git+https://github.com/bytedance/MVDream

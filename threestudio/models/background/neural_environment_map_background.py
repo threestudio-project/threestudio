@@ -33,6 +33,9 @@ class NeuralEnvironmentMapBackground(BaseBackground):
         random_aug_prob: float = 0.5
         eval_color: Optional[Tuple[float, float, float]] = None
 
+        # multi-view diffusion
+        share_aug_bg: bool = False
+
     cfg: Config
 
     def configure(self) -> None:
@@ -59,8 +62,9 @@ class NeuralEnvironmentMapBackground(BaseBackground):
             and random.random() < self.cfg.random_aug_prob
         ):
             # use random background color with probability random_aug_prob
+            n_color = 1 if self.cfg.share_aug_bg else dirs.shape[0]
             color = color * 0 + (  # prevent checking for unused parameters in DDP
-                torch.rand(dirs.shape[0], 1, 1, self.cfg.n_output_dims)
+                torch.rand(n_color, 1, 1, self.cfg.n_output_dims)
                 .to(dirs)
                 .expand(*dirs.shape[:-1], -1)
             )
