@@ -33,7 +33,7 @@ system:
       densify_from_iter: 500
       densify_until_iter: 15000
       densify_grad_threshold: 0.0002
-    dynamic_geo_name: "dynamic-implicit-volume"
+    dynamic_geo_name: "dynamic-flow-volume"
     dynamic_geo:
       n_feature_dims: 7
 
@@ -75,8 +75,8 @@ system:
       betas: [0.9, 0.99]
       eps: 1.e-15
     params:
-      geometry.dynamic_geo:
-        lr: 0.0001
+      geometry:
+        0.001
 
 trainer:
   max_steps: 15000

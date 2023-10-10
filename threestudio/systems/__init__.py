@@ -7,6 +7,7 @@ from . import (
     gs_editing,
     imagedreamfusion,
     instructnerf2nerf,
+    dynamic_instructnerf2nerf,
     latentnerf,
     magic3d,
     magic123,

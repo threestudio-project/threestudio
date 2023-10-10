@@ -106,7 +106,7 @@ class DynamicGaussianRasterizer(Rasterizer):
         print(moment)
         if moment.item() > 1e-6:
             dynamic_feature = dynamic_gaussian(
-                torch.cat([means3D, moment.expand(*means3D.shape[:-1], 1)], dim=-1)
+                means3D, moment.item()
             )
             dynamic_means3D = dynamic_feature["features"][..., :3]
             dynamic_rotations = dynamic_feature["features"][..., 3:]

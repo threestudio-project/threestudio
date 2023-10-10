@@ -25,10 +25,10 @@ class DynamicFlowVolume(BaseImplicitGeometry):
         pos_encoding_config: dict = field(
             default_factory=lambda: {
                 "otype": "HashGrid",
-                "n_levels": 16,
+                "n_levels": 10,
                 "n_features_per_level": 2,
                 "log2_hashmap_size": 19,
-                "base_resolution": 16,
+                "base_resolution": 10,
                 "per_level_scale": 1.447269237440378,
             }
         )
@@ -63,16 +63,14 @@ class DynamicFlowVolume(BaseImplicitGeometry):
         )
 
     def forward(
-        self, points_4d: Float[Tensor, "*N Di"]
+        self, points_3d: Float[Tensor, "*N Di"], moment
     ) -> Dict[str, Float[Tensor, "..."]]:
         # points 4D
-        points_unscaled = points_4d[
-            ..., : self.cfg.n_input_dims - 1
-        ]  # points in the original scale
         points = contract_to_unisphere(
-            points_4d[..., : self.cfg.n_input_dims - 1], self.bbox, self.unbounded
+            points_3d[..., : self.cfg.n_input_dims - 1], self.bbox, self.unbounded
         )  # points normalized to (0, 1)
-        points_time = points_4d[..., -1:]
+        points_time = torch.zeros_like(points[..., 0])
+        points_time[...] = moment
 
         pos_enc = self.pos_encoding(points.view(-1, self.cfg.n_input_dims - 1))
         time_enc = self.time_encoding(points_time.view(-1, 1))

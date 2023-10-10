@@ -20,7 +20,9 @@ from threestudio.utils.typing import *
 class DynamicImplicitVolume(BaseImplicitGeometry):
     @dataclass
     class Config(BaseImplicitGeometry.Config):
-        n_input_dims: int = 4
+        dynamic_flow_volume_config: Optional[BaseImplicitGeometry.Config] = None
+
+        n_input_dims: int = 3
         n_feature_dims: int = 3
         density_activation: Optional[str] = "softplus"
         density_bias: Union[float, str] = "blob_magic3d"
@@ -34,12 +36,6 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
                 "log2_hashmap_size": 19,
                 "base_resolution": 16,
                 "per_level_scale": 1.447269237440378,
-            }
-        )
-        time_encoding_config: dict = field(
-            default_factory=lambda: {
-                "otype": "ProgressiveBandFrequency",
-                "n_frequencies": 4,
             }
         )
         mlp_network_config: dict = field(
@@ -63,15 +59,11 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
 
     def configure(self) -> None:
         super().configure()
-        self.pos_encoding = get_encoding(
+        self.encoding = get_encoding(
             self.cfg.n_input_dims, self.cfg.pos_encoding_config
         )
-        self.time_encoding = get_encoding(1, self.cfg.time_encoding_config)
         self.density_network = get_mlp(
-            self.pos_encoding.n_output_dims, 1, self.cfg.mlp_network_config
-        )
-        self.flow_network = get_mlp(
-            self.pos_encoding.n_output_dims, 1, self.cfg.mlp_network_config
+            self.encoding.n_output_dims, 1, self.cfg.mlp_network_config
         )
         if self.cfg.n_feature_dims > 0:
             self.feature_network = get_mlp(
@@ -79,14 +71,14 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
                 self.cfg.n_feature_dims,
                 self.cfg.mlp_network_config,
             )
-        if self.cfg.normal_type == "pred":
-            self.normal_network = get_mlp(
-                self.encoding.n_output_dims, 3, self.cfg.mlp_network_config
-            )
+
+        self.dynamic_flow_volume = threestudio.find("dynamic-flow-volume")(self.cfg.dynamic_flow_volume_config)
+        self.moment = 0.0
 
     def get_activated_density(
         self, points: Float[Tensor, "*N Di"], density: Float[Tensor, "*N 1"]
     ) -> Tuple[Float[Tensor, "*N 1"], Float[Tensor, "*N 1"]]:
+        # 3D density
         density_bias: Union[float, Float[Tensor, "*N 1"]]
         if self.cfg.density_bias == "blob_dreamfusion":
             # pre-activation density bias
@@ -121,11 +113,16 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
         if output_normal and self.cfg.normal_type == "analytic":
             torch.set_grad_enabled(True)
             points.requires_grad_(True)
-
+        
         points_unscaled = points  # points in the original scale
         points = contract_to_unisphere(
             points, self.bbox, self.unbounded
         )  # points normalized to (0, 1)
+
+        # dynamic flow
+        if self.moment > 1e-6:
+            flow = self.dynamic_flow_volume(points, self.moment)
+            points = points + flow["features"]
 
         enc = self.encoding(points.view(-1, self.cfg.n_input_dims))
         density = self.density_network(enc).view(*points.shape[:-1], 1)
@@ -205,6 +202,11 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
     def forward_density(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
         points_unscaled = points
         points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
+        
+        # dynamic flow
+        if self.moment > 1e-6:
+            flow = self.dynamic_flow_volume(points, self.moment)
+            points = points + flow["features"]
 
         density = self.density_network(
             self.encoding(points.reshape(-1, self.cfg.n_input_dims))
@@ -234,6 +236,12 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
             return out
         points_unscaled = points
         points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
+        
+        # dynamic flow
+        if self.moment > 1e-6:
+            flow = self.dynamic_flow_volume(points, self.moment)
+            points = points + flow["features"]
+
         enc = self.encoding(points.reshape(-1, self.cfg.n_input_dims))
         features = self.feature_network(enc).view(
             *points.shape[:-1], self.cfg.n_feature_dims
@@ -252,9 +260,9 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
         cfg: Optional[Union[dict, DictConfig]] = None,
         copy_net: bool = True,
         **kwargs,
-    ) -> "ImplicitVolume":
-        if isinstance(other, ImplicitVolume):
-            instance = ImplicitVolume(cfg, **kwargs)
+    ) -> "DynamicImplicitVolume":
+        if isinstance(other, DynamicImplicitVolume):
+            instance = DynamicImplicitVolume(cfg, **kwargs)
             instance.encoding.load_state_dict(other.encoding.state_dict())
             instance.density_network.load_state_dict(other.density_network.state_dict())
             if copy_net:
@@ -275,5 +283,5 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
             return instance
         else:
             raise TypeError(
-                f"Cannot create {ImplicitVolume.__name__} from {other.__class__.__name__}"
+                f"Cannot create {DynamicImplicitVolume.__name__} from {other.__class__.__name__}"
             )
