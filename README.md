@@ -47,10 +47,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 ## Gaussian Splatting
 
 ```shell
-git clone git@github.com:graphdeco-inria/gaussian-splatting.git --recursive
-cd gaussian-splatting/submodules
-python -m pip install diff-gaussian-rasterization/.
-python -m pip install simple-knn/.
+python -m pip install git+https://github.com/Linyou/diff-gaussian-rasterization.git@sh2color
 ```
 
 ## News

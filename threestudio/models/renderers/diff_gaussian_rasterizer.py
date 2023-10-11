@@ -112,6 +112,10 @@ class DiffGaussian(Rasterizer):
             scales = scales,
             rotations = rotations,
             cov3D_precomp = cov3D_precomp)
+        
+        # Retain gradients of the 2D (screen-space) means for batch dim
+        if self.training:
+            screenspace_points.retain_grad()
 
         # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
         # They will be excluded from value updates used in the splitting criteria.

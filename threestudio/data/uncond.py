@@ -317,7 +317,7 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
 
         self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.width / self.height, 0.1, 1000.0
+            fovy, self.width / self.height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
         mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, self.proj_mtx)
         self.fovy = fovy

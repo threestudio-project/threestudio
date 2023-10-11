@@ -7,23 +7,30 @@ import numpy as np
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
-from threestudio.models.geometry.gaussian import BasicPointCloud
 from threestudio.utils.typing import *
 
-def getWorld2View2(R, t, translate=np.array([.0, .0, .0]), scale=1.0):
-    Rt = np.zeros((4, 4))
-    Rt[:3, :3] = R.transpose()
+from torch.cuda.amp import autocast
+
+def stack_dicts(dicts):
+    stacked_dict = {}
+    for k in dicts[0].keys():
+        stacked_dict[k] = torch.stack([d[k] for d in dicts], dim=0)
+    return stacked_dict
+
+def getWorld2View_torch(R, t, translate, scale=1.0):
+    Rt = torch.zeros((4, 4), device=R.device)
+    Rt[:3, :3] = R.transpose(0, 1)
     Rt[:3, 3] = t
     Rt[3, 3] = 1.0
 
-    C2W = np.linalg.inv(Rt)
+    C2W = torch.linalg.inv(Rt)
     cam_center = C2W[:3, 3]
     cam_center = (cam_center + translate) * scale
     C2W[:3, 3] = cam_center
-    Rt = np.linalg.inv(C2W)
-    return np.float32(Rt)
+    Rt = torch.linalg.inv(C2W)
+    return Rt.to(torch.float32)
 
-def getProjectionMatrix(znear, zfar, fovX, fovY):
+def getProjectionMatrix(znear, zfar, fovX, fovY, device="cuda"):
     tanHalfFovY = math.tan((fovY / 2))
     tanHalfFovX = math.tan((fovX / 2))
 
@@ -32,7 +39,7 @@ def getProjectionMatrix(znear, zfar, fovX, fovY):
     right = tanHalfFovX * znear
     left = -right
 
-    P = torch.zeros(4, 4)
+    P = torch.zeros(4, 4, device=device)
 
     z_sign = 1.0
 
@@ -45,14 +52,15 @@ def getProjectionMatrix(znear, zfar, fovX, fovY):
     P[2, 3] = -(zfar * znear) / (zfar - znear)
     return P
 
-def get_cam_info(c2w, fovy):
-    matrix = np.linalg.inv(c2w[0].cpu().numpy())
-    R = np.transpose(matrix[:3,:3])
+def get_cam_info_torch(c2w, fovy):
+    matrix = torch.linalg.inv(c2w)
+    R = torch.transpose(matrix[:3,:3], 0, 1)
     R[:,0] = -R[:,0]
     T = -matrix[:3, 3]
     
-    world_view_transform = torch.tensor(getWorld2View2(R, T)).transpose(0, 1).cuda()
-    projection_matrix = getProjectionMatrix(znear=0.01, zfar=100, fovX=fovy, fovY=fovy).transpose(0,1).cuda()
+    translate = torch.tensor([.0, .0, .0], device=c2w.device)
+    world_view_transform = getWorld2View_torch(R, T, translate).transpose(0, 1)
+    projection_matrix = getProjectionMatrix(znear=0.01, zfar=100, fovX=fovy, fovY=fovy, device=c2w.device).transpose(0,1)
     full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
     camera_center = world_view_transform.inverse()[3, :3]
     
@@ -71,8 +79,6 @@ class Camera(NamedTuple):
 class GaussianSplatting(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
-        extent: float = 5.0
-        num_pts: int = 100
         invert_bg_prob: float = 0.5
 
     cfg: Config
@@ -87,28 +93,8 @@ class GaussianSplatting(BaseLift3DSystem):
             dtype=torch.float32, 
             device="cuda"
         )
-        # Since this data set has no colmap data, we start with random points
-        num_pts = self.cfg.num_pts
-        print(f"Generating random point cloud ({num_pts})...")
-        self.extent = self.cfg.extent
-        phis = np.random.random((num_pts,)) * 2 * np.pi
-        costheta = np.random.random((num_pts,)) * 2 - 1
-        thetas = np.arccos(costheta)
-        mu = np.random.random((num_pts,))
-        radius = 0.5 * np.cbrt(mu)
-        x = radius * np.sin(thetas) * np.cos(phis)
-        y = radius * np.sin(thetas) * np.sin(phis)
-        z = radius * np.cos(thetas)
-        xyz = np.stack((x, y, z), axis=1)
-
-        shs = np.random.random((num_pts, 3)) / 255.0
-        C0 = 0.28209479177387814
-        color = shs * C0 + 0.5
-        pcd = BasicPointCloud(
-            points=xyz, colors=color, normals=np.zeros((num_pts, 3))
-        )
         
-        self.geometry.create_from_pcd(pcd, 10)
+        self.geometry.init_params()
         self.geometry.training_setup()
 
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
@@ -124,45 +110,60 @@ class GaussianSplatting(BaseLift3DSystem):
             "optimizer": optim,
         }
         return ret
-
+    
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         lr_max_step = self.geometry.cfg.position_lr_max_steps
+        scale_lr_max_steps = self.geometry.cfg.scale_lr_max_steps
         
         # self.geometry.update_learning_rate(self.gaussians_step)
         if self.gaussians_step < lr_max_step:
-            self.geometry.update_learning_rate(self.gaussians_step)
-        else:
-            self.geometry.update_learning_rate_fine(self.gaussians_step - lr_max_step)
-        
-        # Every 1000 its we increase the levels of SH up to a maximum degree
-        # if (self.gaussians_step) >= self.opt.position_lr_max_steps:
-        #     self.gaussians.oneupSHdegree()
-        fovy = batch['fovy'][0]
-        w2c, proj, cam_p = get_cam_info(c2w=batch['c2w'], fovy=fovy)
+            self.geometry.update_xyz_learning_rate(self.gaussians_step)
             
-        # import pdb; pdb.set_trace()
-        viewpoint_cam = Camera(
-            FoVx=fovy, 
-            FoVy=fovy, 
-            image_width=batch['width'], 
-            image_height=batch['height'],
-            world_view_transform=w2c,
-            full_proj_transform=proj,
-            camera_center=cam_p,
-        )
+        if self.gaussians_step < scale_lr_max_steps:
+            self.geometry.update_scale_learning_rate(self.gaussians_step)
         
-        render_pkg = self.renderer(
-            viewpoint_cam, 
-            self.background_tensor,
-        )
+        
+        bs = batch['c2w'].shape[0]
+        renders = []
+        viewspace_points = []
+        visibility_filters = []
+        radiis = []
+        for batch_idx in range(bs):
+            fovy = batch['fovy'][batch_idx]
+            w2c, proj, cam_p = get_cam_info_torch(c2w=batch['c2w'][batch_idx], fovy=fovy)
+                
+            # import pdb; pdb.set_trace()
+            viewpoint_cam = Camera(
+                FoVx=fovy, 
+                FoVy=fovy, 
+                image_width=batch['width'], 
+                image_height=batch['height'],
+                world_view_transform=w2c,
+                full_proj_transform=proj,
+                camera_center=cam_p,
+            )
+            
+            with autocast(enabled=False):
+                render_pkg = self.renderer(
+                    viewpoint_cam, 
+                    self.background_tensor,
+                )
+                renders.append(render_pkg["render"])
+                viewspace_points.append(render_pkg["viewspace_points"])
+                visibility_filters.append(render_pkg["visibility_filter"])
+                radiis.append(render_pkg["radii"])
         # image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
         # render_out = {
         #     "comp_rgb": image,
         # }
-        return {
-            **render_pkg,
+        outputs = {
+            "render": torch.stack(renders, dim=0),
+            "viewspace_points": viewspace_points,
+            "visibility_filter": visibility_filters,
+            "radii": radiis,
         }
+        return outputs
 
     def on_fit_start(self) -> None:
         super().on_fit_start()
@@ -174,7 +175,7 @@ class GaussianSplatting(BaseLift3DSystem):
 
         visibility_filter = out['visibility_filter']
         radii = out["radii"]
-        guidance_inp = out["render"].unsqueeze(0).permute(0, 2, 3, 1)  
+        guidance_inp = out["render"].permute(0, 2, 3, 1)  
         # import pdb; pdb.set_trace()
         viewspace_point_tensor = out["viewspace_points"]
         guidance_out = self.guidance(
@@ -190,21 +191,30 @@ class GaussianSplatting(BaseLift3DSystem):
             if name.startswith("loss_"):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
                 
+        xyz_mean = None
+        if self.cfg.loss["lambda_position"] > 0.0:
+            xyz_mean = self.geometry.get_xyz.norm(dim=-1)
+            loss += self.C(self.cfg.loss["lambda_position"]) * xyz_mean.mean()
+            
+        if self.cfg.loss["lambda_opacity"] > 0.0:
+            if xyz_mean is None:
+                xyz_mean = self.geometry.get_xyz.norm(dim=-1)
+            loss += self.C(self.cfg.loss["lambda_opacity"]) * (xyz_mean.detach() * self.geometry.get_opacity).mean()
+                
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
             
             
         loss.backward()
+        opt.step()
         iteration = self.gaussians_step
         self.geometry.update_states(
             iteration,
             visibility_filter,
             radii,
             viewspace_point_tensor,
-            self.extent,
         )
-        opt.step()
         opt.zero_grad(set_to_none = True)
 
         return {"loss": loss}
@@ -217,7 +227,7 @@ class GaussianSplatting(BaseLift3DSystem):
             [
                 {
                     "type": "rgb",
-                    "img": out["render"].unsqueeze(0).permute(0, 2, 3, 1)[0],
+                    "img": out["render"].permute(0, 2, 3, 1)[0],
                     "kwargs": {"data_format": "HWC"},
                 },
             ],
@@ -236,7 +246,7 @@ class GaussianSplatting(BaseLift3DSystem):
             [
                 {
                     "type": "rgb",
-                    "img": out["render"].unsqueeze(0).permute(0, 2, 3, 1)[0],
+                    "img": out["render"].permute(0, 2, 3, 1)[0],
                     "kwargs": {"data_format": "HWC"},
                 },
             ],
