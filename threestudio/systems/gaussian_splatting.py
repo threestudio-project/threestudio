@@ -1,9 +1,7 @@
-import os
 import math
 from dataclasses import dataclass
 
 import torch
-import numpy as np
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem

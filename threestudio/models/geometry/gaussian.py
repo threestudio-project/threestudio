@@ -11,9 +11,6 @@
 import torch
 import numpy as np
 from torch import nn
-from torch.nn import functional as F
-import os
-from simple_knn._C import distCUDA2
 from typing import NamedTuple
 
 import sys
