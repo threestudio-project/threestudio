@@ -45,7 +45,8 @@ class Instructnerf2nerf(BaseLift3DSystem):
 
         # self.gaussians_step += 1
         out = self(batch)
-        guidance_inp = out["comp_rgb"].unsqueeze(0).permute(0, 2, 3, 1)
+        # guidance_inp = out["comp_rgb"].unsqueeze(0).permute(0, 2, 3, 1)
+        out["comp_rgb"] = out["comp_rgb"].permute(0, 3, 1, 2)
 
         origin_gt_rgb = batch["gt_rgb"]
         B, H, W, C = origin_gt_rgb.shape
@@ -53,10 +54,10 @@ class Instructnerf2nerf(BaseLift3DSystem):
 
         guidance_out = {
             "loss_l1": torch.nn.functional.l1_loss(
-                out["comp_rgb"], gt_rgb.permute(0, 3, 1, 2)[0]
+                out["comp_rgb"], gt_rgb.permute(0, 3, 1, 2)
             ),
             "loss_p": self.perceptual_loss(
-                out["comp_rgb"].unsqueeze(0).contiguous(),
+                out["comp_rgb"].contiguous(),
                 gt_rgb.permute(0, 3, 1, 2).contiguous(),
             ).mean(),
         }
@@ -67,6 +68,27 @@ class Instructnerf2nerf(BaseLift3DSystem):
             self.log(f"train/{name}", value)
             if name.startswith("loss_"):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
+
+        if self.C(self.cfg.loss.lambda_orient) > 0:
+            if "normal" not in out:
+                raise ValueError(
+                    "Normal is required for orientation loss, no normal is found in the output."
+                )
+            loss_orient = (
+                out["weights"].detach()
+                * dot(out["normal"], out["t_dirs"]).clamp_min(0.0) ** 2
+            ).sum() / (out["opacity"] > 0).sum()
+            self.log("train/loss_orient", loss_orient)
+            loss += loss_orient * self.C(self.cfg.loss.lambda_orient)
+
+        loss_sparsity = (out["opacity"] ** 2 + 0.01).sqrt().mean()
+        self.log("train/loss_sparsity", loss_sparsity)
+        loss += loss_sparsity * self.C(self.cfg.loss.lambda_sparsity)
+
+        opacity_clamped = out["opacity"].clamp(1.0e-3, 1.0 - 1.0e-3)
+        loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
+        self.log("train/loss_opaque", loss_opaque)
+        loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
@@ -79,13 +101,13 @@ class Instructnerf2nerf(BaseLift3DSystem):
             batch_index = batch["index"].item()
         else:
             batch_index = batch["index"]
-        if batch_index in self.edit_frames:
-            B, H, W, C = batch["gt_rgb"].shape
-            rgb = torch.nn.functional.interpolate(
-                self.edit_frames[batch_index].permute(0, 3, 1, 2), (H, W)
-            ).permute(0, 2, 3, 1)[0]
-        else:
-            rgb = batch["gt_rgb"][0]
+        # if batch_index in self.edit_frames:
+        #     B, H, W, C = batch["gt_rgb"].shape
+        #     rgb = torch.nn.functional.interpolate(
+        #         self.edit_frames[batch_index].permute(0, 3, 1, 2), (H, W)
+        #     ).permute(0, 2, 3, 1)[0]
+        # else:
+        rgb = batch["gt_rgb"][0]
         self.save_image_grid(
             f"it{self.true_global_step}-{batch['index'][0]}.png",
             [

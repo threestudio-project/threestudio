@@ -35,7 +35,7 @@ class DynamicFlowVolume(BaseImplicitGeometry):
         time_encoding_config: dict = field(
             default_factory=lambda: {
                 "otype": "ProgressiveBandFrequency",
-                "n_frequencies": 4,
+                "n_frequencies": 6,
             }
         )
         mlp_network_config: dict = field(
@@ -66,9 +66,7 @@ class DynamicFlowVolume(BaseImplicitGeometry):
         self, points_3d: Float[Tensor, "*N Di"], moment
     ) -> Dict[str, Float[Tensor, "..."]]:
         # points 4D
-        points = contract_to_unisphere(
-            points_3d[..., : self.cfg.n_input_dims - 1], self.bbox, self.unbounded
-        )  # points normalized to (0, 1)
+        points = points_3d[..., : self.cfg.n_input_dims - 1]
         points_time = torch.zeros_like(points[..., 0])
         points_time[...] = moment
 
