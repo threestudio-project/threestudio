@@ -34,16 +34,16 @@ class DynamicGaussianModel(BaseGeometry):
     @dataclass
     class Config(BaseGeometry.Config):
         gaussian: Optional[GaussianModel.Config] = None
-        dynamic_geo_name: str = ""
-        dynamic_geo: Optional[BaseGeometry.Config] = None
+        dynamic_flow_name: str = ""
+        dynamic_flow_config: Optional[BaseGeometry.Config] = None
 
     cfg: Config
 
     def configure(self) -> None:
         super().configure()
         self.gaussian = threestudio.find("gaussian")(self.cfg.gaussian)
-        self.dynamic_geo = threestudio.find(self.cfg.dynamic_geo_name)(
-            self.cfg.dynamic_geo
+        self.dynamic_flow = threestudio.find(self.cfg.dynamic_flow_name)(
+            self.cfg.dynamic_flow_config
         )
 
     def setup_functions(self):
@@ -55,7 +55,7 @@ class DynamicGaussianModel(BaseGeometry):
 
     @property
     def dynamic_optimizer(self):
-        return self.dynamic_geo.optimizer
+        return self.dynamic_flow.optimizer
 
     @property
     def get_scaling(self):

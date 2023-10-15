@@ -20,7 +20,8 @@ from threestudio.utils.typing import *
 class DynamicImplicitVolume(BaseImplicitGeometry):
     @dataclass
     class Config(BaseImplicitGeometry.Config):
-        dynamic_flow_volume_config: Optional[BaseImplicitGeometry.Config] = None
+        dynamic_flow_name: str = ""
+        dynamic_flow_config: Optional[BaseImplicitGeometry.Config] = None
 
         n_input_dims: int = 3
         n_feature_dims: int = 3
@@ -72,7 +73,7 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
                 self.cfg.mlp_network_config,
             )
 
-        self.dynamic_flow_volume = threestudio.find("dynamic-flow-volume")(self.cfg.dynamic_flow_volume_config)
+        self.dynamic_flow_volume = threestudio.find(self.cfg.dynamic_flow_name)(self.cfg.dynamic_flow_config)
         self.moment = 0.0
 
     def get_activated_density(

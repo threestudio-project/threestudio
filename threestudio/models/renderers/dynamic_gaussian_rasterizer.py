@@ -55,7 +55,7 @@ class DynamicGaussianRasterizer(Rasterizer):
 
         bg_color = bg_color if not invert_bg_color else (1.0 - bg_color)
 
-        dynamic_gaussian = self.geometry.dynamic_geo
+        dynamic_gaussian = self.geometry.dynamic_flow
 
         pc = self.geometry.gaussian
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means

@@ -16,26 +16,22 @@ from threestudio.utils.ops import get_activation
 from threestudio.utils.typing import *
 
 
-@threestudio.register("dynamic-flow-volume")
-class DynamicFlowVolume(BaseImplicitGeometry):
+@threestudio.register("dynamic-flow-mlp")
+class DynamicFlowMLP(BaseImplicitGeometry):
     @dataclass
     class Config(BaseImplicitGeometry.Config):
         n_input_dims: int = 4
         n_feature_dims: int = 3
         pos_encoding_config: dict = field(
             default_factory=lambda: {
-                "otype": "HashGrid",
-                "n_levels": 10,
-                "n_features_per_level": 2,
-                "log2_hashmap_size": 19,
-                "base_resolution": 10,
-                "per_level_scale": 1.447269237440378,
+                "otype": "ProgressiveBandFrequency",
+                "n_frequencies": 6
             }
         )
         time_encoding_config: dict = field(
             default_factory=lambda: {
                 "otype": "ProgressiveBandFrequency",
-                "n_frequencies": 6,
+                "n_frequencies": 4,
             }
         )
         mlp_network_config: dict = field(
@@ -43,8 +39,8 @@ class DynamicFlowVolume(BaseImplicitGeometry):
                 "otype": "VanillaMLP",
                 "activation": "ReLU",
                 "output_activation": "none",
-                "n_neurons": 64,
-                "n_hidden_layers": 1,
+                "n_neurons": 256,
+                "n_hidden_layers": 4,
             }
         )
         need_normalization: bool = False
@@ -66,7 +62,8 @@ class DynamicFlowVolume(BaseImplicitGeometry):
     def forward(
         self, points_3d: Float[Tensor, "*N Di"], moment
     ) -> Dict[str, Float[Tensor, "..."]]:
-        if self.need_normalization:
+        # points 4D
+        if self.cfg.need_normalization:
             points = contract_to_unisphere(
                 points_3d[..., : self.cfg.n_input_dims - 1], self.bbox, self.unbounded
             )  # points normalized to (0, 1)
@@ -93,14 +90,14 @@ class DynamicFlowVolume(BaseImplicitGeometry):
         cfg: Optional[Union[dict, DictConfig]] = None,
         copy_net: bool = True,
         **kwargs,
-    ) -> "DynamicFlowVolume":
-        if isinstance(other, DynamicFlowVolume):
-            instance = DynamicFlowVolume(cfg, **kwargs)
+    ) -> "DynamicFlowMLP":
+        if isinstance(other, DynamicFlowMLP):
+            instance = DynamicFlowMLP(cfg, **kwargs)
             instance.pos_encoding.load_state_dict(other.pos_encoding.state_dict())
             instance.time_encoding.load_state_dict(other.time_encoding.state_dict())
             instance.flow_network.load_state_dict(other.flow_network.state_dict())
             return instance
         else:
             raise TypeError(
-                f"Cannot create {DynamicFlowVolume.__name__} from {other.__class__.__name__}"
+                f"Cannot create {DynamicFlowMLP.__name__} from {other.__class__.__name__}"
             )

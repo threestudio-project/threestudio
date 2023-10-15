@@ -7,7 +7,7 @@ data_type: "dynamic-multiview-camera-datamodule"
 data:
   train_downsample_resolution: 8
   eval_downsample_resolution: 8
-  eval_data_interval: 20
+  eval_data_interval: 8
   dataroot: ???
 
 system_type: "dynamic-instructnerf2nerf-system"
@@ -31,7 +31,8 @@ system:
     density_blob_scale: 10.
     density_blob_std: 0.5
 
-    dynamic_flow_volume_config:
+    dynamic_flow_name: "dynamic-flow-mlp"
+    dynamic_flow_config:
       n_feature_dims: 3
 
   material_type: "diffuse-with-point-light-material"
@@ -81,7 +82,7 @@ system:
       eps: 1.e-15
     params:
       geometry:
-        lr: 0.001
+        lr: 0.0001
 
 trainer:
   max_steps: 15000

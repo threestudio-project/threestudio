@@ -3,6 +3,7 @@ from . import (
     custom_mesh,
     dynamic_gaussian,
     dynamic_implicit_volume,
+    dynamic_flow_mlp,
     dynamic_flow_volume,
     gaussian,
     implicit_sdf,
