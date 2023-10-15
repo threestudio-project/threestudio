@@ -112,32 +112,37 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
         )
         # Since this data set has no colmap data, we start with random points
         num_pts = self.cfg.num_pts
-        print(f"Generating random point cloud ({num_pts})...")
+
         self.extent = self.cfg.extent
-        phis = np.random.random((num_pts,)) * 2 * np.pi
-        costheta = np.random.random((num_pts,)) * 2 - 1
-        thetas = np.arccos(costheta)
-        mu = np.random.random((num_pts,))
-        radius = 0.25 * np.cbrt(mu)
-        x = radius * np.sin(thetas) * np.cos(phis)
-        y = radius * np.sin(thetas) * np.sin(phis)
-        z = radius * np.cos(thetas)
-        xyz = np.stack((x, y, z), axis=1)
+        if self.resumed:
+            pass
+        else:
+            print(f"Generating random point cloud ({num_pts})...")
+            phis = np.random.random((num_pts,)) * 2 * np.pi
+            costheta = np.random.random((num_pts,)) * 2 - 1
+            thetas = np.arccos(costheta)
+            mu = np.random.random((num_pts,))
+            radius = 0.25 * np.cbrt(mu)
+            x = radius * np.sin(thetas) * np.cos(phis)
+            y = radius * np.sin(thetas) * np.sin(phis)
+            z = radius * np.cos(thetas)
+            xyz = np.stack((x, y, z), axis=1)
 
-        shs = np.random.random((num_pts, 3)) / 255.0
-        C0 = 0.28209479177387814
-        color = shs * C0 + 0.5
-        pcd = BasicPointCloud(points=xyz, colors=color, normals=np.zeros((num_pts, 3)))
+            shs = np.random.random((num_pts, 3)) / 255.0
+            C0 = 0.28209479177387814
+            color = shs * C0 + 0.5
+            pcd = BasicPointCloud(
+                points=xyz, colors=color, normals=np.zeros((num_pts, 3))
+            )
 
-        self.geometry.create_from_pcd(pcd, 10)
-        self.geometry.training_setup()
+            self.geometry.create_from_pcd(pcd, 10)
+            self.geometry.training_setup()
 
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
         self.prompt_utils = self.prompt_processor()
-        self.gaussians_step = 0
 
     def configure_optimizers(self):
         g_optim = self.geometry.gaussian_optimizer
@@ -148,12 +153,11 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         lr_max_step = self.geometry.gaussian.cfg.position_lr_max_steps
 
-        # self.geometry.update_learning_rate(self.gaussians_step)
-        if self.gaussians_step < lr_max_step:
-            self.geometry.gaussian.update_learning_rate(self.gaussians_step)
+        if self.global_step // 2 < lr_max_step:
+            self.geometry.gaussian.update_learning_rate(self.global_step // 2)
         else:
             self.geometry.gaussian.update_learning_rate_fine(
-                self.gaussians_step - lr_max_step
+                self.global_step // 2 - lr_max_step
             )
 
         # Every 1000 its we increase the levels of SH up to a maximum degree
@@ -197,10 +201,20 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
     def on_fit_start(self) -> None:
         super().on_fit_start()
 
+    def on_load_checkpoint(self, ckpt_dict) -> None:
+        num_pts = ckpt_dict["state_dict"]["geometry.gaussian._xyz"].shape[0]
+        pcd = BasicPointCloud(
+            points=np.zeros((num_pts, 3)),
+            colors=np.zeros((num_pts, 3)),
+            normals=np.zeros((num_pts, 3)),
+        )
+        self.geometry.create_from_pcd(pcd, 10)
+        self.geometry.training_setup()
+        super().on_load_checkpoint(ckpt_dict)
+
     def training_step(self, batch, batch_idx):
         g_opt, d_opt = self.optimizers()
 
-        self.gaussians_step += 1
         out = self(batch)
 
         visibility_filter = out["visibility_filter"]
@@ -243,7 +257,7 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
             self.log(f"train_params/{name}", self.C(value))
 
         loss.backward()
-        iteration = self.gaussians_step
+        iteration = self.global_step // 2
         self.geometry.update_states(
             iteration,
             visibility_filter,
@@ -262,7 +276,7 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
         out = self(batch)
         # import pdb; pdb.set_trace()
         self.save_image_grid(
-            f"it{self.gaussians_step}-{batch['index'][0]}.png",
+            f"it{self.global_step}-{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
@@ -280,7 +294,7 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.gaussians_step}-test/{batch['index'][0]}.png",
+            f"it{self.global_step}-test/{batch['index'][0]}.png",
             [
                 {
                     "type": "rgb",
@@ -294,8 +308,8 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
 
     def on_test_epoch_end(self):
         self.save_img_sequence(
-            f"it{self.gaussians_step}-test",
-            f"it{self.gaussians_step}-test",
+            f"it{self.global_step}-test",
+            f"it{self.global_step}-test",
             "(\d+)\.png",
             save_format="mp4",
             fps=30,
