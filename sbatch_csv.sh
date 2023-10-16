@@ -17,7 +17,7 @@
 # Check if the batchname is provided
 if [ -z "$1" ]; then
     echo "Error: No batchname provided."
-    echo "Usage: sbatch your_slurm_script.sh <batchname> <input_filename> <threestudio_root_directory> [optional_phase_numbers]"
+    echo "Usage: sbatch sbatch_csv.sh <batchname> <input_filename> <threestudio_root_directory> [optional_phase_numbers]"
     exit 1
 fi
 
@@ -33,7 +33,7 @@ BATCHNAME=$1
 # Check if the filename is provided
 if [ -z "$2" ]; then
     echo "Error: No input file provided."
-    echo "Usage: sbatch your_slurm_script.sh <batchname> <input_filename> <threestudio_root_directory> [optional_phase_numbers]"
+    echo "Usage: sbatch sbatch_csv.sh <batchname> <input_filename> <threestudio_root_directory> [optional_phase_numbers]"
     exit 1
 fi
 
@@ -46,7 +46,7 @@ fi
 # Check if the second parameter (directory) is provided
 if [ -z "$3" ]; then
     echo "Error: No directory provided."
-    echo "Usage: sbatch your_slurm_script.sh <batchname> <input_filename> <threestudio_root_directory> [optional_phase_numbers]"
+    echo "Usage: sbatch sbatch_csv.sh <batchname> <input_filename> <threestudio_root_directory> [optional_phase_numbers]"
     exit 1
 fi
 
@@ -104,8 +104,9 @@ INPUT_FILE=$2  # Assign the provided filename to INPUT_FILE variable
 # Set common base arguments for all potential phases
 WANDB_ARGS="system.loggers.wandb.enable=False system.loggers.wandb.project=dummy system.loggers.wandb.name=dummy"
 declare -A BASE_ARGS
-BASE_ARGS[1]="--config=/fsx/proj-mod3d/adam/threestudio-mesh/configs/zero123_sai_multinoise_amb.yaml --train tag=Phase1 use_timestamp=false ${WANDB_ARGS}"
-BASE_ARGS[2]="--config=/fsx/proj-mod3d/adam/threestudio-mesh/configs/zero123_magic123refine.yaml --train tag=Phase2_magic use_timestamp=false ${WANDB_ARGS}"
+# BASE_ARGS[1]="--config=${BASE_DIR}/configs/zero123_sai_multinoise_amb.yaml --train tag=Phase1 use_timestamp=false ${WANDB_ARGS}"
+BASE_ARGS[1]="--config=${BASE_DIR}/configs/zero123_sai_multinoise_amb_rays_divisor_always64_diffcols.yaml --train tag=Phase1 use_timestamp=false ${WANDB_ARGS}"
+BASE_ARGS[2]="--config=${BASE_DIR}/configs/zero123_magic123refine.yaml --train tag=Phase2_magic use_timestamp=false ${WANDB_ARGS}"
 BASE_ARGS[3]="--export tag=Phase3 system.exporter_type=mesh-exporter use_timestamp=false ${WANDB_ARGS}"
 
 # Load any necessary modules or environment variables
@@ -166,7 +167,7 @@ for ((i=$START_ROW; i<=$END_ROW; i++)); do
         echo "REFIMAGE: ${REFIMAGE}"
         echo "ARGS: ${ARGS}"
 
-        python /fsx/proj-mod3d/adam/threestudio-mesh/launch.py $ARGS name="$NAME" data.default_elevation_deg="$DEG" data.image_path="$REFIMAGE" system.prompt_processor.prompt="$PROMPT"
+        python "${BASE_DIR}/launch.py" $ARGS name="$NAME" data.default_elevation_deg="$DEG" data.image_path="$REFIMAGE" system.prompt_processor.prompt="$PROMPT"
 
         if [ "$PHASE_NUM" -eq 3 ]; then
             # Get the directory "it${N}-export" where N is numerically greatest
