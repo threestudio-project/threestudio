@@ -19,7 +19,11 @@ class Magic123(BaseLift3DSystem):
         refinement: bool = False
         guidance_3d_type: str = ""
         guidance_3d: dict = field(default_factory=dict)
+        # The following are here as a convenience because we may take input config from the previous phase config
         ambient_ratio_min: float = 0.5
+        rays_divisor_power: int = 0
+        ref_batch_size: int = 1
+
 
     cfg: Config
 

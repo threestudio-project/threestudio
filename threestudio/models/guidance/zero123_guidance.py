@@ -160,7 +160,7 @@ class Zero123Guidance(BaseObject):
         self.max_step = int(self.num_train_timesteps * max_step_percent)
 
     @torch.cuda.amp.autocast(enabled=False)
-    def prepare_embeddings(self, image_path: str) -> None:
+    def prepare_embeddings(self, image_path: str, background_color: Tuple[int, int, int] = (255, 255, 255)) -> None:
         # load cond image for zero123
         assert os.path.exists(image_path)
         rgba = cv2.cvtColor(
@@ -172,7 +172,10 @@ class Zero123Guidance(BaseObject):
             )
             / 255.0
         )
-        rgb = rgba[..., :3] * rgba[..., 3:] + (1 - rgba[..., 3:])
+
+        bg_color_np = np.array(background_color, dtype=np.float32) / 255.0
+        rgb = rgba[..., :3] * rgba[..., 3:] + bg_color_np * (1 - rgba[..., 3:])
+
         self.rgb_256: Float[Tensor, "1 3 H W"] = (
             torch.from_numpy(rgb)
             .unsqueeze(0)
