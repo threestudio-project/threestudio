@@ -73,7 +73,9 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
                 self.cfg.mlp_network_config,
             )
 
-        self.dynamic_flow_volume = threestudio.find(self.cfg.dynamic_flow_name)(self.cfg.dynamic_flow_config)
+        self.dynamic_flow = threestudio.find(self.cfg.dynamic_flow_name)(
+            self.cfg.dynamic_flow_config
+        )
         self.moment = 0.0
 
     def get_activated_density(
@@ -114,7 +116,7 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
         if output_normal and self.cfg.normal_type == "analytic":
             torch.set_grad_enabled(True)
             points.requires_grad_(True)
-        
+
         points_unscaled = points  # points in the original scale
         points = contract_to_unisphere(
             points, self.bbox, self.unbounded
@@ -122,7 +124,7 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
 
         # dynamic flow
         if self.moment > 1e-6:
-            flow = self.dynamic_flow_volume(points, self.moment)
+            flow = self.dynamic_flow(points, self.moment)
             points = points + flow["features"]
 
         enc = self.encoding(points.view(-1, self.cfg.n_input_dims))
@@ -203,10 +205,10 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
     def forward_density(self, points: Float[Tensor, "*N Di"]) -> Float[Tensor, "*N 1"]:
         points_unscaled = points
         points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
-        
+
         # dynamic flow
         if self.moment > 1e-6:
-            flow = self.dynamic_flow_volume(points, self.moment)
+            flow = self.dynamic_flow(points, self.moment)
             points = points + flow["features"]
 
         density = self.density_network(
@@ -237,10 +239,10 @@ class DynamicImplicitVolume(BaseImplicitGeometry):
             return out
         points_unscaled = points
         points = contract_to_unisphere(points_unscaled, self.bbox, self.unbounded)
-        
+
         # dynamic flow
         if self.moment > 1e-6:
-            flow = self.dynamic_flow_volume(points, self.moment)
+            flow = self.dynamic_flow(points, self.moment)
             points = points + flow["features"]
 
         enc = self.encoding(points.reshape(-1, self.cfg.n_input_dims))

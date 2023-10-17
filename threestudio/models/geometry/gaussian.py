@@ -195,6 +195,8 @@ class GaussianModel(BaseGeometry):
         densify_grad_threshold: float = 0.01
         min_opac_prune: float = 0.05
 
+        force_sphere: bool = False
+
     cfg: Config
 
     def setup_functions(self):
@@ -234,6 +236,9 @@ class GaussianModel(BaseGeometry):
 
     @property
     def get_scaling(self):
+        if self.cfg.force_sphere:
+            scales = torch.mean(self._scaling, dim=-1).unsqueeze(-1).repeat(1, 3)
+            return self.scaling_activation(scales)
         return self.scaling_activation(self._scaling)
 
     @property
@@ -668,5 +673,8 @@ class GaussianModel(BaseGeometry):
                     self.cfg.densify_grad_threshold, 0.005, 1.0, size_threshold
                 )
 
-            if iteration % self.cfg.opacity_reset_interval == 0:
+            if (
+                iteration > self.cfg.densify_from_iter
+                and iteration % self.cfg.opacity_reset_interval == 0
+            ):
                 self.reset_opacity()

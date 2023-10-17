@@ -26,7 +26,7 @@
         "**/exporters": true,
         "**/prompt_processors": true,
 
-        "**/configs/[^gid]*": true,
+        "**/configs/[^cgid]*": true,
         "**/configs/dream*": true,
 
         "**/scripts/run_[^g]*": true,

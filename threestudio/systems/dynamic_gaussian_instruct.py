@@ -91,13 +91,16 @@ class Camera(NamedTuple):
     full_proj_transform: torch.Tensor
 
 
-@threestudio.register("dynamic-gaussian-splatting-system")
-class DynamicGaussianSplatting(BaseLift3DSystem):
+@threestudio.register("dynamic-gaussian-splatting-instruct-system")
+class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         extent: float = 5.0
         num_pts: int = 100
         invert_bg_prob: float = 0.5
+
+        per_editing_step: int = 10
+        start_editing_step: int = 1000
 
     cfg: Config
 
@@ -114,35 +117,33 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
         num_pts = self.cfg.num_pts
 
         self.extent = self.cfg.extent
-        if self.resumed:
-            pass
-        else:
-            print(f"Generating random point cloud ({num_pts})...")
-            phis = np.random.random((num_pts,)) * 2 * np.pi
-            costheta = np.random.random((num_pts,)) * 2 - 1
-            thetas = np.arccos(costheta)
-            mu = np.random.random((num_pts,))
-            radius = 0.25 * np.cbrt(mu)
-            x = radius * np.sin(thetas) * np.cos(phis)
-            y = radius * np.sin(thetas) * np.sin(phis)
-            z = radius * np.cos(thetas)
-            xyz = np.stack((x, y, z), axis=1)
 
-            shs = np.random.random((num_pts, 3)) / 255.0
-            C0 = 0.28209479177387814
-            color = shs * C0 + 0.5
-            pcd = BasicPointCloud(
-                points=xyz, colors=color, normals=np.zeros((num_pts, 3))
-            )
+        print(f"Generating random point cloud ({num_pts})...")
+        phis = np.random.random((num_pts,)) * 2 * np.pi
+        costheta = np.random.random((num_pts,)) * 2 - 1
+        thetas = np.arccos(costheta)
+        mu = np.random.random((num_pts,))
+        radius = 0.25 * np.cbrt(mu)
+        x = radius * np.sin(thetas) * np.cos(phis)
+        y = radius * np.sin(thetas) * np.sin(phis)
+        z = radius * np.cos(thetas)
+        xyz = np.stack((x, y, z), axis=1)
 
-            self.geometry.create_from_pcd(pcd, 10)
-            self.geometry.training_setup()
+        shs = np.random.random((num_pts, 3)) / 255.0
+        C0 = 0.28209479177387814
+        color = shs * C0 + 0.5
+        pcd = BasicPointCloud(points=xyz, colors=color, normals=np.zeros((num_pts, 3)))
+
+        self.geometry.create_from_pcd(pcd, 10)
+        self.geometry.training_setup()
 
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
         )
         self.prompt_utils = self.prompt_processor()
+
+        self.edit_frames = {}
 
     def configure_optimizers(self):
         g_optim = self.geometry.gaussian_optimizer
@@ -182,11 +183,7 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
             batch["moment"][0],
             self.background_tensor,
         )
-        # image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
-        # render_out = {
-        #     "comp_rgb": image,
-        # }
         return {
             **render_pkg,
         }
@@ -208,6 +205,40 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
     def training_step(self, batch, batch_idx):
         g_opt, d_opt = self.optimizers()
 
+        if torch.is_tensor(batch["index"]):
+            batch_index = batch["index"].item()
+        else:
+            batch_index = batch["index"]
+        origin_gt_rgb = batch["gt_rgb"]
+        B, H, W, C = origin_gt_rgb.shape
+        if batch_index in self.edit_frames:
+            gt_rgb = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
+            gt_rgb = torch.nn.functional.interpolate(
+                gt_rgb.permute(0, 3, 1, 2), (H, W), mode="bilinear", align_corners=False
+            ).permute(0, 2, 3, 1)
+            batch["gt_rgb"] = gt_rgb
+        else:
+            gt_rgb = origin_gt_rgb
+
+        if (
+            self.cfg.per_editing_step > 0
+            and self.global_step > self.cfg.start_editing_step
+        ):
+            prompt_utils = self.prompt_processor()
+            if (
+                not batch_index in self.edit_frames
+                or self.global_step % self.cfg.per_editing_step == 0
+            ):
+                self.renderer.eval()
+                full_out = self(batch)
+                self.renderer.train()
+                result = self.guidance(
+                    full_out["render"].unsqueeze(0).permute(0, 2, 3, 1),
+                    origin_gt_rgb,
+                    prompt_utils,
+                )
+                self.edit_frames[batch_index] = result["edit_images"].detach().cpu()
+
         out = self(batch)
 
         visibility_filter = out["visibility_filter"]
@@ -215,14 +246,10 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
         guidance_inp = out["render"].unsqueeze(0).permute(0, 2, 3, 1)
         viewspace_point_tensor = out["viewspace_points"]
 
-        origin_gt_rgb = batch["gt_rgb"]
         bg_color = out["bg_color"]
-
-        B, H, W, C = origin_gt_rgb.shape
-        gt_rgb = origin_gt_rgb
-        # mask = torch.sum(gt_rgb, dim=-1).unsqueeze(-1)
-        # mask = (mask > 1e-3).float()
-        # gt_rgb = gt_rgb * mask + (1-mask) * bg_color.reshape(1, 1, 1, 3)
+        mask = torch.sum(origin_gt_rgb, dim=-1).unsqueeze(-1)
+        mask = (mask > 1e-3).float()
+        gt_rgb = gt_rgb * mask + (1 - mask) * bg_color.reshape(1, 1, 1, 3)
 
         guidance_out = {
             "loss_l1": torch.nn.functional.l1_loss(
@@ -235,6 +262,7 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
         }
 
         loss = 0.0
+        loss_l1 = guidance_out["loss_l1"] * self.C(self.cfg.loss["lambda_l1"])
 
         self.log(
             "gauss_num",
@@ -247,13 +275,13 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
 
         for name, value in guidance_out.items():
             self.log(f"train/{name}", value)
-            if name.startswith("loss_"):
+            if name.startswith("loss_") and (not name.startswith("loss_l1")):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
-        loss.backward()
+        loss_l1.backward(retain_graph=True)
         iteration = self.global_step // 2
         self.geometry.update_states(
             iteration,
@@ -262,6 +290,7 @@ class DynamicGaussianSplatting(BaseLift3DSystem):
             viewspace_point_tensor,
             self.extent,
         )
+        # loss.backward()
         g_opt.step()
         d_opt.step()
         g_opt.zero_grad(set_to_none=True)

@@ -51,7 +51,7 @@ class DynamicGaussianRasterizer(Rasterizer):
         if self.training:
             invert_bg_color = np.random.rand() > self.cfg.invert_bg_prob
         else:
-            invert_bg_color = True
+            invert_bg_color = False
 
         bg_color = bg_color if not invert_bg_color else (1.0 - bg_color)
 
@@ -103,11 +103,8 @@ class DynamicGaussianRasterizer(Rasterizer):
         scales = pc.get_scaling
         rotations = pc._rotation
 
-        print(moment)
         if moment.item() > 1e-6:
-            dynamic_feature = dynamic_gaussian(
-                means3D, moment.item()
-            )
+            dynamic_feature = dynamic_gaussian(means3D, moment.item())
             dynamic_means3D = dynamic_feature["features"][..., :3]
             dynamic_rotations = dynamic_feature["features"][..., 3:]
         else:
@@ -146,4 +143,5 @@ class DynamicGaussianRasterizer(Rasterizer):
             "viewspace_points": screenspace_points,
             "visibility_filter": radii > 0,
             "radii": radii,
+            "bg_color": bg_color,
         }
