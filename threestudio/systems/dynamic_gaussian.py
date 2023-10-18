@@ -14,18 +14,12 @@ from threestudio.utils.perceptual import PerceptualLoss
 from threestudio.utils.typing import *
 
 
-def getWorld2View2(R, t, translate=np.array([0.0, 0.0, 0.0]), scale=1.0):
-    Rt = np.zeros((4, 4))
-    Rt[:3, :3] = R.transpose()
-    Rt[:3, 3] = t
-    Rt[3, 3] = 1.0
-
-    C2W = np.linalg.inv(Rt)
-    cam_center = C2W[:3, 3]
-    cam_center = (cam_center + translate) * scale
-    C2W[:3, 3] = cam_center
-    Rt = np.linalg.inv(C2W)
-    return np.float32(Rt)
+def convert_pose(C2W):
+    flip_yz = np.eye(4)
+    flip_yz[1, 1] = -1
+    flip_yz[2, 2] = -1
+    C2W = np.matmul(C2W, flip_yz)
+    return C2W
 
 
 def getProjectionMatrix(znear, zfar, fovX, fovY):
@@ -62,12 +56,13 @@ def getFOV(P, znear, zfar):
 
 
 def get_cam_info(c2w, fovx, fovy):
-    matrix = np.linalg.inv(c2w[0].cpu().numpy())
-    R = np.transpose(matrix[:3, :3])
-    R[:, 0] = -R[:, 0]
-    T = -matrix[:3, 3]
+    c2w = c2w[0].cpu().numpy()
+    c2w = convert_pose(c2w)
+    world_view_transform = np.linalg.inv(c2w)
 
-    world_view_transform = torch.tensor(getWorld2View2(R, T)).transpose(0, 1).cuda()
+    world_view_transform = (
+        torch.tensor(world_view_transform).transpose(0, 1).cuda().float()
+    )
     projection_matrix = (
         getProjectionMatrix(znear=0.01, zfar=100.0, fovX=fovx, fovY=fovy)
         .transpose(0, 1)

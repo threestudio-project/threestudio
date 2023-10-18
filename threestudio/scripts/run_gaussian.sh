@@ -15,3 +15,4 @@ python launch.py --config configs/dynamic_nerf.yaml --train --gpu 0  data.dataro
 python launch.py --config configs/dynamic_control4d.yaml --train --gpu 0 data.dataroot="load/twindom_dynamic" name=dynamic_control4d system.prompt_processor.prompt="a zoomed out DSLR photo of a baby bunny sitting on top of a stack of pancakes" data.eval_interpolation=[0,3,40] data.eval_time_interpolation=[0.0,0.8]
 
 python launch.py --config configs/dynamic_gaussian_instruct.yaml --train --gpu 0 data.dataroot="load/twindom_dynamic" name=dynamic_gaussian tag=v1 system.prompt_processor.prompt="Turn him into Elon Musk"
+python launch.py --config configs/dynamic_gaussian_instruct.yaml --train --gpu 0 data.dataroot="load/twindom_dynamic" name=dynamic_gaussian tag=v1 system.prompt_processor.prompt="Turn him into Elon Musk" data.eval_interpolation=[0,3,40] data.eval_time_interpolation=[0.0,0.0]

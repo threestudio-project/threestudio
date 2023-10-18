@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 import threestudio
 from threestudio import register
+from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
 from threestudio.utils.ops import get_mvp_matrix, get_ray_directions, get_rays
 from threestudio.utils.typing import *
@@ -71,8 +72,10 @@ class DynamicMultiviewsDataModuleConfig:
     eval_interpolation: Optional[Tuple[int, int, int]] = None  # (0, 1, 30)
     eval_time_interpolation: Optional[Tuple[float, float]] = None  # (t0, t1)
 
+    initial_t0_step: int = 0
 
-class DynamicMultiviewIterableDataset(IterableDataset):
+
+class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
     def __init__(self, cfg: Any) -> None:
         super().__init__()
         self.cfg: DynamicMultiviewsDataModuleConfig = cfg
@@ -93,6 +96,9 @@ class DynamicMultiviewIterableDataset(IterableDataset):
         frames_direction = []
         frames_img = []
         frames_moment = []
+
+        self.frames_t0 = []
+        self.step = 0
 
         self.frame_w = frames[0]["w"] // scale
         self.frame_h = frames[0]["h"] // scale
@@ -118,6 +124,8 @@ class DynamicMultiviewIterableDataset(IterableDataset):
             rot_z_vector = c2w_list[:, :3, :3] @ z_vector
             rot_z_vector = torch.mean(rot_z_vector, dim=0).unsqueeze(0)
             c2w_list[:, :3, 3] -= rot_z_vector[:, :, 0] * self.cfg.camera_distance
+        elif self.cfg.camera_layout == "default":
+            pass
         else:
             raise ValueError(
                 f"Unknown camera layout {self.cfg.camera_layout}. Now support only around and front."
@@ -154,6 +162,8 @@ class DynamicMultiviewIterableDataset(IterableDataset):
 
             moment: Float[Tensor, "1"] = torch.zeros(1)
             moment[0] = frame["moment"]
+            if moment[0] < 1e-3:
+                self.frames_t0.append(idx)
 
             frames_proj.append(proj)
             frames_c2w.append(c2w)
@@ -185,8 +195,15 @@ class DynamicMultiviewIterableDataset(IterableDataset):
         while True:
             yield {}
 
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        self.step = global_step
+
     def collate(self, batch):
-        index = torch.randint(0, self.n_frames, (1,)).item()
+        if self.step > self.cfg.initial_t0_step:
+            index = torch.randint(0, self.n_frames, (1,)).item()
+        else:
+            t0_index = torch.randint(0, len(self.frames_t0), (1,)).item()
+            index = self.frames_t0[t0_index]
         return {
             "index": index,
             "rays_o": self.rays_o[index : index + 1],
@@ -249,6 +266,8 @@ class DynamicMultiviewDataset(Dataset):
             rot_z_vector = c2w_list[:, :3, :3] @ z_vector
             rot_z_vector = torch.mean(rot_z_vector, dim=0).unsqueeze(0)
             c2w_list[:, :3, 3] -= rot_z_vector[:, :, 0] * self.cfg.camera_distance
+        elif self.cfg.camera_layout == "default":
+            pass
         else:
             raise ValueError(
                 f"Unknown camera layout {self.cfg.camera_layout}. Now support only around and front."
@@ -406,7 +425,7 @@ class DynamicMultiviewDataModule(pl.LightningDataModule):
     def general_loader(self, dataset, batch_size, collate_fn=None) -> DataLoader:
         return DataLoader(
             dataset,
-            num_workers=1,  # type: ignore
+            num_workers=0,  # type: ignore
             batch_size=batch_size,
             collate_fn=collate_fn,
         )
