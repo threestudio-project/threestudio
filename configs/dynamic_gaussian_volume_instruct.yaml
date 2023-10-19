@@ -23,7 +23,7 @@ system:
 
   geometry_type: "dynamic-gaussian"
   geometry:
-    gaussian_name: "gaussian-residual"
+    gaussian_name: "gaussian-residual-volume"
     gaussian:
       position_lr_init: 0.00016
       position_lr_final:  0.0000016
@@ -34,6 +34,7 @@ system:
       # opacity_lr: 0.01
       scaling_lr: 0.005
       rotation_lr: 0.001
+      xyz_residual_lr: 0.001
       force_sphere: True
     dynamic_flow_name: "dynamic-flow-mlp"
     dynamic_flow_config:
@@ -79,8 +80,8 @@ system:
   loss:
     lambda_l1: 1.0
     lambda_p: 1.0
-    lambda_xyz_residual: 0.0
-    lambda_scaling_residual: 0.0
+    lambda_xyz_residual: 1.0
+    lambda_scaling_residual: 1.0
 
   optimizer:
     name: Adam
@@ -96,7 +97,7 @@ trainer:
   max_steps: 50000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 500
+  val_check_interval: 1000
   enable_progress_bar: true
   precision: 32-true
 

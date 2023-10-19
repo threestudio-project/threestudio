@@ -1,4 +1,4 @@
-name: "dynamic-gaussian-implicit-instruct"
+name: "dynamic-gaussian-reconstruct"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -12,10 +12,8 @@ data:
   initial_t0_step: 1000
   dataroot: ???
 
-system_type: "dynamic-gaussian-splatting-instruct-system"
+system_type: "dynamic-gaussian-splatting-reconstruct-system"
 system:
-  start_editing_step: 0
-  per_editing_step: 40
 
   extent: 1.0
   num_pts: 5000
@@ -23,17 +21,23 @@ system:
 
   geometry_type: "dynamic-gaussian"
   geometry:
-    gaussian_name: "gaussian-residual"
+    gaussian_name: "gaussian"
     gaussian:
       position_lr_init: 0.00016
       position_lr_final:  0.0000016
       position_lr_delay_mult: 0.01
       position_lr_max_steps: 30000
       feature_lr: 0.0025
-      opacity_lr: 0.00
+      opacity_lr: 0.05
       # opacity_lr: 0.01
       scaling_lr: 0.005
       rotation_lr: 0.001
+      percent_dense: 0.01
+      densification_interval: 100
+      opacity_reset_interval: 2000
+      densify_from_iter: 500
+      densify_until_iter: 15000
+      densify_grad_threshold: 0.0002
       force_sphere: True
     dynamic_flow_name: "dynamic-flow-mlp"
     dynamic_flow_config:
@@ -56,19 +60,19 @@ system:
   #   min_step_percent: 0.02
   #   max_step_percent: 0.98
 
-  guidance_type: "stable-diffusion-controlnet-guidance"
-  guidance:
-    control_type: "normal"
-    min_step_percent: 0.05
-    max_step_percent: 0.8
-    condition_scale: 1.0
-    fixed_size: 512
-    cache_dir: '/root/autodl-tmp/.huggingface_cache'
+  # guidance_type: "stable-diffusion-controlnet-guidance"
+  # guidance:
+  #   control_type: "normal"
+  #   min_step_percent: 0.05
+  #   max_step_percent: 0.8
+  #   condition_scale: 1.0
+  #   fixed_size: 512
+  #   cache_dir: '/root/autodl-tmp/.huggingface_cache'
 
-  prompt_processor_type: "stable-diffusion-prompt-processor"
-  prompt_processor:
-    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
-    prompt: "Turn him into Elon Musk"
+  # prompt_processor_type: "stable-diffusion-prompt-processor"
+  # prompt_processor:
+  #   pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+  #   prompt: "Turn him into Elon Musk"
 
   loggers:
     wandb:
@@ -78,9 +82,6 @@ system:
 
   loss:
     lambda_l1: 1.0
-    lambda_p: 1.0
-    lambda_xyz_residual: 0.0
-    lambda_scaling_residual: 0.0
 
   optimizer:
     name: Adam
@@ -93,7 +94,7 @@ system:
         lr: 0.0001
 
 trainer:
-  max_steps: 50000
+  max_steps: 20000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 500

@@ -33,18 +33,51 @@ from threestudio.utils.typing import *
 class DynamicGaussianModel(BaseGeometry):
     @dataclass
     class Config(BaseGeometry.Config):
+        gaussian_name: str = ""
         gaussian: Optional[GaussianModel.Config] = None
         dynamic_flow_name: str = ""
         dynamic_flow_config: Optional[BaseGeometry.Config] = None
+
+        geometry_convert_from: str = ""
 
     cfg: Config
 
     def configure(self) -> None:
         super().configure()
-        self.gaussian = threestudio.find("gaussian")(self.cfg.gaussian)
+        self.gaussian = threestudio.find(self.cfg.gaussian_name)(self.cfg.gaussian)
         self.dynamic_flow = threestudio.find(self.cfg.dynamic_flow_name)(
             self.cfg.dynamic_flow_config
         )
+
+        if len(self.cfg.geometry_convert_from) > 0:
+            ckpt_dict = torch.load(self.cfg.geometry_convert_from)
+            num_pts = ckpt_dict["state_dict"]["geometry.gaussian._xyz"].shape[0]
+            pcd = BasicPointCloud(
+                points=np.zeros((num_pts, 3)),
+                colors=np.zeros((num_pts, 3)),
+                normals=np.zeros((num_pts, 3)),
+            )
+            self.gaussian.create_from_pcd(pcd, 10)
+            self.gaussian.training_setup()
+            new_ckpt_dict = {}
+            for key in self.gaussian.state_dict():
+                if ckpt_dict["state_dict"].__contains__("geometry.gaussian." + key):
+                    new_ckpt_dict[key] = ckpt_dict["state_dict"][
+                        "geometry.gaussian." + key
+                    ]
+                else:
+                    new_ckpt_dict[key] = self.gaussian.state_dict()[key]
+            self.gaussian.load_state_dict(new_ckpt_dict)
+
+            new_ckpt_dict = {}
+            for key in self.dynamic_flow.state_dict():
+                if ckpt_dict["state_dict"].__contains__("geometry.dynamic_flow." + key):
+                    new_ckpt_dict[key] = ckpt_dict["state_dict"][
+                        "geometry.dynamic_flow." + key
+                    ]
+                else:
+                    new_ckpt_dict[key] = self.dynamic_flow.state_dict()[key]
+            self.dynamic_flow.load_state_dict(new_ckpt_dict)
 
     def setup_functions(self):
         self.gaussian.setup_functions()
@@ -59,30 +92,26 @@ class DynamicGaussianModel(BaseGeometry):
 
     @property
     def get_scaling(self):
-        return self.gaussian.scaling_activation(self.gaussian._scaling)
+        return self.gaussian.get_scaling
 
     @property
     def get_rotation(self):
-        return self.gaussian.rotation_activation(self.gaussian._rotation)
+        return self.gaussian.get_rotation
 
     @property
     def get_xyz(self):
-        return self.gaussian._xyz
+        return self.gaussian.get_xyz
 
     @property
     def get_features(self):
-        features_dc = self.gaussian._features_dc
-        features_rest = self.gaussian._features_rest
-        return torch.cat((features_dc, features_rest), dim=1)
+        return self.gaussian.get_features
 
     @property
     def get_opacity(self):
-        return self.gaussian.opacity_activation(self.gaussian._opacity)
+        return self.gaussian.get_opacity
 
     def get_covariance(self, scaling_modifier=1):
-        return self.gaussian.covariance_activation(
-            self.gaussian.get_scaling, scaling_modifier, self.gaussian._rotation
-        )
+        return self.get_covariance(scaling_modifier)
 
     def oneupSHdegree(self):
         if self.gaussian.active_sh_degree < self.gaussian.max_sh_degree:

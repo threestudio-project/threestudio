@@ -4,6 +4,7 @@ from . import (
     dynamic_control4d,
     dynamic_gaussian,
     dynamic_gaussian_instruct,
+    dynamic_gaussian_reconstruction,
     dynamic_instructnerf2nerf,
     fantasia3d,
     gaussian_splatting,

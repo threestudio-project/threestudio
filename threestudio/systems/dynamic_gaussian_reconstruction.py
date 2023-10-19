@@ -86,16 +86,13 @@ class Camera(NamedTuple):
     full_proj_transform: torch.Tensor
 
 
-@threestudio.register("dynamic-gaussian-splatting-instruct-system")
-class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
+@threestudio.register("dynamic-gaussian-splatting-reconstruct-system")
+class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
         extent: float = 5.0
         num_pts: int = 100
         invert_bg_prob: float = 0.5
-
-        per_editing_step: int = 10
-        start_editing_step: int = 1000
 
     cfg: Config
 
@@ -113,35 +110,24 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
 
         self.extent = self.cfg.extent
 
-        if len(self.geometry.cfg.geometry_convert_from) == 0:
-            print(f"Generating random point cloud ({num_pts})...")
-            phis = np.random.random((num_pts,)) * 2 * np.pi
-            costheta = np.random.random((num_pts,)) * 2 - 1
-            thetas = np.arccos(costheta)
-            mu = np.random.random((num_pts,))
-            radius = 0.25 * np.cbrt(mu)
-            x = radius * np.sin(thetas) * np.cos(phis)
-            y = radius * np.sin(thetas) * np.sin(phis)
-            z = radius * np.cos(thetas)
-            xyz = np.stack((x, y, z), axis=1)
+        print(f"Generating random point cloud ({num_pts})...")
+        phis = np.random.random((num_pts,)) * 2 * np.pi
+        costheta = np.random.random((num_pts,)) * 2 - 1
+        thetas = np.arccos(costheta)
+        mu = np.random.random((num_pts,))
+        radius = 0.25 * np.cbrt(mu)
+        x = radius * np.sin(thetas) * np.cos(phis)
+        y = radius * np.sin(thetas) * np.sin(phis)
+        z = radius * np.cos(thetas)
+        xyz = np.stack((x, y, z), axis=1)
 
-            shs = np.random.random((num_pts, 3)) / 255.0
-            C0 = 0.28209479177387814
-            color = shs * C0 + 0.5
-            pcd = BasicPointCloud(
-                points=xyz, colors=color, normals=np.zeros((num_pts, 3))
-            )
+        shs = np.random.random((num_pts, 3)) / 255.0
+        C0 = 0.28209479177387814
+        color = shs * C0 + 0.5
+        pcd = BasicPointCloud(points=xyz, colors=color, normals=np.zeros((num_pts, 3)))
 
-            self.geometry.create_from_pcd(pcd, 10)
-            self.geometry.training_setup()
-
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
-        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
-        )
-        self.prompt_utils = self.prompt_processor()
-
-        self.edit_frames = {}
+        self.geometry.create_from_pcd(pcd, 10)
+        self.geometry.training_setup()
 
     def configure_optimizers(self):
         g_optim = self.geometry.gaussian_optimizer
@@ -203,39 +189,9 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
     def training_step(self, batch, batch_idx):
         g_opt, d_opt = self.optimizers()
 
-        if torch.is_tensor(batch["index"]):
-            batch_index = batch["index"].item()
-        else:
-            batch_index = batch["index"]
         origin_gt_rgb = batch["gt_rgb"]
         B, H, W, C = origin_gt_rgb.shape
-        if batch_index in self.edit_frames:
-            gt_rgb = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
-            gt_rgb = torch.nn.functional.interpolate(
-                gt_rgb.permute(0, 3, 1, 2), (H, W), mode="bilinear", align_corners=False
-            ).permute(0, 2, 3, 1)
-            batch["gt_rgb"] = gt_rgb
-        else:
-            gt_rgb = origin_gt_rgb
-
-        if (
-            self.cfg.per_editing_step > 0
-            and self.global_step > self.cfg.start_editing_step
-        ):
-            prompt_utils = self.prompt_processor()
-            if (
-                not batch_index in self.edit_frames
-                or self.global_step % self.cfg.per_editing_step == 0
-            ):
-                self.renderer.eval()
-                full_out = self(batch)
-                self.renderer.train()
-                result = self.guidance(
-                    full_out["render"].unsqueeze(0).permute(0, 2, 3, 1),
-                    origin_gt_rgb,
-                    prompt_utils,
-                )
-                self.edit_frames[batch_index] = result["edit_images"].detach().cpu()
+        gt_rgb = origin_gt_rgb
 
         out = self(batch)
 
@@ -252,15 +208,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         guidance_out = {
             "loss_l1": torch.nn.functional.l1_loss(
                 out["render"], gt_rgb.permute(0, 3, 1, 2)[0]
-            ),
-            "loss_p": self.perceptual_loss(
-                out["render"].unsqueeze(0).contiguous(),
-                gt_rgb.permute(0, 3, 1, 2).contiguous(),
-            ).mean(),
-            "loss_xyz_residual": torch.mean(self.geometry.gaussian._xyz_residual**2),
-            "loss_scaling_residual": torch.mean(
-                self.geometry.gaussian._xyz_residual**2
-            ),
+            )
         }
 
         loss = 0.0
@@ -292,27 +240,16 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             viewspace_point_tensor,
             self.extent,
         )
-        loss.backward()
         g_opt.step()
         d_opt.step()
         g_opt.zero_grad(set_to_none=True)
         d_opt.zero_grad(set_to_none=True)
 
-        return {"loss": loss}
+        return {"loss": loss_l1}
 
     def validation_step(self, batch, batch_idx):
         out = self(batch)
-        if torch.is_tensor(batch["index"]):
-            batch_index = batch["index"].item()
-        else:
-            batch_index = batch["index"]
-        if batch_index in self.edit_frames:
-            B, H, W, C = batch["gt_rgb"].shape
-            rgb = torch.nn.functional.interpolate(
-                self.edit_frames[batch_index].permute(0, 3, 1, 2), (H, W)
-            ).permute(0, 2, 3, 1)[0]
-        else:
-            rgb = batch["gt_rgb"][0]
+        rgb = batch["gt_rgb"][0]
         # import pdb; pdb.set_trace()
         self.save_image_grid(
             f"it{self.global_step}-{batch['index'][0]}.png",
