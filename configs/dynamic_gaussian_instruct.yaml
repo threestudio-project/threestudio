@@ -5,8 +5,8 @@ seed: 0
 
 data_type: "dynamic-multiview-camera-datamodule"
 data:
-  train_downsample_resolution: 2
-  eval_downsample_resolution: 2
+  train_downsample_resolution: 1
+  eval_downsample_resolution: 1
   eval_data_interval: 1
   camera_layout: "default"
   initial_t0_step: 1000
@@ -30,7 +30,7 @@ system:
       position_lr_delay_mult: 0.01
       position_lr_max_steps: 30000
       feature_lr: 0.0025
-      opacity_lr: 0.00
+      opacity_lr: 0.005
       # opacity_lr: 0.01
       scaling_lr: 0.005
       rotation_lr: 0.001
@@ -59,8 +59,8 @@ system:
   guidance_type: "stable-diffusion-controlnet-guidance"
   guidance:
     control_type: "normal"
-    min_step_percent: 0.05
-    max_step_percent: 0.8
+    min_step_percent: [0, 0.5, 0.02, 2000]
+    max_step_percent: [0, 0.98, 0.5, 2000]
     condition_scale: 1.0
     fixed_size: 512
     cache_dir: '/root/autodl-tmp/.huggingface_cache'
@@ -79,8 +79,8 @@ system:
   loss:
     lambda_l1: 1.0
     lambda_p: 1.0
-    lambda_xyz_residual: 0.0
-    lambda_scaling_residual: 0.0
+    lambda_xyz_residual: 1.0
+    lambda_scaling_residual: 1.0
 
   optimizer:
     name: Adam
@@ -93,10 +93,10 @@ system:
         lr: 0.0001
 
 trainer:
-  max_steps: 50000
+  max_steps: 30000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 500
+  val_check_interval: 200
   enable_progress_bar: true
   precision: 32-true
 

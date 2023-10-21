@@ -16,7 +16,7 @@ from threestudio.utils.typing import *
 
 def convert_pose(C2W):
     flip_yz = np.eye(4)
-    flip_yz[1, 1] = -1
+    # flip_yz[1, 1] = -1
     flip_yz[2, 2] = -1
     C2W = np.matmul(C2W, flip_yz)
     return C2W
@@ -153,7 +153,7 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
         w2c, proj, cam_p = get_cam_info(c2w=batch["c2w"], fovy=fovy, fovx=fovx)
 
         viewpoint_cam = Camera(
-            FoVx=fovy,
+            FoVx=fovx,
             FoVy=fovy,
             image_width=batch["width"],
             image_height=batch["height"],
@@ -201,9 +201,9 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
         viewspace_point_tensor = out["viewspace_points"]
 
         bg_color = out["bg_color"]
-        # mask = torch.sum(origin_gt_rgb, dim=-1).unsqueeze(-1)
-        # mask = (mask > 1e-3).float()
-        # gt_rgb = gt_rgb * mask + (1 - mask) * bg_color.reshape(1, 1, 1, 3)
+        mask = torch.sum(origin_gt_rgb, dim=-1).unsqueeze(-1)
+        mask = (mask > 1e-3).float()
+        gt_rgb = gt_rgb * mask + (1 - mask) * bg_color.reshape(1, 1, 1, 3)
 
         guidance_out = {
             "loss_l1": torch.nn.functional.l1_loss(
@@ -251,8 +251,10 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
         out = self(batch)
         rgb = batch["gt_rgb"][0]
         # import pdb; pdb.set_trace()
+
+        save_path = self.get_save_path(f"it{self.global_step}-{batch['index'][0]}.ply")
         self.save_image_grid(
-            f"it{self.global_step}-{batch['index'][0]}.png",
+            f"it{self.global_step}-{batch['index'][0]}.jpg",
             [
                 {
                     "type": "rgb",
@@ -270,6 +272,7 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
             name="validation_step",
             step=self.global_step,
         )
+        # self.geometry.save_ply(save_path)
 
     def on_validation_epoch_end(self):
         pass
@@ -277,7 +280,7 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.global_step}-test/{batch['index'][0]}.png",
+            f"it{self.global_step}-test/{batch['index'][0]}.jpg",
             [
                 {
                     "type": "rgb",
@@ -293,7 +296,7 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
         self.save_img_sequence(
             f"it{self.global_step}-test",
             f"it{self.global_step}-test",
-            "(\d+)\.png",
+            "(\d+)\.jpg",
             save_format="mp4",
             fps=30,
             name="test",

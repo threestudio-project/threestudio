@@ -30,7 +30,7 @@ system:
       position_lr_delay_mult: 0.01
       position_lr_max_steps: 30000
       feature_lr: 0.0025
-      opacity_lr: 0.00
+      opacity_lr: 0.005
       # opacity_lr: 0.01
       scaling_lr: 0.005
       rotation_lr: 0.001
@@ -60,8 +60,8 @@ system:
   guidance_type: "stable-diffusion-controlnet-guidance"
   guidance:
     control_type: "normal"
-    min_step_percent: 0.05
-    max_step_percent: 0.8
+    min_step_percent: [0, 0.5, 0.02, 2000]
+    max_step_percent: [0, 0.98, 0.5, 2000]
     condition_scale: 1.0
     fixed_size: 512
     cache_dir: '/root/autodl-tmp/.huggingface_cache'
@@ -97,7 +97,7 @@ trainer:
   max_steps: 50000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
-  val_check_interval: 1000
+  val_check_interval: 200
   enable_progress_bar: true
   precision: 32-true
 

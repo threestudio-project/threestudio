@@ -22,7 +22,7 @@ class DynamicGaussianRasterizer(Rasterizer):
     @dataclass
     class Config(Rasterizer.Config):
         debug: bool = False
-        invert_bg_prob: bool = True
+        invert_bg_prob: float = 1
 
     cfg: Config
 

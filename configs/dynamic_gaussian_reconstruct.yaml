@@ -5,11 +5,11 @@ seed: 0
 
 data_type: "dynamic-multiview-camera-datamodule"
 data:
-  train_downsample_resolution: 2
-  eval_downsample_resolution: 2
+  train_downsample_resolution: 1
+  eval_downsample_resolution: 1
   eval_data_interval: 1
   camera_layout: "default"
-  initial_t0_step: 1000
+  initial_t0_step: 2000
   dataroot: ???
 
 system_type: "dynamic-gaussian-splatting-reconstruct-system"
@@ -17,7 +17,7 @@ system:
 
   extent: 1.0
   num_pts: 5000
-  invert_bg_prob: 1.0
+  invert_bg_prob: 0.5
 
   geometry_type: "dynamic-gaussian"
   geometry:
@@ -48,6 +48,7 @@ system:
   renderer_type: "dynamic-gaussian-rasterizer"
   renderer:
     debug: false
+    invert_bg_prob: 0.5
 
   material_type: "no-material" # unused
   material:
@@ -94,7 +95,7 @@ system:
         lr: 0.0001
 
 trainer:
-  max_steps: 20000
+  max_steps: 30000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 500

@@ -195,3 +195,6 @@ class DynamicGaussianModel(BaseGeometry):
         self.gaussian.update_states(
             iteration, visibility_filter, radii, viewspace_point_tensor, extent
         )
+
+    def save_ply(self, path):
+        self.gaussian.save_ply(path)

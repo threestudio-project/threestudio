@@ -161,8 +161,12 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
 
             moment: Float[Tensor, "1"] = torch.zeros(1)
-            moment[0] = frame["moment"]
-            if moment[0] < 1e-3:
+            if frame.__contains__("moment"):
+                moment[0] = frame["moment"]
+                if moment[0] < 1e-3:
+                    self.frames_t0.append(idx)
+            else:
+                moment[0] = 0
                 self.frames_t0.append(idx)
 
             frames_proj.append(proj)
@@ -199,7 +203,9 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
         self.step = global_step
 
     def collate(self, batch):
-        if self.step > self.cfg.initial_t0_step:
+        if self.step > self.cfg.initial_t0_step and (
+            torch.randint(0, 1000, (1,)).item() % 2 == 0
+        ):
             index = torch.randint(0, self.n_frames, (1,)).item()
         else:
             t0_index = torch.randint(0, len(self.frames_t0), (1,)).item()
@@ -348,7 +354,10 @@ class DynamicMultiviewDataset(Dataset):
                 proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
 
                 moment: Float[Tensor, "1"] = torch.zeros(1)
-                moment[0] = frame["moment"]
+                if frame.__contains__("moment"):
+                    moment[0] = frame["moment"]
+                else:
+                    moment[0] = 0
 
                 frames_proj.append(proj)
                 frames_c2w.append(c2w)

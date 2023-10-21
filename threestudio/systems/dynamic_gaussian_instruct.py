@@ -16,7 +16,7 @@ from threestudio.utils.typing import *
 
 def convert_pose(C2W):
     flip_yz = np.eye(4)
-    flip_yz[1, 1] = -1
+    # flip_yz[1, 1] = -1
     flip_yz[2, 2] = -1
     C2W = np.matmul(C2W, flip_yz)
     return C2W
@@ -167,7 +167,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         w2c, proj, cam_p = get_cam_info(c2w=batch["c2w"], fovy=fovy, fovx=fovx)
 
         viewpoint_cam = Camera(
-            FoVx=fovy,
+            FoVx=fovx,
             FoVy=fovy,
             image_width=batch["width"],
             image_height=batch["height"],
@@ -315,7 +315,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             rgb = batch["gt_rgb"][0]
         # import pdb; pdb.set_trace()
         self.save_image_grid(
-            f"it{self.global_step}-{batch['index'][0]}.png",
+            f"it{self.global_step}-{batch['index'][0]}.jpg",
             [
                 {
                     "type": "rgb",
@@ -340,7 +340,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
     def test_step(self, batch, batch_idx):
         out = self(batch)
         self.save_image_grid(
-            f"it{self.global_step}-test/{batch['index'][0]}.png",
+            f"it{self.global_step}-test/{batch['index'][0]}.jpg",
             [
                 {
                     "type": "rgb",
@@ -356,7 +356,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         self.save_img_sequence(
             f"it{self.global_step}-test",
             f"it{self.global_step}-test",
-            "(\d+)\.png",
+            "(\d+)\.jpg",
             save_format="mp4",
             fps=30,
             name="test",
