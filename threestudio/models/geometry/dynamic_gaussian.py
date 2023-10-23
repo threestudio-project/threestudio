@@ -19,6 +19,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from plyfile import PlyData
 from simple_knn._C import distCUDA2
 from torch import nn
 from torch.nn import functional as F
@@ -50,34 +51,53 @@ class DynamicGaussianModel(BaseGeometry):
         )
 
         if len(self.cfg.geometry_convert_from) > 0:
-            ckpt_dict = torch.load(self.cfg.geometry_convert_from)
-            num_pts = ckpt_dict["state_dict"]["geometry.gaussian._xyz"].shape[0]
-            pcd = BasicPointCloud(
-                points=np.zeros((num_pts, 3)),
-                colors=np.zeros((num_pts, 3)),
-                normals=np.zeros((num_pts, 3)),
-            )
-            self.gaussian.create_from_pcd(pcd, 10)
-            self.gaussian.training_setup()
-            new_ckpt_dict = {}
-            for key in self.gaussian.state_dict():
-                if ckpt_dict["state_dict"].__contains__("geometry.gaussian." + key):
-                    new_ckpt_dict[key] = ckpt_dict["state_dict"][
-                        "geometry.gaussian." + key
-                    ]
-                else:
-                    new_ckpt_dict[key] = self.gaussian.state_dict()[key]
-            self.gaussian.load_state_dict(new_ckpt_dict)
+            print("Loading point cloud from %s" % self.cfg.geometry_convert_from)
+            if self.cfg.geometry_convert_from.endswith(".ckpt"):
+                ckpt_dict = torch.load(self.cfg.geometry_convert_from)
+                num_pts = ckpt_dict["state_dict"]["geometry.gaussian._xyz"].shape[0]
+                pcd = BasicPointCloud(
+                    points=np.zeros((num_pts, 3)),
+                    colors=np.zeros((num_pts, 3)),
+                    normals=np.zeros((num_pts, 3)),
+                )
+                self.gaussian.create_from_pcd(pcd, 10)
+                self.gaussian.training_setup()
+                new_ckpt_dict = {}
+                for key in self.gaussian.state_dict():
+                    if ckpt_dict["state_dict"].__contains__("geometry.gaussian." + key):
+                        new_ckpt_dict[key] = ckpt_dict["state_dict"][
+                            "geometry.gaussian." + key
+                        ]
+                    else:
+                        new_ckpt_dict[key] = self.gaussian.state_dict()[key]
+                self.gaussian.load_state_dict(new_ckpt_dict)
 
-            new_ckpt_dict = {}
-            for key in self.dynamic_flow.state_dict():
-                if ckpt_dict["state_dict"].__contains__("geometry.dynamic_flow." + key):
-                    new_ckpt_dict[key] = ckpt_dict["state_dict"][
+                new_ckpt_dict = {}
+                for key in self.dynamic_flow.state_dict():
+                    if ckpt_dict["state_dict"].__contains__(
                         "geometry.dynamic_flow." + key
-                    ]
-                else:
-                    new_ckpt_dict[key] = self.dynamic_flow.state_dict()[key]
-            self.dynamic_flow.load_state_dict(new_ckpt_dict)
+                    ):
+                        new_ckpt_dict[key] = ckpt_dict["state_dict"][
+                            "geometry.dynamic_flow." + key
+                        ]
+                    else:
+                        new_ckpt_dict[key] = self.dynamic_flow.state_dict()[key]
+                self.dynamic_flow.load_state_dict(new_ckpt_dict)
+            elif self.cfg.geometry_convert_from.endswith(".ply"):
+                plydata = PlyData.read(self.cfg.geometry_convert_from)
+                vertices = plydata["vertex"]
+                positions = np.vstack([vertices["x"], vertices["y"], vertices["z"]]).T
+                colors = (
+                    np.vstack([vertices["red"], vertices["green"], vertices["blue"]]).T
+                    / 255.0
+                )
+                normals = np.vstack([vertices["nx"], vertices["ny"], vertices["nz"]]).T
+                # print(np.min(positions, axis=0))
+                # print(np.max(positions, axis=0))
+                # exit(0)
+                pcd = BasicPointCloud(points=positions, colors=colors, normals=normals)
+                self.gaussian.create_from_pcd(pcd, 10)
+                self.gaussian.training_setup()
 
     def setup_functions(self):
         self.gaussian.setup_functions()

@@ -73,6 +73,7 @@ class DynamicMultiviewsDataModuleConfig:
     eval_time_interpolation: Optional[Tuple[float, float]] = None  # (t0, t1)
 
     initial_t0_step: int = 0
+    online_load_image: bool = False
 
 
 class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
@@ -96,6 +97,8 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
         frames_direction = []
         frames_img = []
         frames_moment = []
+        self.frame_file_path = []
+        self.frame_intrinsic = []
 
         self.frames_t0 = []
         self.step = 0
@@ -139,18 +142,23 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             intrinsic[1, 2] = frame["cy"] / scale
 
             frame_path = os.path.join(self.cfg.dataroot, frame["file_path"])
-            img = cv2.imread(frame_path)[:, :, ::-1].copy()
-            img = cv2.resize(img, (self.frame_w, self.frame_h))
-            img: Float[Tensor, "H W 3"] = torch.FloatTensor(img) / 255
-            frames_img.append(img)
+            if not self.cfg.online_load_image:
+                img = cv2.imread(frame_path)[:, :, ::-1].copy()
+                img = cv2.resize(img, (self.frame_w, self.frame_h))
+                img: Float[Tensor, "H W 3"] = torch.FloatTensor(img) / 255
+                frames_img.append(img)
+            self.frame_file_path.append(frame_path)
 
-            direction: Float[Tensor, "H W 3"] = get_ray_directions(
-                self.frame_h,
-                self.frame_w,
-                (intrinsic[0, 0], intrinsic[1, 1]),
-                (intrinsic[0, 2], intrinsic[1, 2]),
-                use_pixel_centers=False,
-            )
+            self.frame_intrinsic.append(intrinsic)
+            if not self.cfg.online_load_image:
+                direction: Float[Tensor, "H W 3"] = get_ray_directions(
+                    self.frame_h,
+                    self.frame_w,
+                    (intrinsic[0, 0], intrinsic[1, 1]),
+                    (intrinsic[0, 2], intrinsic[1, 2]),
+                    use_pixel_centers=False,
+                )
+                frames_direction.append(direction)
 
             c2w = c2w_list[idx]
             camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
@@ -172,22 +180,22 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             frames_proj.append(proj)
             frames_c2w.append(c2w)
             frames_position.append(camera_position)
-            frames_direction.append(direction)
             frames_moment.append(moment)
         threestudio.info("Loaded frames.")
 
         self.frames_proj: Float[Tensor, "B 4 4"] = torch.stack(frames_proj, dim=0)
         self.frames_c2w: Float[Tensor, "B 4 4"] = torch.stack(frames_c2w, dim=0)
         self.frames_position: Float[Tensor, "B 3"] = torch.stack(frames_position, dim=0)
-        self.frames_direction: Float[Tensor, "B H W 3"] = torch.stack(
-            frames_direction, dim=0
-        )
-        self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
+        if not self.cfg.online_load_image:
+            self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
+            self.frames_direction: Float[Tensor, "B H W 3"] = torch.stack(
+                frames_direction, dim=0
+            )
+            self.rays_o, self.rays_d = get_rays(
+                self.frames_direction, self.frames_c2w, keepdim=True
+            )
         self.frames_moment: Float[Tensor, "B 1"] = torch.stack(frames_moment, dim=0)
 
-        self.rays_o, self.rays_d = get_rays(
-            self.frames_direction, self.frames_c2w, keepdim=True
-        )
         self.mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(
             self.frames_c2w, self.frames_proj
         )
@@ -203,23 +211,45 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
         self.step = global_step
 
     def collate(self, batch):
-        if self.step > self.cfg.initial_t0_step and (
+        # index = torch.randint(0, self.n_frames, (1,)).item()
+        if (self.cfg.online_load_image or self.step > self.cfg.initial_t0_step) and (
             torch.randint(0, 1000, (1,)).item() % 2 == 0
         ):
             index = torch.randint(0, self.n_frames, (1,)).item()
         else:
             t0_index = torch.randint(0, len(self.frames_t0), (1,)).item()
             index = self.frames_t0[t0_index]
+        if not self.cfg.online_load_image:
+            frame_img = self.frames_img[index : index + 1]
+            rays_o = self.rays_o[index : index + 1]
+            rays_d = self.rays_d[index : index + 1]
+        else:
+            img = cv2.imread(self.frame_file_path[index])[:, :, ::-1]
+            img = cv2.resize(img, (self.frame_w, self.frame_h))
+            frame_img: Float[Tensor, "H W 3"] = (
+                torch.FloatTensor(img).unsqueeze(0) / 255
+            )
+            intrinsic = self.frame_intrinsic[index]
+            frame_direction = get_ray_directions(
+                self.frame_h,
+                self.frame_w,
+                (intrinsic[0, 0], intrinsic[1, 1]),
+                (intrinsic[0, 2], intrinsic[1, 2]),
+                use_pixel_centers=False,
+            ).unsqueeze(0)
+            rays_o, rays_d = get_rays(
+                frame_direction, self.frames_c2w[index : index + 1], keepdim=True
+            )
         return {
             "index": index,
-            "rays_o": self.rays_o[index : index + 1],
-            "rays_d": self.rays_d[index : index + 1],
+            "rays_o": rays_o,
+            "rays_d": rays_d,
             "mvp_mtx": self.mvp_mtx[index : index + 1],
             "proj": self.frames_proj[index : index + 1],
             "c2w": self.frames_c2w[index : index + 1],
             "camera_positions": self.frames_position[index : index + 1],
             "light_positions": self.light_positions[index : index + 1],
-            "gt_rgb": self.frames_img[index : index + 1],
+            "gt_rgb": frame_img,
             "height": self.frame_h,
             "width": self.frame_w,
             "moment": self.frames_moment[index : index + 1],
@@ -432,16 +462,27 @@ class DynamicMultiviewDataModule(pl.LightningDataModule):
         pass
 
     def general_loader(self, dataset, batch_size, collate_fn=None) -> DataLoader:
-        return DataLoader(
-            dataset,
-            num_workers=0,  # type: ignore
-            batch_size=batch_size,
-            collate_fn=collate_fn,
-        )
+        if (
+            hasattr(dataset.cfg, "online_load_image")
+            and dataset.cfg.online_load_image == True
+        ):
+            return DataLoader(
+                dataset,
+                num_workers=8,  # type: ignore
+                batch_size=batch_size,
+                collate_fn=collate_fn,
+            )
+        else:
+            return DataLoader(
+                dataset,
+                num_workers=0,  # type: ignore
+                batch_size=batch_size,
+                collate_fn=collate_fn,
+            )
 
     def train_dataloader(self) -> DataLoader:
         return self.general_loader(
-            self.train_dataset, batch_size=None, collate_fn=self.train_dataset.collate
+            self.train_dataset, batch_size=1, collate_fn=self.train_dataset.collate
         )
 
     def val_dataloader(self) -> DataLoader:

@@ -2,6 +2,7 @@ from . import (
     base,
     custom_mesh,
     dynamic_flow_mlp,
+    dynamic_flow_tensor4d,
     dynamic_flow_volume,
     dynamic_gaussian,
     dynamic_implicit_volume,

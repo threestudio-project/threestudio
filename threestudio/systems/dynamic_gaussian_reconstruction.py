@@ -55,7 +55,7 @@ def getFOV(P, znear, zfar):
     return fovX, fovY
 
 
-def get_cam_info(c2w, fovx, fovy):
+def get_cam_info(c2w, fovx, fovy, znear, zfar):
     c2w = c2w[0].cpu().numpy()
     c2w = convert_pose(c2w)
     world_view_transform = np.linalg.inv(c2w)
@@ -64,7 +64,7 @@ def get_cam_info(c2w, fovx, fovy):
         torch.tensor(world_view_transform).transpose(0, 1).cuda().float()
     )
     projection_matrix = (
-        getProjectionMatrix(znear=0.01, zfar=100.0, fovX=fovx, fovY=fovy)
+        getProjectionMatrix(znear=znear, zfar=zfar, fovX=fovx, fovY=fovy)
         .transpose(0, 1)
         .cuda()
     )
@@ -110,24 +110,27 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
 
         self.extent = self.cfg.extent
 
-        print(f"Generating random point cloud ({num_pts})...")
-        phis = np.random.random((num_pts,)) * 2 * np.pi
-        costheta = np.random.random((num_pts,)) * 2 - 1
-        thetas = np.arccos(costheta)
-        mu = np.random.random((num_pts,))
-        radius = 0.25 * np.cbrt(mu)
-        x = radius * np.sin(thetas) * np.cos(phis)
-        y = radius * np.sin(thetas) * np.sin(phis)
-        z = radius * np.cos(thetas)
-        xyz = np.stack((x, y, z), axis=1)
+        if len(self.geometry.cfg.geometry_convert_from) == 0:
+            print(f"Generating random point cloud ({num_pts})...")
+            phis = np.random.random((num_pts,)) * 2 * np.pi
+            costheta = np.random.random((num_pts,)) * 2 - 1
+            thetas = np.arccos(costheta)
+            mu = np.random.random((num_pts,))
+            radius = 0.25 * np.cbrt(mu)
+            x = radius * np.sin(thetas) * np.cos(phis)
+            y = radius * np.sin(thetas) * np.sin(phis)
+            z = radius * np.cos(thetas)
+            xyz = np.stack((x, y, z), axis=1)
 
-        shs = np.random.random((num_pts, 3)) / 255.0
-        C0 = 0.28209479177387814
-        color = shs * C0 + 0.5
-        pcd = BasicPointCloud(points=xyz, colors=color, normals=np.zeros((num_pts, 3)))
+            shs = np.random.random((num_pts, 3)) / 255.0
+            C0 = 0.28209479177387814
+            color = shs * C0 + 0.5
+            pcd = BasicPointCloud(
+                points=xyz, colors=color, normals=np.zeros((num_pts, 3))
+            )
 
-        self.geometry.create_from_pcd(pcd, 10)
-        self.geometry.training_setup()
+            self.geometry.create_from_pcd(pcd, 10)
+            self.geometry.training_setup()
 
     def configure_optimizers(self):
         g_optim = self.geometry.gaussian_optimizer
@@ -149,8 +152,12 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
         # if (self.gaussians_step) >= self.opt.position_lr_max_steps:
         #     self.gaussians.oneupSHdegree()
         proj = batch["proj"][0]
-        fovx, fovy = getFOV(proj, 0.01, 100.0)
-        w2c, proj, cam_p = get_cam_info(c2w=batch["c2w"], fovy=fovy, fovx=fovx)
+        znear = self.renderer.cfg.near
+        zfar = self.renderer.cfg.far
+        fovx, fovy = getFOV(proj, znear, zfar)
+        w2c, proj, cam_p = get_cam_info(
+            c2w=batch["c2w"], fovy=fovy, fovx=fovx, znear=znear, zfar=zfar
+        )
 
         viewpoint_cam = Camera(
             FoVx=fovx,
@@ -272,7 +279,8 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
             name="validation_step",
             step=self.global_step,
         )
-        # self.geometry.save_ply(save_path)
+        if batch["index"][0] == 0:
+            self.geometry.save_ply(save_path)
 
     def on_validation_epoch_end(self):
         pass

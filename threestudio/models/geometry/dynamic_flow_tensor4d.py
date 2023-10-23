@@ -42,18 +42,31 @@ class DynamicFlowTensor4D(BaseImplicitGeometry):
             }
         )
         need_normalization: bool = False
+        bbox_min: Optional[Tuple[float, float, float]] = None
+        bbox_max: Optional[Tuple[float, float, float]] = None
 
     cfg: Config
 
     def configure(self) -> None:
         super().configure()
-        self.pos_encoding_list = []
-        for i in range(6):
-            pos_encoding = get_encoding(2, self.cfg.pos_encoding_config)
-            self.pos_encoding_list.append(pos_encoding)
+        self.enc0 = get_encoding(2, self.cfg.pos_encoding_config)
+        self.enc1 = get_encoding(2, self.cfg.pos_encoding_config)
+        self.enc2 = get_encoding(2, self.cfg.pos_encoding_config)
+        self.enc3 = get_encoding(2, self.cfg.pos_encoding_config)
+        self.enc4 = get_encoding(2, self.cfg.pos_encoding_config)
+        self.enc5 = get_encoding(2, self.cfg.pos_encoding_config)
+
+        self.pos_encoding_list = [
+            self.enc0,
+            self.enc1,
+            self.enc2,
+            self.enc3,
+            self.enc4,
+            self.enc5,
+        ]
 
         self.flow_network = get_mlp(
-            pos_encoding.n_output_dims * 6,
+            self.enc0.n_output_dims * 6,
             self.cfg.n_feature_dims,
             self.cfg.mlp_network_config,
         )
@@ -63,9 +76,15 @@ class DynamicFlowTensor4D(BaseImplicitGeometry):
     ) -> Dict[str, Float[Tensor, "..."]]:
         # points 4D
         if self.cfg.need_normalization:
-            points = contract_to_unisphere(
-                points_3d[..., : self.cfg.n_input_dims - 1], self.bbox, self.unbounded
-            )  # points normalized to (0, 1)
+            bbox_min = self.cfg.bbox_min
+            bbox_max = self.cfg.bbox_max
+            points = points_3d.clone()
+            scale_x = bbox_max[0] - bbox_min[0]
+            scale_y = bbox_max[1] - bbox_min[1]
+            scale_z = bbox_max[2] - bbox_min[2]
+            points[:, 0] = (points[:, 0] - bbox_min[0]) / scale_x
+            points[:, 1] = (points[:, 1] - bbox_min[1]) / scale_y
+            points[:, 2] = (points[:, 2] - bbox_min[2]) / scale_z
         else:
             points = points_3d[..., : self.cfg.n_input_dims - 1]
         points = points.view(-1, self.cfg.n_input_dims - 1)
@@ -104,6 +123,10 @@ class DynamicFlowTensor4D(BaseImplicitGeometry):
         features = self.flow_network(enc).view(
             *points.shape[:-1], self.cfg.n_feature_dims
         )
+        if self.cfg.need_normalization:
+            features[0] *= scale_x
+            features[1] *= scale_y
+            features[2] *= scale_z
         output = {}
         output.update({"features": features})
 

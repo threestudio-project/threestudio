@@ -670,7 +670,10 @@ class GaussianModel(BaseGeometry):
                     20 if iteration > self.cfg.opacity_reset_interval else None
                 )
                 self.densify_and_prune(
-                    self.cfg.densify_grad_threshold, 0.005, 1.0, size_threshold
+                    self.cfg.densify_grad_threshold,
+                    self.cfg.min_opac_prune,
+                    1.0,
+                    size_threshold,
                 )
 
             if (
