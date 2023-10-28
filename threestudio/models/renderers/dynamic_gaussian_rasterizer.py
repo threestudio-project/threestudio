@@ -138,10 +138,10 @@ class DynamicGaussianRasterizer(Rasterizer):
             cov3D_precomp=cov3D_precomp,
         )
 
-        # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
-        # They will be excluded from value updates used in the splitting criteria.
+        refine_image = self.geometry.refine_net(rendered_image.unsqueeze(0).detach())
         return {
             "render": rendered_image,
+            "refine": refine_image[0],
             "viewspace_points": screenspace_points,
             "visibility_filter": radii > 0,
             "radii": radii,

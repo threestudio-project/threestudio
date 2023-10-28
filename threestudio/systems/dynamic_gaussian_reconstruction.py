@@ -215,7 +215,14 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
         guidance_out = {
             "loss_l1": torch.nn.functional.l1_loss(
                 out["render"], gt_rgb.permute(0, 3, 1, 2)[0]
-            )
+            ),
+            "loss_G_l1": torch.nn.functional.l1_loss(
+                out["refine"], gt_rgb.permute(0, 3, 1, 2)[0]
+            ),
+            "loss_G_p": self.perceptual_loss(
+                out["refine"].unsqueeze(0).contiguous(),
+                gt_rgb.permute(0, 3, 1, 2).contiguous(),
+            ).mean(),
         }
 
         loss = 0.0
@@ -247,6 +254,7 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
             viewspace_point_tensor,
             self.extent,
         )
+        loss.backward()
         g_opt.step()
         d_opt.step()
         g_opt.zero_grad(set_to_none=True)
@@ -266,6 +274,13 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
                 {
                     "type": "rgb",
                     "img": out["render"].unsqueeze(0).permute(0, 2, 3, 1)[0],
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
+            + [
+                {
+                    "type": "rgb",
+                    "img": out["refine"].unsqueeze(0).permute(0, 2, 3, 1)[0],
                     "kwargs": {"data_format": "HWC"},
                 },
             ]
@@ -293,6 +308,13 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
                 {
                     "type": "rgb",
                     "img": out["render"].unsqueeze(0).permute(0, 2, 3, 1)[0],
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
+            + [
+                {
+                    "type": "rgb",
+                    "img": out["refine"].unsqueeze(0).permute(0, 2, 3, 1)[0],
                     "kwargs": {"data_format": "HWC"},
                 },
             ],

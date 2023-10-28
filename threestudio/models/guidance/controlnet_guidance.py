@@ -286,7 +286,8 @@ class ControlNetGuidance(BaseObject):
             control = (
                 torch.from_numpy(np.array(detected_map)).float().to(self.device) / 255.0
             )
-            control = control.unsqueeze(-1).repeat(1, 1, 3)
+            # print(control.shape)
+            # control = control.unsqueeze(-1).repeat(1, 1, 3)
             control = control.unsqueeze(0)
             control = control.permute(0, 3, 1, 2)
 

@@ -27,6 +27,7 @@ from torch.nn import functional as F
 import threestudio
 from threestudio.models.geometry.base import BaseGeometry
 from threestudio.models.geometry.gaussian import BasicPointCloud, GaussianModel
+from threestudio.utils.GAN.normalunet import NormalNet
 from threestudio.utils.typing import *
 
 
@@ -49,6 +50,7 @@ class DynamicGaussianModel(BaseGeometry):
         self.dynamic_flow = threestudio.find(self.cfg.dynamic_flow_name)(
             self.cfg.dynamic_flow_config
         )
+        self.refine_net = NormalNet(ngf=32, n_downsampling=3, n_blocks=3)
 
         if len(self.cfg.geometry_convert_from) > 0:
             print("Loading point cloud from %s" % self.cfg.geometry_convert_from)
@@ -83,6 +85,18 @@ class DynamicGaussianModel(BaseGeometry):
                     else:
                         new_ckpt_dict[key] = self.dynamic_flow.state_dict()[key]
                 self.dynamic_flow.load_state_dict(new_ckpt_dict)
+
+                new_ckpt_dict = {}
+                for key in self.refine_net.state_dict():
+                    if ckpt_dict["state_dict"].__contains__(
+                        "geometry.refine_net." + key
+                    ):
+                        new_ckpt_dict[key] = ckpt_dict["state_dict"][
+                            "geometry.refine_net." + key
+                        ]
+                    else:
+                        new_ckpt_dict[key] = self.refine_net.state_dict()[key]
+                self.refine_net.load_state_dict(new_ckpt_dict)
             elif self.cfg.geometry_convert_from.endswith(".ply"):
                 plydata = PlyData.read(self.cfg.geometry_convert_from)
                 vertices = plydata["vertex"]

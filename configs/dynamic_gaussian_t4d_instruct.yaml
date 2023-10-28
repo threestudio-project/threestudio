@@ -12,16 +12,19 @@ data:
   initial_t0_step: 2000
   dataroot: ???
 
-system_type: "dynamic-gaussian-splatting-reconstruct-system"
+system_type: "dynamic-gaussian-splatting-instruct-system"
 system:
+
+  start_editing_step: 0
+  per_editing_step: 40
 
   extent: 1.0
   num_pts: 5000
-  invert_bg_prob: 1.0
+  invert_bg_prob: 0.5
 
   geometry_type: "dynamic-gaussian"
   geometry:
-    gaussian_name: "gaussian"
+    gaussian_name: "gaussian-residual"
     gaussian:
       position_lr_init: 0.00016
       position_lr_final:  0.0000016
@@ -31,13 +34,6 @@ system:
       opacity_lr: 0.05
       scaling_lr: 0.005
       rotation_lr: 0.001
-      percent_dense: 0.01
-      densification_interval: 100
-      opacity_reset_interval: 200000
-      densify_from_iter: 500
-      densify_until_iter: 15000
-      densify_grad_threshold: 0.0002
-      min_opac_prune: 0.05
       force_sphere: True
     dynamic_flow_name: "dynamic-flow-tensor4d"
     dynamic_flow_config:
@@ -58,6 +54,20 @@ system:
 
   background_type: "solid-color-background" # unused
 
+  guidance_type: "stable-diffusion-controlnet-guidance"
+  guidance:
+    control_type: "canny"
+    min_step_percent: [0, 0.5, 0.02, 2000]
+    max_step_percent: [0, 0.98, 0.5, 2000]
+    condition_scale: 1.0
+    fixed_size: 512
+    cache_dir: '/root/autodl-tmp/.huggingface_cache'
+
+  prompt_processor_type: "stable-diffusion-prompt-processor"
+  prompt_processor:
+    pretrained_model_name_or_path: "runwayml/stable-diffusion-v1-5"
+    prompt: "Elon Musk is cooking something"
+
   loggers:
     wandb:
       enable: false
@@ -66,6 +76,9 @@ system:
 
   loss:
     lambda_l1: 1.0
+    lambda_p: 1.0
+    lambda_xyz_residual: 1.0
+    lambda_scaling_residual: 1.0
     lambda_G_p: 1.0
     lambda_G_l1: 1.0
 

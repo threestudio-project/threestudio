@@ -231,7 +231,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
                 full_out = self(batch)
                 self.renderer.train()
                 result = self.guidance(
-                    full_out["render"].unsqueeze(0).permute(0, 2, 3, 1),
+                    full_out["refine"].unsqueeze(0).permute(0, 2, 3, 1),
                     origin_gt_rgb,
                     prompt_utils,
                 )
@@ -255,6 +255,13 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             ),
             "loss_p": self.perceptual_loss(
                 out["render"].unsqueeze(0).contiguous(),
+                gt_rgb.permute(0, 3, 1, 2).contiguous(),
+            ).mean(),
+            "loss_G_l1": torch.nn.functional.l1_loss(
+                out["refine"], gt_rgb.permute(0, 3, 1, 2)[0]
+            ),
+            "loss_G_p": self.perceptual_loss(
+                out["refine"].unsqueeze(0).contiguous(),
                 gt_rgb.permute(0, 3, 1, 2).contiguous(),
             ).mean(),
             "loss_xyz_residual": torch.mean(self.geometry.gaussian._xyz_residual**2),
@@ -326,6 +333,13 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             + [
                 {
                     "type": "rgb",
+                    "img": out["refine"].unsqueeze(0).permute(0, 2, 3, 1)[0],
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
+            + [
+                {
+                    "type": "rgb",
                     "img": rgb,
                     "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
                 },
@@ -345,6 +359,13 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
                 {
                     "type": "rgb",
                     "img": out["render"].unsqueeze(0).permute(0, 2, 3, 1)[0],
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
+            + [
+                {
+                    "type": "rgb",
+                    "img": out["refine"].unsqueeze(0).permute(0, 2, 3, 1)[0],
                     "kwargs": {"data_format": "HWC"},
                 },
             ],
