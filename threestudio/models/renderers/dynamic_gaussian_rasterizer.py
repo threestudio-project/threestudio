@@ -26,6 +26,8 @@ class DynamicGaussianRasterizer(Rasterizer):
         near: float = 0.01
         far: float = 100.0
 
+        refine_size: int = 1024
+
     cfg: Config
 
     def configure(
@@ -43,6 +45,9 @@ class DynamicGaussianRasterizer(Rasterizer):
         bg_color: torch.Tensor,
         scaling_modifier=1.0,
         override_color=None,
+        patch_x=None,
+        patch_y=None,
+        patch_S=None,
     ) -> Dict[str, Any]:
         """
         Render the scene.
@@ -138,7 +143,15 @@ class DynamicGaussianRasterizer(Rasterizer):
             cov3D_precomp=cov3D_precomp,
         )
 
-        refine_image = self.geometry.refine_net(rendered_image.unsqueeze(0).detach())
+        refine_input = rendered_image.unsqueeze(0).detach()
+        if patch_x is not None:
+            refine_input = refine_input[
+                :, :, patch_y : patch_y + patch_S, patch_x : patch_x + patch_S
+            ]
+        refine_input = F.interpolate(
+            refine_input, (self.cfg.refine_size, self.cfg.refine_size), mode="bilinear"
+        )
+        refine_image = self.geometry.refine_net(refine_input)
         return {
             "render": rendered_image,
             "refine": refine_image[0],
