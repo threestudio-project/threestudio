@@ -50,7 +50,9 @@ class DynamicImplicitRenderer(VolumeRenderer):
     ) -> Dict[str, Float[Tensor, "..."]]:
         assert kwargs["moment"] is not None
         self.geometry.moment = kwargs["moment"]
-        return self.implicit_renderer(rays_o, rays_d, light_positions, bg_color, **kwargs)
+        return self.implicit_renderer(
+            rays_o, rays_d, light_positions, bg_color, **kwargs
+        )
 
     def update_step(
         self, epoch: int, global_step: int, on_load_weights: bool = False

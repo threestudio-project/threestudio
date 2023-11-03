@@ -25,7 +25,7 @@ class DynamicFlowMLP(BaseImplicitGeometry):
         pos_encoding_config: dict = field(
             default_factory=lambda: {
                 "otype": "ProgressiveBandFrequency",
-                "n_frequencies": 6
+                "n_frequencies": 6,
             }
         )
         time_encoding_config: dict = field(
