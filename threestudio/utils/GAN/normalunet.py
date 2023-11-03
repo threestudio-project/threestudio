@@ -227,7 +227,7 @@ class NormalNet(nn.Module):
         model = [
             nn.ReflectionPad2d(3),
             nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0),
-            nn.GroupNorm(ngf // 4, ngf),
+            nn.BatchNorm2d(ngf),
             activation,
         ]
         ### downsample
@@ -237,7 +237,7 @@ class NormalNet(nn.Module):
                 nn.Conv2d(
                     ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1
                 ),
-                nn.GroupNorm(ngf * mult * 2 // 4, ngf * mult * 2),
+                nn.BatchNorm2d(ngf * mult * 2),
                 activation,
             ]
 
@@ -256,18 +256,12 @@ class NormalNet(nn.Module):
         ### upsample
         for i in range(n_downsampling):
             mult = 2 ** (n_downsampling - i)
-            # model += [nn.Upsample(scale_factor=2), nn.Conv2d(ngf * mult, int(ngf * mult / 2), kernel_size=3, stride=1, padding=1),
-            #            nn.GroupNorm(int(ngf * mult / 2) // 4, int(ngf * mult / 2)), activation]
             model += [
-                nn.ConvTranspose2d(
-                    ngf * mult,
-                    int(ngf * mult / 2),
-                    kernel_size=3,
-                    stride=2,
-                    padding=1,
-                    output_padding=1,
+                nn.Upsample(scale_factor=2),
+                nn.Conv2d(
+                    ngf * mult, int(ngf * mult / 2), kernel_size=3, stride=1, padding=1
                 ),
-                nn.GroupNorm(int(ngf * mult / 2) // 4, int(ngf * mult / 2)),
+                nn.BatchNorm2d(int(ngf * mult / 2)),
                 activation,
             ]
         model += [
@@ -307,7 +301,7 @@ class ResnetBlock(nn.Module):
 
         conv_block += [
             nn.Conv2d(dim, dim, kernel_size=3, padding=p),
-            nn.GroupNorm(dim // 4, dim),
+            nn.BatchNorm2d(dim),
             activation,
         ]
         if use_dropout:
@@ -324,7 +318,7 @@ class ResnetBlock(nn.Module):
             raise NotImplementedError("padding [%s] is not implemented" % padding_type)
         conv_block += [
             nn.Conv2d(dim, dim, kernel_size=3, padding=p),
-            nn.GroupNorm(dim // 4, dim),
+            nn.BatchNorm2d(dim),
         ]
 
         return nn.Sequential(*conv_block)
