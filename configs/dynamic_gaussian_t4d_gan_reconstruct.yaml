@@ -1,0 +1,106 @@
+name: "dynamic-gaussian-reconstruct"
+tag: "${rmspace:${system.prompt_processor.prompt},_}"
+exp_root_dir: "outputs"
+seed: 0
+
+data_type: "dynamic-multiview-camera-datamodule"
+data:
+  train_downsample_resolution: 2
+  eval_downsample_resolution: 2
+  eval_data_interval: 1
+  camera_layout: "default"
+  initial_t0_step: 2000
+  dataroot: ???
+
+system_type: "dynamic-gaussian-splatting-gan-reconstruct-system"
+system:
+
+  extent: 1.0
+  num_pts: 5000
+  invert_bg_prob: 1.0
+
+  geometry_type: "dynamic-gaussian"
+  geometry:
+    gaussian_name: "gaussian"
+    gaussian:
+      position_lr_init: 0.00016
+      position_lr_final:  0.0000016
+      position_lr_delay_mult: 0.01
+      position_lr_max_steps: 30000
+      feature_lr: 0.0025
+      opacity_lr: 0.05
+      scaling_lr: 0.005
+      rotation_lr: 0.001
+      percent_dense: 0.01
+      densification_interval: 100
+      opacity_reset_interval: 200000
+      densify_from_iter: 500
+      densify_until_iter: 15000
+      densify_grad_threshold: 0.0002
+      min_opac_prune: 0.05
+      force_sphere: True
+    dynamic_flow_name: "dynamic-flow-tensor4d"
+    dynamic_flow_config:
+      n_feature_dims: 7
+      need_normalization: True
+      bbox_min: [-1, -1, -1]
+      bbox_max: [1, 1, 1]
+
+
+  renderer_type: "dynamic-gaussian-rasterizer"
+  renderer:
+    debug: false
+    invert_bg_prob: 0.5
+
+  material_type: "no-material" # unused
+  material:
+    n_output_dims: 0
+
+  background_type: "solid-color-background" # unused
+
+  loggers:
+    wandb:
+      enable: false
+      project: 'threestudio'
+      name: None
+
+  loss:
+    lambda_l1: 1.0
+    lambda_G_p: 1.0
+    lambda_G_l1: 1.0
+    lambda_G_dis: 0.001
+    lambda_D: 1.0
+
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+    params:
+      geometry.dynamic_flow:
+        lr: 0.001
+      geometry.refine_net:
+        lr: 0.0002
+    optimizer_dis:
+      name: Adam
+      args:
+        lr: 0.01
+        betas: [0.9, 0.99]
+        eps: 1.e-15
+      params:
+        geometry.discriminator:
+          lr: 0.00001
+
+trainer:
+  max_steps: 30000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 1000
+  enable_progress_bar: true
+  precision: 32-true
+
+checkpoint:
+  save_last: true # save at each validation time
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}

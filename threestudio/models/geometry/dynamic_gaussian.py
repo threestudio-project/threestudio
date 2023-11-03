@@ -27,6 +27,7 @@ from torch.nn import functional as F
 import threestudio
 from threestudio.models.geometry.base import BaseGeometry
 from threestudio.models.geometry.gaussian import BasicPointCloud, GaussianModel
+from threestudio.utils.GAN.discriminator import NLayerDiscriminator, weights_init
 from threestudio.utils.GAN.normalunet import NormalNet
 from threestudio.utils.typing import *
 
@@ -36,7 +37,7 @@ class DynamicGaussianModel(BaseGeometry):
     @dataclass
     class Config(BaseGeometry.Config):
         gaussian_name: str = ""
-        gaussian: Optional[GaussianModel.Config] = None
+        gaussian: Optional[BaseGeometry.Config] = None
         dynamic_flow_name: str = ""
         dynamic_flow_config: Optional[BaseGeometry.Config] = None
 
@@ -51,6 +52,9 @@ class DynamicGaussianModel(BaseGeometry):
             self.cfg.dynamic_flow_config
         )
         self.refine_net = NormalNet(ngf=32, n_downsampling=3, n_blocks=3)
+        self.discriminator = NLayerDiscriminator(
+            input_nc=3, n_layers=3, use_actnorm=False, ndf=64
+        ).apply(weights_init)
 
         if len(self.cfg.geometry_convert_from) > 0:
             print("Loading point cloud from %s" % self.cfg.geometry_convert_from)
@@ -97,6 +101,18 @@ class DynamicGaussianModel(BaseGeometry):
                     else:
                         new_ckpt_dict[key] = self.refine_net.state_dict()[key]
                 self.refine_net.load_state_dict(new_ckpt_dict)
+
+                new_ckpt_dict = {}
+                for key in self.discriminator.state_dict():
+                    if ckpt_dict["state_dict"].__contains__(
+                        "geometry.discriminator." + key
+                    ):
+                        new_ckpt_dict[key] = ckpt_dict["state_dict"][
+                            "geometry.discriminator." + key
+                        ]
+                    else:
+                        new_ckpt_dict[key] = self.discriminator.state_dict()[key]
+                self.discriminator.load_state_dict(new_ckpt_dict)
             elif self.cfg.geometry_convert_from.endswith(".ply"):
                 plydata = PlyData.read(self.cfg.geometry_convert_from)
                 vertices = plydata["vertex"]
