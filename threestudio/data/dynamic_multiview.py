@@ -96,9 +96,12 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
         frames_position = []
         frames_direction = []
         frames_img = []
+        frames_mask = []
         frames_moment = []
-        self.frame_file_path = []
-        self.frame_intrinsic = []
+        self.frames_file_path = []
+        self.frames_mask_path = []
+        self.frames_intrinsic = []
+        self.frames_bbox = []
 
         self.frames_t0 = []
         self.step = 0
@@ -147,10 +150,6 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
                 img = cv2.resize(img, (self.frame_w, self.frame_h))
                 img: Float[Tensor, "H W 3"] = torch.FloatTensor(img) / 255
                 frames_img.append(img)
-            self.frame_file_path.append(frame_path)
-
-            self.frame_intrinsic.append(intrinsic)
-            if not self.cfg.online_load_image:
                 direction: Float[Tensor, "H W 3"] = get_ray_directions(
                     self.frame_h,
                     self.frame_w,
@@ -159,6 +158,21 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
                     use_pixel_centers=False,
                 )
                 frames_direction.append(direction)
+                if frame.__contains__("mask_path"):
+                    mask_path = os.path.join(self.cfg.dataroot, frame["mask_path"])
+                    mask = cv2.imread(mask_path)
+                    mask = cv2.resize(mask, (self.frame_w, self.frame_h))
+                    mask: Float[Tensor, "H W 3"] = torch.FloatTensor(mask) / 255
+                    frames_mask.append(mask)
+
+            if frame.__contains__("bbox"):
+                self.frames_bbox.append(torch.FloatTensor(frame["bbox"]) / scale)
+
+            self.frames_file_path.append(frame_path)
+            if frame.__contains__("mask_path"):
+                mask_path = os.path.join(self.cfg.dataroot, frame["mask_path"])
+                self.frames_mask_path.append(mask_path)
+            self.frames_intrinsic.append(intrinsic)
 
             c2w = c2w_list[idx]
             camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
@@ -188,6 +202,10 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
         self.frames_position: Float[Tensor, "B 3"] = torch.stack(frames_position, dim=0)
         if not self.cfg.online_load_image:
             self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
+            if len(frames_mask) > 0:
+                self.frames_mask: Float[Tensor, "B H W 3"] = torch.stack(
+                    frames_mask, dim=0
+                )
             self.frames_direction: Float[Tensor, "B H W 3"] = torch.stack(
                 frames_direction, dim=0
             )
@@ -202,6 +220,11 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
         self.light_positions: Float[Tensor, "B 3"] = torch.zeros_like(
             self.frames_position
         )
+
+        if len(self.frames_bbox) > 0:
+            self.frames_bbox: Float[Tensor, "B 4"] = torch.stack(
+                self.frames_bbox, dim=0
+            )
 
     def __iter__(self):
         while True:
@@ -223,13 +246,25 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             frame_img = self.frames_img[index : index + 1]
             rays_o = self.rays_o[index : index + 1]
             rays_d = self.rays_d[index : index + 1]
+            if len(self.frames_mask_path) > 0:
+                mask_img = self.frames_mask[index : index + 1]
+            else:
+                mask_img = torch.ones_like(frame_img)
         else:
-            img = cv2.imread(self.frame_file_path[index])[:, :, ::-1]
+            img = cv2.imread(self.frames_file_path[index])[:, :, ::-1]
             img = cv2.resize(img, (self.frame_w, self.frame_h))
+            if len(self.frames_mask_path) > 0:
+                mask = cv2.imread(self.frames_mask_path[index])
+            else:
+                mask = np.ones_like(img)
+
             frame_img: Float[Tensor, "H W 3"] = (
                 torch.FloatTensor(img).unsqueeze(0) / 255
             )
-            intrinsic = self.frame_intrinsic[index]
+            mask_img: Float[Tensor, "H W 3"] = (
+                torch.FloatTensor(mask).unsqueeze(0) / 255
+            )
+            intrinsic = self.frames_intrinsic[index]
             frame_direction = get_ray_directions(
                 self.frame_h,
                 self.frame_w,
@@ -240,7 +275,7 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             rays_o, rays_d = get_rays(
                 frame_direction, self.frames_c2w[index : index + 1], keepdim=True
             )
-        return {
+        return_dict = {
             "index": index,
             "rays_o": rays_o,
             "rays_d": rays_d,
@@ -250,10 +285,18 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             "camera_positions": self.frames_position[index : index + 1],
             "light_positions": self.light_positions[index : index + 1],
             "gt_rgb": frame_img,
+            "frame_mask": mask_img,
             "height": self.frame_h,
             "width": self.frame_w,
             "moment": self.frames_moment[index : index + 1],
         }
+        if len(self.frames_bbox) > 0:
+            return_dict.update(
+                {
+                    "frame_bbox": self.frames_bbox[index : index + 1],
+                }
+            )
+        return return_dict
 
 
 class DynamicMultiviewDataset(Dataset):
@@ -277,6 +320,7 @@ class DynamicMultiviewDataset(Dataset):
         frames_direction = []
         frames_img = []
         frames_moment = []
+        self.frames_bbox = []
 
         self.frame_w = frames[0]["w"] // scale
         self.frame_h = frames[0]["h"] // scale
@@ -321,6 +365,9 @@ class DynamicMultiviewDataset(Dataset):
             intrinsic[1, 1] = frame["fl_y"] / scale
             intrinsic[0, 2] = frame["cx"] / scale
             intrinsic[1, 2] = frame["cy"] / scale
+            if frame.__contains__("bbox"):
+                bbox0 = torch.FloatTensor(frames[idx0]["bbox"]) / scale
+                bbox1 = torch.FloatTensor(frames[idx1]["bbox"]) / scale
             for ratio in np.linspace(0, 1, eval_nums):
                 img: Float[Tensor, "H W 3"] = torch.zeros(
                     (self.frame_h, self.frame_w, 3)
@@ -352,6 +399,8 @@ class DynamicMultiviewDataset(Dataset):
                 frames_position.append(camera_position)
                 frames_direction.append(direction)
                 frames_moment.append(moment)
+                if frame.__contains__("bbox"):
+                    self.frames_bbox.append(bbox0 * (1 - ratio) + bbox1 * ratio)
         else:
             for idx, frame in tqdm(enumerate(frames)):
                 intrinsic: Float[Tensor, "4 4"] = torch.eye(4)
@@ -388,6 +437,8 @@ class DynamicMultiviewDataset(Dataset):
                     moment[0] = frame["moment"]
                 else:
                     moment[0] = 0
+                if frame.__contains__("bbox"):
+                    self.frames_bbox.append(torch.FloatTensor(frame["bbox"]) / scale)
 
                 frames_proj.append(proj)
                 frames_c2w.append(c2w)
@@ -414,12 +465,16 @@ class DynamicMultiviewDataset(Dataset):
         self.light_positions: Float[Tensor, "B 3"] = torch.zeros_like(
             self.frames_position
         )
+        if len(self.frames_bbox) > 0:
+            self.frames_bbox: Float[Tensor, "B 4"] = torch.stack(
+                self.frames_bbox, dim=0
+            )
 
     def __len__(self):
         return self.frames_proj.shape[0]
 
     def __getitem__(self, index):
-        return {
+        return_dict = {
             "index": index,
             "rays_o": self.rays_o[index],
             "rays_d": self.rays_d[index],
@@ -431,6 +486,13 @@ class DynamicMultiviewDataset(Dataset):
             "gt_rgb": self.frames_img[index],
             "moment": self.frames_moment[index],
         }
+        if len(self.frames_bbox) > 0:
+            return_dict.update(
+                {
+                    "frame_bbox": self.frames_bbox[index],
+                }
+            )
+        return return_dict
 
     def __iter__(self):
         while True:
