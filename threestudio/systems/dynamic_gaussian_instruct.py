@@ -9,6 +9,7 @@ import threestudio
 from threestudio.models.geometry.gaussian import BasicPointCloud
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
+from threestudio.utils.GAN.loss import discriminator_loss, generator_loss
 from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.perceptual import PerceptualLoss
 from threestudio.utils.typing import *
@@ -142,12 +143,14 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         self.prompt_utils = self.prompt_processor()
 
         self.edit_frames = {}
+        self.edit_patches = {}
 
     def configure_optimizers(self):
         g_optim = self.geometry.gaussian_optimizer
         d_optim = parse_optimizer(self.cfg.optimizer, self)
+        dis_optim = parse_optimizer(self.cfg.optimizer.optimizer_dis, self)
 
-        return g_optim, d_optim
+        return g_optim, d_optim, dis_optim
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         lr_max_step = self.geometry.gaussian.cfg.position_lr_max_steps
@@ -180,6 +183,9 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             viewpoint_cam,
             batch["moment"][0],
             self.background_tensor,
+            patch_x=batch["patch_x"],
+            patch_y=batch["patch_y"],
+            patch_S=batch["patch_S"],
         )
 
         return {
@@ -200,8 +206,33 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         self.geometry.training_setup()
         super().on_load_checkpoint(ckpt_dict)
 
+    def get_patch(self, batch):
+        origin_gt_rgb = batch["gt_rgb"]
+        B, H, W, C = origin_gt_rgb.shape
+
+        S = 512
+        if batch.__contains__("frame_bbox"):
+            bbox = batch["frame_bbox"][0]
+            x1, y1, x2, y2 = (
+                bbox[0].item(),
+                bbox[1].item(),
+                bbox[2].item(),
+                bbox[3].item(),
+            )
+            center_x = (x1 + x2) / 2
+            center_y = (y1 + y2) / 2
+            patch_x = int(min(max(0, center_x - S // 2), W - S - 1))
+            patch_y = int(min(max(0, center_y - S // 2), H - S - 1))
+        else:
+            patch_x = W // 2 - S // 2
+            patch_y = H // 2 - S // 2
+        batch["patch_x"] = patch_x
+        batch["patch_y"] = patch_y
+        batch["patch_S"] = S
+        return batch
+
     def training_step(self, batch, batch_idx):
-        g_opt, d_opt = self.optimizers()
+        g_opt, d_opt, dis_opt = self.optimizers()
 
         if torch.is_tensor(batch["index"]):
             batch_index = batch["index"].item()
@@ -209,18 +240,14 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             batch_index = batch["index"]
         origin_gt_rgb = batch["gt_rgb"]
         B, H, W, C = origin_gt_rgb.shape
-        if batch_index in self.edit_frames:
-            gt_rgb = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
-            gt_rgb = torch.nn.functional.interpolate(
-                gt_rgb.permute(0, 3, 1, 2), (H, W), mode="bilinear", align_corners=False
-            ).permute(0, 2, 3, 1)
-            batch["gt_rgb"] = gt_rgb
-        else:
-            gt_rgb = origin_gt_rgb
+        batch = self.get_patch(batch)
 
+        S = batch["patch_S"]
+        patch_x = batch["patch_x"]
+        patch_y = batch["patch_y"]
         if (
             self.cfg.per_editing_step > 0
-            and self.global_step > self.cfg.start_editing_step
+            and self.global_step >= self.cfg.start_editing_step
         ):
             prompt_utils = self.prompt_processor()
             if (
@@ -230,33 +257,70 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
                 self.renderer.eval()
                 full_out = self(batch)
                 self.renderer.train()
+                refine_size = full_out["refine"].shape[-1]
+                if batch.__contains__("frame_mask"):
+                    guidance_input = torch.zeros(
+                        B, refine_size, refine_size, 4, device=origin_gt_rgb.device
+                    )
+
+                    mask = batch["frame_mask"][
+                        :, patch_y : patch_y + S, patch_x : patch_x + S
+                    ]
+                    origin_patch_gt_rgb = origin_gt_rgb[
+                        :, patch_y : patch_y + S, patch_x : patch_x + S
+                    ]
+                    mask = torch.nn.functional.interpolate(
+                        mask.permute(0, 3, 1, 2),
+                        (refine_size, refine_size),
+                        mode="bilinear",
+                    ).permute(0, 2, 3, 1)
+                    origin_patch_gt_rgb = torch.nn.functional.interpolate(
+                        origin_patch_gt_rgb.permute(0, 3, 1, 2),
+                        (refine_size, refine_size),
+                        mode="bilinear",
+                    ).permute(0, 2, 3, 1)
+
+                    guidance_input[:, :, :, :3] = full_out["refine"].unsqueeze(
+                        0
+                    ).permute(0, 2, 3, 1) * mask[:, :, :, :1] + origin_patch_gt_rgb * (
+                        1 - mask[:, :, :, :1]
+                    )
+                    guidance_input[:, :, :, 3] = 1.0 - mask[:, :, :, 0]
+                else:
+                    guidance_input = (
+                        full_out["refine"]
+                        .unsqueeze(0)
+                        .permute(0, 2, 3, 1)[
+                            :, patch_y : patch_y + S, patch_x : patch_x + S
+                        ]
+                    )
                 result = self.guidance(
-                    full_out["refine"].unsqueeze(0).permute(0, 2, 3, 1),
-                    origin_gt_rgb,
+                    guidance_input,
+                    origin_gt_rgb[:, patch_y : patch_y + S, patch_x : patch_x + S],
                     prompt_utils,
                 )
                 self.edit_frames[batch_index] = result["edit_images"].detach().cpu()
+                self.edit_patches[batch_index] = (patch_x, patch_y)
+
+        gt_rgb = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
+        resize_gt_rgb = torch.nn.functional.interpolate(
+            gt_rgb.permute(0, 3, 1, 2), (S, S), mode="bilinear"
+        ).permute(0, 2, 3, 1)
+        origin_gt_rgb[:, patch_y : patch_y + S, patch_x : patch_x + S] = resize_gt_rgb
+        gt_patch_x, gt_patch_y = self.edit_patches[batch_index]
 
         out = self(batch)
 
         visibility_filter = out["visibility_filter"]
         radii = out["radii"]
-        guidance_inp = out["render"].unsqueeze(0).permute(0, 2, 3, 1)
         viewspace_point_tensor = out["viewspace_points"]
 
         bg_color = out["bg_color"]
-        # mask = torch.sum(origin_gt_rgb, dim=-1).unsqueeze(-1)
-        # mask = (mask > 1e-3).float()
-        # gt_rgb = gt_rgb * mask + (1 - mask) * bg_color.reshape(1, 1, 1, 3)
 
         guidance_out = {
             "loss_l1": torch.nn.functional.l1_loss(
-                out["render"], gt_rgb.permute(0, 3, 1, 2)[0]
+                out["render"], origin_gt_rgb.permute(0, 3, 1, 2)[0]
             ),
-            "loss_p": self.perceptual_loss(
-                out["render"].unsqueeze(0).contiguous(),
-                gt_rgb.permute(0, 3, 1, 2).contiguous(),
-            ).mean(),
             "loss_G_l1": torch.nn.functional.l1_loss(
                 out["refine"], gt_rgb.permute(0, 3, 1, 2)[0]
             ),
@@ -264,6 +328,11 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
                 out["refine"].unsqueeze(0).contiguous(),
                 gt_rgb.permute(0, 3, 1, 2).contiguous(),
             ).mean(),
+            "loss_G_dis": generator_loss(
+                self.geometry.discriminator,
+                gt_rgb.permute(0, 3, 1, 2),
+                out["refine"].unsqueeze(0),
+            ),
             "loss_xyz_residual": torch.mean(self.geometry.gaussian._xyz_residual**2),
             "loss_scaling_residual": torch.mean(
                 self.geometry.gaussian._xyz_residual**2
@@ -305,9 +374,21 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         g_opt.zero_grad(set_to_none=True)
         d_opt.zero_grad(set_to_none=True)
 
+        loss_D = discriminator_loss(
+            self.renderer.geometry.discriminator,
+            gt_rgb.permute(0, 3, 1, 2),
+            out["refine"].unsqueeze(0),
+        )
+        loss_D *= self.C(self.cfg.loss["lambda_D"])
+        self.log("train/loss_D", loss_D)
+        loss_D.backward()
+        dis_opt.step()
+        dis_opt.zero_grad(set_to_none=True)
+
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
+        batch = self.get_patch(batch)
         out = self(batch)
         if torch.is_tensor(batch["index"]):
             batch_index = batch["index"].item()
@@ -352,6 +433,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         pass
 
     def test_step(self, batch, batch_idx):
+        batch = self.get_patch(batch)
         out = self(batch)
         self.save_image_grid(
             f"it{self.global_step}-test/{batch['index'][0]}.jpg",
