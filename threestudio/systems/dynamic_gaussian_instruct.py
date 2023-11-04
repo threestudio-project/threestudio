@@ -1,15 +1,19 @@
+import json
 import math
 import os
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 import torch
+from tqdm import tqdm
 
 import threestudio
 from threestudio.models.geometry.gaussian import BasicPointCloud
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
 from threestudio.utils.GAN.loss import discriminator_loss, generator_loss
+from threestudio.utils.gaussian.loss import l1_loss, ssim
 from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.perceptual import PerceptualLoss
 from threestudio.utils.typing import *
@@ -98,6 +102,8 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         per_editing_step: int = 10
         start_editing_step: int = 1000
 
+        edit_path: str = ""
+
     cfg: Config
 
     def configure(self) -> None:
@@ -144,6 +150,19 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
 
         self.edit_frames = {}
         self.edit_patches = {}
+        self.edit_json = {}
+
+        if self.cfg.edit_path != "":
+            edit_json = dict(
+                json.load(open(os.path.join(self.cfg.edit_path, "edit.json"), "r"))
+            )
+            for key in tqdm(edit_json):
+                img = cv2.imread(
+                    os.path.join(self.cfg.edit_path, edit_json[key]["file_path"])
+                )
+                img = torch.FloatTensor(img[:, :, ::-1].copy()).unsqueeze(0) / 255
+                self.edit_frames[int(key)] = img
+                self.edit_patches[int(key)] = edit_json[key]["patches"]
 
     def configure_optimizers(self):
         g_optim = self.geometry.gaussian_optimizer
@@ -265,7 +284,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
 
                     mask = batch["frame_mask"][
                         :, patch_y : patch_y + S, patch_x : patch_x + S
-                    ]
+                    ].clone()
                     origin_patch_gt_rgb = origin_gt_rgb[
                         :, patch_y : patch_y + S, patch_x : patch_x + S
                     ]
@@ -302,6 +321,22 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
                 self.edit_frames[batch_index] = result["edit_images"].detach().cpu()
                 self.edit_patches[batch_index] = (patch_x, patch_y)
 
+                save_path = self.get_save_path("edit")
+                os.makedirs(save_path, exist_ok=True)
+                self.edit_json[batch_index] = {}
+                self.edit_json[batch_index]["file_path"] = "%05d.jpg" % batch_index
+                self.edit_json[batch_index]["patches"] = [patch_x, patch_y]
+                save_img = self.edit_frames[batch_index]
+                cv2.imwrite(
+                    os.path.join(save_path, "%05d.jpg" % batch_index),
+                    (save_img.clamp(0, 1).numpy() * 255).astype(np.uint8)[0][
+                        :, :, ::-1
+                    ],
+                )
+                json.dump(
+                    self.edit_json, open(os.path.join(save_path, "edit.json"), "w")
+                )
+
         gt_rgb = self.edit_frames[batch_index].to(batch["gt_rgb"].device)
         resize_gt_rgb = torch.nn.functional.interpolate(
             gt_rgb.permute(0, 3, 1, 2), (S, S), mode="bilinear"
@@ -335,12 +370,16 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             ),
             "loss_xyz_residual": torch.mean(self.geometry.gaussian._xyz_residual**2),
             "loss_scaling_residual": torch.mean(
-                self.geometry.gaussian._xyz_residual**2
+                self.geometry.gaussian._scaling_residual**2
             ),
+            "loss_flow_residual": torch.mean(out["dynamic_feature_residual"] ** 2),
         }
 
         loss = 0.0
-        loss_l1 = guidance_out["loss_l1"] * self.C(self.cfg.loss["lambda_l1"])
+        Ll1 = l1_loss(out["render"], origin_gt_rgb.permute(0, 3, 1, 2)[0])
+        loss_l1 = (1.0 - 0.2) * Ll1 + 0.2 * (
+            1.0 - ssim(out["render"], origin_gt_rgb.permute(0, 3, 1, 2)[0])
+        )
 
         self.log(
             "gauss_num",

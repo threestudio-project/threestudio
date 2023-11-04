@@ -10,6 +10,7 @@ from threestudio.models.geometry.gaussian import BasicPointCloud
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.systems.utils import parse_optimizer, parse_scheduler
 from threestudio.utils.GAN.loss import discriminator_loss, generator_loss
+from threestudio.utils.gaussian.loss import l1_loss, ssim
 from threestudio.utils.misc import cleanup, get_device
 from threestudio.utils.perceptual import PerceptualLoss
 from threestudio.utils.typing import *
@@ -270,7 +271,10 @@ class DynamicGaussianSplattingGANReconstruction(BaseLift3DSystem):
         }
 
         loss = 0.0
-        loss_l1 = guidance_out["loss_l1"] * self.C(self.cfg.loss["lambda_l1"])
+        Ll1 = l1_loss(out["render"], gt_rgb.permute(0, 3, 1, 2)[0])
+        loss_l1 = (1.0 - 0.2) * Ll1 + 0.2 * (
+            1.0 - ssim(out["render"], gt_rgb.permute(0, 3, 1, 2)[0])
+        )
 
         self.log(
             "gauss_num",
