@@ -234,7 +234,7 @@ class GaussianResidualModel(BaseGeometry):
                 .repeat(1, 3)
             )
             return self.scaling_activation(scales)
-        return self.scaling_activation(self._scaling)
+        return self.scaling_activation(self._scaling + self._scaling_residual)
 
     @property
     def get_rotation(self):

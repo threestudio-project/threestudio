@@ -43,6 +43,8 @@ class DynamicGaussianModel(BaseGeometry):
 
         geometry_convert_from: str = ""
 
+        flow_residual: bool = False
+
     cfg: Config
 
     def configure(self) -> None:
@@ -51,7 +53,10 @@ class DynamicGaussianModel(BaseGeometry):
         self.dynamic_flow = threestudio.find(self.cfg.dynamic_flow_name)(
             self.cfg.dynamic_flow_config
         )
-        self.refine_net = NormalNet(ngf=32, n_downsampling=3, n_blocks=3)
+        self.dynamic_flow_residual = threestudio.find(self.cfg.dynamic_flow_name)(
+            self.cfg.dynamic_flow_config
+        )
+        self.refine_net = NormalNet(ngf=32, n_downsampling=3, n_blocks=3, last_op=None)
         self.discriminator = NLayerDiscriminator(
             input_nc=3, n_layers=3, use_actnorm=False, ndf=64
         ).apply(weights_init)

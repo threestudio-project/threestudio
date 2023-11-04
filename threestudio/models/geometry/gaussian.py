@@ -672,7 +672,7 @@ class GaussianModel(BaseGeometry):
                 self.densify_and_prune(
                     self.cfg.densify_grad_threshold,
                     self.cfg.min_opac_prune,
-                    1.0,
+                    1000.0,
                     size_threshold,
                 )
 
