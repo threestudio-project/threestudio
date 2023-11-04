@@ -24,7 +24,7 @@ system:
 
   geometry_type: "dynamic-gaussian"
   geometry:
-    gaussian_name: "gaussian-residual"
+    gaussian_name: "gaussian-residual-volume"
     gaussian:
       position_lr_init: 0.00016
       position_lr_final:  0.0000016
@@ -34,7 +34,7 @@ system:
       opacity_lr: 0.05
       scaling_lr: 0.005
       rotation_lr: 0.001
-      force_sphere: True
+      force_sphere: False
     dynamic_flow_name: "dynamic-flow-tensor4d"
     dynamic_flow_config:
       n_feature_dims: 7
@@ -57,8 +57,8 @@ system:
   guidance_type: "stable-diffusion-controlnet-guidance"
   guidance:
     control_type: "canny"
-    min_step_percent: [0, 0.5, 0.02, 2000]
-    max_step_percent: [0, 0.98, 0.5, 2000]
+    min_step_percent: [0, 0.5, 0.2, 2000]
+    max_step_percent: [0, 0.98, 0.98, 2000]
     condition_scale: 1.0
     fixed_size: 512
     cache_dir: '/root/autodl-tmp/.huggingface_cache'
@@ -90,7 +90,7 @@ system:
       eps: 1.e-15
     params:
       geometry.dynamic_flow:
-        lr: 0.001
+        lr: 0.0001
       geometry.refine_net:
         lr: 0.0002
 

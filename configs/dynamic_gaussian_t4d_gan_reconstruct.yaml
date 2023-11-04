@@ -33,12 +33,12 @@ system:
       rotation_lr: 0.001
       percent_dense: 0.01
       densification_interval: 100
-      opacity_reset_interval: 200000
+      opacity_reset_interval: 2000
       densify_from_iter: 500
       densify_until_iter: 15000
       densify_grad_threshold: 0.0002
-      min_opac_prune: 0.05
-      force_sphere: True
+      min_opac_prune: 0.005
+      force_sphere: False
     dynamic_flow_name: "dynamic-flow-tensor4d"
     dynamic_flow_config:
       n_feature_dims: 7
