@@ -255,6 +255,7 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             img = cv2.resize(img, (self.frame_w, self.frame_h))
             if len(self.frames_mask_path) > 0:
                 mask = cv2.imread(self.frames_mask_path[index])
+                mask = cv2.resize(mask, (self.frame_w, self.frame_h))
             else:
                 mask = np.ones_like(img)
 
