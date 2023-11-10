@@ -27,6 +27,7 @@ class DynamicGaussianRasterizer(Rasterizer):
         far: float = 100.0
 
         refine_size: int = 1024
+        need_refine: bool = True
 
     cfg: Config
 
@@ -111,7 +112,8 @@ class DynamicGaussianRasterizer(Rasterizer):
         rotations = pc._rotation
 
         dynamic_feature_residual = None
-        if moment.item() > 1e-6:
+        dynamic_feature = None
+        if moment.item() > 1e-6 or torch.randint(0, 1000, (1,)).item() % 2 == 0:
             dynamic_feature = dynamic_gaussian(means3D, moment.item())
             dynamic_means3D = dynamic_feature["features"][..., :3]
             dynamic_rotations = dynamic_feature["features"][..., 3:]
@@ -151,22 +153,34 @@ class DynamicGaussianRasterizer(Rasterizer):
         )
 
         if self.cfg.refine_size > 0:
-            refine_input = rendered_image.unsqueeze(0).detach()
-            if patch_x is not None:
-                refine_input = refine_input[
-                    :, :, patch_y : patch_y + patch_S, patch_x : patch_x + patch_S
-                ]
-            refine_input = F.interpolate(
-                refine_input,
-                (self.cfg.refine_size, self.cfg.refine_size),
-                mode="bilinear",
-            )
-            refine_image = torch.sigmoid(
-                torch.logit(refine_input.clamp(0.01, 0.99))
-                + self.geometry.refine_net(refine_input)
-            )
+            if self.cfg.need_refine:
+                refine_input = rendered_image.unsqueeze(0).detach()
+                if patch_x is not None:
+                    refine_input = refine_input[
+                        :, :, patch_y : patch_y + patch_S, patch_x : patch_x + patch_S
+                    ]
+                refine_input = F.interpolate(
+                    refine_input,
+                    (self.cfg.refine_size, self.cfg.refine_size),
+                    mode="bilinear",
+                )
+                refine_image = torch.sigmoid(
+                    torch.logit(refine_input.clamp(0.01, 0.99))
+                    + self.geometry.refine_net(refine_input)
+                )
+            else:
+                refine_input = rendered_image.unsqueeze(0)
+                if patch_x is not None:
+                    refine_input = refine_input[
+                        :, :, patch_y : patch_y + patch_S, patch_x : patch_x + patch_S
+                    ]
+                refine_image = F.interpolate(
+                    refine_input,
+                    (self.cfg.refine_size, self.cfg.refine_size),
+                    mode="bilinear",
+                )
         else:
-            refine_image = rendered_image.unsqueeze(0).detach()
+            refine_image = rendered_image.unsqueeze(0)
         return {
             "render": rendered_image,
             "refine": refine_image[0],
@@ -175,4 +189,5 @@ class DynamicGaussianRasterizer(Rasterizer):
             "radii": radii,
             "bg_color": bg_color,
             "dynamic_feature_residual": dynamic_feature_residual,
+            "dynamic_feature": dynamic_feature,
         }
