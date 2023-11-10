@@ -51,6 +51,7 @@ system:
   renderer:
     debug: false
     invert_bg_prob: 0.5
+    need_refine: false
 
   material_type: "no-material" # unused
   material:

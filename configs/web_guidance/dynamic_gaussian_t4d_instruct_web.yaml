@@ -1,0 +1,17 @@
+system:
+  web_dataset:
+    downsample_resolution: 2
+    dataroot: "/root/autodl-tmp/threestudio/dataset/n3d_video_dynamic_pose_editing"
+
+  web_guidance:
+    # json_path: "/root/autodl-tmp/ComfyUI/config/n3d_sdxl_elon_musk_api.json"
+    # json_path: "/root/autodl-tmp/ComfyUI/config/n3d_jugger_elon_musk_api.json"
+    json_path: "/root/autodl-tmp/ComfyUI/config/n3d_nvidia_api.json"
+    server_address: "127.0.0.1:8188"
+
+    rgb_name: "rgb.jpg"
+    cond_rgb_name: "cond_rgb.jpg"
+    server_path: "/root/autodl-tmp/ComfyUI/input"
+
+    min_step_percent: [0, 0.5, 0.2, 2000]
+    max_step_percent: [0, 0.98, 0.7, 2000]

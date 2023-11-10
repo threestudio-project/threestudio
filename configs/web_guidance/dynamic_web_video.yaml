@@ -1,0 +1,16 @@
+system:
+  web_dataset:
+    downsample_resolution: 1
+    dataroot: "/root/autodl-tmp/threestudio/dataset/enerf_actor1_dynamic_editing2"
+
+  web_guidance:
+    json_path: "/root/autodl-tmp/ComfyUI/config/enerf_sdxl_temporal_ironman_api.json"
+    static_json_path: "/root/autodl-tmp/ComfyUI/config/enerf_sdxl_temporal_ironman_api_static.json"
+    server_address: "127.0.0.1:8188"
+
+    rgb_name: "/root/autodl-tmp/threestudio/.threestudio_cache/images_20231110171243"
+    cond_rgb_name: "/root/autodl-tmp/threestudio/.threestudio_cache/cond_images_20231110171243"
+    server_path: "/root/autodl-tmp/ComfyUI/input"
+
+    min_step_percent: [0, 0.5, 0.2, 2000]
+    max_step_percent: [0, 0.98, 0.7, 2000]
