@@ -3,6 +3,7 @@ from . import (
     dreamfusion,
     dynamic_control4d,
     dynamic_gaussian,
+    dynamic_gaussian_du,
     dynamic_gaussian_gan_reconstruction,
     dynamic_gaussian_instruct,
     dynamic_gaussian_reconstruction,
