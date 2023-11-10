@@ -256,14 +256,11 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             if len(self.frames_mask_path) > 0:
                 mask = cv2.imread(self.frames_mask_path[index])
                 mask = cv2.resize(mask, (self.frame_w, self.frame_h))
-            else:
-                mask = np.ones_like(img)
-
+                mask_img: Float[Tensor, "H W 3"] = (
+                    torch.FloatTensor(mask).unsqueeze(0) / 255
+                )
             frame_img: Float[Tensor, "H W 3"] = (
                 torch.FloatTensor(img).unsqueeze(0) / 255
-            )
-            mask_img: Float[Tensor, "H W 3"] = (
-                torch.FloatTensor(mask).unsqueeze(0) / 255
             )
             intrinsic = self.frames_intrinsic[index]
             frame_direction = get_ray_directions(
@@ -286,11 +283,17 @@ class DynamicMultiviewIterableDataset(IterableDataset, Updateable):
             "camera_positions": self.frames_position[index : index + 1],
             "light_positions": self.light_positions[index : index + 1],
             "gt_rgb": frame_img,
-            "frame_mask": mask_img,
             "height": self.frame_h,
             "width": self.frame_w,
             "moment": self.frames_moment[index : index + 1],
+            "file_path": self.frames_file_path[index],
         }
+        if len(self.frames_mask_path) > 0:
+            return_dict.update(
+                {
+                    "frame_mask": mask_img,
+                }
+            )
         if len(self.frames_bbox) > 0:
             return_dict.update(
                 {
