@@ -102,6 +102,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         per_editing_step: int = 10
         start_editing_step: int = 1000
 
+        get_patch_size: int = 512
         edit_path: str = ""
 
     cfg: Config
@@ -229,7 +230,7 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
         origin_gt_rgb = batch["gt_rgb"]
         B, H, W, C = origin_gt_rgb.shape
 
-        S = 512
+        S = self.cfg.get_patch_size
         if batch.__contains__("frame_bbox"):
             bbox = batch["frame_bbox"][0]
             x1, y1, x2, y2 = (
@@ -372,8 +373,15 @@ class DynamicGaussianSplattingInstruct(BaseLift3DSystem):
             "loss_scaling_residual": torch.mean(
                 self.geometry.gaussian._scaling_residual**2
             ),
-            "loss_flow_residual": torch.mean(out["dynamic_feature_residual"] ** 2),
         }
+        if out["dynamic_feature_residual"] is not None:
+            guidance_out.update(
+                {
+                    "loss_flow_residual": torch.mean(
+                        out["dynamic_feature_residual"]["features"] ** 2
+                    ),
+                }
+            )
 
         loss = 0.0
         Ll1 = l1_loss(out["render"], origin_gt_rgb.permute(0, 3, 1, 2)[0])

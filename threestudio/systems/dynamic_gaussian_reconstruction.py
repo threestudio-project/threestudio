@@ -225,6 +225,12 @@ class DynamicGaussianSplattingReconstruction(BaseLift3DSystem):
                 gt_rgb.permute(0, 3, 1, 2).contiguous(),
             ).mean(),
         }
+        if out["dynamic_feature"] is not None:
+            guidance_out.update(
+                {
+                    "loss_flow": torch.mean(out["dynamic_feature"]["features"] ** 2),
+                }
+            )
 
         loss = 0.0
         Ll1 = l1_loss(out["render"], gt_rgb.permute(0, 3, 1, 2)[0])
