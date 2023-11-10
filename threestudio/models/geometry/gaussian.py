@@ -194,6 +194,7 @@ class GaussianModel(BaseGeometry):
         densify_until_iter: int = 2000
         densify_grad_threshold: float = 0.01
         min_opac_prune: float = 0.05
+        max_num: int = 500000
 
         force_sphere: bool = False
 
@@ -655,6 +656,12 @@ class GaussianModel(BaseGeometry):
         viewspace_point_tensor,
         extent,
     ):
+        if self._xyz.shape[0] >= self.cfg.max_num + 100:
+            prune_mask = torch.randperm(self._xyz.shape[0]).to(self._xyz.device)
+            prune_mask = prune_mask > self.cfg.max_num
+            self.prune_points(prune_mask)
+            return
+
         if iteration < self.cfg.densify_until_iter:
             # Keep track of max radii in image-space for pruning
             self.max_radii2D[visibility_filter] = torch.max(
