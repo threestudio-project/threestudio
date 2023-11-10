@@ -122,10 +122,15 @@ class DynamicGaussianModel(BaseGeometry):
                 plydata = PlyData.read(self.cfg.geometry_convert_from)
                 vertices = plydata["vertex"]
                 positions = np.vstack([vertices["x"], vertices["y"], vertices["z"]]).T
-                colors = (
-                    np.vstack([vertices["red"], vertices["green"], vertices["blue"]]).T
-                    / 255.0
-                )
+                if vertices.__contains__("red"):
+                    colors = (
+                        np.vstack(
+                            [vertices["red"], vertices["green"], vertices["blue"]]
+                        ).T
+                        / 255.0
+                    )
+                else:
+                    colors = np.zeros_like(positions)
                 normals = np.vstack([vertices["nx"], vertices["ny"], vertices["nz"]]).T
                 # print(np.min(positions, axis=0))
                 # print(np.max(positions, axis=0))
