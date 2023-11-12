@@ -2,9 +2,10 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import nerfacc
-import threestudio
 import torch
 import torch.nn.functional as F
+
+import threestudio
 from threestudio.models.background.base import BaseBackground
 from threestudio.models.estimators import ImportanceEstimator
 from threestudio.models.geometry.base import BaseImplicitGeometry

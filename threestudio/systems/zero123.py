@@ -4,13 +4,14 @@ import shutil
 from dataclasses import dataclass, field
 from math import ceil
 
-import threestudio
 import torch
 import torch.nn.functional as F
+from torchmetrics import PearsonCorrCoef
+
+import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
-from torchmetrics import PearsonCorrCoef
 
 
 @threestudio.register("zero123-system")
