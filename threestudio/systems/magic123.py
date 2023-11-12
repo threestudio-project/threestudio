@@ -2,10 +2,9 @@ import os
 import shutil
 from dataclasses import dataclass, field
 
+import threestudio
 import torch
 import torch.nn.functional as F
-
-import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.misc import get_CPU_mem, get_GPU_mem
 from threestudio.utils.ops import binary_cross_entropy, dot
@@ -23,7 +22,6 @@ class Magic123(BaseLift3DSystem):
         ambient_ratio_min: float = 0.5
         rays_divisor_power: int = 0
         ref_batch_size: int = 1
-
 
     cfg: Config
 

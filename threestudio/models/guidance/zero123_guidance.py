@@ -4,17 +4,16 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from diffusers import DDIMScheduler
 from omegaconf import OmegaConf
-from tqdm import tqdm
-
-import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, get_CPU_mem, get_GPU_mem
 from threestudio.utils.typing import *
+from tqdm import tqdm
 
 
 def get_obj_from_str(string, reload=False):
@@ -160,7 +159,9 @@ class Zero123Guidance(BaseObject):
         self.max_step = int(self.num_train_timesteps * max_step_percent)
 
     @torch.cuda.amp.autocast(enabled=False)
-    def prepare_embeddings(self, image_path: str, background_color: Tuple[int, int, int] = (255, 255, 255)) -> None:
+    def prepare_embeddings(
+        self, image_path: str, background_color: Tuple[int, int, int] = (255, 255, 255)
+    ) -> None:
         # load cond image for zero123
         assert os.path.exists(image_path)
         rgba = cv2.cvtColor(

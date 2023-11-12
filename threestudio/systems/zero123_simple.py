@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
 
-import torch
-
 import threestudio
+import torch
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.ops import binary_cross_entropy, dot
 from threestudio.utils.typing import *
