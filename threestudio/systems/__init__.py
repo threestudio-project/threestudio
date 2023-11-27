@@ -9,6 +9,7 @@ from . import (
     magic123,
     prolificdreamer,
     sjc,
+    svd,
     textmesh,
     zero123,
     zero123_simple,

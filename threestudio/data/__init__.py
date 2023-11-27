@@ -1,1 +1,1 @@
-from . import co3d, image, multiview, uncond
+from . import co3d, image, multiview, svd, uncond
