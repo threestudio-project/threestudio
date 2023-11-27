@@ -151,18 +151,16 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         else:
             # otherwise sample uniformly on sphere
             elevation_range_percent = [
-                (self.elevation_range[0] + 90.0) / 180.0,
-                (self.elevation_range[1] + 90.0) / 180.0,
+                self.elevation_range[0] / 180.0 * math.pi,
+                self.elevation_range[1] / 180.0 * math.pi,
             ]
             # inverse transform sampling
             elevation = torch.asin(
-                2
-                * (
+                (
                     torch.rand(self.batch_size)
-                    * (elevation_range_percent[1] - elevation_range_percent[0])
-                    + elevation_range_percent[0]
+                    * (math.sin(elevation_range_percent[1]) - math.sin(elevation_range_percent[0]) )
+                    + math.sin(elevation_range_percent[0] )
                 )
-                - 1.0
             )
             elevation_deg = elevation / math.pi * 180.0
 
