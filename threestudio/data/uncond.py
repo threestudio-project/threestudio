@@ -158,8 +158,11 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             elevation = torch.asin(
                 (
                     torch.rand(self.batch_size)
-                    * (math.sin(elevation_range_percent[1]) - math.sin(elevation_range_percent[0]) )
-                    + math.sin(elevation_range_percent[0] )
+                    * (
+                        math.sin(elevation_range_percent[1])
+                        - math.sin(elevation_range_percent[0])
+                    )
+                    + math.sin(elevation_range_percent[0])
                 )
             )
             elevation_deg = elevation / math.pi * 180.0
