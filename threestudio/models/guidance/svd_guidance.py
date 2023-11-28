@@ -5,16 +5,15 @@ from dataclasses import dataclass
 import cv2
 import imageio
 import numpy as np
+import threestudio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as TT
-from tqdm import tqdm
-
-import threestudio
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, get_CPU_mem, get_GPU_mem
 from threestudio.utils.typing import *
+from tqdm import tqdm
 
 
 def get_resizing_factor(
@@ -61,15 +60,16 @@ class StableVideoDiffusionGuidance(BaseObject):
         stable_research_path: str = "/admin/home-vikram/ROBIN/stable-research"
         pretrained_model_name_or_path: str = "prediction_stable_jucifer_3D_OBJ"
         cond_aug: float = 0.00
-        vram_O: bool = True
+        num_steps: int = None  # 50
         height: int = 576
+        guidance_scale: float = None  # 4.0
+
+        vram_O: bool = True
 
         cond_image_path: str = "load/images/hamburger_rgba.png"
         cond_elevation_deg: float = 0.0
         cond_azimuth_deg: float = 0.0
         cond_camera_distance: float = 1.2
-
-        guidance_scale: float = 5.0
 
         grad_clip: Optional[
             Any
@@ -84,6 +84,11 @@ class StableVideoDiffusionGuidance(BaseObject):
         """Maximum number of batch items to evaluate guidance for (for debugging) and to save on disk. -1 means save all items."""
         max_items_eval: int = 4
 
+        guidance_eval_freq: int = 0
+        guidance_eval_dir: str = os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "../../../")
+        )
+
     cfg: Config
 
     def configure(self) -> None:
@@ -97,6 +102,8 @@ class StableVideoDiffusionGuidance(BaseObject):
         self.model = JucifierDenoiser(
             self.cfg.pretrained_model_name_or_path,
             self.cfg.cond_aug,
+            self.cfg.num_steps,
+            self.cfg.guidance_scale,
             self.cfg.height,
         )
         for p in self.model.parameters():
@@ -106,12 +113,18 @@ class StableVideoDiffusionGuidance(BaseObject):
 
         self.prepare_embeddings(self.cfg.cond_image_path)
 
+        self.T = self.model.T
+        self.num_steps = self.model.num_steps
+        self.set_min_max_steps()  # set to default values
+
+        self.count = 0
+
         threestudio.info(f"Loaded SVD!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
-        self.min_step = int(self.num_train_timesteps * min_step_percent)
-        self.max_step = int(self.num_train_timesteps * max_step_percent)
+        self.min_step = int(self.num_steps * min_step_percent)
+        self.max_step = int(self.num_steps * max_step_percent)
 
     @torch.cuda.amp.autocast(enabled=False)
     def prepare_embeddings(
@@ -131,35 +144,55 @@ class StableVideoDiffusionGuidance(BaseObject):
     def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-        rgb_as_latents=False,
-        guidance_eval=False,
         **kwargs,
     ):
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents = self.encode_images(rgb_BCHW)
 
         latents = torch.repeat_interleave(latents, self.noises_per_item, 0)
-        elevation = torch.repeat_interleave(elevation, self.noises_per_item)
-        azimuth = torch.repeat_interleave(azimuth, self.noises_per_item)
-        camera_distances = torch.repeat_interleave(
-            camera_distances, self.noises_per_item
-        )
         batch_size = latents.shape[0]
 
-        # # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
-        # t = torch.randint(
-        #     self.min_step,
-        #     self.max_step + 1,
-        #     [batch_size],
-        #     dtype=torch.long,
-        #     device=self.device,
-        # )
+        # timestep ~ U(0.02, 0.98) to avoid very high/low noise level
+        t = torch.randint(
+            self.min_step,
+            self.max_step + 1,
+            [batch_size // self.T],
+            dtype=torch.long,
+            device=self.device,
+        )
+
+        guidance_eval = (
+            self.cfg.guidance_eval_freq > 0
+            and self.count % self.cfg.guidance_eval_freq == 0
+        )
 
         with torch.no_grad():
-            rgb_pred = self.model(latents)
+            rgb_pred = self.model(latents, t, guidance_eval=guidance_eval)
+
+        if guidance_eval:
+            rgb_pred, rgb_i, rgb_d, rgb_eval = rgb_pred
+            imageio.mimsave(
+                os.path.join(
+                    self.cfg.guidance_eval_dir,
+                    f"guidance_eval_input_{self.count:05d}.mp4",
+                ),
+                rgb_i,
+            )
+            imageio.mimsave(
+                os.path.join(
+                    self.cfg.guidance_eval_dir,
+                    f"guidance_eval_denoise_{self.count:05d}.mp4",
+                ),
+                rgb_d,
+            )
+            imageio.mimsave(
+                os.path.join(
+                    self.cfg.guidance_eval_dir,
+                    f"guidance_eval_final_{self.count:05d}.mp4",
+                ),
+                rgb_eval,
+            )
+        self.count += 1
 
         # TODO CFG
         # TODO min_step, max_step
@@ -197,77 +230,6 @@ class StableVideoDiffusionGuidance(BaseObject):
 
         return guidance_out
 
-    @torch.cuda.amp.autocast(enabled=False)
-    @torch.no_grad()
-    def guidance_eval(self, cond, t_orig, latents_noisy, noise_pred):
-        # use only 50 timesteps, and find nearest of those to t
-        self.scheduler.set_timesteps(50)
-        self.scheduler.timesteps_gpu = self.scheduler.timesteps.to(self.device)
-        bs = (
-            min(self.cfg.max_items_eval, latents_noisy.shape[0])
-            if self.cfg.max_items_eval > 0
-            else latents_noisy.shape[0]
-        )  # batch size
-        large_enough_idxs = self.scheduler.timesteps_gpu.expand([bs, -1]) > t_orig[
-            :bs
-        ].unsqueeze(
-            -1
-        )  # sized [bs,50] > [bs,1]
-        idxs = torch.min(large_enough_idxs, dim=1)[1]
-        t = self.scheduler.timesteps_gpu[idxs]
-
-        fracs = list((t / self.scheduler.config.num_train_timesteps).cpu().numpy())
-        imgs_noisy = self.decode_latents(latents_noisy[:bs]).permute(0, 2, 3, 1)
-
-        # get prev latent
-        latents_1step = []
-        pred_1orig = []
-        for b in range(bs):
-            step_output = self.scheduler.step(
-                noise_pred[b : b + 1], t[b], latents_noisy[b : b + 1], eta=1
-            )
-            latents_1step.append(step_output["prev_sample"])
-            pred_1orig.append(step_output["pred_original_sample"])
-        latents_1step = torch.cat(latents_1step)
-        pred_1orig = torch.cat(pred_1orig)
-        imgs_1step = self.decode_latents(latents_1step).permute(0, 2, 3, 1)
-        imgs_1orig = self.decode_latents(pred_1orig).permute(0, 2, 3, 1)
-
-        latents_final = []
-        for b, i in enumerate(idxs):
-            latents = latents_1step[b : b + 1]
-            c = {
-                "c_crossattn": [cond["c_crossattn"][0][[b, b + len(idxs)], ...]],
-                "c_concat": [cond["c_concat"][0][[b, b + len(idxs)], ...]],
-            }
-            for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
-                # pred noise
-                x_in = torch.cat([latents] * 2)
-                t_in = torch.cat([t.reshape(1)] * 2).to(self.device)
-                noise_pred = self.model(x_in, t_in, c)
-                # perform guidance
-                noise_pred_uncond, noise_pred_cond = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + self.cfg.guidance_scale * (
-                    noise_pred_cond - noise_pred_uncond
-                )
-                # get prev latent
-                latents = self.scheduler.step(noise_pred, t, latents, eta=1)[
-                    "prev_sample"
-                ]
-            latents_final.append(latents)
-
-        latents_final = torch.cat(latents_final)
-        imgs_final = self.decode_latents(latents_final).permute(0, 2, 3, 1)
-
-        return {
-            "bs": bs,
-            "noise_levels": fracs,
-            "imgs_noisy": imgs_noisy,
-            "imgs_1step": imgs_1step,
-            "imgs_1orig": imgs_1orig,
-            "imgs_final": imgs_final,
-        }
-
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in
         # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
@@ -275,10 +237,10 @@ class StableVideoDiffusionGuidance(BaseObject):
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
-        # self.set_min_max_steps(
-        #     min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
-        #     max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
-        # )
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )
 
         if self.cfg.noises_per_item is not None:
             self.noises_per_item = np.floor(

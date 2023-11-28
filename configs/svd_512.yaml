@@ -8,18 +8,18 @@ data: # threestudio/data/svd.py -> SVDImageDataModuleConfig
   image_path: ???   # ./load/images/hamburger_rgba.png
   height: [128, 256, 512]
   width: [128, 256, 512]
-  resolution_milestones: [200, 300]
+  resolution_milestones: [50, 100]
   default_elevation_deg: 5.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
   requires_depth: False
   requires_normal: False
-  random_camera: # threestudio/data/svd.py -> SVDDataModuleConfig
+  random_camera: # threestudio/data/svd_uncond.py -> SVDDataModuleConfig
     height: [64, 128, 256]
     width: [64, 128, 256]
     batch_size: [21, 21, 21] # same as video model # of frames
-    resolution_milestones: [200, 300]
+    resolution_milestones: [50, 100]
     eval_height: 512
     eval_width: 512
     eval_batch_size: 1
@@ -42,7 +42,7 @@ data: # threestudio/data/svd.py -> SVDImageDataModuleConfig
     n_val_views: 30
     n_test_views: 120
 
-system_type: "svd-system"
+system_type: "zero123-system"
 system:
   geometry_type: "implicit-volume"
   geometry:
@@ -101,16 +101,18 @@ system:
     stable_research_path: "/admin/home-vikram/ROBIN/stable-research"
     pretrained_model_name_or_path: "prediction_stable_jucifer_3D_OBJ_IMG"
     cond_aug: 0.00
-    vram_O: true
+    num_steps: 50
     height: ${max:${data.random_camera.height}}
+    vram_O: true
     cond_image_path: ${data.image_path}
     cond_elevation_deg: ${data.default_elevation_deg}
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
-    guidance_scale: 3.0
-    min_step_percent: [50, 0.7, 0.3, 200]  # (start_iter, start_val, end_val, end_iter)
-    max_step_percent: [50, 0.98, 0.8, 200]
+    guidance_scale: 4.0
+    min_step_percent: [30, 0.7, 0.3, 200]  # (start_iter, start_val, end_val, end_iter)
+    max_step_percent: [30, 0.98, 0.8, 200]
     noises_per_item: 1
+    guidance_eval_freq: 0
 
   ambient_ratio_min: [0, 0.1, 0.5, 400, 0.9, 401]
 
@@ -122,7 +124,7 @@ system:
 
   loss:
     lambda_sds: 0.1
-    lambda_rgb: [100, 500., 1000., 400]
+    lambda_rgb: 1000.
     lambda_mask: 50.
     lambda_depth: 0. # 0.05
     lambda_depth_rel: 0. # [0, 0, 0.05, 100]
