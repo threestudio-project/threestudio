@@ -1,5 +1,6 @@
 import argparse
 import contextlib
+import importlib
 import logging
 import os
 import sys
@@ -98,6 +99,10 @@ def main(args, extras) -> None:
     cfg: ExperimentConfig
     cfg = load_config(args.config, cli_args=extras, n_gpus=n_gpus)
 
+    if len(cfg.custom_import) > 0:
+        print(cfg.custom_import)
+        for extension in cfg.custom_import:
+            importlib.import_module(extension)
     # set a different seed for each device
     pl.seed_everything(cfg.seed + get_rank(), workers=True)
 
