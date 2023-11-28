@@ -53,6 +53,9 @@ class ExperimentConfig:
     timestamp: Optional[str] = None
     exp_root_dir: str = "outputs"
 
+    # import custom extension
+    custom_import: Tuple[str] = ()
+
     ### these shouldn't be set manually
     exp_dir: str = "outputs/default"
     trial_name: str = "exp"
