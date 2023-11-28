@@ -70,7 +70,7 @@ system:
     guidance_scale: 100.0
     weighting_strategy: sds
     min_step_percent: 0.02
-    max_step_percent: [2000, 0.98, 0.5, 2001]
+    max_step_percent: [1000, 0.98, 0.5, 1001]
 
   loggers:
     wandb:
@@ -82,7 +82,7 @@ system:
     lambda_sds: 1.0
     lambda_position: 0.0
     lambda_opacity: 0.0
-    lambda_scales: 0.0
+    lambda_scales: 1.0
 
 trainer:
   max_steps: 15000
