@@ -1,13 +1,14 @@
 import math
 from dataclasses import dataclass
 
+import numpy as np
 import torch
+from torch.cuda.amp import autocast
 
 import threestudio
 from threestudio.systems.base import BaseLift3DSystem
 from threestudio.utils.typing import *
 
-from torch.cuda.amp import autocast
 
 def stack_dicts(dicts):
     stacked_dict = {}
@@ -15,18 +16,14 @@ def stack_dicts(dicts):
         stacked_dict[k] = torch.stack([d[k] for d in dicts], dim=0)
     return stacked_dict
 
-def getWorld2View_torch(R, t, translate, scale=1.0):
-    Rt = torch.zeros((4, 4), device=R.device)
-    Rt[:3, :3] = R.transpose(0, 1)
-    Rt[:3, 3] = t
-    Rt[3, 3] = 1.0
 
-    C2W = torch.linalg.inv(Rt)
-    cam_center = C2W[:3, 3]
-    cam_center = (cam_center + translate) * scale
-    C2W[:3, 3] = cam_center
-    Rt = torch.linalg.inv(C2W)
-    return Rt.to(torch.float32)
+def convert_pose(C2W):
+    flip_yz = np.eye(4)
+    flip_yz[1, 1] = -1
+    flip_yz[2, 2] = -1
+    C2W = np.matmul(C2W, flip_yz)
+    return C2W
+
 
 def getProjectionMatrix(znear, zfar, fovX, fovY, device="cuda"):
     tanHalfFovY = math.tan((fovY / 2))
@@ -50,19 +47,35 @@ def getProjectionMatrix(znear, zfar, fovX, fovY, device="cuda"):
     P[2, 3] = -(zfar * znear) / (zfar - znear)
     return P
 
-def get_cam_info_torch(c2w, fovy):
-    matrix = torch.linalg.inv(c2w)
-    R = torch.transpose(matrix[:3,:3], 0, 1)
-    R[:,0] = -R[:,0]
-    T = -matrix[:3, 3]
-    
-    translate = torch.tensor([.0, .0, .0], device=c2w.device)
-    world_view_transform = getWorld2View_torch(R, T, translate).transpose(0, 1)
-    projection_matrix = getProjectionMatrix(znear=0.01, zfar=100, fovX=fovy, fovY=fovy, device=c2w.device).transpose(0,1)
-    full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)
+
+def getFOV(P):
+    tanHalfFovX = 1 / P[0, 0]
+    tanHalfFovY = 1 / P[1, 1]
+    fovY = math.atan(tanHalfFovY) * 2
+    fovX = math.atan(tanHalfFovX) * 2
+    return fovX, fovY
+
+
+def get_cam_info(c2w, fovx, fovy, znear, zfar):
+    c2w = c2w.cpu().numpy()
+    c2w = convert_pose(c2w)
+    world_view_transform = np.linalg.inv(c2w)
+
+    world_view_transform = (
+        torch.tensor(world_view_transform).transpose(0, 1).cuda().float()
+    )
+    projection_matrix = (
+        getProjectionMatrix(znear=znear, zfar=zfar, fovX=fovx, fovY=fovy)
+        .transpose(0, 1)
+        .cuda()
+    )
+    full_proj_transform = (
+        world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))
+    ).squeeze(0)
     camera_center = world_view_transform.inverse()[3, :3]
-    
+
     return world_view_transform, full_proj_transform, camera_center
+
 
 class Camera(NamedTuple):
     FoVx: torch.Tensor
@@ -72,7 +85,8 @@ class Camera(NamedTuple):
     image_height: int
     world_view_transform: torch.Tensor
     full_proj_transform: torch.Tensor
-        
+
+
 @threestudio.register("gaussian-splatting-system")
 class GaussianSplatting(BaseLift3DSystem):
     @dataclass
@@ -84,14 +98,12 @@ class GaussianSplatting(BaseLift3DSystem):
     def configure(self) -> None:
         # set up geometry, material, background, renderer
         super().configure()
-        self.automatic_optimization=False
-        
+        self.automatic_optimization = False
+
         self.background_tensor = torch.tensor(
-            [1, 1, 1], 
-            dtype=torch.float32, 
-            device="cuda"
+            [1, 1, 1], dtype=torch.float32, device="cuda"
         )
-        
+
         self.geometry.init_params()
         self.geometry.training_setup()
 
@@ -101,49 +113,50 @@ class GaussianSplatting(BaseLift3DSystem):
         )
         self.prompt_utils = self.prompt_processor()
         self.gaussians_step = 0
-        
+
     def configure_optimizers(self):
         optim = self.geometry.optimizer
         ret = {
             "optimizer": optim,
         }
         return ret
-    
+
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         lr_max_step = self.geometry.cfg.position_lr_max_steps
         scale_lr_max_steps = self.geometry.cfg.scale_lr_max_steps
-        
+
         # self.geometry.update_learning_rate(self.gaussians_step)
         if self.gaussians_step < lr_max_step:
             self.geometry.update_xyz_learning_rate(self.gaussians_step)
-            
+
         if self.gaussians_step < scale_lr_max_steps:
             self.geometry.update_scale_learning_rate(self.gaussians_step)
-        
-        
-        bs = batch['c2w'].shape[0]
+
+        bs = batch["c2w"].shape[0]
         renders = []
         viewspace_points = []
         visibility_filters = []
         radiis = []
         for batch_idx in range(bs):
-            fovy = batch['fovy'][batch_idx]
-            w2c, proj, cam_p = get_cam_info_torch(c2w=batch['c2w'][batch_idx], fovy=fovy)
-                
+            fovy = batch["fovy"][batch_idx]
+            w2c, proj, cam_p = get_cam_info(
+                c2w=batch["c2w"][batch_idx], fovx=fovy, fovy=fovy, znear=0.1, zfar=100
+            )
+
             # import pdb; pdb.set_trace()
             viewpoint_cam = Camera(
-                FoVx=fovy, 
-                FoVy=fovy, 
-                image_width=batch['width'], 
-                image_height=batch['height'],
+                FoVx=fovy,
+                FoVy=fovy,
+                image_width=batch["width"],
+                image_height=batch["height"],
                 world_view_transform=w2c,
                 full_proj_transform=proj,
                 camera_center=cam_p,
             )
-            
+
             with autocast(enabled=False):
                 render_pkg = self.renderer(
-                    viewpoint_cam, 
+                    viewpoint_cam,
                     self.background_tensor,
                 )
                 renders.append(render_pkg["render"])
@@ -171,41 +184,75 @@ class GaussianSplatting(BaseLift3DSystem):
         self.gaussians_step += 1
         out = self(batch)
 
-        visibility_filter = out['visibility_filter']
+        visibility_filter = out["visibility_filter"]
         radii = out["radii"]
-        guidance_inp = out["render"].permute(0, 2, 3, 1)  
+        guidance_inp = out["render"].permute(0, 2, 3, 1)
         # import pdb; pdb.set_trace()
         viewspace_point_tensor = out["viewspace_points"]
         guidance_out = self.guidance(
             guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
         )
 
+        loss_sds = 0.0
         loss = 0.0
-        
-        self.log("gauss_num", int(self.geometry.get_xyz.shape[0]), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+
+        self.log(
+            "gauss_num",
+            int(self.geometry.get_xyz.shape[0]),
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            logger=True,
+        )
 
         for name, value in guidance_out.items():
             self.log(f"train/{name}", value)
             if name.startswith("loss_"):
-                loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
-                
+                loss_sds += value * self.C(
+                    self.cfg.loss[name.replace("loss_", "lambda_")]
+                )
+
         xyz_mean = None
         if self.cfg.loss["lambda_position"] > 0.0:
             xyz_mean = self.geometry.get_xyz.norm(dim=-1)
+            self.log(f"train/position", value)
             loss += self.C(self.cfg.loss["lambda_position"]) * xyz_mean.mean()
-            
+
         if self.cfg.loss["lambda_opacity"] > 0.0:
             if xyz_mean is None:
                 xyz_mean = self.geometry.get_xyz.norm(dim=-1)
-            loss += self.C(self.cfg.loss["lambda_opacity"]) * (xyz_mean.detach() * self.geometry.get_opacity).mean()
-                
+            self.log(f"train/opacity", value)
+            loss += (
+                self.C(self.cfg.loss["lambda_opacity"])
+                * (xyz_mean.detach() * self.geometry.get_opacity).mean()
+            )
+
+        if self.cfg.loss["lambda_scales"] > 0.0:
+            scale_mean = torch.mean(self.geometry.get_scaling)
+            self.log(f"train/scales", scale_mean)
+            loss += self.C(self.cfg.loss["lambda_scales"]) * scale_mean
+
+        def _tensor_size(t):
+            return t.size()[1] * t.size()[2] * t.size()[3]
+
+        def tv_loss(x):
+            batch_size = x.size()[0]
+            h_x = x.size()[2]
+            w_x = x.size()[3]
+            count_h = _tensor_size(x[:, :, 1:, :])
+            count_w = _tensor_size(x[:, :, :, 1:])
+            h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, : h_x - 1, :]), 2).sum()
+            w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, : w_x - 1]), 2).sum()
+            return 2 * (h_tv / count_h + w_tv / count_w) / batch_size
+
+        loss_tv = tv_loss(out["render"]) * 0.0
+        self.log(f"train/loss_tv", loss_tv)
+        loss += loss_tv
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
-            
-            
-        loss.backward()
-        opt.step()
+
+        loss_sds.backward(retain_graph=True)
         iteration = self.gaussians_step
         self.geometry.update_states(
             iteration,
@@ -213,7 +260,9 @@ class GaussianSplatting(BaseLift3DSystem):
             radii,
             viewspace_point_tensor,
         )
-        opt.zero_grad(set_to_none = True)
+        loss.backward()
+        opt.step()
+        opt.zero_grad(set_to_none=True)
 
         return {"loss": loss}
 
@@ -232,7 +281,6 @@ class GaussianSplatting(BaseLift3DSystem):
             name="validation_step",
             step=self.global_step,
         )
-
 
     def on_validation_epoch_end(self):
         pass

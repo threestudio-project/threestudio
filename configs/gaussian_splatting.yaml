@@ -21,28 +21,28 @@ system:
 
   geometry_type: "gaussian"
   geometry:
-    position_lr_init: 0.005
-    position_lr_final: 0.00003
+    position_lr_init: 0.001
+    position_lr_final: 0.00002
     position_lr_delay_mult: 0.02
-    position_lr_max_steps: ${trainer.max_steps}
-    scale_lr_init: 0.003
-    scale_lr_final: 0.001
+    position_lr_max_steps: 1000
+    scale_lr_init: 0.005
+    scale_lr_final: 0.005
     scale_lr_max_steps: ${trainer.max_steps}
     feature_lr: 0.01
-    opacity_lr: 0.003
-    scaling_lr: 0.003
-    rotation_lr: 0.003
-    densification_interval: 1000
-    prune_interval: 500
-    opacity_reset_interval: 100000
+    opacity_lr: 0.05
+    scaling_lr: 0.005
+    rotation_lr: 0.005
+    densification_interval: 100
+    prune_interval: 100
+    opacity_reset_interval: 50000000
     densify_from_iter: 1000
     densify_until_iter: 10000
-    prune_from_iter: 500
+    prune_from_iter: 1000
     prune_until_iter: ${trainer.max_steps}
     # prune_until_iter: 0
-    densify_grad_threshold: 0.02
-    min_opac_prune: 0.05
-    split_thresh: 0.02 
+    densify_grad_threshold: 0.01
+    min_opac_prune: 0.005
+    split_thresh: 0.02
     radii2d_thresh: 1000
     init_num_pts: 4096
     pc_init_radius: 0.8
@@ -79,9 +79,10 @@ system:
       name: None
 
   loss:
-    lambda_sds: 0.1
+    lambda_sds: 1.0
     lambda_position: 0.0
     lambda_opacity: 0.0
+    lambda_scales: 0.0
 
 trainer:
   max_steps: 15000
