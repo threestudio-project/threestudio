@@ -46,8 +46,8 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 
 
 ## News
-- 30/11/2023 Implementation of [MVDream](https://github.com/DSaurus/threestudio-mvdream), [Gaussian Splatting](https://github.com/DSaurus/threestudio-3dgs) as the custom extensions. You can also use neural representation to fit a mesh by [Mesh-Fitting](https://github.com/DSaurus/threestudio-meshfitting).
-- 30/11/2023: Implementation of [custom extension system](https://threestudio-project.github.io/threestudio-extensions/) and you can add your extensions in [this project](https://github.com/threestudio-project/threestudio-extensions).
+- 11/30/2023 Implementation of [MVDream](https://github.com/DSaurus/threestudio-mvdream), [Gaussian Splatting](https://github.com/DSaurus/threestudio-3dgs) as the custom extensions. You can also use neural representation to fit a mesh by [Mesh-Fitting](https://github.com/DSaurus/threestudio-meshfitting).
+- 11/30/2023: Implementation of [custom extension system](https://threestudio-project.github.io/threestudio-extensions/) and you can add your extensions in [this project](https://github.com/threestudio-project/threestudio-extensions).
 - 08/25/2023: Implementation of [Magic123](https://guochengqian.github.io/project/magic123/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#magic123-) to give it a try.
 - 07/06/2023: Join our [Discord server](https://discord.gg/ejer2MAB8N) for lively discussions!
 - 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
