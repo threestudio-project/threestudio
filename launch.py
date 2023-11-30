@@ -4,6 +4,8 @@ import importlib
 import logging
 import os
 import sys
+import time
+import traceback
 
 
 class ColoredFilter(logging.Filter):
@@ -58,7 +60,7 @@ def load_custom_module(module_path):
         module = importlib.util.module_from_spec(module_spec)
         sys.modules[module_name] = module
         module_spec.loader.exec_module(module)
-
+        return True
     except Exception as e:
         print(traceback.format_exc())
         print(f"Cannot import {module_path} module for custom nodes:", e)
@@ -66,7 +68,7 @@ def load_custom_module(module_path):
 
 
 def load_custom_modules():
-    node_paths = folder_paths.get_folder_paths("custom_nodes")
+    node_paths = ["custom"]
     node_import_times = []
     for custom_node_path in node_paths:
         possible_modules = os.listdir(custom_node_path)
@@ -153,6 +155,8 @@ def main(args, extras) -> None:
                 handler.addFilter(ColoredFilter())
             else:
                 handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+
+    load_custom_modules()
 
     # parse YAML config to OmegaConf
     cfg: ExperimentConfig

@@ -8,6 +8,7 @@
 #
 # For inquiries contact  george.drettakis@inria.fr
 #
+import os
 import random
 import sys
 from dataclasses import dataclass
@@ -211,8 +212,7 @@ class GaussianModel(BaseGeometry):
         geometry_convert_from: str = ""
         init_num_pts: int = 100
         pc_init_radius: float = 0.8
-        opacity_init: float = 0.8
-        scales_init: float = 0.02
+        opacity_init: float = 0.1
 
     cfg: Config
 
@@ -249,8 +249,10 @@ class GaussianModel(BaseGeometry):
         self.optimizer = None
         self.setup_functions()
 
-        if len(self.cfg.geometry_convert_from) > 0:
-            print("Loading point cloud from %s" % self.cfg.geometry_convert_from)
+        if os.path.exists(self.cfg.geometry_convert_from):
+            threestudio.info(
+                "Loading point cloud from %s" % self.cfg.geometry_convert_from
+            )
             if self.cfg.geometry_convert_from.endswith(".ckpt"):
                 ckpt_dict = torch.load(self.cfg.geometry_convert_from)
                 num_pts = ckpt_dict["state_dict"]["geometry._xyz"].shape[0]
@@ -262,7 +264,7 @@ class GaussianModel(BaseGeometry):
                 self.create_from_pcd(pcd, 10)
                 self.training_setup()
                 new_ckpt_dict = {}
-                for key in self.gaussian.state_dict():
+                for key in self.state_dict():
                     if ckpt_dict["state_dict"].__contains__("geometry." + key):
                         new_ckpt_dict[key] = ckpt_dict["state_dict"]["geometry." + key]
                     else:
@@ -357,7 +359,7 @@ class GaussianModel(BaseGeometry):
         rots[:, 0] = 1
 
         opacities = inverse_sigmoid(
-            0.1
+            self.cfg.opacity_init
             * torch.ones(
                 (fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"
             )
