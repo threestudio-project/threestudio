@@ -29,7 +29,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 | <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> | <a href="https://guochengqian.github.io/project/magic123/">Magic123</a> |
 <br />
 | <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
-</b></p>
+</b>
 
 <p align="center">
   <a href="https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb">
@@ -41,9 +41,15 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 <p align="center">
-    Did not find what you want? Submit a feature request or upvote others' requests <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
+    Did not find what you want? Checkout <b>threestudio-extension</b> or submit a feature request <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
 </p>
 
+<p align="center">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/ac6089a7-d88f-414c-96d6-a5e75616115a" width="68%">
+</p>
+<p align="center">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/8892898f-8bd8-43dc-a4ec-dd8d078af860" width="50%">
+</p>
 
 ## News
 - 11/30/2023 Implementation of [MVDream](https://github.com/DSaurus/threestudio-mvdream), [Gaussian Splatting](https://github.com/DSaurus/threestudio-3dgs) as the custom extensions. You can also use neural representation to fit a mesh by [Mesh-Fitting](https://github.com/DSaurus/threestudio-meshfitting).
