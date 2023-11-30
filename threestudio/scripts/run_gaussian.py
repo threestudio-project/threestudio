@@ -24,13 +24,15 @@ out_name = "gsgen_baseline"
 for prompt in prompt_list:
     print(f"Running model on device {gpu_id}: ", prompt)
     command = [
-        "python", "launch.py",
-        "--config", "configs/gaussian_splatting.yaml",
+        "python",
+        "launch.py",
+        "--config",
+        "configs/gaussian_splatting.yaml",
         "--train",
         f"system.prompt_processor.prompt={prompt}",
         f"system.prompt_processor.negative_prompt={negative_prompt}",
         f"name={out_name}",
-        "--gpu", f"{gpu_id}"
+        "--gpu",
+        f"{gpu_id}",
     ]
     subprocess.run(command)
-        

@@ -2,6 +2,7 @@ from . import (
     control4d_multiview,
     dreamfusion,
     fantasia3d,
+    gaussian_splatting,
     imagedreamfusion,
     instructnerf2nerf,
     latentnerf,
@@ -12,5 +13,4 @@ from . import (
     textmesh,
     zero123,
     zero123_simple,
-    gaussian_splatting,
 )
