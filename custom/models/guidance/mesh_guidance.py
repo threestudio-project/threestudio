@@ -3,14 +3,14 @@ from dataclasses import dataclass, field
 import torch.nn.functional as F
 
 import threestudio
-from threestudio.utils.base import BaseModule
+from threestudio.utils.base import BaseObject
 from threestudio.utils.typing import *
 
 
 @threestudio.register("mesh-guidance")
-class MeshGuidance(BaseModule):
+class MeshGuidance(BaseObject):
     @dataclass
-    class Config(BaseModule.Config):
+    class Config(BaseObject.Config):
         geometry_type: str = ""
         geometry: dict = field(default_factory=dict)
         renderer_type: str = ""
