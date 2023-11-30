@@ -142,7 +142,9 @@ class GaussianSplatting(BaseLift3DSystem):
         if self.cfg.loss["lambda_opacity"] > 0.0:
             if xyz_mean is None:
                 xyz_mean = self.geometry.get_xyz.norm(dim=-1)
-            loss_opacity = (xyz_mean.detach() * self.geometry.get_opacity).mean()
+            loss_opacity = (
+                xyz_mean.detach().unsqueeze(1) * self.geometry.get_opacity
+            ).mean()
             self.log(f"train/loss_opacity", loss_opacity)
             loss += self.C(self.cfg.loss["lambda_opacity"]) * loss_opacity
 
