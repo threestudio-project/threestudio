@@ -32,6 +32,9 @@ class DiffGaussian(Rasterizer):
         material: BaseMaterial,
         background: BaseBackground,
     ) -> None:
+        threestudio.info(
+            "[Note] Gaussian Splatting doesn't support material and background now."
+        )
         super().configure(geometry, material, background)
 
     def forward(

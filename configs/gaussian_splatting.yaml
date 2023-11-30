@@ -32,14 +32,13 @@ system:
     opacity_lr: 0.05
     scaling_lr: 0.005
     rotation_lr: 0.005
-    densification_interval: 100
-    prune_interval: 100
+    densification_interval: 500
+    prune_interval: 500
     opacity_reset_interval: 50000000
-    densify_from_iter: 1000
+    densify_from_iter: 0
     densify_until_iter: 10000
     prune_from_iter: 1000
     prune_until_iter: ${trainer.max_steps}
-    # prune_until_iter: 0
     densify_grad_threshold: 0.01
     min_opac_prune: 0.005
     split_thresh: 0.02
@@ -79,13 +78,14 @@ system:
       name: None
 
   loss:
-    lambda_sds: 1.0
-    lambda_position: 0.0
-    lambda_opacity: 0.0
+    lambda_sds: 0.1
+    lambda_position: 1.0
+    lambda_opacity: 1.0
     lambda_scales: 1.0
+    lambda_tv_loss: 1.0
 
 trainer:
-  max_steps: 15000
+  max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100
