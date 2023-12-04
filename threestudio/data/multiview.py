@@ -70,6 +70,8 @@ class MultiviewsDataModuleConfig:
     camera_distance: float = -1
     eval_interpolation: Optional[Tuple[int, int, int]] = None  # (0, 1, 30)
 
+    rays_d_normalize: bool = True
+
 
 class MultiviewIterableDataset(IterableDataset):
     def __init__(self, cfg: Any) -> None:
@@ -164,7 +166,10 @@ class MultiviewIterableDataset(IterableDataset):
         self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
 
         self.rays_o, self.rays_d = get_rays(
-            self.frames_direction, self.frames_c2w, keepdim=True
+            self.frames_direction,
+            self.frames_c2w,
+            keepdim=True,
+            normalize=self.cfg.rays_d_normalize,
         )
         self.mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(
             self.frames_c2w, self.frames_proj
@@ -344,7 +349,10 @@ class MultiviewDataset(Dataset):
         self.frames_img: Float[Tensor, "B H W 3"] = torch.stack(frames_img, dim=0)
 
         self.rays_o, self.rays_d = get_rays(
-            self.frames_direction, self.frames_c2w, keepdim=True
+            self.frames_direction,
+            self.frames_c2w,
+            keepdim=True,
+            normalize=self.cfg.rays_d_normalize,
         )
         self.mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(
             self.frames_c2w, self.frames_proj

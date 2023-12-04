@@ -56,6 +56,8 @@ class RandomCameraDataModuleConfig:
     batch_uniform_azimuth: bool = True
     progressive_until: int = 0  # progressive ranges for elevation, azimuth, r, fovy
 
+    rays_d_normalize: bool = True
+
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
     def __init__(self, cfg: Any) -> None:
@@ -315,7 +317,9 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         )
 
         # Importance note: the returned rays_d MUST be normalized!
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
+        rays_o, rays_d = get_rays(
+            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
+        )
 
         self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
             fovy, self.width / self.height, 0.01, 100.0
@@ -418,7 +422,9 @@ class RandomCameraDataset(Dataset):
             directions[:, :, :, :2] / focal_length[:, None, None, None]
         )
 
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
+        rays_o, rays_d = get_rays(
+            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
+        )
         self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
             fovy, self.cfg.eval_width / self.cfg.eval_height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
