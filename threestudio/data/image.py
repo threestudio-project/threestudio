@@ -48,6 +48,8 @@ class SingleImageDataModuleConfig:
     requires_depth: bool = False
     requires_normal: bool = False
 
+    rays_d_normalize: bool = True
+
 
 class SingleImageDataBase:
     def setup(self, cfg, split):
@@ -141,7 +143,11 @@ class SingleImageDataBase:
         directions[:, :, :, :2] = directions[:, :, :, :2] / self.focal_length
 
         rays_o, rays_d = get_rays(
-            directions, self.c2w, keepdim=True, noise_scale=self.cfg.rays_noise_scale
+            directions,
+            self.c2w,
+            keepdim=True,
+            noise_scale=self.cfg.rays_noise_scale,
+            normalize=self.cfg.rays_d_normalize,
         )
 
         proj_mtx: Float[Tensor, "4 4"] = get_projection_matrix(

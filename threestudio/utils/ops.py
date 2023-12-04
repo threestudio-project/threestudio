@@ -222,6 +222,7 @@ def get_rays(
     c2w: Float[Tensor, "... 4 4"],
     keepdim=False,
     noise_scale=0.0,
+    normalize=True,
 ) -> Tuple[Float[Tensor, "... 3"], Float[Tensor, "... 3"]]:
     # Rotate ray directions from camera coordinate to the world coordinate
     assert directions.shape[-1] == 3
@@ -257,7 +258,8 @@ def get_rays(
         rays_o = rays_o + torch.randn(3, device=rays_o.device) * noise_scale
         rays_d = rays_d + torch.randn(3, device=rays_d.device) * noise_scale
 
-    rays_d = F.normalize(rays_d, dim=-1)
+    if normalize:
+        rays_d = F.normalize(rays_d, dim=-1)
     if not keepdim:
         rays_o, rays_d = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
