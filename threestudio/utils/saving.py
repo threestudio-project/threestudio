@@ -13,14 +13,16 @@ import wandb
 from matplotlib import cm
 from matplotlib.colors import LinearSegmentedColormap
 from PIL import Image, ImageDraw
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import AimLogger, WandbLogger
 
+import aim
 from threestudio.models.mesh import Mesh
 from threestudio.utils.typing import *
 
 
 class SaverMixin:
     _save_dir: Optional[str] = None
+    _aim_logger: Optional[AimLogger] = None
     _wandb_logger: Optional[WandbLogger] = None
 
     def set_save_dir(self, save_dir: str):
@@ -54,16 +56,23 @@ class SaverMixin:
         return save_path
 
     def create_loggers(self, cfg_loggers: DictConfig) -> None:
+        if "aim" in cfg_loggers.keys() and cfg_loggers.aim.enable:
+            self._aim_logger = AimLogger(
+                experiment=cfg_loggers.aim.experiment, run_name=cfg_loggers.aim.run_name
+            )
         if "wandb" in cfg_loggers.keys() and cfg_loggers.wandb.enable:
             self._wandb_logger = WandbLogger(
                 project=cfg_loggers.wandb.project, name=cfg_loggers.wandb.name
             )
 
     def get_loggers(self) -> List:
+        loggers = []
+        if self._aim_logger:
+            loggers.append(self._aim_logger)
         if self._wandb_logger:
-            return [self._wandb_logger]
-        else:
-            return []
+            loggers.append(self._wandb_logger)
+
+        return loggers
 
     DEFAULT_RGB_KWARGS = {"data_format": "HWC", "data_range": (0, 1)}
     DEFAULT_UV_KWARGS = {
@@ -119,6 +128,10 @@ class SaverMixin:
     ):
         img = self.get_rgb_image_(img, data_format, data_range)
         cv2.imwrite(filename, img)
+        if name and self._aim_logger:
+            aim_image = aim.Image(self.get_save_path(filename))
+            self._aim_logger._run.track(aim_image, name="images", step=step)
+
         if name and self._wandb_logger:
             wandb.log(
                 {
@@ -231,6 +244,10 @@ class SaverMixin:
     ):
         img = self.get_grayscale_image_(img, data_range, cmap)
         cv2.imwrite(filename, img)
+        if name and self._aim_logger:
+            aim_image = aim.Image(self.get_save_path(filename))
+            self._aim_logger._run.track(aim_image, name="images", step=step)
+
         if name and self._wandb_logger:
             wandb.log(
                 {
@@ -323,6 +340,9 @@ class SaverMixin:
             img = np.asarray(img)
 
         cv2.imwrite(save_path, img)
+        if name and self._aim_logger:
+            aim_image = aim.Image(save_path)
+            self._aim_logger._run.track(aim_image, name="images", step=step)
         if name and self._wandb_logger:
             wandb.log({name: wandb.Image(save_path), "trainer/global_step": step})
         return save_path
@@ -421,6 +441,8 @@ class SaverMixin:
         elif save_format == "mp4":
             imgs = [cv2.cvtColor(i, cv2.COLOR_BGR2RGB) for i in imgs]
             imageio.mimsave(save_path, imgs, fps=fps)
+        if name and self._wandb_logger:
+            print("NOTE: the Aim logger doesn't support saving videos yet...")
         if name and self._wandb_logger:
             wandb.log(
                 {

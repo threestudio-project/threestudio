@@ -114,6 +114,11 @@ system:
   ambient_ratio_min: [0, 0.1, 0.5, 400, 0.9, 401]
 
   loggers:
+    aim:
+      enable: false
+      experiment: "experiment"
+      run_name: "test_run"
+
     wandb:
       enable: false
       project: "threestudio"
