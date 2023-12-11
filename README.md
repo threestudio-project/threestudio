@@ -108,6 +108,8 @@ pip install ninja
 pip install -r requirements.txt
 ```
 
+- (Optional) `tiny-cuda-nn` installation might require downgrading pip to 23.0.1
+
 - (Optional, Recommended) The best-performing models in threestudio use the newly-released T2I model [DeepFloyd IF](https://github.com/deep-floyd/IF), which currently requires signing a license agreement. If you would like to use these models, you need to [accept the license on the model card of DeepFloyd IF](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login into the Hugging Face hub in the terminal by `huggingface-cli login`.
 
 - For contributors, see [here](https://github.com/threestudio-project/threestudio#contributing-to-threestudio).
@@ -516,6 +518,34 @@ python launch.py --config configs/magic123-refine-sd.yaml --train --gpu 0 data.i
 **Tips**
 
 - If the image contains non-front-facing objects, specifying the approximate elevation and azimuth angle by setting `data.default_elevation_deg` and `data.default_azimuth_deg` can be helpful. In threestudio, top is elevation +90 and bottom is elevation -90; left is azimuth -90 and right is azimuth +90.
+
+### Stable Zero123
+
+**Installation**
+
+Download pretrained Stable-Zero123 weights into `load/zero123`:
+
+```sh
+cd load/zero123
+wget https://huggingface.co/stabilityai/stable-zero123/blob/main/stable-zero123.ckpt
+```
+
+**Results obtained by threestudio (Stable Zero123 vs Zero123-XL)**
+
+
+**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
+
+**IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
+
+**Example running commands**
+
+1. Take an image of your choice, or generate it from text using your favourite AI image generator such as SDXL Turbo (https://clipdrop.co/stable-diffusion-turbo) E.g. "A simple 3D render of a friendly dog"
+2. Remove its background using Clipdrop (https://clipdrop.co/remove-background)
+3. Save to `load/images/`, preferably with `_rgba.png` as the suffix
+4. Run Zero-1-to-3 with the Stable Zero123 ckpt:
+```sh
+python launch.py --config configs/stable-zero123.yaml --train --gpu 0 data.image_path=./load/images/dog1_rgba.png
+```
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
 
