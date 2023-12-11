@@ -531,6 +531,7 @@ wget https://huggingface.co/stabilityai/stable-zero123/blob/main/stable-zero123.
 ```
 
 **Results obtained by threestudio (Stable Zero123 vs Zero123-XL)**
+![Final_video_v01](https://github.com/threestudio-project/threestudio/assets/22424247/bf2d2213-5027-489c-a6ba-1c56c14ee8b7)
 
 
 **IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
