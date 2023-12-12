@@ -528,7 +528,7 @@ Download pretrained Stable Zero123 weights into `load/zero123`:
 
 ```sh
 cd load/zero123
-wget https://huggingface.co/stabilityai/Stable-Zero123/blob/main/stable_zero123.ckpt
+wget https://huggingface.co/stabilityai/stable-zero123/resolve/main/stable_zero123.ckpt
 ```
 
 **Results obtained by threestudio (Stable Zero123 vs Zero123-XL)**
