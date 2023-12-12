@@ -524,12 +524,7 @@ python launch.py --config configs/magic123-refine-sd.yaml --train --gpu 0 data.i
 
 **Installation**
 
-Download pretrained Stable Zero123 weights into `load/zero123`:
-
-```sh
-cd load/zero123
-wget https://huggingface.co/stabilityai/stable-zero123/resolve/main/stable_zero123.ckpt
-```
+Download pretrained Stable Zero123 checkpoint `stable-zero123.ckpt` into `load/zero123` from https://huggingface.co/stabilityai/stable-zero123
 
 **Results obtained by threestudio (Stable Zero123 vs Zero123-XL)**
 ![Final_video_v01](https://github.com/threestudio-project/threestudio/assets/22424247/bf2d2213-5027-489c-a6ba-1c56c14ee8b7)
