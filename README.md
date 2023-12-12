@@ -519,24 +519,20 @@ python launch.py --config configs/magic123-refine-sd.yaml --train --gpu 0 data.i
 
 - If the image contains non-front-facing objects, specifying the approximate elevation and azimuth angle by setting `data.default_elevation_deg` and `data.default_azimuth_deg` can be helpful. In threestudio, top is elevation +90 and bottom is elevation -90; left is azimuth -90 and right is azimuth +90.
 
+
 ### Stable Zero123
 
 **Installation**
 
-Download pretrained Stable-Zero123 weights into `load/zero123`:
+Download pretrained Stable Zero123 weights into `load/zero123`:
 
 ```sh
 cd load/zero123
-wget https://huggingface.co/stabilityai/stable-zero123/blob/main/stable-zero123.ckpt
+wget https://huggingface.co/stabilityai/Stable-Zero123/blob/main/stable_zero123.ckpt
 ```
 
 **Results obtained by threestudio (Stable Zero123 vs Zero123-XL)**
 ![Final_video_v01](https://github.com/threestudio-project/threestudio/assets/22424247/bf2d2213-5027-489c-a6ba-1c56c14ee8b7)
-
-
-**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
-
-**IMPORTANT NOTE: This implementation is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
 
 **Example running commands**
 
@@ -545,8 +541,13 @@ wget https://huggingface.co/stabilityai/stable-zero123/blob/main/stable-zero123.
 3. Save to `load/images/`, preferably with `_rgba.png` as the suffix
 4. Run Zero-1-to-3 with the Stable Zero123 ckpt:
 ```sh
-python launch.py --config configs/stable-zero123.yaml --train --gpu 0 data.image_path=./load/images/dog1_rgba.png
+python launch.py --config configs/stable-zero123.yaml --train --gpu 0 data.image_path=./load/images/hamburger_rgba.png
 ```
+
+**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
+
+**IMPORTANT NOTE: This implementation extends the Zero-1-to-3 implementation below, and is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
+
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
 
