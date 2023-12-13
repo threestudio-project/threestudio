@@ -71,6 +71,17 @@ def C(value: Any, epoch: int, global_step: int) -> float:
             raise TypeError("Scalar specification only supports list, got", type(value))
         if len(value) == 3:
             value = [0] + value
+        if len(value) >= 6:
+            select_i = 3
+            for i in range(3, len(value) - 2, 2):
+                if global_step >= value[i]:
+                    select_i = i + 2
+            if select_i != 3:
+                start_value, start_step = value[select_i - 3], value[select_i - 2]
+            else:
+                start_step, start_value = value[:2]
+            end_value, end_step = value[select_i - 1], value[select_i]
+            value = [start_step, start_value, end_value, end_step]
         assert len(value) == 4
         start_step, start_value, end_value, end_step = value
         if isinstance(end_step, int):

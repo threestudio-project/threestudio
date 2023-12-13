@@ -1,5 +1,5 @@
 name: "zero123"
-tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}_prog${data.random_camera.progressive_until}"
+tag: "${data.random_camera.height}_${rmspace:${basename:${data.image_path}},_}"
 exp_root_dir: "outputs"
 seed: 0
 
@@ -9,7 +9,7 @@ data: # threestudio/data/image.py -> SingleImageDataModuleConfig
   height: [128, 256, 512]
   width: [128, 256, 512]
   resolution_milestones: [200, 300]
-  default_elevation_deg: 0.0
+  default_elevation_deg: 5.0
   default_azimuth_deg: 0.0
   default_camera_distance: 3.8
   default_fovy_deg: 20.0
@@ -111,9 +111,7 @@ system:
     cond_azimuth_deg: ${data.default_azimuth_deg}
     cond_camera_distance: ${data.default_camera_distance}
     guidance_scale: 3.0
-    #min_step_percent: 0.02
     min_step_percent: [0, 0.4, 0.2, 200]  # (start_iter, start_val, end_val, end_iter)
-    #max_step_percent: 0.98
     max_step_percent: [0, 0.85, 0.5, 200]
 
   freq:
@@ -147,7 +145,7 @@ system:
       eps: 1.e-8
 
 trainer:
-  max_steps: 400
+  max_steps: 600
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 100

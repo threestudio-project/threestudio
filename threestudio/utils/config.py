@@ -35,6 +35,11 @@ def C_max(value: Any) -> float:
         value = config_to_primitive(value)
         if not isinstance(value, list):
             raise TypeError("Scalar specification only supports list, got", type(value))
+        if len(value) >= 6:
+            max_value = value[2]
+            for i in range(4, len(value), 2):
+                max_value = max(max_value, value[i])
+            value = [value[0], value[1], max_value, value[3]]
         if len(value) == 3:
             value = [0] + value
         assert len(value) == 4
