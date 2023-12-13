@@ -24,7 +24,8 @@ class Instructnerf2nerf(BaseLift3DSystem):
         # create geometry, material, background, renderer
         super().configure()
         self.edit_frames = {}
-        self.perceptual_loss = PerceptualLoss().eval().to(get_device())
+        p_config = {}
+        self.perceptual_loss = threestudio.find("perceptual-loss")(p_config)
 
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch)
