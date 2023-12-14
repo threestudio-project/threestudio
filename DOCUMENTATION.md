@@ -414,7 +414,6 @@ For the first three options, you can check more details in [pipe_stable_diffusio
 | var_red                   | bool           | Whether to use Eq. 16 in [SJC paper](https://arxiv.org/pdf/2212.00774.pdf). Default: True                                                           |
 | token_merging             | bool           | Whether to use token merging. This will speed up the unet forward and slightly affect the performance. Default: False                               |
 | token_merging_params      | Optional[dict] | The config for token merging. See [here](https://github.com/dbolya/tomesd/blob/main/tomesd/patch.py#L183-L213) for supported arguments. Default: {} |
-| max_step_percent_annealed | float          | The precent range (max value) of the random timesteps to add noise and denoise after t annealing. Default: 0.5                                      |
 | anneal_start_step         | Optional[int]  | If specified, denotes at which step to perform t annealing. Default: None                                                                           |
 
 ### deep-floyd-guidance
@@ -428,8 +427,6 @@ No specific configuration.
 | pretrained_model_name_or_path_lora | str           | The pretrained base model path for the LoRA model. Default: "stabilityai/stable-diffusion-2-1"                                                                  |
 | guidance_scale_lora                | float         | The classifier free guidance scale for the LoRA model. Default: 1.                                                                                              |
 | lora_cfg_training                  | bool          | Whether to adopt classifier free guidance training strategy in LoRA training. If True, will zero out the camera condition with a probability 0.1. Default: True |
-| max_step_percent_annealed          | float         | The precent range (max value) of the random timesteps to add noise and denoise after t annealing. Default: 0.5                                                  |
-| anneal_start_step                  | Optional[int] | If specified, denotes at which step to perform t annealing. Default: 5000                                                                                       |
 | camera_condition_type              | str           | Which to use as the camera condition for the LoRA model, in ["extrinsics", "mvp"]. Default: "extrinsics"                                                        |
 
 ## Prompt Processors

@@ -89,6 +89,7 @@ system:
 
   loss:
     lambda_vsd: 1.
+    lambda_vsd_img: 0.0
     lambda_lora: 1.
     lambda_orient: 0.
     lambda_sparsity: 0.

@@ -32,8 +32,9 @@ class StableDiffusionGuidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        max_step_percent_annealed: float = 0.5
-        anneal_start_step: Optional[int] = None
+        sqrt_anneal: bool = False
+        trainer_max_steps: int = 25000
+        use_img_loss: bool = False
 
         use_sjc: bool = False
         var_red: bool = True
@@ -185,6 +186,7 @@ class StableDiffusionGuidance(BaseObject):
     def compute_grad_sds(
         self,
         latents: Float[Tensor, "B 4 64 64"],
+        image: Float[Tensor, "B 3 512 512"]
         t: Int[Tensor, "B"],
         prompt_utils: PromptProcessorOutput,
         elevation: Float[Tensor, "B"],
@@ -262,7 +264,11 @@ class StableDiffusionGuidance(BaseObject):
                 f"Unknown weighting strategy: {self.cfg.weighting_strategy}"
             )
 
+        latents_denoised_est = (latents_noisy - sigma_t * noise_pred_est) / alpha_t
+        image_denoised_est = self.decode_latents(latents_denoised_est)
+
         grad = w * (noise_pred - noise)
+        grad_img = w * (image - image_denoised_est) * self.alphas[t] ** 0.5 / (1 - self.alphas[t]) ** 0.5
 
         guidance_eval_utils = {
             "use_perp_neg": prompt_utils.use_perp_neg,
@@ -273,7 +279,7 @@ class StableDiffusionGuidance(BaseObject):
             "noise_pred": noise_pred,
         }
 
-        return grad, guidance_eval_utils
+        return grad, grad_img, guidance_eval_utils
 
     def compute_grad_sjc(
         self,
@@ -411,23 +417,28 @@ class StableDiffusionGuidance(BaseObject):
                 latents, t, prompt_utils, elevation, azimuth, camera_distances
             )
         else:
-            grad, guidance_eval_utils = self.compute_grad_sds(
-                latents, t, prompt_utils, elevation, azimuth, camera_distances
+            grad, grad_img guidance_eval_utils = self.compute_grad_sds(
+                latents, RGB_BCHW_512, t, prompt_utils, elevation, azimuth, camera_distances
             )
 
         grad = torch.nan_to_num(grad)
+        grad_img = torch.nan_to_num(grad)
         # clip grad for stable training?
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
+            grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # loss = SpecifyGradient.apply(latents, grad)
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         target = (latents - grad).detach()
+        target_img = (rgb_BCHW_512 - grad_img).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_sds_img = 0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
 
         guidance_out = {
             "loss_sds": loss_sds,
+            "loss_sds_img": loss_sds_img,
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,
@@ -585,7 +596,16 @@ class StableDiffusionGuidance(BaseObject):
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
-        self.set_min_max_steps(
-            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
-            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
-        )
+        if self.cfg.sqrt_anneal:
+            percentage = (float(global_step) / self.cfg.trainer_max_steps) ** 0.5 # progress percentage
+            curr_percent = (self.cfg.max_step_percent[1] - self.cfg.min_step_percent) * (1 - percentage) + self.cfg.min_step_percent
+            self.set_min_max_steps(
+                min_step_percent=curr_percent,
+                max_step_percent=curr_percent,
+            )
+        else:
+            self.set_min_max_steps(
+                min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+                max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+            )
+

@@ -23,7 +23,7 @@ class ProlificDreamer(BaseLift3DSystem):
     def configure(self) -> None:
         # set up geometry, material, background, renderer
         super().configure()
-
+        self.cfg.guidance.use_img_loss = self.cfg.loss.lambda_vsd_img > 0
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor

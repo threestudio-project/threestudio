@@ -45,6 +45,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         guidance_scale_lora: float = 1.0
+        dummy: int = 1
         grad_clip: Optional[
             Any
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
@@ -54,6 +55,9 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
+        sqrt_anneal: bool = False
+        trainer_max_steps: int = 25000
+        use_img_loss: bool = False
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
@@ -468,6 +472,7 @@ class StableDiffusionVSDGuidance(BaseModule):
                 dtype=torch.long,
                 device=self.device,
             )
+
             # add noise
             noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
@@ -536,7 +541,16 @@ class StableDiffusionVSDGuidance(BaseModule):
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
 
         grad = w * (noise_pred_pretrain - noise_pred_est)
-        return grad
+
+        latents_denoised_pretrain = (latents_noisy - sigma_t * noise_pred_pretrain) / alpha_t
+        latents_denoised_est = (latents_noisy - sigma_t * noise_pred_est) / alpha_t
+        image_denoised_pretrain = self.decode_latents(latents_denoised_pretrain)
+        image_denoised_est = self.decode_latents(latents_denoised_est)
+        if self.cfg.use_img_loss:
+            grad_img = w * (image_denoised_est - image_denoised_pretrain) * self.alphas[t] ** 0.5 / (1 - self.alphas[t]) ** 0.5
+        else:
+            grad_img = torch.tensor([0.], dtype=grad.dtype).to(grad.device)
+        return grad, grad_img
 
     def train_lora(
         self,
@@ -596,7 +610,7 @@ class StableDiffusionVSDGuidance(BaseModule):
             )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
-        return latents
+        return latents, rgb_BCHW_512
 
     def forward(
         self,
@@ -613,7 +627,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         batch_size = rgb.shape[0]
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
+        latents, rgb_BCHW_512 = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
 
         # view-dependent text embeddings
         text_embeddings_vd = prompt_utils.get_text_embeddings(
@@ -637,19 +651,23 @@ class StableDiffusionVSDGuidance(BaseModule):
                 f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
             )
 
-        grad = self.compute_grad_vsd(
+        grad, grad_img = self.compute_grad_vsd(
             latents, text_embeddings_vd, text_embeddings, camera_condition
         )
 
         grad = torch.nan_to_num(grad)
+        grad_img = torch.nan_to_num(grad_img)
         # clip grad for stable training?
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
+            grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # reparameterization trick
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
+        target_img = (rgb_BCHW_512 - grad_img).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+        loss_vsd_img = 0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
 
         loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
 
@@ -659,6 +677,7 @@ class StableDiffusionVSDGuidance(BaseModule):
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,
+            "loss_vsd_img": loss_vsd_img,
         }
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
@@ -668,7 +687,15 @@ class StableDiffusionVSDGuidance(BaseModule):
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
-        self.set_min_max_steps(
-            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
-            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
-        )
+        if self.cfg.sqrt_anneal:
+            percentage = (float(global_step) / self.cfg.trainer_max_steps) ** 0.5 # progress percentage
+            curr_percent = (self.cfg.max_step_percent[1] - self.cfg.min_step_percent) * (1 - percentage) + self.cfg.min_step_percent
+            self.set_min_max_steps(
+                min_step_percent=curr_percent,
+                max_step_percent=curr_percent,
+            )
+        else:
+            self.set_min_max_steps(
+                min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+                max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+            )
