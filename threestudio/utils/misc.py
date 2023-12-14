@@ -123,3 +123,24 @@ def broadcast(tensor, src=0):
 def enable_gradient(model, enabled: bool = True) -> None:
     for param in model.parameters():
         param.requires_grad_(enabled)
+
+
+def find_last_path(path: str):
+    if (path is not None) and ("LAST" in path):
+        path = path.replace(" ", "_")
+        base_dir_prefix, suffix = path.split("LAST", 1)
+        base_dir = os.path.dirname(base_dir_prefix)
+        prefix = os.path.split(base_dir_prefix)[-1]
+        base_dir_prefix = os.path.join(base_dir, prefix)
+        all_path = os.listdir(base_dir)
+        all_path = [os.path.join(base_dir, dir) for dir in all_path]
+        filtered_path = [dir for dir in all_path if dir.startswith(base_dir_prefix)]
+        filtered_path.sort(reverse=True)
+        last_path = filtered_path[0]
+        new_path = last_path + suffix
+        if os.path.exists(new_path):
+            return new_path
+        else:
+            raise FileNotFoundError(new_path)
+    else:
+        return path
