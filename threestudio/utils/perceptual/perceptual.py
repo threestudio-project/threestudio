@@ -1,12 +1,35 @@
 """Stripped version of https://github.com/richzhang/PerceptualSimilarity/tree/master/models"""
 
 from collections import namedtuple
+from dataclasses import dataclass, field
 
 import torch
 import torch.nn as nn
 from torchvision import models
 
+import threestudio
+from threestudio.utils.base import BaseObject
 from threestudio.utils.perceptual.utils import get_ckpt_path
+from threestudio.utils.typing import *
+
+
+@threestudio.register("perceptual-loss")
+class PerceptualLossObject(BaseObject):
+    @dataclass
+    class Config(BaseObject.Config):
+        use_dropout: bool = True
+
+    cfg: Config
+
+    def configure(self) -> None:
+        self.perceptual_loss = PerceptualLoss(self.cfg.use_dropout).to(self.device)
+
+    def __call__(
+        self,
+        x: Float[Tensor, "B 3 256 256"],
+        y: Float[Tensor, "B 3 256 256"],
+    ):
+        return self.perceptual_loss(x, y)
 
 
 class PerceptualLoss(nn.Module):
