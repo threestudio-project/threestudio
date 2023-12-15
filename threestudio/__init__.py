@@ -3,7 +3,12 @@ __modules__ = {}
 
 def register(name):
     def decorator(cls):
-        __modules__[name] = cls
+        if name in __modules__:
+            raise ValueError(
+                f"Module {name} already exists! Names of extensions conflict!"
+            )
+        else:
+            __modules__[name] = cls
         return cls
 
     return decorator

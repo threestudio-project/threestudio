@@ -82,7 +82,7 @@ def load_custom_modules():
                 and os.path.splitext(module_path)[1] != ".py"
             ):
                 continue
-            if module_path.endswith(".disabled"):
+            if module_path.endswith("_disabled"):
                 continue
             time_before = time.perf_counter()
             success = load_custom_module(module_path)
