@@ -93,6 +93,7 @@ system:
 
   loss:
     lambda_sds: 0.1
+    lambda_sds_img: 0.
     lambda_rgb: 10.
     lambda_mask: 1.
     lambda_depth: 0.
@@ -102,6 +103,8 @@ system:
     # lambda_orient: [1000, 0.0, 10, 6000]
     lambda_sparsity: 0.0
     lambda_opaque: 0.01
+    lambda_z_variance: 0.
+
   optimizer:
     name: Adan
     args:

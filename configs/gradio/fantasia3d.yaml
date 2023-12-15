@@ -84,7 +84,9 @@ system:
 
   loss:
     lambda_sds: 1.
+    lambda_sds_img: 0.
     lambda_normal_consistency: 0.
+    lambda_z_variance: 0.
 
   optimizer:
     name: AdamW

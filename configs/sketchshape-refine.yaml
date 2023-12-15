@@ -46,10 +46,13 @@ system:
 
   loss:
     lambda_sds: 1.
+    lambda_sds_img: 0.
     lambda_sparsity: 0.0
     lambda_shape: 1.
     lambda_opaque: 0.0
     lambda_orient: 0.0
+    lambda_z_variance: 0.
+
   optimizer:
     name: Adam
     args:

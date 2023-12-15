@@ -186,7 +186,7 @@ class StableDiffusionGuidance(BaseObject):
     def compute_grad_sds(
         self,
         latents: Float[Tensor, "B 4 64 64"],
-        image: Float[Tensor, "B 3 512 512"]
+        image: Float[Tensor, "B 3 512 512"],
         t: Int[Tensor, "B"],
         prompt_utils: PromptProcessorOutput,
         elevation: Float[Tensor, "B"],
@@ -264,12 +264,17 @@ class StableDiffusionGuidance(BaseObject):
                 f"Unknown weighting strategy: {self.cfg.weighting_strategy}"
             )
 
-        latents_denoised_est = (latents_noisy - sigma_t * noise_pred_est) / alpha_t
-        image_denoised_est = self.decode_latents(latents_denoised_est)
+        alpha = self.alphas[t] ** 0.5
+        sigma = (1 - self.alphas[t]) ** 0.5
+        latents_denoised = (latents_noisy - sigma * noise_pred) / alpha
+        image_denoised = self.decode_latents(latents_denoised)
 
         grad = w * (noise_pred - noise)
-        grad_img = w * (image - image_denoised_est) * self.alphas[t] ** 0.5 / (1 - self.alphas[t]) ** 0.5
-
+        if self.cfg.use_img_loss:
+            grad_img = w * (image - image_denoised) * alpha / sigma
+        else:
+            grad_img = torch.tensor([0.], dtype=grad.dtype).to(grad.device)
+            
         guidance_eval_utils = {
             "use_perp_neg": prompt_utils.use_perp_neg,
             "neg_guidance_weights": neg_guidance_weights,
@@ -416,13 +421,14 @@ class StableDiffusionGuidance(BaseObject):
             grad, guidance_eval_utils = self.compute_grad_sjc(
                 latents, t, prompt_utils, elevation, azimuth, camera_distances
             )
+            grad_img = torch.tensor([0.], dtype=grad.dtype).to(grad.device)
         else:
-            grad, grad_img guidance_eval_utils = self.compute_grad_sds(
-                latents, RGB_BCHW_512, t, prompt_utils, elevation, azimuth, camera_distances
+            grad, grad_img, guidance_eval_utils = self.compute_grad_sds(
+                latents, rgb_BCHW_512, t, prompt_utils, elevation, azimuth, camera_distances
             )
 
         grad = torch.nan_to_num(grad)
-        grad_img = torch.nan_to_num(grad)
+        grad_img = torch.nan_to_num(grad_img)
         # clip grad for stable training?
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
@@ -598,7 +604,11 @@ class StableDiffusionGuidance(BaseObject):
 
         if self.cfg.sqrt_anneal:
             percentage = (float(global_step) / self.cfg.trainer_max_steps) ** 0.5 # progress percentage
-            curr_percent = (self.cfg.max_step_percent[1] - self.cfg.min_step_percent) * (1 - percentage) + self.cfg.min_step_percent
+            if type(self.cfg.max_step_percent) == tuple:
+                max_step_percent = self.cfg.max_step_percent[1]
+            else:
+                max_step_percent = self.cfg.max_step_percent
+            curr_percent = (max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
             self.set_min_max_steps(
                 min_step_percent=curr_percent,
                 max_step_percent=curr_percent,

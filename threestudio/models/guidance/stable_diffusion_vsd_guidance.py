@@ -542,12 +542,14 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         grad = w * (noise_pred_pretrain - noise_pred_est)
 
-        latents_denoised_pretrain = (latents_noisy - sigma_t * noise_pred_pretrain) / alpha_t
-        latents_denoised_est = (latents_noisy - sigma_t * noise_pred_est) / alpha_t
+        alpha = self.alphas[t] ** 0.5
+        sigma = (1 - self.alphas[t]) ** 0.5
+        latents_denoised_pretrain = (latents_noisy - sigma * noise_pred_pretrain) / alpha
+        latents_denoised_est = (latents_noisy - sigma * noise_pred_est) / alpha
         image_denoised_pretrain = self.decode_latents(latents_denoised_pretrain)
         image_denoised_est = self.decode_latents(latents_denoised_est)
         if self.cfg.use_img_loss:
-            grad_img = w * (image_denoised_est - image_denoised_pretrain) * self.alphas[t] ** 0.5 / (1 - self.alphas[t]) ** 0.5
+            grad_img = w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
         else:
             grad_img = torch.tensor([0.], dtype=grad.dtype).to(grad.device)
         return grad, grad_img
@@ -689,7 +691,11 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         if self.cfg.sqrt_anneal:
             percentage = (float(global_step) / self.cfg.trainer_max_steps) ** 0.5 # progress percentage
-            curr_percent = (self.cfg.max_step_percent[1] - self.cfg.min_step_percent) * (1 - percentage) + self.cfg.min_step_percent
+            if type(self.cfg.max_step_percent) not in [float, int]:
+                max_step_percent = self.cfg.max_step_percent[1]
+            else:
+                max_step_percent = self.cfg.max_step_percent
+            curr_percent = (max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
             self.set_min_max_steps(
                 min_step_percent=curr_percent,
                 max_step_percent=curr_percent,

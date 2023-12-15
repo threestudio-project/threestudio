@@ -133,6 +133,7 @@ system:
 
   loss:
     lambda_sds: 10.0
+    lambda_sds_img: 0.
     lambda_rgb: 0.
     lambda_mask: 0.
     lambda_depth: 0.
@@ -143,6 +144,8 @@ system:
     lambda_orient: 1.0
     lambda_sparsity: 0.1
     lambda_opaque: 0.1
+    lambda_z_variance: 0.
+
 
   optimizer:
     name: Adam

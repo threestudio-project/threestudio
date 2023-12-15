@@ -1,4 +1,4 @@
-name: "dreamfusion-sd"
+name: "hifa"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -74,6 +74,8 @@ system:
     weighting_strategy: sds
     min_step_percent: 0.02
     max_step_percent: 0.98
+    sqrt_anneal: true
+    use_img_loss: true
 
   loggers:
     wandb:
@@ -87,8 +89,8 @@ system:
     lambda_orient: [0, 10., 1000., 5000]
     lambda_sparsity: 1.
     lambda_opaque: 0.
-    lambda_z_variance: 0.
-    
+    lambda_z_variance: 300
+
   optimizer:
     name: Adam
     args:
