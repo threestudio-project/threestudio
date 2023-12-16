@@ -431,7 +431,7 @@ https://github.com/threestudio-project/threestudio/assets/19284678/72217cdd-765a
 
 - Most of the settings are the same as the DreamFusion model. Please refer to the notable differences of the DreamFusion model.
 - We use NeuS as the geometry representation while the original paper uses VolSDF.
-- We adopt techniques from [Neuralangelo](https://arxiv.org/abs/2306.03092) to stablize normal computation when using hash grids.
+- We adopt techniques from [Neuralangelo](https://arxiv.org/abs/2306.03092) to stabilize normal computation when using hash grids.
 - We currently only implemented the coarse stage of TextMesh.
 
 **Example running commands**
