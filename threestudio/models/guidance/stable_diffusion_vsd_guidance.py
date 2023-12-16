@@ -544,14 +544,18 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         alpha = self.alphas[t] ** 0.5
         sigma = (1 - self.alphas[t]) ** 0.5
-        latents_denoised_pretrain = (latents_noisy - sigma * noise_pred_pretrain) / alpha
+        latents_denoised_pretrain = (
+            latents_noisy - sigma * noise_pred_pretrain
+        ) / alpha
         latents_denoised_est = (latents_noisy - sigma * noise_pred_est) / alpha
         image_denoised_pretrain = self.decode_latents(latents_denoised_pretrain)
         image_denoised_est = self.decode_latents(latents_denoised_est)
         if self.cfg.use_img_loss:
-            grad_img = w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
+            grad_img = (
+                w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
+            )
         else:
-            grad_img = torch.tensor([0.], dtype=grad.dtype).to(grad.device)
+            grad_img = torch.tensor([0.0], dtype=grad.dtype).to(grad.device)
         return grad, grad_img
 
     def train_lora(
@@ -629,7 +633,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         batch_size = rgb.shape[0]
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents, rgb_BCHW_512 = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
+        latents, rgb_BCHW_512 = self.get_latents(
+            rgb_BCHW, rgb_as_latents=rgb_as_latents
+        )
 
         # view-dependent text embeddings
         text_embeddings_vd = prompt_utils.get_text_embeddings(
@@ -669,7 +675,9 @@ class StableDiffusionVSDGuidance(BaseModule):
         target = (latents - grad).detach()
         target_img = (rgb_BCHW_512 - grad_img).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-        loss_vsd_img = 0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+        loss_vsd_img = (
+            0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+        )
 
         loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
 
@@ -690,12 +698,16 @@ class StableDiffusionVSDGuidance(BaseModule):
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
         if self.cfg.sqrt_anneal:
-            percentage = (float(global_step) / self.cfg.trainer_max_steps) ** 0.5 # progress percentage
+            percentage = (
+                float(global_step) / self.cfg.trainer_max_steps
+            ) ** 0.5  # progress percentage
             if type(self.cfg.max_step_percent) not in [float, int]:
                 max_step_percent = self.cfg.max_step_percent[1]
             else:
                 max_step_percent = self.cfg.max_step_percent
-            curr_percent = (max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
+            curr_percent = (
+                max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)
+            ) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
             self.set_min_max_steps(
                 min_step_percent=curr_percent,
                 max_step_percent=curr_percent,

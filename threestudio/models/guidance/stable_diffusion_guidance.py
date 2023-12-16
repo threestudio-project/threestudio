@@ -273,8 +273,8 @@ class StableDiffusionGuidance(BaseObject):
         if self.cfg.use_img_loss:
             grad_img = w * (image - image_denoised) * alpha / sigma
         else:
-            grad_img = torch.tensor([0.], dtype=grad.dtype).to(grad.device)
-            
+            grad_img = torch.tensor([0.0], dtype=grad.dtype).to(grad.device)
+
         guidance_eval_utils = {
             "use_perp_neg": prompt_utils.use_perp_neg,
             "neg_guidance_weights": neg_guidance_weights,
@@ -421,10 +421,16 @@ class StableDiffusionGuidance(BaseObject):
             grad, guidance_eval_utils = self.compute_grad_sjc(
                 latents, t, prompt_utils, elevation, azimuth, camera_distances
             )
-            grad_img = torch.tensor([0.], dtype=grad.dtype).to(grad.device)
+            grad_img = torch.tensor([0.0], dtype=grad.dtype).to(grad.device)
         else:
             grad, grad_img, guidance_eval_utils = self.compute_grad_sds(
-                latents, rgb_BCHW_512, t, prompt_utils, elevation, azimuth, camera_distances
+                latents,
+                rgb_BCHW_512,
+                t,
+                prompt_utils,
+                elevation,
+                azimuth,
+                camera_distances,
             )
 
         grad = torch.nan_to_num(grad)
@@ -440,7 +446,9 @@ class StableDiffusionGuidance(BaseObject):
         target_img = (rgb_BCHW_512 - grad_img).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-        loss_sds_img = 0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+        loss_sds_img = (
+            0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+        )
 
         guidance_out = {
             "loss_sds": loss_sds,
@@ -603,12 +611,16 @@ class StableDiffusionGuidance(BaseObject):
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
         if self.cfg.sqrt_anneal:
-            percentage = (float(global_step) / self.cfg.trainer_max_steps) ** 0.5 # progress percentage
+            percentage = (
+                float(global_step) / self.cfg.trainer_max_steps
+            ) ** 0.5  # progress percentage
             if type(self.cfg.max_step_percent) == tuple:
                 max_step_percent = self.cfg.max_step_percent[1]
             else:
                 max_step_percent = self.cfg.max_step_percent
-            curr_percent = (max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
+            curr_percent = (
+                max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)
+            ) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
             self.set_min_max_steps(
                 min_step_percent=curr_percent,
                 max_step_percent=curr_percent,
@@ -618,4 +630,3 @@ class StableDiffusionGuidance(BaseObject):
                 min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
                 max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
             )
-

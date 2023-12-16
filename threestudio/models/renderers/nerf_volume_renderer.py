@@ -332,9 +332,12 @@ class NeRFVolumeRenderer(VolumeRenderer):
         )
 
         # populate depth and opacity to each point
-        weights_normalized = weights / opacity.clamp(min=1e-5)[ray_indices] # num_pts
+        weights_normalized = weights / opacity.clamp(min=1e-5)[ray_indices]  # num_pts
         z_mean: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(
-            weights_normalized[..., 0], values=t_positions, ray_indices=ray_indices, n_rays=n_rays
+            weights_normalized[..., 0],
+            values=t_positions,
+            ray_indices=ray_indices,
+            n_rays=n_rays,
         )
         z_variance_unmasked = nerfacc.accumulate_along_rays(
             weights_normalized[..., 0],

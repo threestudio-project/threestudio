@@ -88,7 +88,7 @@ system:
     lambda_sparsity: 1.
     lambda_opaque: 0.
     lambda_z_variance: 0.
-    
+
   optimizer:
     name: Adam
     args:
