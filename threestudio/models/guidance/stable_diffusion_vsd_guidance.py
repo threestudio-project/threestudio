@@ -55,9 +55,9 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        sqrt_anneal: bool = False
+        sqrt_anneal: bool = False  # sqrt anneal proposed in HiFA: https://hifa-team.github.io/HiFA-site/
         trainer_max_steps: int = 25000
-        use_img_loss: bool = False
+        use_img_loss: bool = False  # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
@@ -544,13 +544,14 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         alpha = self.alphas[t] ** 0.5
         sigma = (1 - self.alphas[t]) ** 0.5
-        latents_denoised_pretrain = (
-            latents_noisy - sigma * noise_pred_pretrain
-        ) / alpha
-        latents_denoised_est = (latents_noisy - sigma * noise_pred_est) / alpha
-        image_denoised_pretrain = self.decode_latents(latents_denoised_pretrain)
-        image_denoised_est = self.decode_latents(latents_denoised_est)
+        # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
         if self.cfg.use_img_loss:
+            latents_denoised_pretrain = (
+                latents_noisy - sigma * noise_pred_pretrain
+            ) / alpha
+            latents_denoised_est = (latents_noisy - sigma * noise_pred_est) / alpha
+            image_denoised_pretrain = self.decode_latents(latents_denoised_pretrain)
+            image_denoised_est = self.decode_latents(latents_denoised_est)
             grad_img = (
                 w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
             )
