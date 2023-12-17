@@ -70,9 +70,11 @@ system:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 7.5
     weighting_strategy: dreamfusion
-    min_step_percent: 0.02
+    min_step_percent: 0.3
     max_step_percent: 0.98
     vsd_phi_model_name_or_path: "stabilityai/stable-diffusion-2-1"
+    use_img_loss: false
+    sqrt_anneal: false
 
   loggers:
     wandb:
@@ -82,11 +84,12 @@ system:
 
   loss:
     lambda_sd: 1.
+
     lambda_train_phi: 1.
     lambda_orient: 0.
     lambda_sparsity: 10.
     lambda_opaque: [10000, 0.0, 1000.0, 10001]
-    lambda_z_variance: 0.
+    lambda_z_variance: 300.
   optimizer:
     name: AdamW
     args:

@@ -6,8 +6,8 @@ seed: 0
 data_type: "random-camera-datamodule"
 data:
   batch_size: 1
-  width: 64
-  height: 64
+  width: 512
+  height: 512
   camera_distance_range: [1.5, 2.0]
   fovy_range: [40, 70]
   elevation_range: [-10, 45]

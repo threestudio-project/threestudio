@@ -77,11 +77,12 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         # camera condition type, in ["extrinsics", "mvp", "spherical"]
         vsd_camera_condition_type: Optional[str] = "extrinsics"
 
-        # HiFA configurations
-        use_img_loss: bool = True  # works with most cases
+        # HiFA configurations: https://hifa-team.github.io/HiFA-site/
         sqrt_anneal: bool = (
             False  # requires setting min_step_percent=0.3 to work properly
         )
+        trainer_max_steps: int = 25000
+        use_img_loss: bool = True  # works with most cases
 
     cfg: Config
 
@@ -642,40 +643,23 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         sigma = (1 - self.alphas[t]) ** 0.5
 
         # compute decoded image if needed for visualization/img loss
-        if self.cfg.return_rgb_1step_orig or self.use_img_loss:
+        if self.cfg.return_rgb_1step_orig or self.cfg.use_img_loss:
             with torch.no_grad():
                 image_denoised_pretrain = self.vae_decode(
                     self.pipe.vae, latents_1step_orig
                 )
                 rgb_1step_orig = image_denoised_pretrain.permute(0, 2, 3, 1)
 
-        if self.use_img_loss:
-            if self.cfg.guidance_type == "vsd":
-                latents_denoised_est = (latents_noisy - sigma * noise_pred_est) / alpha
-                image_denoised_est = self.decode_latents(latents_denoised_est)
-            else:
-                image_denoised_est = rgb_BCHW_512
-            grad_img = (
-                w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
-            )
-        else:
-            grad_img = torch.tensor([0.0], dtype=grad.dtype).to(grad.device)
-
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
-            grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # reparameterization trick:
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
         loss_sd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-        loss_sd_img = (
-            0.5 * F.mse_loss(rgb_BCHW_512, target, reduction="sum") / batch_size
-        )
 
         guidance_out = {
             "loss_sd": loss_sd,
-            "loss_sd_img": loss_sd_img,
             "grad_norm": grad.norm(),
             "timesteps": t,
             "min_step": self.min_step,
@@ -686,6 +670,26 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             "weights": w,
             "lambdas": self.lambdas[t],
         }
+
+        # image-space loss proposed in HiFA: https://hifa-team.github.io/HiFA-site/
+        if self.cfg.use_img_loss:
+            if self.cfg.guidance_type == "vsd":
+                latents_denoised_est = (latents_noisy - sigma * eps_phi) / alpha
+                image_denoised_est = self.vae_decode(
+                    self.pipe.vae, latents_denoised_est
+                )
+            else:
+                image_denoised_est = rgb_BCHW_512
+            grad_img = (
+                w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
+            )
+            if self.grad_clip_val is not None:
+                grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target_img = (rgb_BCHW_512 - grad_img).detach()
+            loss_sd_img = (
+                0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+            )
+            guidance_out.update({"loss_sd_img": loss_sd_img})
 
         if self.cfg.return_rgb_1step_orig:
             guidance_out.update({"rgb_1step_orig": rgb_1step_orig})

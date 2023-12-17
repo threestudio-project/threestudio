@@ -75,6 +75,7 @@ system:
     weighting_strategy: dreamfusion
     min_step_percent: 0.02
     max_step_percent: 0.98
+    use_img_loss: false
 
   loggers:
     wandb:
@@ -87,6 +88,8 @@ system:
     lambda_orient: [0, 10., 1000., 5000]
     lambda_sparsity: 1.
     lambda_opaque: 0.
+    lambda_z_variance: 0.
+
   optimizer:
     name: Adam
     args:
