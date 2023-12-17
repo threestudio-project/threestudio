@@ -32,9 +32,9 @@ class StableDiffusionGuidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        sqrt_anneal: bool = False
+        sqrt_anneal: bool = False  # sqrt anneal proposed in HiFA: https://hifa-team.github.io/HiFA-site/
         trainer_max_steps: int = 25000
-        use_img_loss: bool = False
+        use_img_loss: bool = False  # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
 
         use_sjc: bool = False
         var_red: bool = True
@@ -270,6 +270,7 @@ class StableDiffusionGuidance(BaseObject):
         image_denoised = self.decode_latents(latents_denoised)
 
         grad = w * (noise_pred - noise)
+        # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
         if self.cfg.use_img_loss:
             grad_img = w * (image - image_denoised) * alpha / sigma
         else:

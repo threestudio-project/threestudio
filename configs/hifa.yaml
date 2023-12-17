@@ -72,7 +72,7 @@ system:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 100.
     weighting_strategy: sds
-    min_step_percent: 0.02
+    min_step_percent: 0.3
     max_step_percent: 0.98
     sqrt_anneal: true
     use_img_loss: true
@@ -85,7 +85,7 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_sds_img: 0.
+    lambda_sds_img: 0.01
     lambda_orient: [0, 10., 1000., 5000]
     lambda_sparsity: 1.
     lambda_opaque: 0.
