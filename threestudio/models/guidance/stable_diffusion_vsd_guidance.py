@@ -607,14 +607,14 @@ class StableDiffusionVSDGuidance(BaseModule):
     def get_latents(
         self, rgb_BCHW: Float[Tensor, "B C H W"], rgb_as_latents=False
     ) -> Float[Tensor, "B 4 64 64"]:
+        rgb_BCHW_512 = F.interpolate(
+            rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+        )
         if rgb_as_latents:
             latents = F.interpolate(
                 rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
             )
         else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-            )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
         return latents, rgb_BCHW_512

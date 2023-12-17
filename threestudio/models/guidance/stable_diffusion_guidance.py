@@ -398,14 +398,14 @@ class StableDiffusionGuidance(BaseObject):
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
+        rgb_BCHW_512 = F.interpolate(
+            rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+        )
         if rgb_as_latents:
             latents = F.interpolate(
                 rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
             )
         else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-            )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
 
