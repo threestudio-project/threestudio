@@ -78,8 +78,10 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         vsd_camera_condition_type: Optional[str] = "extrinsics"
 
         # HiFA configurations
-        use_img_loss: bool = True # works with most cases
-        sqrt_anneal: bool = False # requires setting min_step_percent=0.3 to work properly
+        use_img_loss: bool = True  # works with most cases
+        sqrt_anneal: bool = (
+            False  # requires setting min_step_percent=0.3 to work properly
+        )
 
     cfg: Config
 
@@ -646,7 +648,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                     self.pipe.vae, latents_1step_orig
                 )
                 rgb_1step_orig = image_denoised_pretrain.permute(0, 2, 3, 1)
-        
+
         if self.use_img_loss:
             if self.cfg.guidance_type == "vsd":
                 latents_denoised_est = (latents_noisy - sigma * noise_pred_est) / alpha
@@ -667,11 +669,13 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
         loss_sd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-        loss_sd_img = 0.5 * F.mse_loss(rgb_BCHW_512, target, reduction="sum") / batch_size
+        loss_sd_img = (
+            0.5 * F.mse_loss(rgb_BCHW_512, target, reduction="sum") / batch_size
+        )
 
         guidance_out = {
             "loss_sd": loss_sd,
-            "loss_sd_img": loss_sd_img
+            "loss_sd_img": loss_sd_img,
             "grad_norm": grad.norm(),
             "timesteps": t,
             "min_step": self.min_step,
