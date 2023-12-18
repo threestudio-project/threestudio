@@ -48,10 +48,13 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/ac6089a7-d88f-414c-96d6-a5e75616115a" width="68%">
 </p>
 <p align="center">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/025e6980-baf2-4b5f-9c23-4f66ef847bf5" width="33%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/f04b6bdd-ef02-4ce7-b7c9-981f8bda419f" width="33%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/8892898f-8bd8-43dc-a4ec-dd8d078af860" width="50%">
 </p>
 
 ## News
+- 18/12/2023 Implementation of [4D-fy](https://github.com/DSaurus/threestudio-4dfy) for 4D generation and [DreamCraft3D](https://github.com/DSaurus/threestudio-dreamcraft3D) for high-quality image-to-3D generation as the custom extensions! Follow the instructions on the extensions website to give it a try.
 - 11/30/2023 Implementation of [MVDream](https://github.com/DSaurus/threestudio-mvdream), [Gaussian Splatting](https://github.com/DSaurus/threestudio-3dgs) as the custom extensions. You can also use neural representation to fit a mesh by [Mesh-Fitting](https://github.com/DSaurus/threestudio-meshfitting).
 - 11/30/2023: Implementation of [custom extension system](https://threestudio-project.github.io/threestudio-extensions/) and you can add your extensions in [this project](https://github.com/threestudio-project/threestudio-extensions).
 - 08/25/2023: Implementation of [Magic123](https://guochengqian.github.io/project/magic123/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#magic123-) to give it a try.
