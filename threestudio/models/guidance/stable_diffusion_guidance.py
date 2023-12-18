@@ -615,7 +615,7 @@ class StableDiffusionGuidance(BaseObject):
             percentage = (
                 float(global_step) / self.cfg.trainer_max_steps
             ) ** 0.5  # progress percentage
-            if type(self.cfg.max_step_percent) == tuple:
+            if type(self.cfg.max_step_percent) not in [float, int]:
                 max_step_percent = self.cfg.max_step_percent[1]
             else:
                 max_step_percent = self.cfg.max_step_percent
