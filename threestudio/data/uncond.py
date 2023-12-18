@@ -1,7 +1,9 @@
 import bisect
+import hashlib
 import math
 import random
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import numpy as np
 import pytorch_lightning as pl
@@ -13,7 +15,7 @@ import threestudio
 from threestudio import register
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
-from threestudio.utils.misc import get_device
+from threestudio.utils.misc import GlobalStepLocker, get_device
 from threestudio.utils.ops import (
     get_full_projection_matrix,
     get_mvp_matrix,
@@ -57,6 +59,8 @@ class RandomCameraDataModuleConfig:
     progressive_until: int = 0  # progressive ranges for elevation, azimuth, r, fovy
 
     rays_d_normalize: bool = True
+
+    num_workers: int = 0
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
@@ -104,6 +108,10 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         self.fovy_range = self.cfg.fovy_range
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        if hasattr(self, "global_step_locker"):
+            global_step_json = self.global_step_locker.read()
+            global_step = global_step_json["global_step"]
+            print(global_step)
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
         self.height = self.heights[size_ind]
         self.width = self.widths[size_ind]
@@ -475,9 +483,20 @@ class RandomCameraDataModule(pl.LightningDataModule):
         super().__init__()
         self.cfg = parse_structured(RandomCameraDataModuleConfig, cfg)
 
+        if self.cfg.num_workers > 0:
+            now = datetime.now()
+            date_string = now.strftime("%Y-%m-%d-%H:%M")
+            hash_string = hashlib.md5(date_string.encode()).hexdigest()
+            self.global_step_locker = GlobalStepLocker(
+                f".threestudio_cache/global_step_locker/{hash_string}.json"
+            )
+            self.global_step_locker.write({"global_step": 0})
+
     def setup(self, stage=None) -> None:
         if stage in [None, "fit"]:
             self.train_dataset = RandomCameraIterableDataset(self.cfg)
+            if self.cfg.num_workers > 0:
+                self.train_dataset.global_step_locker = self.global_step_locker
         if stage in [None, "fit", "validate"]:
             self.val_dataset = RandomCameraDataset(self.cfg, "val")
         if stage in [None, "test", "predict"]:
@@ -486,19 +505,24 @@ class RandomCameraDataModule(pl.LightningDataModule):
     def prepare_data(self):
         pass
 
-    def general_loader(self, dataset, batch_size, collate_fn=None) -> DataLoader:
+    def general_loader(
+        self, dataset, batch_size, num_workers=0, collate_fn=None
+    ) -> DataLoader:
         return DataLoader(
             dataset,
             # very important to disable multi-processing if you want to change self attributes at runtime!
             # (for example setting self.width and self.height in update_step)
-            num_workers=0,  # type: ignore
+            num_workers=num_workers,  # type: ignore
             batch_size=batch_size,
             collate_fn=collate_fn,
         )
 
     def train_dataloader(self) -> DataLoader:
         return self.general_loader(
-            self.train_dataset, batch_size=None, collate_fn=self.train_dataset.collate
+            self.train_dataset,
+            batch_size=None,
+            collate_fn=self.train_dataset.collate,
+            num_workers=self.cfg.num_workers,
         )
 
     def val_dataloader(self) -> DataLoader:

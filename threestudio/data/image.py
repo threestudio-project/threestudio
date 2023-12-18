@@ -1,7 +1,9 @@
 import bisect
+import hashlib
 import math
 import os
 from dataclasses import dataclass, field
+from datetime import datetime
 
 import cv2
 import numpy as np
@@ -19,7 +21,7 @@ from threestudio.data.uncond import (
 )
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
-from threestudio.utils.misc import get_rank
+from threestudio.utils.misc import GlobalStepLocker, get_rank
 from threestudio.utils.ops import (
     get_mvp_matrix,
     get_projection_matrix,
@@ -49,6 +51,8 @@ class SingleImageDataModuleConfig:
     requires_normal: bool = False
 
     rays_d_normalize: bool = True
+
+    num_workers: int = 0
 
 
 class SingleImageDataBase:
@@ -174,11 +178,11 @@ class SingleImageDataBase:
         )
         rgb = rgba[..., :3]
         self.rgb: Float[Tensor, "1 H W 3"] = (
-            torch.from_numpy(rgb).unsqueeze(0).contiguous().to(self.rank)
+            torch.from_numpy(rgb).unsqueeze(0).contiguous()
         )
-        self.mask: Float[Tensor, "1 H W 1"] = (
-            torch.from_numpy(rgba[..., 3:] > 0.5).unsqueeze(0).to(self.rank)
-        )
+        self.mask: Float[Tensor, "1 H W 1"] = torch.from_numpy(
+            rgba[..., 3:] > 0.5
+        ).unsqueeze(0)
         print(
             f"[INFO] single image dataset: load image {self.cfg.image_path} {self.rgb.shape}"
         )
@@ -191,11 +195,9 @@ class SingleImageDataBase:
             depth = cv2.resize(
                 depth, (self.width, self.height), interpolation=cv2.INTER_AREA
             )
-            self.depth: Float[Tensor, "1 H W 1"] = (
-                torch.from_numpy(depth.astype(np.float32) / 255.0)
-                .unsqueeze(0)
-                .to(self.rank)
-            )
+            self.depth: Float[Tensor, "1 H W 1"] = torch.from_numpy(
+                depth.astype(np.float32) / 255.0
+            ).unsqueeze(0)
             print(
                 f"[INFO] single image dataset: load depth {depth_path} {self.depth.shape}"
             )
@@ -210,11 +212,9 @@ class SingleImageDataBase:
             normal = cv2.resize(
                 normal, (self.width, self.height), interpolation=cv2.INTER_AREA
             )
-            self.normal: Float[Tensor, "1 H W 3"] = (
-                torch.from_numpy(normal.astype(np.float32) / 255.0)
-                .unsqueeze(0)
-                .to(self.rank)
-            )
+            self.normal: Float[Tensor, "1 H W 3"] = torch.from_numpy(
+                normal.astype(np.float32) / 255.0
+            ).unsqueeze(0)
             print(
                 f"[INFO] single image dataset: load normal {normal_path} {self.normal.shape}"
             )
@@ -267,6 +267,10 @@ class SingleImageIterableDataset(IterableDataset, SingleImageDataBase, Updateabl
         return batch
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        if hasattr(self, "global_step_locker") and self.cfg.num_workers > 0:
+            global_step_json = self.global_step_locker.read()
+            global_step = global_step_json["global_step"]
+            self.random_pose_generator.global_step_locker = self.global_step_locker
         self.update_step_(epoch, global_step, on_load_weights)
         self.random_pose_generator.update_step(epoch, global_step, on_load_weights)
 
@@ -310,10 +314,20 @@ class SingleImageDataModule(pl.LightningDataModule):
     def __init__(self, cfg: Optional[Union[dict, DictConfig]] = None) -> None:
         super().__init__()
         self.cfg = parse_structured(SingleImageDataModuleConfig, cfg)
+        if self.cfg.num_workers > 0:
+            now = datetime.now()
+            date_string = now.strftime("%Y-%m-%d-%H:%M")
+            hash_string = hashlib.md5(date_string.encode()).hexdigest()
+            self.global_step_locker = GlobalStepLocker(
+                f".threestudio_cache/global_step_locker/{hash_string}.json"
+            )
+            self.global_step_locker.write({"global_step": 0})
 
     def setup(self, stage=None) -> None:
         if stage in [None, "fit"]:
             self.train_dataset = SingleImageIterableDataset(self.cfg, "train")
+            if self.cfg.num_workers > 0:
+                self.train_dataset.global_step_locker = self.global_step_locker
         if stage in [None, "fit", "validate"]:
             self.val_dataset = SingleImageDataset(self.cfg, "val")
         if stage in [None, "test", "predict"]:
@@ -322,9 +336,14 @@ class SingleImageDataModule(pl.LightningDataModule):
     def prepare_data(self):
         pass
 
-    def general_loader(self, dataset, batch_size, collate_fn=None) -> DataLoader:
+    def general_loader(
+        self, dataset, batch_size, num_workers=0, collate_fn=None
+    ) -> DataLoader:
         return DataLoader(
-            dataset, num_workers=0, batch_size=batch_size, collate_fn=collate_fn
+            dataset,
+            num_workers=num_workers,
+            batch_size=batch_size,
+            collate_fn=collate_fn,
         )
 
     def train_dataloader(self) -> DataLoader:
@@ -332,6 +351,7 @@ class SingleImageDataModule(pl.LightningDataModule):
             self.train_dataset,
             batch_size=self.cfg.batch_size,
             collate_fn=self.train_dataset.collate,
+            num_workers=self.cfg.num_workers,
         )
 
     def val_dataloader(self) -> DataLoader:

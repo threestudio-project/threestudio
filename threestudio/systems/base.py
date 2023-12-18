@@ -119,6 +119,12 @@ class BaseSystem(pl.LightningModule, Updateable, SaverMixin):
 
     def on_train_batch_end(self, outputs, batch, batch_idx):
         self.dataset = self.trainer.train_dataloader.dataset
+        if (
+            hasattr(self.dataset.cfg, "num_workers")
+            and self.dataset.cfg.num_workers > 0
+        ):
+            self.dataset.global_step_locker.write({"global_step": self.global_step})
+
         update_end_if_possible(
             self.dataset, self.true_current_epoch, self.true_global_step
         )

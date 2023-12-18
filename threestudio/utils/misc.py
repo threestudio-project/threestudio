@@ -1,9 +1,11 @@
 import gc
+import json
 import os
 import re
 
 import tinycudann as tcnn
 import torch
+from filelock import FileLock
 from packaging import version
 
 from threestudio.utils.config import config_to_primitive
@@ -155,3 +157,20 @@ def find_last_path(path: str):
             raise FileNotFoundError(new_path)
     else:
         return path
+
+
+class GlobalStepLocker:
+    def __init__(self, filename):
+        self.filename = filename
+        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+        self.lock = FileLock(f"{filename}.lock")
+
+    def read(self):
+        with self.lock:
+            with open(self.filename, "r") as f:
+                return json.load(f)
+
+    def write(self, value):
+        with self.lock:
+            with open(self.filename, "w") as f:
+                json.dump(value, f)
