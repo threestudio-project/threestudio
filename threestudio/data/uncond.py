@@ -111,7 +111,6 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         if hasattr(self, "global_step_locker"):
             global_step_json = self.global_step_locker.read()
             global_step = global_step_json["global_step"]
-            print(global_step)
         size_ind = bisect.bisect_right(self.resolution_milestones, global_step) - 1
         self.height = self.heights[size_ind]
         self.width = self.widths[size_ind]
