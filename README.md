@@ -533,6 +533,9 @@ Download pretrained Stable Zero123 checkpoint `stable-zero123.ckpt` into `load/z
 **Results obtained by threestudio (Stable Zero123 vs Zero123-XL)**
 ![Final_video_v01](https://github.com/threestudio-project/threestudio/assets/22424247/bf2d2213-5027-489c-a6ba-1c56c14ee8b7)
 
+**Direct multi-view images generation**
+If you only want to generate multi-view images, please refer to [threestudio-mvimg-gen](https://github.com/DSaurus/threestudio-mvimg-gen). This extension can use Stable Zero123 to directly generate images from multi-view perspectives.
+
 **Example running commands**
 
 1. Take an image of your choice, or generate it from text using your favourite AI image generator such as SDXL Turbo (https://clipdrop.co/stable-diffusion-turbo) E.g. "A simple 3D render of a friendly dog"
