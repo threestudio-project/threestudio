@@ -239,12 +239,48 @@ class SingleImageDataBase:
         self.load_images()
 
 
-class SingleImageIterableDataset(IterableDataset, SingleImageDataBase, Updateable):
+class SingleImageIterableDataset(Dataset, SingleImageDataBase, Updateable):
     def __init__(self, cfg: Any, split: str) -> None:
         super().__init__()
         self.setup(cfg, split)
 
+    def __len__(self):
+        return 10000000
+
     def collate(self, batch) -> Dict[str, Any]:
+        output = {
+            "height": self.cfg.height,
+            "width": self.cfg.width,
+        }
+
+        for key in batch[0]:
+            if key != "random_camera":
+                if batch[0][key] is not None:
+                    output[key] = torch.cat([b[key] for b in batch], dim=0)
+                else:
+                    output[key] = None
+
+        output["random_camera"] = {}
+        for key in batch[0]["random_camera"]:
+            if batch[0]["random_camera"][key] is not None:
+                output["random_camera"][key] = torch.cat(
+                    [b["random_camera"][key] for b in batch], dim=0
+                )
+            else:
+                output["random_camera"][key] = None
+        return output
+
+    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
+        if hasattr(self, "global_step_locker") and self.cfg.num_workers > 0:
+            global_step_json = self.global_step_locker.read()
+            global_step = global_step_json["global_step"]
+            self.random_pose_generator.global_step_locker = self.global_step_locker
+        self.update_step_(epoch, global_step, on_load_weights)
+        self.random_pose_generator.update_step(epoch, global_step, on_load_weights)
+
+    def __getitem__(self, idx):
+        if hasattr(self, "global_step_locker") and self.cfg.num_workers > 0:
+            self.update_step(0, 0)
         batch = {
             "rays_o": self.rays_o,
             "rays_d": self.rays_d,
@@ -258,25 +294,11 @@ class SingleImageIterableDataset(IterableDataset, SingleImageDataBase, Updateabl
             "ref_depth": self.depth,
             "ref_normal": self.normal,
             "mask": self.mask,
-            "height": self.cfg.height,
-            "width": self.cfg.width,
         }
         if self.cfg.use_random_camera:
-            batch["random_camera"] = self.random_pose_generator.collate(None)
+            batch["random_camera"] = self.random_pose_generator.__getitem__(idx)
 
         return batch
-
-    def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        if hasattr(self, "global_step_locker") and self.cfg.num_workers > 0:
-            global_step_json = self.global_step_locker.read()
-            global_step = global_step_json["global_step"]
-            self.random_pose_generator.global_step_locker = self.global_step_locker
-        self.update_step_(epoch, global_step, on_load_weights)
-        self.random_pose_generator.update_step(epoch, global_step, on_load_weights)
-
-    def __iter__(self):
-        while True:
-            yield {}
 
 
 class SingleImageDataset(Dataset, SingleImageDataBase):
