@@ -201,7 +201,7 @@ def run(
 
     # manually assign the output directory, name and tag so that we know the trial directory
     name = os.path.basename(model_config[model_name]["path"]).split(".")[0]
-    tag = datetime.now().strftime("@%Y%m%d-%H%M%S")
+    tag = datetime.now().strftime("%Y%m%d-%H%M%S")
     trial_dir = os.path.join(save_root, EXP_ROOT_DIR, name, tag)
     alive_path = os.path.join(trial_dir, "alive")
 
@@ -441,6 +441,7 @@ def launch(
                 run_btn,
                 stop_btn,
             ],
+            concurrency_limit=1,
         )
         stop_btn.click(
             fn=stop_run,
@@ -453,7 +454,7 @@ def launch(
     launch_args = {"server_port": port}
     if listen:
         launch_args["server_name"] = "0.0.0.0"
-    demo.queue(concurrency_count=1).launch(**launch_args)
+    demo.queue().launch(**launch_args)
 
 
 def watch(
