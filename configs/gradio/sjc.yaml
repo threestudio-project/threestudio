@@ -67,12 +67,10 @@ system:
 
   loss:
     lambda_sds: 1.
-    lambda_sds_img: 0.
     center_ratio: 0.78125 # = 50 / 64
     lambda_depth: 0 # or try 10
     lambda_emptiness: [5000, 1.e+4, 2.e+5, 5001]
     emptiness_scale: 10
-    lambda_z_variance: 0.
 
   optimizer:
     name: Adamax

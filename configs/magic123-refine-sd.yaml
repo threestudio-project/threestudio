@@ -104,7 +104,6 @@ system:
     lambda_sd_img: 0.
     lambda_normal_consistency: 1000.
     lambda_laplacian_smoothness: 0.
-    lambda_z_variance: 0.
 
   optimizer:
     name: Adam

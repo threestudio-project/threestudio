@@ -1,4 +1,4 @@
-name: "magic123-coarse-sd"
+name: "magic123-hifa-coarse-sd"
 tag: "${rmspace:${basename:${data.image_path}},_}-${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -100,7 +100,7 @@ system:
     guidance_scale: 100.
     min_step_percent: 0.2
     max_step_percent: 0.6
-    use_img_loss: false
+    use_img_loss: true
 
   loggers:
     wandb:
@@ -113,11 +113,12 @@ system:
     lambda_mask: 100.
     lambda_sd: 0.025
     lambda_3d_sd: 1.
-    lambda_sd_img: 0.
+    lambda_sd_img: 0.00025
     lambda_orient: 0.
     lambda_normal_smoothness_2d: 1000.
     lambda_sparsity: 0.
     lambda_opaque: 0.
+    lambda_z_variance: 300.
 
   optimizer:
     name: Adam

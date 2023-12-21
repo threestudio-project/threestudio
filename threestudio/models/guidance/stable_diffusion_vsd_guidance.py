@@ -556,7 +556,7 @@ class StableDiffusionVSDGuidance(BaseModule):
                 w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
             )
         else:
-            grad_img = torch.tensor([0.0], dtype=grad.dtype).to(grad.device)
+            grad_img = None
         return grad, grad_img
 
     def train_lora(
@@ -665,31 +665,36 @@ class StableDiffusionVSDGuidance(BaseModule):
         )
 
         grad = torch.nan_to_num(grad)
-        grad_img = torch.nan_to_num(grad_img)
         # clip grad for stable training?
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
-            grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # reparameterization trick
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         target = (latents - grad).detach()
-        target_img = (rgb_BCHW_512 - grad_img).detach()
         loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-        loss_vsd_img = (
-            0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
-        )
-
         loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
 
-        return {
+        loss_dict = {
             "loss_vsd": loss_vsd,
             "loss_lora": loss_lora,
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,
-            "loss_vsd_img": loss_vsd_img,
         }
+
+        if self.cfg.use_img_loss:
+            grad_img = torch.nan_to_num(grad_img)
+            if self.grad_clip_val is not None:
+                grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target_img = (rgb_BCHW_512 - grad_img).detach()
+            loss_vsd_img = (
+                0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+            )
+            loss_dict["loss_vsd_img"] = loss_vsd_img
+
+        return loss_dict
+
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in

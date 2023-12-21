@@ -79,7 +79,6 @@ system:
     lambda_orient: 0.
     lambda_sparsity: 1.
     lambda_opaque: 0.
-    lambda_z_variance: 300
 
   optimizer:
     name: Adam

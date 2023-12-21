@@ -1,4 +1,4 @@
-name: "prolificdreamer-patch"
+name: "hifa-unified"
 tag: "${rmspace:${system.prompt_processor.prompt},_}"
 exp_root_dir: "outputs"
 seed: 0
@@ -17,9 +17,8 @@ data:
   eval_camera_distance: 1.5
   eval_fovy_deg: 70.
 
-system_type: "prolificdreamer-system"
+system_type: "dreamfusion-system"
 system:
-  stage: coarse
   geometry_type: "implicit-volume"
   geometry:
     radius: 1.0
@@ -48,44 +47,46 @@ system:
     color_activation: sigmoid
     random_aug: true
 
-  renderer_type: "patch-renderer"
+
+  renderer_type: "nerf-volume-renderer"
   renderer:
-    base_renderer_type: "nerf-volume-renderer"
-    base_renderer:
-      radius: ${system.geometry.radius}
-      num_samples_per_ray: 512
-    patch_size: 128
+    radius: ${system.geometry.radius}
+    num_samples_per_ray: 512
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     prompt: ???
-    front_threshold: 30.
-    back_threshold: 30.
 
-  guidance_type: "stable-diffusion-vsd-guidance"
+  guidance_type: "stable-diffusion-unified-guidance"
   guidance:
+    guidance_type: "sds"
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-    pretrained_model_name_or_path_lora: "stabilityai/stable-diffusion-2-1"
-    guidance_scale: 7.5
-    min_step_percent: 0.02
-    max_step_percent: [5000, 0.98, 0.5, 5001] # annealed to 0.5 after 5000 steps
+    guidance_scale: 100.
+    weighting_strategy: uniform
+    min_step_percent: 0.3
+    max_step_percent: 0.98
+    use_img_loss: true
+    sqrt_anneal: true
 
   loggers:
     wandb:
       enable: false
       project: "threestudio"
+      name: None
 
   loss:
-    lambda_vsd: 1.
-    lambda_lora: 1.
+    lambda_sd: 1.
+    lambda_sd_img: 0.01
     lambda_orient: 0.
-    lambda_sparsity: 10.
-    lambda_opaque: [10000, 0.0, 1000.0, 10001]
-    lambda_z_variance: 0.
+    lambda_sparsity: 1.
+    lambda_opaque: 0.
+    lambda_z_variance: 100.
+
   optimizer:
-    name: AdamW
+    name: Adam
     args:
+      lr: 0.01
       betas: [0.9, 0.99]
       eps: 1.e-15
     params:
@@ -97,11 +98,8 @@ system:
         lr: 0.001
       background:
         lr: 0.001
-      guidance:
-        lr: 0.0001
-
 trainer:
-  max_steps: 25000
+  max_steps: 10000
   log_every_n_steps: 1
   num_sanity_val_steps: 0
   val_check_interval: 200
@@ -109,6 +107,6 @@ trainer:
   precision: 32
 
 checkpoint:
-  save_last: true
+  save_last: true # save at each validation time
   save_top_k: -1
   every_n_train_steps: ${trainer.max_steps}

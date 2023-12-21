@@ -92,7 +92,6 @@ system:
 
   loss:
     lambda_sds: 0.1
-    lambda_sds_img: 0.
     lambda_rgb: 10.
     lambda_mask: 1.
     lambda_depth: [0.0, 0.0, 1.0, 10000]
@@ -103,7 +102,6 @@ system:
     lambda_orient: 0.0
     lambda_sparsity: 0.0
     lambda_opaque: 0.0
-    lambda_z_variance: 0.
 
 
   optimizer:

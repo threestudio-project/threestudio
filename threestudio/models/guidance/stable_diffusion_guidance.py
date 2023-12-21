@@ -274,7 +274,7 @@ class StableDiffusionGuidance(BaseObject):
         if self.cfg.use_img_loss:
             grad_img = w * (image - image_denoised) * alpha / sigma
         else:
-            grad_img = torch.tensor([0.0], dtype=grad.dtype).to(grad.device)
+            grad_img = None
 
         guidance_eval_utils = {
             "use_perp_neg": prompt_utils.use_perp_neg,
@@ -435,21 +435,17 @@ class StableDiffusionGuidance(BaseObject):
             )
 
         grad = torch.nan_to_num(grad)
-        grad_img = torch.nan_to_num(grad_img)
+
         # clip grad for stable training?
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
-            grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
 
         # loss = SpecifyGradient.apply(latents, grad)
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         target = (latents - grad).detach()
-        target_img = (rgb_BCHW_512 - grad_img).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-        loss_sds_img = (
-            0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
-        )
+
 
         guidance_out = {
             "loss_sds": loss_sds,
@@ -459,6 +455,16 @@ class StableDiffusionGuidance(BaseObject):
             "max_step": self.max_step,
         }
 
+        if self.cfg.use_img_loss:
+            grad_img = torch.nan_to_num(grad_img)
+            if self.grad_clip_val is not None:
+                grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target_img = (rgb_BCHW_512 - grad_img).detach()
+            loss_sds_img = (
+                0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+            )
+            guidance_out["loss_sds_img"] = loss_sds_img
+            
         if guidance_eval:
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
             texts = []
