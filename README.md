@@ -48,27 +48,33 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/ac6089a7-d88f-414c-96d6-a5e75616115a" width="68%">
 </p>
 <p align="center">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/025e6980-baf2-4b5f-9c23-4f66ef847bf5" width="33%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/f04b6bdd-ef02-4ce7-b7c9-981f8bda419f" width="33%">
+    
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/302a399e-d36f-453e-a595-1c7d120451d3" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/025e6980-baf2-4b5f-9c23-4f66ef847bf5" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/f04b6bdd-ef02-4ce7-b7c9-981f8bda419f" width="35%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/8892898f-8bd8-43dc-a4ec-dd8d078af860" width="50%">
 </p>
+<p align="center"><b>
+| <a href="https://github.com/HeliosZhao/Animate124/tree/threestudio">Animate-124</a> | <a href="https://github.com/DSaurus/threestudio-4dfy">4D-fy</a> | <a href="https://github.com/DSaurus/threestudio-dreamcraft3D">DreamCraft3D</a> | <a href="https://github.com/DSaurus/threestudio-3dgs">Gaussian Splatting</a> | <a href="https://github.com/DSaurus/threestudio-mvdream">MVDream</a> | <a href="https://github.com/DSaurus/threestudio-meshfitting">Mesh-Fitting</a> |
+</b>
 
 ## News
-- 12/18/2023: Implementation of [4D-fy](https://github.com/DSaurus/threestudio-4dfy) for 4D generation and [DreamCraft3D](https://github.com/DSaurus/threestudio-dreamcraft3D) for high-quality image-to-3D generation as the custom extensions! Follow the instructions on the extensions website to give it a try.
-- 12/13/2023: Implementation supporting [Stable Zero123](https://stability.ai/news/stable-zero123-3d-generation) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#stable-zero123) to give it a try.
-- 11/30/2023: Implementation of [MVDream](https://github.com/DSaurus/threestudio-mvdream), [Gaussian Splatting](https://github.com/DSaurus/threestudio-3dgs) as the custom extensions. You can also use neural representation to fit a mesh by [Mesh-Fitting](https://github.com/DSaurus/threestudio-meshfitting).
-- 11/30/2023: Implementation of [custom extension system](https://threestudio-project.github.io/threestudio-extensions/) and you can add your extensions in [this project](https://github.com/threestudio-project/threestudio-extensions).
-- 08/25/2023: Implementation of [Magic123](https://guochengqian.github.io/project/magic123/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#magic123-) to give it a try.
-- 07/06/2023: Join our [Discord server](https://discord.gg/ejer2MAB8N) for lively discussions!
-- 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
-- 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-) to give it a try.
-- 06/14/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
-- 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
-- 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
-- 05/26/2023: Implementation of [ProlificDreamer](https://ml.cs.tsinghua.edu.cn/prolificdreamer/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
-- 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
-- 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
-- 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
+- 23/12/2023: Thank [Yuyang Zhao](https://github.com/HeliosZhao) for implementation of image-to-4D generation extensions [Aniamte-124](https://github.com/HeliosZhao/Animate124/tree/threestudio)! Follow the instructions on the extensions website to give it a try.
+- 18/12/2023: Implementation of [4D-fy](https://github.com/DSaurus/threestudio-4dfy) for 4D generation and [DreamCraft3D](https://github.com/DSaurus/threestudio-dreamcraft3D) for high-quality image-to-3D generation as the custom extensions! Follow the instructions on the extensions website to give it a try.
+- 13/12/2023: Implementation supporting [Stable Zero123](https://stability.ai/news/stable-zero123-3d-generation) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#stable-zero123) to give it a try.
+- 30/11/2023: Implementation of [MVDream](https://github.com/DSaurus/threestudio-mvdream), [Gaussian Splatting](https://github.com/DSaurus/threestudio-3dgs) as the custom extensions. You can also use neural representation to fit a mesh by [Mesh-Fitting](https://github.com/DSaurus/threestudio-meshfitting).
+- 30/11/2023: Implementation of [custom extension system](https://threestudio-project.github.io/threestudio-extensions/) and you can add your extensions in [this project](https://github.com/threestudio-project/threestudio-extensions).
+- 25/06/2023: Implementation of [Magic123](https://guochengqian.github.io/project/magic123/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#magic123-) to give it a try.
+- 06/07/2023: Join our [Discord server](https://discord.gg/ejer2MAB8N) for lively discussions!
+- 03/07/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
+- 20/06/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-) to give it a try.
+- 14/06/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
+- 14/06/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
+- 29/05/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
+- 26/05/2023: Implementation of [ProlificDreamer](https://ml.cs.tsinghua.edu.cn/prolificdreamer/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
+- 14/05/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
+- 13/05/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
+- 11/05/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
 
 ![export-blender](https://github.com/threestudio-project/threestudio/assets/19284678/ccae2820-e702-484c-a43f-81678a365427)
 
