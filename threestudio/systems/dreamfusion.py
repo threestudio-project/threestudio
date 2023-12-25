@@ -71,11 +71,11 @@ class DreamFusion(BaseLift3DSystem):
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
 
         # z-variance loss proposed in HiFA: https://hifa-team.github.io/HiFA-site/
-        if "z_variance" in out:
+        if "z_variance" in out and "lambda_z_variance" in self.cfg.loss:
             loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
             self.log("train/loss_z_variance", loss_z_variance)
             loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
-
+            
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 

@@ -126,7 +126,7 @@ class Magic123(BaseLift3DSystem):
 
             # z variance loss proposed in HiFA: http://arxiv.org/abs/2305.18766
             # helps reduce floaters and produce solid geometry
-            if "z_variance" in out:
+            if "z_variance" in out and "lambda_z_variance" in self.cfg.loss:
                 loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
                 self.log("train/loss_z_variance", loss_z_variance)
                 loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)

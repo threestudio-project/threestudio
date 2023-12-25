@@ -449,7 +449,6 @@ class StableDiffusionGuidance(BaseObject):
 
         guidance_out = {
             "loss_sds": loss_sds,
-            "loss_sds_img": loss_sds_img,
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,

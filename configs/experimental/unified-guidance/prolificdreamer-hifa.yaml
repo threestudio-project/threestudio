@@ -68,7 +68,7 @@ system:
     guidance_type: "vsd"
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 7.5
-    weighting_strategy: uniform
+    weighting_strategy: dreamfusion
     min_step_percent: 0.3
     max_step_percent: 0.98
     vsd_phi_model_name_or_path: "stabilityai/stable-diffusion-2-1"

@@ -639,9 +639,6 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
         grad = w * (eps_pretrain - eps_phi)
 
-        alpha = self.alphas[t] ** 0.5
-        sigma = (1 - self.alphas[t]) ** 0.5
-
         # compute decoded image if needed for visualization/img loss
         if self.cfg.return_rgb_1step_orig or self.cfg.use_img_loss:
             with torch.no_grad():
@@ -671,7 +668,9 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             "lambdas": self.lambdas[t],
         }
 
-        # image-space loss proposed in HiFA: https://hifa-team.github.io/HiFA-site/
+        # image-space loss proposed in HiFA: https://hifa-team.github.io/HiFA-site
+        alpha = self.alphas[t] ** 0.5
+        sigma = (1 - self.alphas[t]) ** 0.5
         if self.cfg.use_img_loss:
             if self.cfg.guidance_type == "vsd":
                 latents_denoised_est = (latents_noisy - sigma * eps_phi) / alpha

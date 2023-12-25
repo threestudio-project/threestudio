@@ -118,7 +118,7 @@ system:
     lambda_normal_smoothness_2d: 1000.
     lambda_sparsity: 0.
     lambda_opaque: 0.
-    lambda_z_variance: 300.
+    lambda_z_variance: 100.
 
   optimizer:
     name: Adam
