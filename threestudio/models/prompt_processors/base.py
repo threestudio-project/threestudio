@@ -379,6 +379,7 @@ class PromptProcessor(BaseObject):
                 )
                 subprocess.start()
                 subprocess.join()
+                assert subprocess.exitcode == 0, "prompt embedding process failed!"
             else:
                 self.spawn_func(
                     self.cfg.pretrained_model_name_or_path,
