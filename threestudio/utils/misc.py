@@ -85,7 +85,7 @@ def C(value: Any, epoch: int, global_step: int, interpolation="linear") -> float
             value = [start_step, start_value, end_value, end_step]
         assert len(value) == 4
         start_step, start_value, end_value, end_step = value
-        if isinstance(end_step, int) or isinstance(end_step, float):
+        if isinstance(end_step, int):
             current_step = global_step
         elif isinstance(end_step, float):
             current_step = epoch
