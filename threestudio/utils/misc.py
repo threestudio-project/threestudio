@@ -1,4 +1,5 @@
 import gc
+import math
 import os
 import re
 
@@ -62,7 +63,7 @@ def load_module_weights(
     return state_dict_to_load, ckpt["epoch"], ckpt["global_step"]
 
 
-def C(value: Any, epoch: int, global_step: int) -> float:
+def C(value: Any, epoch: int, global_step: int, interpolation="linear") -> float:
     if isinstance(value, int) or isinstance(value, float):
         pass
     else:
@@ -84,15 +85,18 @@ def C(value: Any, epoch: int, global_step: int) -> float:
             value = [start_step, start_value, end_value, end_step]
         assert len(value) == 4
         start_step, start_value, end_value, end_step = value
-        if isinstance(end_step, int):
+        if isinstance(end_step, int) or isinstance(end_step, float):
             current_step = global_step
-            value = start_value + (end_value - start_value) * max(
-                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
-            )
         elif isinstance(end_step, float):
             current_step = epoch
-            value = start_value + (end_value - start_value) * max(
-                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
+        t = max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
+        if interpolation == "linear":
+            value = start_value + (end_value - start_value) * t
+        elif interpolation == "exp":
+            value = math.exp(math.log(start_value) * (1 - t) + math.log(end_value) * t)
+        else:
+            raise ValueError(
+                f"Unknown interpolation method: {interpolation}, only support linear and exp"
             )
     return value
 
