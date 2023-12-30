@@ -13,7 +13,13 @@ from threestudio.utils.base import (
     update_if_possible,
 )
 from threestudio.utils.config import parse_structured
-from threestudio.utils.misc import C, cleanup, get_device, load_module_weights
+from threestudio.utils.misc import (
+    C,
+    cleanup,
+    find_last_path,
+    get_device,
+    load_module_weights,
+)
 from threestudio.utils.saving import SaverMixin
 from threestudio.utils.typing import *
 
@@ -241,6 +247,8 @@ class BaseLift3DSystem(BaseSystem):
     cfg: Config
 
     def configure(self) -> None:
+        self.cfg.geometry_convert_from = find_last_path(self.cfg.geometry_convert_from)
+        self.cfg.weights = find_last_path(self.cfg.weights)
         if (
             self.cfg.geometry_convert_from  # from_coarse must be specified
             and not self.cfg.weights  # not initialized from coarse when weights are specified

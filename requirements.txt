@@ -20,7 +20,7 @@ networkx
 pysdf
 PyMCubes
 wandb
-gradio
+gradio==4.11.0
 git+https://github.com/ashawkey/envlight.git
 torchmetrics
 

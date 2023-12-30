@@ -31,7 +31,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 | <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> | <a href="https://guochengqian.github.io/project/magic123/">Magic123</a> |
 <br />
 | <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
-</b></p>
+</b>
 
 <p align="center">
   <a href="https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb">
@@ -43,22 +43,40 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </p>
 
 <p align="center">
-    Did not find what you want? Submit a feature request or upvote others' requests <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
+    Did not find what you want? Checkout <a href="https://threestudio-project.github.io/threestudio-extensions/"><b>threestudio-extension</b></a> or submit a feature request <a href="https://github.com/threestudio-project/threestudio/discussions/46">here</a>!
 </p>
 
-## News
+<p align="center">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/ac6089a7-d88f-414c-96d6-a5e75616115a" width="68%">
+</p>
+<p align="center">
 
-- 08/25/2023: Implementation of [Magic123](https://guochengqian.github.io/project/magic123/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#magic123-) to give it a try.
-- 07/06/2023: Join our [Discord server](https://discord.gg/ejer2MAB8N) for lively discussions!
-- 07/03/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
-- 06/20/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-) to give it a try.
-- 06/14/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
-- 06/14/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
-- 05/29/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
-- 05/26/2023: Implementation of [ProlificDreamer](https://ml.cs.tsinghua.edu.cn/prolificdreamer/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
-- 05/14/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
-- 05/13/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
-- 05/11/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/302a399e-d36f-453e-a595-1c7d120451d3" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/025e6980-baf2-4b5f-9c23-4f66ef847bf5" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/f04b6bdd-ef02-4ce7-b7c9-981f8bda419f" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/8892898f-8bd8-43dc-a4ec-dd8d078af860" width="50%">
+</p>
+<p align="center"><b>
+| <a href="https://github.com/HeliosZhao/Animate124/tree/threestudio">Animate-124</a> | <a href="https://github.com/DSaurus/threestudio-4dfy">4D-fy</a> | <a href="https://github.com/DSaurus/threestudio-dreamcraft3D">DreamCraft3D</a> | <a href="https://github.com/DSaurus/threestudio-3dgs">Gaussian Splatting</a> | <a href="https://github.com/DSaurus/threestudio-mvdream">MVDream</a> | <a href="https://github.com/DSaurus/threestudio-meshfitting">Mesh-Fitting</a> |
+</b>
+
+## News
+- 23/12/2023: Thank [Yuyang Zhao](https://github.com/HeliosZhao) for implementation of image-to-4D generation extensions [Animate-124](https://github.com/HeliosZhao/Animate124/tree/threestudio)! Follow the instructions on the extensions website to give it a try.
+- 18/12/2023: Implementation of [4D-fy](https://github.com/DSaurus/threestudio-4dfy) for 4D generation and [DreamCraft3D](https://github.com/DSaurus/threestudio-dreamcraft3D) for high-quality image-to-3D generation as the custom extensions! Follow the instructions on the extensions website to give it a try.
+- 13/12/2023: Implementation supporting [Stable Zero123](https://stability.ai/news/stable-zero123-3d-generation) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#stable-zero123) to give it a try.
+- 30/11/2023: Implementation of [MVDream](https://github.com/DSaurus/threestudio-mvdream), [Gaussian Splatting](https://github.com/DSaurus/threestudio-3dgs) as the custom extensions. You can also use neural representation to fit a mesh by [Mesh-Fitting](https://github.com/DSaurus/threestudio-meshfitting).
+- 30/11/2023: Implementation of [custom extension system](https://threestudio-project.github.io/threestudio-extensions/) and you can add your extensions in [this project](https://github.com/threestudio-project/threestudio-extensions).
+- 25/06/2023: Implementation of [Magic123](https://guochengqian.github.io/project/magic123/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#magic123-) to give it a try.
+- 06/07/2023: Join our [Discord server](https://discord.gg/ejer2MAB8N) for lively discussions!
+- 03/07/2023: Try text-to-3D online in [HuggingFace Spaces](https://huggingface.co/spaces/bennyguo/threestudio) or using our [self-hosted service](http://t23-g-01.threestudio.ai) (GPU support from Tencent). To host the web interface locally, see [here](https://github.com/threestudio-project/threestudio#gradio-web-interface).
+- 20/06/2023: Implementations of Instruct-NeRF2NeRF and Control4D for high-fidelity 3D editing! Follow the instructions for [Control4D](https://github.com/threestudio-project/threestudio#control4d-) and [Instruct-NeRF2NeRF](https://github.com/threestudio-project/threestudio#instructnerf2nerf-) to give it a try.
+- 14/06/2023: Implementation of TextMesh! Follow the instructions [here](https://github.com/threestudio-project/threestudio#textmesh-) to give it a try.
+- 14/06/2023: Implementation of [prompt debiasing](https://arxiv.org/abs/2303.15413) and [Perp-Neg](https://perp-neg.github.io/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#tips-on-improving-quality) to give it a try.
+- 29/05/2023: An experimental implementation of using [Zero-1-to-3](https://zero123.cs.columbia.edu/) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#zero-1-to-3-) to give it a try.
+- 26/05/2023: Implementation of [ProlificDreamer](https://ml.cs.tsinghua.edu.cn/prolificdreamer/)! Follow the instructions [here](https://github.com/threestudio-project/threestudio#prolificdreamer-) to give it a try.
+- 14/05/2023: You can experiment with the SDS loss on 2D images using our [2dplayground](2dplayground.ipynb).
+- 13/05/2023: You can now try threestudio on [Google Colab](https://colab.research.google.com/github/threestudio-project/threestudio/blob/main/threestudio.ipynb)!
+- 11/05/2023: We now support exporting textured meshes! See [here](https://github.com/threestudio-project/threestudio#export-meshes) for instructions.
 
 ![export-blender](https://github.com/threestudio-project/threestudio/assets/19284678/ccae2820-e702-484c-a43f-81678a365427)
 
@@ -101,6 +119,8 @@ pip install ninja
 ```sh
 pip install -r requirements.txt
 ```
+
+- (Optional) `tiny-cuda-nn` installation might require downgrading pip to 23.0.1
 
 - (Optional, Recommended) The best-performing models in threestudio use the newly-released T2I model [DeepFloyd IF](https://github.com/deep-floyd/IF), which currently requires signing a license agreement. If you would like to use these models, you need to [accept the license on the model card of DeepFloyd IF](https://huggingface.co/DeepFloyd/IF-I-XL-v1.0), and login into the Hugging Face hub in the terminal by `huggingface-cli login`.
 
@@ -423,7 +443,7 @@ https://github.com/threestudio-project/threestudio/assets/19284678/72217cdd-765a
 
 - Most of the settings are the same as the DreamFusion model. Please refer to the notable differences of the DreamFusion model.
 - We use NeuS as the geometry representation while the original paper uses VolSDF.
-- We adopt techniques from [Neuralangelo](https://arxiv.org/abs/2306.03092) to stablize normal computation when using hash grids.
+- We adopt techniques from [Neuralangelo](https://arxiv.org/abs/2306.03092) to stabilize normal computation when using hash grids.
 - We currently only implemented the coarse stage of TextMesh.
 
 **Example running commands**
@@ -510,6 +530,34 @@ python launch.py --config configs/magic123-refine-sd.yaml --train --gpu 0 data.i
 **Tips**
 
 - If the image contains non-front-facing objects, specifying the approximate elevation and azimuth angle by setting `data.default_elevation_deg` and `data.default_azimuth_deg` can be helpful. In threestudio, top is elevation +90 and bottom is elevation -90; left is azimuth -90 and right is azimuth +90.
+
+
+### Stable Zero123
+
+**Installation**
+
+Download pretrained Stable Zero123 checkpoint `stable-zero123.ckpt` into `load/zero123` from https://huggingface.co/stabilityai/stable-zero123
+
+**Results obtained by threestudio (Stable Zero123 vs Zero123-XL)**
+![Final_video_v01](https://github.com/threestudio-project/threestudio/assets/22424247/bf2d2213-5027-489c-a6ba-1c56c14ee8b7)
+
+**Direct multi-view images generation**
+If you only want to generate multi-view images, please refer to [threestudio-mvimg-gen](https://github.com/DSaurus/threestudio-mvimg-gen). This extension can use Stable Zero123 to directly generate images from multi-view perspectives.
+
+**Example running commands**
+
+1. Take an image of your choice, or generate it from text using your favourite AI image generator such as SDXL Turbo (https://clipdrop.co/stable-diffusion-turbo) E.g. "A simple 3D render of a friendly dog"
+2. Remove its background using Clipdrop (https://clipdrop.co/remove-background)
+3. Save to `load/images/`, preferably with `_rgba.png` as the suffix
+4. Run Zero-1-to-3 with the Stable Zero123 ckpt:
+```sh
+python launch.py --config configs/stable-zero123.yaml --train --gpu 0 data.image_path=./load/images/hamburger_rgba.png
+```
+
+**IMPORTANT NOTE: This is an experimental implementation and we're constantly improving the quality.**
+
+**IMPORTANT NOTE: This implementation extends the Zero-1-to-3 implementation below, and is heavily inspired from the Zero-1-to-3 implementation in [https://github.com/ashawkey/stable-dreamfusion](stable-dreamfusion)! `extern/ldm_zero123` is borrowed from `stable-dreamfusion/ldm`.**
+
 
 ### Zero-1-to-3 [![arXiv](https://img.shields.io/badge/arXiv-2303.11328-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2303.11328)
 

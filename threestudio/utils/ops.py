@@ -1,3 +1,4 @@
+import math
 from collections import defaultdict
 
 import numpy as np
@@ -221,6 +222,7 @@ def get_rays(
     c2w: Float[Tensor, "... 4 4"],
     keepdim=False,
     noise_scale=0.0,
+    normalize=True,
 ) -> Tuple[Float[Tensor, "... 3"], Float[Tensor, "... 3"]]:
     # Rotate ray directions from camera coordinate to the world coordinate
     assert directions.shape[-1] == 3
@@ -256,7 +258,8 @@ def get_rays(
         rays_o = rays_o + torch.randn(3, device=rays_o.device) * noise_scale
         rays_d = rays_d + torch.randn(3, device=rays_d.device) * noise_scale
 
-    rays_d = F.normalize(rays_d, dim=-1)
+    if normalize:
+        rays_d = F.normalize(rays_d, dim=-1)
     if not keepdim:
         rays_o, rays_d = rays_o.reshape(-1, 3), rays_d.reshape(-1, 3)
 
@@ -290,6 +293,70 @@ def get_mvp_matrix(
     # calculate mvp matrix by proj_mtx @ w2c (mv_mtx)
     mvp_mtx = proj_mtx @ w2c
     return mvp_mtx
+
+
+def get_full_projection_matrix(
+    c2w: Float[Tensor, "B 4 4"], proj_mtx: Float[Tensor, "B 4 4"]
+) -> Float[Tensor, "B 4 4"]:
+    return (c2w.unsqueeze(0).bmm(proj_mtx.unsqueeze(0))).squeeze(0)
+
+
+# gaussian splatting functions
+def convert_pose(C2W):
+    flip_yz = torch.eye(4, device=C2W.device)
+    flip_yz[1, 1] = -1
+    flip_yz[2, 2] = -1
+    C2W = torch.matmul(C2W, flip_yz)
+    return C2W
+
+
+def get_projection_matrix_gaussian(znear, zfar, fovX, fovY, device="cuda"):
+    tanHalfFovY = math.tan((fovY / 2))
+    tanHalfFovX = math.tan((fovX / 2))
+
+    top = tanHalfFovY * znear
+    bottom = -top
+    right = tanHalfFovX * znear
+    left = -right
+
+    P = torch.zeros(4, 4, device=device)
+
+    z_sign = 1.0
+
+    P[0, 0] = 2.0 * znear / (right - left)
+    P[1, 1] = 2.0 * znear / (top - bottom)
+    P[0, 2] = (right + left) / (right - left)
+    P[1, 2] = (top + bottom) / (top - bottom)
+    P[3, 2] = z_sign
+    P[2, 2] = z_sign * zfar / (zfar - znear)
+    P[2, 3] = -(zfar * znear) / (zfar - znear)
+    return P
+
+
+def get_fov_gaussian(P):
+    tanHalfFovX = 1 / P[0, 0]
+    tanHalfFovY = 1 / P[1, 1]
+    fovY = math.atan(tanHalfFovY) * 2
+    fovX = math.atan(tanHalfFovX) * 2
+    return fovX, fovY
+
+
+def get_cam_info_gaussian(c2w, fovx, fovy, znear, zfar):
+    c2w = convert_pose(c2w)
+    world_view_transform = torch.inverse(c2w)
+
+    world_view_transform = world_view_transform.transpose(0, 1).cuda().float()
+    projection_matrix = (
+        get_projection_matrix_gaussian(znear=znear, zfar=zfar, fovX=fovx, fovY=fovy)
+        .transpose(0, 1)
+        .cuda()
+    )
+    full_proj_transform = (
+        world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))
+    ).squeeze(0)
+    camera_center = world_view_transform.inverse()[3, :3]
+
+    return world_view_transform, full_proj_transform, camera_center
 
 
 def binary_cross_entropy(input, target):

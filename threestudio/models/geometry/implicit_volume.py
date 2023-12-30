@@ -53,6 +53,9 @@ class ImplicitVolume(BaseImplicitGeometry):
         # automatically determine the threshold
         isosurface_threshold: Union[float, str] = 25.0
 
+        # 4D Gaussian Annealing
+        anneal_density_blob_std_config: Optional[dict] = None
+
     cfg: Config
 
     def configure(self) -> None:
@@ -267,3 +270,16 @@ class ImplicitVolume(BaseImplicitGeometry):
             raise TypeError(
                 f"Cannot create {ImplicitVolume.__name__} from {other.__class__.__name__}"
             )
+
+    def update_step(
+        self, epoch: int, global_step: int, on_load_weights: bool = False
+    ) -> None:
+        if self.cfg.anneal_density_blob_std_config is not None:
+            min_step = self.cfg.anneal_density_blob_std_config.min_anneal_step
+            max_step = self.cfg.anneal_density_blob_std_config.max_anneal_step
+            if global_step >= min_step and global_step <= max_step:
+                end_val = self.cfg.anneal_density_blob_std_config.end_val
+                start_val = self.cfg.anneal_density_blob_std_config.start_val
+                self.density_blob_std = start_val + (global_step - min_step) * (
+                    end_val - start_val
+                ) / (max_step - min_step)

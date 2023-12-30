@@ -3,6 +3,7 @@ import math
 import random
 from dataclasses import dataclass, field
 
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
@@ -14,6 +15,7 @@ from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_device
 from threestudio.utils.ops import (
+    get_full_projection_matrix,
     get_mvp_matrix,
     get_projection_matrix,
     get_ray_directions,
@@ -53,6 +55,8 @@ class RandomCameraDataModuleConfig:
     light_sample_strategy: str = "dreamfusion"
     batch_uniform_azimuth: bool = True
     progressive_until: int = 0  # progressive ranges for elevation, azimuth, r, fovy
+
+    rays_d_normalize: bool = True
 
 
 class RandomCameraIterableDataset(IterableDataset, Updateable):
@@ -151,18 +155,19 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         else:
             # otherwise sample uniformly on sphere
             elevation_range_percent = [
-                (self.elevation_range[0] + 90.0) / 180.0,
-                (self.elevation_range[1] + 90.0) / 180.0,
+                self.elevation_range[0] / 180.0 * math.pi,
+                self.elevation_range[1] / 180.0 * math.pi,
             ]
             # inverse transform sampling
             elevation = torch.asin(
-                2
-                * (
+                (
                     torch.rand(self.batch_size)
-                    * (elevation_range_percent[1] - elevation_range_percent[0])
-                    + elevation_range_percent[0]
+                    * (
+                        math.sin(elevation_range_percent[1])
+                        - math.sin(elevation_range_percent[0])
+                    )
+                    + math.sin(elevation_range_percent[0])
                 )
-                - 1.0
             )
             elevation_deg = elevation / math.pi * 180.0
 
@@ -312,12 +317,15 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
         )
 
         # Importance note: the returned rays_d MUST be normalized!
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
+        rays_o, rays_d = get_rays(
+            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
+        )
 
-        proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.width / self.height, 0.1, 1000.0
+        self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
+            fovy, self.width / self.height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
-        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
+        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, self.proj_mtx)
+        self.fovy = fovy
 
         return {
             "rays_o": rays_o,
@@ -331,6 +339,8 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             "camera_distances": camera_distances,
             "height": self.height,
             "width": self.width,
+            "fovy": self.fovy,
+            "proj_mtx": self.proj_mtx,
         }
 
 
@@ -412,11 +422,13 @@ class RandomCameraDataset(Dataset):
             directions[:, :, :, :2] / focal_length[:, None, None, None]
         )
 
-        rays_o, rays_d = get_rays(directions, c2w, keepdim=True)
-        proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.1, 1000.0
+        rays_o, rays_d = get_rays(
+            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
+        )
+        self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
+            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.01, 100.0
         )  # FIXME: hard-coded near and far
-        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, proj_mtx)
+        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, self.proj_mtx)
 
         self.rays_o, self.rays_d = rays_o, rays_d
         self.mvp_mtx = mvp_mtx
@@ -426,6 +438,7 @@ class RandomCameraDataset(Dataset):
         self.elevation, self.azimuth = elevation, azimuth
         self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
         self.camera_distances = camera_distances
+        self.fovy = fovy
 
     def __len__(self):
         return self.n_views
@@ -444,6 +457,8 @@ class RandomCameraDataset(Dataset):
             "camera_distances": self.camera_distances[index],
             "height": self.cfg.eval_height,
             "width": self.cfg.eval_width,
+            "fovy": self.fovy[index],
+            "proj_mtx": self.proj_mtx[index],
         }
 
     def collate(self, batch):

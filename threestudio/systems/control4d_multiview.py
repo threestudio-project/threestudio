@@ -37,8 +37,8 @@ class Control4D(BaseLift3DSystem):
             material=self.material,
             background=self.background,
         )
-
-        self.perceptual_loss = PerceptualLoss().eval().to(get_device())
+        p_config = {}
+        self.perceptual_loss = threestudio.find("perceptual-loss")(p_config)
         self.edit_frames = {}
         self.per_editing_step = self.cfg.per_editing_step
         self.start_editing_step = self.cfg.start_editing_step

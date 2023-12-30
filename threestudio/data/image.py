@@ -48,6 +48,8 @@ class SingleImageDataModuleConfig:
     requires_depth: bool = False
     requires_normal: bool = False
 
+    rays_d_normalize: bool = True
+
 
 class SingleImageDataBase:
     def setup(self, cfg, split):
@@ -94,6 +96,10 @@ class SingleImageDataBase:
             [torch.stack([right, up, -lookat], dim=-1), camera_position[:, :, None]],
             dim=-1,
         )
+        self.c2w4x4: Float[Tensor, "B 4 4"] = torch.cat(
+            [self.c2w, torch.zeros_like(self.c2w[:, :1])], dim=1
+        )
+        self.c2w4x4[:, 3, 3] = 1.0
 
         self.camera_position = camera_position
         self.light_position = light_position
@@ -141,7 +147,11 @@ class SingleImageDataBase:
         directions[:, :, :, :2] = directions[:, :, :, :2] / self.focal_length
 
         rays_o, rays_d = get_rays(
-            directions, self.c2w, keepdim=True, noise_scale=self.cfg.rays_noise_scale
+            directions,
+            self.c2w,
+            keepdim=True,
+            noise_scale=self.cfg.rays_noise_scale,
+            normalize=self.cfg.rays_d_normalize,
         )
 
         proj_mtx: Float[Tensor, "4 4"] = get_projection_matrix(
@@ -252,8 +262,10 @@ class SingleImageIterableDataset(IterableDataset, SingleImageDataBase, Updateabl
             "ref_depth": self.depth,
             "ref_normal": self.normal,
             "mask": self.mask,
-            "height": self.cfg.height,
-            "width": self.cfg.width,
+            "height": self.height,
+            "width": self.width,
+            "c2w": self.c2w4x4,
+            "fovy": self.fovy,
         }
         if self.cfg.use_random_camera:
             batch["random_camera"] = self.random_pose_generator.collate(None)

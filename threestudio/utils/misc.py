@@ -1,4 +1,5 @@
 import gc
+import math
 import os
 import re
 
@@ -62,7 +63,7 @@ def load_module_weights(
     return state_dict_to_load, ckpt["epoch"], ckpt["global_step"]
 
 
-def C(value: Any, epoch: int, global_step: int) -> float:
+def C(value: Any, epoch: int, global_step: int, interpolation="linear") -> float:
     if isinstance(value, int) or isinstance(value, float):
         pass
     else:
@@ -71,17 +72,31 @@ def C(value: Any, epoch: int, global_step: int) -> float:
             raise TypeError("Scalar specification only supports list, got", type(value))
         if len(value) == 3:
             value = [0] + value
+        if len(value) >= 6:
+            select_i = 3
+            for i in range(3, len(value) - 2, 2):
+                if global_step >= value[i]:
+                    select_i = i + 2
+            if select_i != 3:
+                start_value, start_step = value[select_i - 3], value[select_i - 2]
+            else:
+                start_step, start_value = value[:2]
+            end_value, end_step = value[select_i - 1], value[select_i]
+            value = [start_step, start_value, end_value, end_step]
         assert len(value) == 4
         start_step, start_value, end_value, end_step = value
         if isinstance(end_step, int):
             current_step = global_step
-            value = start_value + (end_value - start_value) * max(
-                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
-            )
         elif isinstance(end_step, float):
             current_step = epoch
-            value = start_value + (end_value - start_value) * max(
-                min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0
+        t = max(min(1.0, (current_step - start_step) / (end_step - start_step)), 0.0)
+        if interpolation == "linear":
+            value = start_value + (end_value - start_value) * t
+        elif interpolation == "exp":
+            value = math.exp(math.log(start_value) * (1 - t) + math.log(end_value) * t)
+        else:
+            raise ValueError(
+                f"Unknown interpolation method: {interpolation}, only support linear and exp"
             )
     return value
 
@@ -123,3 +138,24 @@ def broadcast(tensor, src=0):
 def enable_gradient(model, enabled: bool = True) -> None:
     for param in model.parameters():
         param.requires_grad_(enabled)
+
+
+def find_last_path(path: str):
+    if (path is not None) and ("LAST" in path):
+        path = path.replace(" ", "_")
+        base_dir_prefix, suffix = path.split("LAST", 1)
+        base_dir = os.path.dirname(base_dir_prefix)
+        prefix = os.path.split(base_dir_prefix)[-1]
+        base_dir_prefix = os.path.join(base_dir, prefix)
+        all_path = os.listdir(base_dir)
+        all_path = [os.path.join(base_dir, dir) for dir in all_path]
+        filtered_path = [dir for dir in all_path if dir.startswith(base_dir_prefix)]
+        filtered_path.sort(reverse=True)
+        last_path = filtered_path[0]
+        new_path = last_path + suffix
+        if os.path.exists(new_path):
+            return new_path
+        else:
+            raise FileNotFoundError(new_path)
+    else:
+        return path
