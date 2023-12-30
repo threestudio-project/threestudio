@@ -14,14 +14,17 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/1dbdebab-43d5-4830-872c-66b38d9fda92" width="60%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/d746b874-d82f-4977-a549-98d9ba764dfc" width="30%">
+
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/437b4044-142c-4e5d-a406-4d9bad0205e1" width="60%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/812741c0-7229-412e-b6ab-81e377890f04" width="30%">
+
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/4f4d62c5-2304-4e20-b632-afe6d144a203" width="68%">
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/2f36ddbd-e3cf-4431-b269-47a9cb3d6e6e" width="68%">
 <br/>
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24391451/83b77a1b-f3bc-465f-866f-a83a0c1f1763" width="68%">
 </p>
 
 <p align="center"><b>
