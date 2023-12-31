@@ -1,5 +1,5 @@
 __modules__ = {}
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 
 def register(name):
@@ -16,6 +16,14 @@ def register(name):
 
 
 def find(name):
+    if ":" in name:
+        main_name, sub_name = name.split(":")
+        NewClass = type(
+            f"{main_name}.{sub_name}",
+            (__modules__[main_name], __modules__[sub_name]),
+            {},
+        )
+        return NewClass
     return __modules__[name]
 
 
