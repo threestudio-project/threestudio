@@ -272,6 +272,21 @@ python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 
 # texturing with 512x512 rasterization, Stable Difusion VSD guidance
 python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/dir/ckpts/last.ckpt
 ```
+### HiFA [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.18766)
+**This is a reimplementation, missing some improvements from the original paper(coarse-to-fine NeRF sampling, kernel smoothing). For original results, please refer to [https://github.com/JunzheJosephZhu/HiFA](https://github.com/JunzheJosephZhu/HiFA)
+
+HiFA is more like a suite of improvements including image space SDS, z-variance loss, and noise strength annealing. It is compatible with most optimization-based methods. Therefore, we provide three variants based on DreamFusion, ProlificDreamer, and Magic123. We provide a unified guidance config as well as an SDS/VSD guidance config for the DreamFusion and ProlificDreamer variants, both configs should achieve the same results. 
+**Results obtained by threestudio(Dreamfusion-HiFA, 512x512)
+
+**Results obtained by threestudio(ProlificDreamer-HiFA, 512x512)
+
+**Results obtained by threestudio(Magic123-HiFA, 512x512)
+
+**Tips**
+If the generated object's color seems oversaturated, decrease lambda_sds_img(or lambda_sd_img if using unified guidance)
+If the generated object looks cloudy, increase lamda_z_variance
+If the generated object overall seems to have high luminance, increase percentage_min.
+Make sure sqrt_anneal and use_img_loss are both set to True.
 
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
