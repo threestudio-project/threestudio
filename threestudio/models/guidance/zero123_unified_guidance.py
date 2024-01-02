@@ -82,17 +82,29 @@ class Zero123UnifiedGuidance(BaseModule):
             torch.float16 if self.cfg.half_precision_weights else torch.float32
         )
 
-        threestudio.info(f"Loading Zero123 ...")
+        self.use_stable_zero123 = 'stable' in self.cfg.pretrained_model_name_or_path
+        if self.use_stable_zero123:
+            # stable-zero123 has a different camera embedding
+            threestudio.info(f"Loaded Stable Zero123!")
+            pipe_kwargs = {
+                "safety_checker": None,
+                "requires_safety_checker": False,
+                "variant": "fp16" if self.cfg.half_precision_weights else None,
+                "torch_dtype": self.weights_dtype,
+            }
+        else:
+            pipe_kwargs = {
+                "safety_checker": None,
+                "requires_safety_checker": False,
+                "trust_remote_code": True,
+                # "variant": "fp16" if self.cfg.half_precision_weights else None,
+                "torch_dtype": self.weights_dtype,
+            }
+            threestudio.info(f"Loading Zero123 ...")
 
         # need to make sure the pipeline file is in path
         sys.path.append("extern/")
 
-        pipe_kwargs = {
-            "safety_checker": None,
-            "requires_safety_checker": False,
-            "variant": "fp16" if self.cfg.half_precision_weights else None,
-            "torch_dtype": self.weights_dtype,
-        }
         pipe = Zero123Pipeline.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             **pipe_kwargs,
@@ -262,15 +274,31 @@ class Zero123UnifiedGuidance(BaseModule):
         camera_distances: Float[Tensor, "B"],
     ) -> Float[Tensor, "B 1 D"]:
         batch_size = elevation_deg.shape[0]
-        camera_embeddings: Float[Tensor, "B 1 4"] = torch.stack(
-            [
-                torch.deg2rad(self.cfg.cond_elevation_deg - elevation_deg),
-                torch.sin(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
-                torch.cos(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
-                camera_distances - self.cfg.cond_camera_distance,
-            ],
-            dim=-1,
-        )[:, None, :]
+        if self.use_stable_zero123:
+            camera_embeddings: Float[Tensor, "B 1 4"] = torch.stack(
+                [
+                    torch.deg2rad(
+                        (90 - elevation_deg) - (90 - self.cfg.cond_elevation_deg)
+                    ),  # Zero123 polar is 90-elevation
+                    torch.sin(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
+                    torch.cos(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
+                    torch.deg2rad(
+                        90 - torch.full_like(elevation_deg, self.cfg.cond_elevation_deg)
+                    ),
+                ],
+                dim=-1,
+            )[:, None, :].to(self.device)
+        else:
+            # original zero123 camera embedding
+            camera_embeddings: Float[Tensor, "B 1 4"] = torch.stack(
+                [
+                    torch.deg2rad(self.cfg.cond_elevation_deg - elevation_deg),
+                    torch.sin(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
+                    torch.cos(torch.deg2rad(azimuth_deg - self.cfg.cond_azimuth_deg)),
+                    camera_distances - self.cfg.cond_camera_distance,
+                ],
+                dim=-1,
+            )[:, None, :]
 
         image_camera_embeddings = self.pipe.clip_camera_projection(
             torch.cat(
@@ -638,6 +666,7 @@ class Zero123UnifiedGuidance(BaseModule):
         loss_sd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
         guidance_out = {
+            "loss_sds": loss_sd,
             "loss_sd": loss_sd,
             "grad_norm": grad.norm(),
             "timesteps": t,
