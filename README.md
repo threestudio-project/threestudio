@@ -273,20 +273,43 @@ python launch.py --config configs/prolificdreamer-geometry.yaml --train --gpu 0 
 python launch.py --config configs/prolificdreamer-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a pineapple" system.geometry_convert_from=path/to/stage2/trial/dir/ckpts/last.ckpt
 ```
 ### HiFA [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.18766)
-**This is a reimplementation, missing some improvements from the original paper(coarse-to-fine NeRF sampling, kernel smoothing). For original results, please refer to [https://github.com/JunzheJosephZhu/HiFA](https://github.com/JunzheJosephZhu/HiFA)
+**This is a re-implementation, missing some improvements from the original paper(coarse-to-fine NeRF sampling, kernel smoothing). For original results, please refer to [https://github.com/JunzheJosephZhu/HiFA](https://github.com/JunzheJosephZhu/HiFA)**
 
-HiFA is more like a suite of improvements including image space SDS, z-variance loss, and noise strength annealing. It is compatible with most optimization-based methods. Therefore, we provide three variants based on DreamFusion, ProlificDreamer, and Magic123. We provide a unified guidance config as well as an SDS/VSD guidance config for the DreamFusion and ProlificDreamer variants, both configs should achieve the same results. 
-**Results obtained by threestudio(Dreamfusion-HiFA, 512x512)
+HiFA is more like a suite of improvements including image space SDS, z-variance loss, and noise strength annealing. It is compatible with most optimization-based methods. Therefore, we provide three variants based on DreamFusion, ProlificDreamer, and Magic123. We provide a unified guidance config as well as an SDS/VSD guidance config for the DreamFusion and ProlificDreamer variants, both configs should achieve the same results. Additionally, we also make HiFA compatible with ProlificDreamer-scene.
 
-**Results obtained by threestudio(ProlificDreamer-HiFA, 512x512)
+**Results obtained by threestudio(Dreamfusion-HiFA, 512x512)**
 
-**Results obtained by threestudio(Magic123-HiFA, 512x512)
+https://github.com/threestudio-project/threestudio/assets/24391451/c0030c66-0691-4ec2-8b79-d933101864a0
+
+**Results obtained by threestudio(ProlificDreamer-HiFA, 512x512)**
+
+https://github.com/threestudio-project/threestudio/assets/24391451/ff5dc4d0-d7d7-4a73-964e-84b8c48e2907
+
+**Results obtained by threestudio(Magic123-HiFA, 512x512)**
+
+https://github.com/threestudio-project/threestudio/assets/24391451/eb6f2f74-9143-4e26-8429-e300ad2d2b80
+
+**Example running commands**
+
+```sh
+# ------ DreamFusion-HiFA ------- # (similar to original paper)
+python launch.py --config configs/hifa.yaml --train --gpu 0 system.prompt_processor.prompt="a plate of delicious tacos"
+python launch.py --config configs/experimental/unified-guidance/hifa.yaml --train --gpu 0 system.prompt_processor.prompt="a plate of delicious tacos"
+# ------ ProlificDreamer-HiFA ------- #
+python launch.py --config configs/prolificdreamer-hifa.yaml --train --gpu 0 system.prompt_processor.prompt="a plate of delicious tacos"
+python launch.py --config configs/experimental/unified-guidance/prolificdreamer-hifa.yaml --train --gpu 0 system.prompt_processor.prompt="a plate of delicious tacos"
+# ------ ProlificDreamer-scene-HiFA ------- #
+python launch.py --config configs/prolificdreamer-scene-hifa.yaml --train --gpu 0 system.prompt_processor.prompt="A DSLR photo of a hamburger inside a restaurant"
+# ------ Magic123-HiFA ------ #
+python launch.py --config configs/magic123-hifa-coarse-sd.yaml --train --gpu 0 data.image_path=load/images/firekeeper_rgba.png system.prompt_processor.prompt="a toy figure of firekeeper from dark souls"
+```
 
 **Tips**
-If the generated object's color seems oversaturated, decrease lambda_sds_img(or lambda_sd_img if using unified guidance)
-If the generated object looks cloudy, increase lamda_z_variance
-If the generated object overall seems to have high luminance, increase percentage_min.
+If the generated object's color seems oversaturated, decrease lambda_sds_img(or lambda_sd_img if using unified guidance).
+If the generated object looks cloudy, increase lamda_z_variance. If the shape becomes corrupted, decrease lambda_z_variance.
+If the generated object overall seems to have high luminance, increase min_step_percent.
 Make sure sqrt_anneal and use_img_loss are both set to True.
+Check out the [original repo](https://github.com/JunzheJosephZhu/HiFA)! The results are better.
 
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
