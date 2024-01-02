@@ -305,11 +305,12 @@ python launch.py --config configs/magic123-hifa-coarse-sd.yaml --train --gpu 0 d
 ```
 
 **Tips**
-If the generated object's color seems oversaturated, decrease lambda_sds_img(or lambda_sd_img if using unified guidance).
-If the generated object looks cloudy, increase lamda_z_variance. If the shape becomes corrupted, decrease lambda_z_variance.
-If the generated object overall seems to have high luminance, increase min_step_percent.
-Make sure sqrt_anneal and use_img_loss are both set to True.
-Check out the [original repo](https://github.com/JunzheJosephZhu/HiFA)! The results are better.
+
+- If the generated object's color seems oversaturated, decrease lambda_sds_img(or lambda_sd_img if using unified guidance).
+- If the generated object looks cloudy, increase lamda_z_variance. If the shape becomes corrupted, decrease lambda_z_variance.
+- If the generated object overall seems to have high luminance, increase min_step_percent.
+- Make sure sqrt_anneal and use_img_loss are both set to True.
+- Check out the [original repo](https://github.com/JunzheJosephZhu/HiFA)! The results are better.
 
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
