@@ -446,7 +446,6 @@ class StableDiffusionGuidance(BaseObject):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-
         guidance_out = {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
@@ -463,7 +462,7 @@ class StableDiffusionGuidance(BaseObject):
                 0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
             )
             guidance_out["loss_sds_img"] = loss_sds_img
-            
+
         if guidance_eval:
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
             texts = []

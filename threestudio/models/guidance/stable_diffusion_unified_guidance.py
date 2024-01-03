@@ -671,14 +671,19 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         # image-space loss proposed in HiFA: https://hifa-team.github.io/HiFA-site
         if self.cfg.use_img_loss:
             if self.cfg.guidance_type == "vsd":
-                latents_denoised_est = (latents_noisy - self.sigmas[t] * eps_phi) / self.alphas[t]
+                latents_denoised_est = (
+                    latents_noisy - self.sigmas[t] * eps_phi
+                ) / self.alphas[t]
                 image_denoised_est = self.vae_decode(
                     self.pipe.vae, latents_denoised_est
                 )
             else:
                 image_denoised_est = rgb_BCHW_512
             grad_img = (
-                w * (image_denoised_est - image_denoised_pretrain) * self.alphas[t] / self.sigmas[t]
+                w
+                * (image_denoised_est - image_denoised_pretrain)
+                * self.alphas[t]
+                / self.sigmas[t]
             )
             if self.grad_clip_val is not None:
                 grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)

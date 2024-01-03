@@ -167,7 +167,6 @@ def main(args, extras) -> None:
 
     dm = threestudio.find(cfg.data_type)(cfg.data)
     # guidance needs to know max_steps for annealing
-    cfg.system.guidance.trainer_max_steps = cfg.trainer.max_steps
     system: BaseSystem = threestudio.find(cfg.system_type)(
         cfg.system, resumed=cfg.resume is not None
     )

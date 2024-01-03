@@ -75,7 +75,7 @@ class DreamFusion(BaseLift3DSystem):
             loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
             self.log("train/loss_z_variance", loss_z_variance)
             loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
-            
+
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))
 
