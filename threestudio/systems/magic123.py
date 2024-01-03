@@ -123,6 +123,13 @@ class Magic123(BaseLift3DSystem):
             loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
             self.log("train/loss_opaque", loss_opaque)
             loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+
+            # z variance loss proposed in HiFA: http://arxiv.org/abs/2305.18766
+            # helps reduce floaters and produce solid geometry
+            if "z_variance" in out and "lambda_z_variance" in self.cfg.loss:
+                loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
+                self.log("train/loss_z_variance", loss_z_variance)
+                loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
         else:
             loss_normal_consistency = out["mesh"].normal_consistency()
             self.log("train/loss_normal_consistency", loss_normal_consistency)

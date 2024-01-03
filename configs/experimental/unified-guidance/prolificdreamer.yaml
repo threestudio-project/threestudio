@@ -71,8 +71,10 @@ system:
     guidance_scale: 7.5
     weighting_strategy: dreamfusion
     min_step_percent: 0.02
-    max_step_percent: 0.98
+    max_step_percent: [5000, 0.98, 0.5, 5001] # annealed to 0.5 after 5000 steps
     vsd_phi_model_name_or_path: "stabilityai/stable-diffusion-2-1"
+    use_img_loss: false
+    sqrt_anneal: false
 
   loggers:
     wandb:

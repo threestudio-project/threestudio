@@ -32,8 +32,9 @@ class StableDiffusionGuidance(BaseObject):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        max_step_percent_annealed: float = 0.5
-        anneal_start_step: Optional[int] = None
+        sqrt_anneal: bool = False  # sqrt anneal proposed in HiFA: https://hifa-team.github.io/HiFA-site/
+        trainer_max_steps: int = 25000
+        use_img_loss: bool = False  # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
 
         use_sjc: bool = False
         var_red: bool = True
@@ -185,6 +186,7 @@ class StableDiffusionGuidance(BaseObject):
     def compute_grad_sds(
         self,
         latents: Float[Tensor, "B 4 64 64"],
+        image: Float[Tensor, "B 3 512 512"],
         t: Int[Tensor, "B"],
         prompt_utils: PromptProcessorOutput,
         elevation: Float[Tensor, "B"],
@@ -262,7 +264,17 @@ class StableDiffusionGuidance(BaseObject):
                 f"Unknown weighting strategy: {self.cfg.weighting_strategy}"
             )
 
+        alpha = self.alphas[t] ** 0.5
+        sigma = (1 - self.alphas[t]) ** 0.5
+        latents_denoised = (latents_noisy - sigma * noise_pred) / alpha
+        image_denoised = self.decode_latents(latents_denoised)
+
         grad = w * (noise_pred - noise)
+        # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
+        if self.cfg.use_img_loss:
+            grad_img = w * (image - image_denoised) * alpha / sigma
+        else:
+            grad_img = None
 
         guidance_eval_utils = {
             "use_perp_neg": prompt_utils.use_perp_neg,
@@ -273,7 +285,7 @@ class StableDiffusionGuidance(BaseObject):
             "noise_pred": noise_pred,
         }
 
-        return grad, guidance_eval_utils
+        return grad, grad_img, guidance_eval_utils
 
     def compute_grad_sjc(
         self,
@@ -386,14 +398,14 @@ class StableDiffusionGuidance(BaseObject):
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 64 64"]
+        rgb_BCHW_512 = F.interpolate(
+            rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+        )
         if rgb_as_latents:
             latents = F.interpolate(
                 rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
             )
         else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-            )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
 
@@ -410,12 +422,20 @@ class StableDiffusionGuidance(BaseObject):
             grad, guidance_eval_utils = self.compute_grad_sjc(
                 latents, t, prompt_utils, elevation, azimuth, camera_distances
             )
+            grad_img = torch.tensor([0.0], dtype=grad.dtype).to(grad.device)
         else:
-            grad, guidance_eval_utils = self.compute_grad_sds(
-                latents, t, prompt_utils, elevation, azimuth, camera_distances
+            grad, grad_img, guidance_eval_utils = self.compute_grad_sds(
+                latents,
+                rgb_BCHW_512,
+                t,
+                prompt_utils,
+                elevation,
+                azimuth,
+                camera_distances,
             )
 
         grad = torch.nan_to_num(grad)
+
         # clip grad for stable training?
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
@@ -432,6 +452,16 @@ class StableDiffusionGuidance(BaseObject):
             "min_step": self.min_step,
             "max_step": self.max_step,
         }
+
+        if self.cfg.use_img_loss:
+            grad_img = torch.nan_to_num(grad_img)
+            if self.grad_clip_val is not None:
+                grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target_img = (rgb_BCHW_512 - grad_img).detach()
+            loss_sds_img = (
+                0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+            )
+            guidance_out["loss_sds_img"] = loss_sds_img
 
         if guidance_eval:
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
@@ -585,7 +615,23 @@ class StableDiffusionGuidance(BaseObject):
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
-        self.set_min_max_steps(
-            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
-            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
-        )
+        if self.cfg.sqrt_anneal:
+            percentage = (
+                float(global_step) / self.cfg.trainer_max_steps
+            ) ** 0.5  # progress percentage
+            if type(self.cfg.max_step_percent) not in [float, int]:
+                max_step_percent = self.cfg.max_step_percent[1]
+            else:
+                max_step_percent = self.cfg.max_step_percent
+            curr_percent = (
+                max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)
+            ) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
+            self.set_min_max_steps(
+                min_step_percent=curr_percent,
+                max_step_percent=curr_percent,
+            )
+        else:
+            self.set_min_max_steps(
+                min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+                max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+            )

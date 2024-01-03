@@ -102,6 +102,7 @@ system:
     # lambda_orient: [1000, 0.0, 10, 6000]
     lambda_sparsity: 0.0
     lambda_opaque: 0.01
+
   optimizer:
     name: Adan
     args:

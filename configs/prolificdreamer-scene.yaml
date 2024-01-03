@@ -68,6 +68,7 @@ system:
     min_step_percent: 0.02
     max_step_percent: [10000, 0.98, 0.5, 10001] # annealed to 0.5 after 10000 steps
     view_dependent_prompting: false
+    sqrt_anneal: false
 
   loggers:
     wandb:

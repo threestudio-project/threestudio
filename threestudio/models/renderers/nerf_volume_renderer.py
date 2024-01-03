@@ -332,13 +332,21 @@ class NeRFVolumeRenderer(VolumeRenderer):
         )
 
         # populate depth and opacity to each point
-        t_depth = depth[ray_indices]
-        z_variance = nerfacc.accumulate_along_rays(
-            weights[..., 0],
-            values=(t_positions - t_depth) ** 2,
+        weights_normalized = weights / opacity.clamp(min=1e-5)[ray_indices]  # num_pts
+        # z-variance loss from HiFA: https://hifa-team.github.io/HiFA-site/
+        z_mean: Float[Tensor, "Nr 1"] = nerfacc.accumulate_along_rays(
+            weights_normalized[..., 0],
+            values=t_positions,
             ray_indices=ray_indices,
             n_rays=n_rays,
         )
+        z_variance_unmasked = nerfacc.accumulate_along_rays(
+            weights_normalized[..., 0],
+            values=(t_positions - z_mean[ray_indices]) ** 2,
+            ray_indices=ray_indices,
+            n_rays=n_rays,
+        )
+        z_variance = z_variance_unmasked * (opacity > 0.5).float()
 
         if bg_color is None:
             bg_color = comp_rgb_bg

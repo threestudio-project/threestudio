@@ -53,6 +53,7 @@ system:
     lambda_shape: 1.0
     lambda_opaque: 0.0
     lambda_orient: 0.0
+
   optimizer:
     name: Adam
     args:

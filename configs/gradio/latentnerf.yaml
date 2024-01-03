@@ -66,6 +66,7 @@ system:
     lambda_sparsity: 5.e-4
     lambda_opaque: 0.0
     lambda_orient: 0.0
+
   optimizer:
     name: Adam
     args:

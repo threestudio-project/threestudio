@@ -23,7 +23,6 @@ class ProlificDreamer(BaseLift3DSystem):
     def configure(self) -> None:
         # set up geometry, material, background, renderer
         super().configure()
-
         self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
         self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
             self.cfg.prompt_processor
@@ -59,7 +58,8 @@ class ProlificDreamer(BaseLift3DSystem):
         loss = 0.0
 
         for name, value in guidance_out.items():
-            self.log(f"train/{name}", value)
+            if not (type(value) is torch.Tensor and value.numel() > 1):
+                self.log(f"train/{name}", value)
             if name.startswith("loss_"):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 

@@ -84,7 +84,6 @@ system:
     lambda_orient: 0.
     lambda_sparsity: 10.
     lambda_opaque: [10000, 0.0, 1000.0, 10001]
-    lambda_z_variance: 0.
   optimizer:
     name: AdamW
     args:

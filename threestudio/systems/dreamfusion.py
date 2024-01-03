@@ -44,7 +44,8 @@ class DreamFusion(BaseLift3DSystem):
         loss = 0.0
 
         for name, value in guidance_out.items():
-            self.log(f"train/{name}", value)
+            if not (type(value) is torch.Tensor and value.numel() > 1):
+                self.log(f"train/{name}", value)
             if name.startswith("loss_"):
                 loss += value * self.C(self.cfg.loss[name.replace("loss_", "lambda_")])
 
@@ -68,6 +69,12 @@ class DreamFusion(BaseLift3DSystem):
         loss_opaque = binary_cross_entropy(opacity_clamped, opacity_clamped)
         self.log("train/loss_opaque", loss_opaque)
         loss += loss_opaque * self.C(self.cfg.loss.lambda_opaque)
+
+        # z-variance loss proposed in HiFA: https://hifa-team.github.io/HiFA-site/
+        if "z_variance" in out and "lambda_z_variance" in self.cfg.loss:
+            loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
+            self.log("train/loss_z_variance", loss_z_variance)
+            loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))

@@ -77,6 +77,13 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         # camera condition type, in ["extrinsics", "mvp", "spherical"]
         vsd_camera_condition_type: Optional[str] = "extrinsics"
 
+        # HiFA configurations: https://hifa-team.github.io/HiFA-site/
+        sqrt_anneal: bool = (
+            False  # requires setting min_step_percent=0.3 to work properly
+        )
+        trainer_max_steps: int = 25000
+        use_img_loss: bool = True  # works with most cases
+
     cfg: Config
 
     def configure(self) -> None:
@@ -539,6 +546,9 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
         latents: Float[Tensor, "B 4 Hl Wl"]
+        rgb_BCHW_512 = F.interpolate(
+            rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+        )
         if rgb_as_latents:
             # treat input rgb as latents
             # input rgb should be in range [-1, 1]
@@ -548,11 +558,8 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         else:
             # treat input rgb as rgb
             # input rgb should be in range [0, 1]
-            rgb_BCHW = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-            )
             # encode image into latents with vae
-            latents = self.vae_encode(self.pipe.vae, rgb_BCHW * 2.0 - 1.0)
+            latents = self.vae_encode(self.pipe.vae, rgb_BCHW_512 * 2.0 - 1.0)
 
         # sample timestep
         # use the same timestep for each batch
@@ -632,6 +639,14 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
         grad = w * (eps_pretrain - eps_phi)
 
+        # compute decoded image if needed for visualization/img loss
+        if self.cfg.return_rgb_1step_orig or self.cfg.use_img_loss:
+            with torch.no_grad():
+                image_denoised_pretrain = self.vae_decode(
+                    self.pipe.vae, latents_1step_orig
+                )
+                rgb_1step_orig = image_denoised_pretrain.permute(0, 2, 3, 1)
+
         if self.grad_clip_val is not None:
             grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
 
@@ -653,11 +668,32 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             "lambdas": self.lambdas[t],
         }
 
+        # image-space loss proposed in HiFA: https://hifa-team.github.io/HiFA-site
+        if self.cfg.use_img_loss:
+            if self.cfg.guidance_type == "vsd":
+                latents_denoised_est = (
+                    latents_noisy - self.sigmas[t] * eps_phi
+                ) / self.alphas[t]
+                image_denoised_est = self.vae_decode(
+                    self.pipe.vae, latents_denoised_est
+                )
+            else:
+                image_denoised_est = rgb_BCHW_512
+            grad_img = (
+                w
+                * (image_denoised_est - image_denoised_pretrain)
+                * self.alphas[t]
+                / self.sigmas[t]
+            )
+            if self.grad_clip_val is not None:
+                grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target_img = (rgb_BCHW_512 - grad_img).detach()
+            loss_sd_img = (
+                0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+            )
+            guidance_out.update({"loss_sd_img": loss_sd_img})
+
         if self.cfg.return_rgb_1step_orig:
-            with torch.no_grad():
-                rgb_1step_orig = self.vae_decode(
-                    self.pipe.vae, latents_1step_orig
-                ).permute(0, 2, 3, 1)
             guidance_out.update({"rgb_1step_orig": rgb_1step_orig})
 
         if self.cfg.return_rgb_multistep_orig:
@@ -709,6 +745,11 @@ class StableDiffusionUnifiedGuidance(BaseModule):
 
         return guidance_out
 
+    @torch.cuda.amp.autocast(enabled=False)
+    def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
+        self.min_step = int(self.num_train_timesteps * min_step_percent)
+        self.max_step = int(self.num_train_timesteps * max_step_percent)
+
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in
         # Debiasing Scores and Prompts of 2D Diffusion for Robust Text-to-3D Generation
@@ -716,9 +757,23 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
-        self.min_step = int(
-            self.num_train_timesteps * C(self.cfg.min_step_percent, epoch, global_step)
-        )
-        self.max_step = int(
-            self.num_train_timesteps * C(self.cfg.max_step_percent, epoch, global_step)
-        )
+        if self.cfg.sqrt_anneal:
+            percentage = (
+                float(global_step) / self.cfg.trainer_max_steps
+            ) ** 0.5  # progress percentage
+            if type(self.cfg.max_step_percent) not in [float, int]:
+                max_step_percent = self.cfg.max_step_percent[1]
+            else:
+                max_step_percent = self.cfg.max_step_percent
+            curr_percent = (
+                max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)
+            ) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
+            self.set_min_max_steps(
+                min_step_percent=curr_percent,
+                max_step_percent=curr_percent,
+            )
+        else:
+            self.set_min_max_steps(
+                min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+                max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+            )
