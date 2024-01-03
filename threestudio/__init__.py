@@ -18,9 +18,14 @@ def register(name):
 def find(name):
     if ":" in name:
         main_name, sub_name = name.split(":")
+        if "," in sub_name:
+            name_list = sub_name.split(",")
+        else:
+            name_list = [sub_name]
+        name_list.append(main_name)
         NewClass = type(
             f"{main_name}.{sub_name}",
-            (__modules__[main_name], __modules__[sub_name]),
+            tuple([__modules__[name] for name in name_list]),
             {},
         )
         return NewClass
