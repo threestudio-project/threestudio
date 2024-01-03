@@ -75,7 +75,6 @@ system:
 
   loss:
     lambda_sds: 1.
-    : 0.
     lambda_normal_consistency: 0.
 
   optimizer:

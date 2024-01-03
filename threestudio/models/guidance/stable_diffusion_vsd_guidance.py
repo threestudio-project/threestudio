@@ -45,7 +45,6 @@ class StableDiffusionVSDGuidance(BaseModule):
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         guidance_scale_lora: float = 1.0
-        dummy: int = 1
         grad_clip: Optional[
             Any
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
@@ -694,7 +693,6 @@ class StableDiffusionVSDGuidance(BaseModule):
             loss_dict["loss_vsd_img"] = loss_vsd_img
 
         return loss_dict
-
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in
