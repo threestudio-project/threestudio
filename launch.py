@@ -166,7 +166,6 @@ def main(args, extras) -> None:
     pl.seed_everything(cfg.seed + get_rank(), workers=True)
 
     dm = threestudio.find(cfg.data_type)(cfg.data)
-    # guidance needs to know max_steps for annealing
     system: BaseSystem = threestudio.find(cfg.system_type)(
         cfg.system, resumed=cfg.resume is not None
     )
