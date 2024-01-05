@@ -64,6 +64,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b>
 
 ## News
+- 05/01/2024: Implemented HiFA. Follow the instructions [here](https://github.com/threestudio-project/threestudio#hifa-) to try all three variants
 - 23/12/2023: Thank [Yuyang Zhao](https://github.com/HeliosZhao) for implementation of image-to-4D generation extensions [Animate-124](https://github.com/HeliosZhao/Animate124/tree/threestudio)! Follow the instructions on the extensions website to give it a try.
 - 18/12/2023: Implementation of [4D-fy](https://github.com/DSaurus/threestudio-4dfy) for 4D generation and [DreamCraft3D](https://github.com/DSaurus/threestudio-dreamcraft3D) for high-quality image-to-3D generation as the custom extensions! Follow the instructions on the extensions website to give it a try.
 - 13/12/2023: Implementation supporting [Stable Zero123](https://stability.ai/news/stable-zero123-3d-generation) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#stable-zero123) to give it a try.
