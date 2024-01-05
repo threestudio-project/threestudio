@@ -265,7 +265,9 @@ class StableDiffusionGuidance(BaseObject):
             )
 
         alpha = self.alphas[t] ** 0.5
+        alpha = alpha.view(-1, 1, 1, 1)
         sigma = (1 - self.alphas[t]) ** 0.5
+        sigma = sigma.view(-1, 1, 1, 1)
         latents_denoised = (latents_noisy - sigma * noise_pred) / alpha
         image_denoised = self.decode_latents(latents_denoised)
 
