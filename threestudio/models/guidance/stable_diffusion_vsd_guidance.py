@@ -541,8 +541,8 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         grad = w * (noise_pred_pretrain - noise_pred_est)
 
-        alpha = self.alphas[t] ** 0.5
-        sigma = (1 - self.alphas[t]) ** 0.5
+        alpha = (self.alphas[t] ** 0.5).view(-1, 1, 1, 1)
+        sigma = ((1 - self.alphas[t]) ** 0.5).view(-1, 1, 1, 1)
         # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
         if self.cfg.use_img_loss:
             latents_denoised_pretrain = (
