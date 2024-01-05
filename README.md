@@ -302,6 +302,7 @@ python launch.py --config configs/experimental/unified-guidance/prolificdreamer-
 python launch.py --config configs/prolificdreamer-scene-hifa.yaml --train --gpu 0 system.prompt_processor.prompt="A DSLR photo of a hamburger inside a restaurant"
 # ------ Magic123-HiFA ------ #
 python launch.py --config configs/magic123-hifa-coarse-sd.yaml --train --gpu 0 data.image_path=load/images/firekeeper_rgba.png system.prompt_processor.prompt="a toy figure of firekeeper from dark souls"
+# We included a config for magic123's refine stage, but didn't really run it, since the coarse stage result already looks pretty decent.
 ```
 
 **Tips**
@@ -311,6 +312,7 @@ python launch.py --config configs/magic123-hifa-coarse-sd.yaml --train --gpu 0 d
 - If the generated object overall seems to have high luminance, increase min_step_percent.
 - Make sure sqrt_anneal and use_img_loss are both set to True.
 - Check out the [original repo](https://github.com/JunzheJosephZhu/HiFA)! The results are better.
+- **If you are using sqrt_anneal, make sure system.guidance.trainer_max_steps is equal to trainer.max_steps, so noise strength annealing works correctly**
 
 ### DreamFusion [![arXiv](https://img.shields.io/badge/arXiv-2209.14988-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2209.14988)
 
