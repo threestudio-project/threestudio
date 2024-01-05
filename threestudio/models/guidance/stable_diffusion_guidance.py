@@ -264,8 +264,8 @@ class StableDiffusionGuidance(BaseObject):
                 f"Unknown weighting strategy: {self.cfg.weighting_strategy}"
             )
 
-        alpha = self.alphas[t] ** 0.5
-        sigma = (1 - self.alphas[t]) ** 0.5
+        alpha = (self.alphas[t] ** 0.5).view(-1, 1, 1, 1)
+        sigma = ((1 - self.alphas[t]) ** 0.5).view(-1, 1, 1, 1)
         latents_denoised = (latents_noisy - sigma * noise_pred) / alpha
         image_denoised = self.decode_latents(latents_denoised)
 
