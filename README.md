@@ -31,7 +31,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
 | <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> |
 <br/>
-| <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> | <a href="https://guochengqian.github.io/project/magic123/">Magic123</a> |
+| <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> | <a href="https://guochengqian.github.io/project/magic123/">Magic123</a> | <a href="https://github.com/JunzheJosephZhu/HiFA">HiFA</a> |
 <br />
 | <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
 </b>
@@ -53,18 +53,19 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/ac6089a7-d88f-414c-96d6-a5e75616115a" width="68%">
 </p>
 <p align="center">
-
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/302a399e-d36f-453e-a595-1c7d120451d3" width="35%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/025e6980-baf2-4b5f-9c23-4f66ef847bf5" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/cfcd828f-daed-4d2e-abf1-29f69eb2ffbb" width="18%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/f04b6bdd-ef02-4ce7-b7c9-981f8bda419f" width="35%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/8892898f-8bd8-43dc-a4ec-dd8d078af860" width="50%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/8892898f-8bd8-43dc-a4ec-dd8d078af860" width="45%">
 </p>
 <p align="center"><b>
-| <a href="https://github.com/HeliosZhao/Animate124/tree/threestudio">Animate-124</a> | <a href="https://github.com/DSaurus/threestudio-4dfy">4D-fy</a> | <a href="https://github.com/DSaurus/threestudio-dreamcraft3D">DreamCraft3D</a> | <a href="https://github.com/DSaurus/threestudio-3dgs">Gaussian Splatting</a> | <a href="https://github.com/DSaurus/threestudio-mvdream">MVDream</a> | <a href="https://github.com/DSaurus/threestudio-meshfitting">Mesh-Fitting</a> |
+| <a href="https://github.com/HeliosZhao/Animate124/tree/threestudio">Animate-124</a> | <a href="https://github.com/DSaurus/threestudio-4dfy">4D-fy</a> | <a href="https://github.com/baaivision/GeoDream/tree/threestudio">GeoDream</a> | <a href="https://github.com/DSaurus/threestudio-dreamcraft3D">DreamCraft3D</a> | <a href="https://github.com/DSaurus/threestudio-3dgs">Gaussian Splatting</a> | <a href="https://github.com/DSaurus/threestudio-mvdream">MVDream</a> | <a href="https://github.com/DSaurus/threestudio-meshfitting">Mesh-Fitting</a> |
 </b>
 
 ## News
-- 05/01/2024: Implemented HiFA. Follow the instructions [here](https://github.com/threestudio-project/threestudio#hifa-) to try all three variants
+- 06/01/2024: Thank [Baorui Ma](https://github.com/mabaorui) for implementation of [GeoGream extensions](https://github.com/baaivision/GeoDream/tree/threestudio)! Follow the instructions on its website to give it a try.
+- 05/01/2024: Implemented HiFA. Follow the instructions [here](https://github.com/threestudio-project/threestudio#hifa-) to try all three variants.
 - 23/12/2023: Thank [Yuyang Zhao](https://github.com/HeliosZhao) for implementation of image-to-4D generation extensions [Animate-124](https://github.com/HeliosZhao/Animate124/tree/threestudio)! Follow the instructions on the extensions website to give it a try.
 - 18/12/2023: Implementation of [4D-fy](https://github.com/DSaurus/threestudio-4dfy) for 4D generation and [DreamCraft3D](https://github.com/DSaurus/threestudio-dreamcraft3D) for high-quality image-to-3D generation as the custom extensions! Follow the instructions on the extensions website to give it a try.
 - 13/12/2023: Implementation supporting [Stable Zero123](https://stability.ai/news/stable-zero123-3d-generation) for 3D generation from a single image! Follow the instructions [here](https://github.com/threestudio-project/threestudio#stable-zero123) to give it a try.
