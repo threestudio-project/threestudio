@@ -295,8 +295,11 @@ class PromptProcessor(BaseObject):
 
         self.direction2idx = {d.name: i for i, d in enumerate(self.directions)}
 
-        with open(os.path.join("load/prompt_library.json"), "r") as f:
-            self.prompt_library = json.load(f)
+        if os.path.exists("load/prompt_library.json"):
+            with open(os.path.join("load/prompt_library.json"), "r") as f:
+                self.prompt_library = json.load(f)
+        else:
+            self.prompt_library = {}
         # use provided prompt or find prompt in library
         self.prompt = self.preprocess_prompt(self.cfg.prompt)
         # use provided negative prompt
