@@ -1,0 +1,7 @@
+git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
+libigl
+git+https://github.com/NVlabs/nvdiffrast
+git+https://github.com/CompVis/taming-transformers/
+openai-clip
+imageio==2.19.3
+imageio-ffmpeg==0.4.7
