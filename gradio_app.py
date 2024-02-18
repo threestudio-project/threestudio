@@ -451,7 +451,7 @@ def launch(
             queue=False,
         )
 
-    launch_args = {"server_port": port}
+    launch_args = {"server_port": port, "share":True}
     if listen:
         launch_args["server_name"] = "0.0.0.0"
     demo.queue().launch(**launch_args)
