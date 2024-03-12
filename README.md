@@ -58,13 +58,19 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/cfcd828f-daed-4d2e-abf1-29f69eb2ffbb" width="18%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/f04b6bdd-ef02-4ce7-b7c9-981f8bda419f" width="35%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/13ae104e-e020-4de9-a677-87f29067a1c0" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/c6337097-b5bd-4fe8-a03a-a68fb9260009" width="18%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/e41532fd-8f00-45b4-a473-26a9f1bca4f8" width="35%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/7b1b919d-d97a-4f50-afa3-6c1b7ecfe7b6" width="35%">
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/8892898f-8bd8-43dc-a4ec-dd8d078af860" width="45%">
 </p>
 <p align="center"><b>
-| <a href="https://github.com/HeliosZhao/Animate124/tree/threestudio">Animate-124</a> | <a href="https://github.com/DSaurus/threestudio-4dfy">4D-fy</a> | <a href="https://github.com/baaivision/GeoDream/tree/threestudio">GeoDream</a> | <a href="https://github.com/DSaurus/threestudio-dreamcraft3D">DreamCraft3D</a> | <a href="https://github.com/huanngzh/threestudio-dreamwaltz">Dreamwaltz</a> | <a href="https://github.com/DSaurus/threestudio-3dgs">Gaussian Splatting</a> | <a href="https://github.com/DSaurus/threestudio-mvdream">MVDream</a> | <a href="https://github.com/DSaurus/threestudio-meshfitting">Mesh-Fitting</a> |
+| <a href="https://github.com/HeliosZhao/Animate124/tree/threestudio">Animate-124</a> | <a href="https://github.com/DSaurus/threestudio-4dfy">4D-fy</a> | <a href="https://github.com/baaivision/GeoDream/tree/threestudio">GeoDream</a> | <a href="https://github.com/DSaurus/threestudio-dreamcraft3D">DreamCraft3D</a> | <a href="https://github.com/huanngzh/threestudio-dreamwaltz">Dreamwaltz</a> | <a href="https://github.com/KU-CVLAB/3DFuse-threestudio">3DFuse</a> | <a href="https://github.com/cxh0519/Progressive3D">Progressive3D</a> |  <a href="https://github.com/cxh0519/threestudio-gaussiandreamer">GaussianDreamer</a> |  <a href="https://github.com/DSaurus/threestudio-3dgs">Gaussian Splatting</a> | <a href="https://github.com/DSaurus/threestudio-mvdream">MVDream</a> | <a href="https://github.com/DSaurus/threestudio-meshfitting">Mesh-Fitting</a> |
 </b>
 
 ## News
+- 12/03/2024: Thank [Matthew Kwak](https://github.com/mskwak01) and [Inès Hyeonsu Kim](https://github.com/Ines-Hyeonsu-Kim) for implementation of [3DFuse](https://github.com/KU-CVLAB/3DFuse-threestudio)! Follow the instructions on its website to give it a try.
+- 08/03/2024: Thank [Xinhua Cheng](https://github.com/cxh0519/) for implementation of [GaussianDreamer](https://github.com/cxh0519/threestudio-gaussiandreamer)! Follow the instructions on its website to give it a try.
+- 01/03/2024: Thank [Xinhua Cheng](https://github.com/cxh0519/) for implementation of [Progressive3D](https://github.com/cxh0519/Progressive3D)! Follow the instructions on its website to give it a try.
 - 09/01/2024: Thank [Zehuan Huang](https://github.com/huanngzh) for implementation of 3D human avatar generation [Dreamwaltz](https://github.com/huanngzh/threestudio-dreamwaltz)! Follow the instructions on its website to give it a try.
 - 06/01/2024: Thank [Baorui Ma](https://github.com/mabaorui) for implementation of [GeoGream extensions](https://github.com/baaivision/GeoDream/tree/threestudio)! Follow the instructions on its website to give it a try.
 - 05/01/2024: Implemented HiFA. Follow the instructions [here](https://github.com/threestudio-project/threestudio#hifa-) to try all three variants.
