@@ -420,7 +420,7 @@ For the first three options, you can check more details in [pipe_stable_diffusio
 
 No specific configuration.
 
-## stable-diffusion-vsd-guidance
+### stable-diffusion-vsd-guidance
 
 | name                               | type          | description                                                                                                                                                     |
 | ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -428,6 +428,20 @@ No specific configuration.
 | guidance_scale_lora                | float         | The classifier free guidance scale for the LoRA model. Default: 1.                                                                                              |
 | lora_cfg_training                  | bool          | Whether to adopt classifier free guidance training strategy in LoRA training. If True, will zero out the camera condition with a probability 0.1. Default: True |
 | camera_condition_type              | str           | Which to use as the camera condition for the LoRA model, in ["extrinsics", "mvp"]. Default: "extrinsics"                                                        |
+
+### controlnet-guidance
+
+View-dependent prompting is currently disabled for controlnet guidance.
+
+| name                               | type          | description                                                                                                                                                     |
+| ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| control_type                       | str           | Type of control. If "normal", a normalbae detector will be used to estimate the normal map from input image. If "canny", a canny edge detector will be used, and you might want to specify canny_lower_bound and canny_upper_bound. If "input_normal", the viewspace normal from the geometry will be used directly.      |
+| condition_scale                    | float         | strength of the conditional control input on ControlNet model. Default: 1.5. |
+| ddim_scheduler_name_or_path        | str           | Name or path for the ddim_scheduler |
+
+### controlnet-vsd-guidance
+
+No specific configuration beyond those in stable-duffusion-vsd-guidance and controlnet-guidance
 
 ## Prompt Processors
 
