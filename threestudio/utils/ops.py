@@ -216,6 +216,27 @@ def get_ray_directions(
 
     return directions
 
+def mask_ray_directions(
+    directions:Float[Tensor, "H W 3"],
+    H: int,
+    W:int,
+    s_H:int,
+    s_W:int
+    ) -> Float[Tensor, "H W 3"]:
+    """
+    Masking the (H,W) image to (s_H,s_W), for efficient training at higher resolution image.
+    pixels from (s_H,s_W) are sampled more (1-aspect_ratio) than outside pixels.
+    then apply the mask to ray_directions vector.
+    """
+    mask = torch.zeros(H,W, device= directions.device)
+    p = (s_H*s_W)/(H*W)
+    mask += p 
+    mask[(H-s_H)//2 : H - math.ceil((H-s_H)/2),(W-s_W)//2 : W - math.ceil((W-s_W)/2)] = 1 - p
+    ### mask contains prob of individual pixel, drawing using Bernoulli dist
+    mask = torch.bernoulli(mask)
+    directions = directions[mask]
+
+    return directions,mask
 
 def get_rays(
     directions: Float[Tensor, "... 3"],
