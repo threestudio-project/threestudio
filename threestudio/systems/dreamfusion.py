@@ -179,11 +179,11 @@ class EffDreamFusion(DreamFusion):
         ### using mask to create image at original resolution during training
         (B,s_H,s_W,C) = out["comp_rgb"].shape
         mask = batch["efficiency_mask"]
-        comp_rgb = torch.zeros(B,batch["sample_height"],batch["sample_width"],C,device=mask.device)
-        comp_rgb[mask] = out["comp_rgb"]
+        comp_rgb = torch.zeros(B,batch["height"],batch["width"],C,device=self.device).view(B,-1,C)
+        comp_rgb[:,mask.view(-1)] = out["comp_rgb"].view(B,-1,C)
         out.update(
                 {
-            "comp_rgb": comp_rgb,
+            "comp_rgb": comp_rgb.view(B,batch["height"],batch["width"],C),
         }
             )
 

@@ -112,8 +112,8 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
                    self.sample_heights, self.sample_widths)]
         self.directions_unit_focals = [
             (
-                self.directions_unit_focals[i].reshape(-1,3)[self.efficiency_masks[i]]
-                ).reshape(self.sample_heights[i],self.sample_widths[i],3)
+                self.directions_unit_focals[i].view(-1,3)[self.efficiency_masks[i]]
+                ).view(self.sample_heights[i],self.sample_widths[i],3)
             for i in range(len(self.heights))
         ]
         

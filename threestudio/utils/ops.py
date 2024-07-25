@@ -250,7 +250,7 @@ def mask_ray_directions(
         [select_ind, out_ind_1d[torch.multinomial(
             torch.ones_like(out_ind_1d)*(p),int((p)*(s_H*s_W)),replacement=False)]
         ],
-        dim=0).to(dtype=torch.int).reshape(s_H,s_W)
+        dim=0).to(dtype=torch.int).view(s_H,s_W)
 
     ### first attempt at sampling, this produces variable number of rays, 
     ### so 4D tensor directions cant be sampled
