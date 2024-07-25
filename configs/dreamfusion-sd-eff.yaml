@@ -17,7 +17,7 @@ data:
   eval_camera_distance: 2.0
   eval_fovy_deg: 70.
 
-system_type: "dreamfusion-system"
+system_type: "efficient-dreamfusion-system"
 system:
   geometry_type: "implicit-volume"
   geometry:

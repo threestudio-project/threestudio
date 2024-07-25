@@ -23,7 +23,7 @@ from threestudio.utils.ops import (
     mask_ray_directions
 )
 from threestudio.utils.typing import *
-
+from threestudio.data.uncond import RandomCameraDataset
 
 @dataclass
 class EffRandomCameraDataModuleConfig:
@@ -105,13 +105,18 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
             get_ray_directions(H=height, W=width, focal=1.0)
             for (height, width) in zip(self.heights, self.widths)
         ]
-        dirs_and_masks = [
-            (mask_ray_directions(dir,H,W,s_H,s_W)) for (dir,H,W,s_H,s_W) 
-            in zip(self.directions_unit_focals, self.heights,
-                   self.widths, self.sample_heights, self.sample_widths)
-            ]
-        self.directions_unit_focals = [dir for (dir,mask) in dirs_and_masks]
-        self.efficiency_masks = [mask for (dir,mask)in dirs_and_masks]
+
+        self.efficiency_masks = [
+            (mask_ray_directions(H,W,s_H,s_W)) for (H,W,s_H,s_W) 
+            in zip( self.heights, self.widths, 
+                   self.sample_heights, self.sample_widths)]
+        self.directions_unit_focals = [
+            (
+                self.directions_unit_focals[i].reshape(-1,3)[self.efficiency_masks[i]]
+                ).reshape(self.sample_heights[i],self.sample_widths[i],3)
+            for i in range(len(self.heights))
+        ]
+        
         self.height: int = self.heights[0]
         self.width: int = self.widths[0]
         self.sample_height: int = self.sample_heights[0]
@@ -341,6 +346,7 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
         )
 
         # Importance note: the returned rays_d MUST be normalized!
+        ### Efficiency masking added here
         rays_o, rays_d = get_rays(
             directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
         )
@@ -364,136 +370,16 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
             "camera_distances": camera_distances,
             "height": self.height,
             "width": self.width,
+            "sample_height": self.sample_height,
+            "sample_width": self.sample_width,
             "fovy": self.fovy,
             "proj_mtx": self.proj_mtx,
         }
 
-### No changes here as this class is used in Validation/test
-class RandomCameraDataset(Dataset):
-    def __init__(self, cfg: Any, split: str) -> None:
-        super().__init__()
-        self.cfg: EffRandomCameraDataModuleConfig = cfg
-        self.split = split
-
-        if split == "val":
-            self.n_views = self.cfg.n_val_views
-        else:
-            self.n_views = self.cfg.n_test_views
-
-        azimuth_deg: Float[Tensor, "B"]
-        if self.split == "val":
-            # make sure the first and last view are not the same
-            azimuth_deg = torch.linspace(0, 360.0, self.n_views + 1)[: self.n_views]
-        else:
-            azimuth_deg = torch.linspace(0, 360.0, self.n_views)
-        elevation_deg: Float[Tensor, "B"] = torch.full_like(
-            azimuth_deg, self.cfg.eval_elevation_deg
-        )
-        camera_distances: Float[Tensor, "B"] = torch.full_like(
-            elevation_deg, self.cfg.eval_camera_distance
-        )
-
-        elevation = elevation_deg * math.pi / 180
-        azimuth = azimuth_deg * math.pi / 180
-
-        # convert spherical coordinates to cartesian coordinates
-        # right hand coordinate system, x back, y right, z up
-        # elevation in (-90, 90), azimuth from +x to +y in (-180, 180)
-        camera_positions: Float[Tensor, "B 3"] = torch.stack(
-            [
-                camera_distances * torch.cos(elevation) * torch.cos(azimuth),
-                camera_distances * torch.cos(elevation) * torch.sin(azimuth),
-                camera_distances * torch.sin(elevation),
-            ],
-            dim=-1,
-        )
-
-        # default scene center at origin
-        center: Float[Tensor, "B 3"] = torch.zeros_like(camera_positions)
-        # default camera up direction as +z
-        up: Float[Tensor, "B 3"] = torch.as_tensor([0, 0, 1], dtype=torch.float32)[
-            None, :
-        ].repeat(self.cfg.eval_batch_size, 1)
-
-        fovy_deg: Float[Tensor, "B"] = torch.full_like(
-            elevation_deg, self.cfg.eval_fovy_deg
-        )
-        fovy = fovy_deg * math.pi / 180
-        light_positions: Float[Tensor, "B 3"] = camera_positions
-
-        lookat: Float[Tensor, "B 3"] = F.normalize(center - camera_positions, dim=-1)
-        right: Float[Tensor, "B 3"] = F.normalize(torch.cross(lookat, up), dim=-1)
-        up = F.normalize(torch.cross(right, lookat), dim=-1)
-        c2w3x4: Float[Tensor, "B 3 4"] = torch.cat(
-            [torch.stack([right, up, -lookat], dim=-1), camera_positions[:, :, None]],
-            dim=-1,
-        )
-        c2w: Float[Tensor, "B 4 4"] = torch.cat(
-            [c2w3x4, torch.zeros_like(c2w3x4[:, :1])], dim=1
-        )
-        c2w[:, 3, 3] = 1.0
-
-        # get directions by dividing directions_unit_focal by focal length
-        focal_length: Float[Tensor, "B"] = (
-            0.5 * self.cfg.eval_height / torch.tan(0.5 * fovy)
-        )
-        directions_unit_focal = get_ray_directions(
-            H=self.cfg.eval_height, W=self.cfg.eval_width, focal=1.0
-        )
-        directions: Float[Tensor, "B H W 3"] = directions_unit_focal[
-            None, :, :, :
-        ].repeat(self.n_views, 1, 1, 1)
-        directions[:, :, :, :2] = (
-            directions[:, :, :, :2] / focal_length[:, None, None, None]
-        )
-
-        rays_o, rays_d = get_rays(
-            directions, c2w, keepdim=True, normalize=self.cfg.rays_d_normalize
-        )
-        self.proj_mtx: Float[Tensor, "B 4 4"] = get_projection_matrix(
-            fovy, self.cfg.eval_width / self.cfg.eval_height, 0.01, 100.0
-        )  # FIXME: hard-coded near and far
-        mvp_mtx: Float[Tensor, "B 4 4"] = get_mvp_matrix(c2w, self.proj_mtx)
-
-        self.rays_o, self.rays_d = rays_o, rays_d
-        self.mvp_mtx = mvp_mtx
-        self.c2w = c2w
-        self.camera_positions = camera_positions
-        self.light_positions = light_positions
-        self.elevation, self.azimuth = elevation, azimuth
-        self.elevation_deg, self.azimuth_deg = elevation_deg, azimuth_deg
-        self.camera_distances = camera_distances
-        self.fovy = fovy
-
-    def __len__(self):
-        return self.n_views
-
-    def __getitem__(self, index):
-        return {
-            "index": index,
-            "rays_o": self.rays_o[index],
-            "rays_d": self.rays_d[index],
-            "mvp_mtx": self.mvp_mtx[index],
-            "c2w": self.c2w[index],
-            "camera_positions": self.camera_positions[index],
-            "light_positions": self.light_positions[index],
-            "elevation": self.elevation_deg[index],
-            "azimuth": self.azimuth_deg[index],
-            "camera_distances": self.camera_distances[index],
-            "height": self.cfg.eval_height,
-            "width": self.cfg.eval_width,
-            "fovy": self.fovy[index],
-            "proj_mtx": self.proj_mtx[index],
-        }
-
-    def collate(self, batch):
-        batch = torch.utils.data.default_collate(batch)
-        batch.update({"height": self.cfg.eval_height, "width": self.cfg.eval_width})
-        return batch
 
 
-@register("random-camera-datamodule")
-class RandomCameraDataModule(pl.LightningDataModule):
+@register("eff-random-camera-datamodule")
+class EffRandomCameraDataModule(pl.LightningDataModule):
     cfg: EffRandomCameraDataModuleConfig
 
     def __init__(self, cfg: Optional[Union[dict, DictConfig]] = None) -> None:
