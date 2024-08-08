@@ -242,7 +242,10 @@ def mask_ray_directions(
     
     in_ind_1d = (indices_all[0]+H*indices_all[1])[mask]
     out_ind_1d = (indices_all[0]+H*indices_all[1])[torch.logical_not(mask)]
-    p = (s_H*s_W)/(H*W)
+    ### tried using 0.5 p ratio of sampling inside vs outside, as smaller area already 
+    ### leads to more samples inside anyways
+    
+    p = 0.5#(s_H*s_W)/(H*W)
     select_ind = in_ind_1d[
         torch.multinomial(
         torch.ones_like(in_ind_1d)*(1-p),int((1-p)*(s_H*s_W)),replacement=False)]
