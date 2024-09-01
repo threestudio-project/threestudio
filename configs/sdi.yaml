@@ -43,10 +43,10 @@ system:
 
   material_type: "diffuse-with-point-light-material"
   material:
-    ambient_only_steps: 10001
+    ambient_only_steps: 1000
     albedo_activation: sigmoid
-    diffuse_prob: 0.4 #0.75
-    textureless_prob: 0.5
+    diffuse_prob: 0.3
+    textureless_prob: 0.75
 
   background_type: "neural-environment-map-background"
   background:
@@ -56,6 +56,7 @@ system:
   renderer:
     radius: ${system.geometry.radius}
     num_samples_per_ray: 512
+    return_comp_normal: true
 
   prompt_processor_type: "stable-diffusion-prompt-processor"
   prompt_processor:
@@ -68,7 +69,7 @@ system:
     pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
     guidance_scale: 7.5
     weighting_strategy: sds
-    min_step_percent: 0.2
+    min_step_percent: 0.32
     max_step_percent: 0.98
 
     # SDI parameters
@@ -85,17 +86,12 @@ system:
       name: None
 
   loss:
-    # lambda_sds: 1.
-    # lambda_orient: [0, 10., 1000., 5000]
-    # lambda_sparsity: 1.
-    # lambda_opaque: 0.
     lambda_sdi: 1.
     lambda_orient: 0.1
     lambda_sparsity: [0,0.15,0.,3000]
     lambda_opaque: 0.1
-    # lambda_z_variance: 1.
-    # lambda_convex: [0,1.,0.1,4000]
-    # lambda_convex_hess: 0.
+    lambda_convex: [0,1.,0.1,4000]
+    lambda_z_variance: 1.
 
   optimizer:
     name: Adam

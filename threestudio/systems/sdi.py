@@ -13,6 +13,7 @@ import torch.nn.functional as F
 class ScoreDistillationViaInversion(BaseLift3DSystem):
     @dataclass
     class Config(BaseLift3DSystem.Config):
+        convexity_res: int = 8
         pass
 
     cfg: Config
@@ -78,6 +79,29 @@ class ScoreDistillationViaInversion(BaseLift3DSystem):
             loss_z_variance = out["z_variance"][out["opacity"] > 0.5].mean()
             self.log("train/loss_z_variance", loss_z_variance)
             loss += loss_z_variance * self.C(self.cfg.loss.lambda_z_variance)
+        
+        # Naive convexity loss
+        if ("lambda_convex" in self.cfg.loss) and (self.C(self.cfg.loss.lambda_convex) > 1e-6):
+            downscaled_norms = F.interpolate(out["comp_normal"].permute(0, 3, 1, 2), [self.cfg.convexity_res, self.cfg.convexity_res], mode='bilinear', align_corners=False).permute(0, 2, 3, 1)
+            
+            # Left-right
+            right_normals = downscaled_norms[:, :, 1: , :]  # Pad and then remove the first column
+            left_normals  = downscaled_norms[:, :, :-1, :]  # Remove the last column to align with right_normals
+    
+            h_cross_product = torch.cross(left_normals, right_normals, dim=-1)
+            h_sine_of_angle = h_cross_product[..., 2]
+            
+            # Up-dowm
+            up_normals    = downscaled_norms[:, :-1, :, :]
+            down_normals  = downscaled_norms[:, 1: , :, :]
+    
+            v_cross_product = torch.cross(down_normals, up_normals, dim=-1)
+            v_sine_of_angle = v_cross_product[..., 2]
+            
+            loss_convexity = - (h_sine_of_angle.mean() + v_sine_of_angle.mean())
+            self.log("train/loss_convexity", loss_convexity)
+            loss += loss_convexity * self.C(self.cfg.loss.lambda_convex)
+            
 
         for name, value in self.cfg.loss.items():
             self.log(f"train_params/{name}", self.C(value))

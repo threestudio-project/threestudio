@@ -72,6 +72,9 @@ pip install ninja
 pip install -r requirements.txt
 ```
 
+<span style="color: orange;">⚠️ Newer versions of diffusers can break the generation, please make sure you are using `diffusers==0.19.3`.⚠️</span>
+
+
 For additional options please address the official installation instructions of Threestudio [here](https://github.com/threestudio-project/threestudio?tab=readme-ov-file#installation) to install threestudio.
 
 ## Running generation
