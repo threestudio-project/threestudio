@@ -79,10 +79,17 @@ For additional options please address the official installation instructions of 
 
 ## Running generation
 The proccess of generating a shape is similar to the one described in the [threestudio](https://github.com/threestudio-project/threestudio?tab=readme-ov-file#quickstart) documentation.
-Make sure you are using the SDI config file, like below:
+Make sure you are using the SDI config file, like below.
+Here are a few examples with different prompts:
 
 ```sh
-python launch.py --config configs/sdi.yaml --train --gpu 0 system.prompt_processor.prompt="a zoomed out DSLR photo of a hamburger"
+python launch.py --config configs/sdi.yaml --train --gpu 0 system.prompt_processor.prompt="pumpkin head zombie, skinny, highly detailed, photorealistic"
+
+python launch.py --config configs/sdi.yaml --train --gpu 1 system.prompt_processor.prompt="a photograph of a ninja"
+
+python launch.py --config configs/sdi.yaml --train --gpu 2 system.prompt_processor.prompt="a zoomed out DSLR photo of a hamburger"
+
+python launch.py --config configs/sdi.yaml --train --gpu 3 system.prompt_processor.prompt="bagel filled with cream cheese and lox"
 ```
 
 The results will be saved to `outputs/score-distillation-via-inversion/`.
