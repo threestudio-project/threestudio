@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Dataset, IterableDataset
 
 import threestudio
 from threestudio import register
+from threestudio.data.uncond import RandomCameraDataset
 from threestudio.utils.base import Updateable
 from threestudio.utils.config import parse_structured
 from threestudio.utils.misc import get_device
@@ -20,10 +21,10 @@ from threestudio.utils.ops import (
     get_projection_matrix,
     get_ray_directions,
     get_rays,
-    mask_ray_directions
+    mask_ray_directions,
 )
 from threestudio.utils.typing import *
-from threestudio.data.uncond import RandomCameraDataset
+
 
 @dataclass
 class EffRandomCameraDataModuleConfig:
@@ -73,17 +74,27 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
             [self.cfg.width] if isinstance(self.cfg.width, int) else self.cfg.width
         )
         self.sample_heights: List[int] = (
-            [self.cfg.sample_height] if isinstance(self.cfg.sample_height, int) else self.cfg.sample_height
+            [self.cfg.sample_height]
+            if isinstance(self.cfg.sample_height, int)
+            else self.cfg.sample_height
         )
         self.sample_widths: List[int] = (
-            [self.cfg.sample_width] if isinstance(self.cfg.sample_width, int) else self.cfg.sample_width
+            [self.cfg.sample_width]
+            if isinstance(self.cfg.sample_width, int)
+            else self.cfg.sample_width
         )
         self.batch_sizes: List[int] = (
             [self.cfg.batch_size]
             if isinstance(self.cfg.batch_size, int)
             else self.cfg.batch_size
         )
-        assert len(self.heights) == len(self.widths) == len(self.batch_sizes) == len(self.sample_heights) == len(self.sample_widths)
+        assert (
+            len(self.heights)
+            == len(self.widths)
+            == len(self.batch_sizes)
+            == len(self.sample_heights)
+            == len(self.sample_widths)
+        )
         self.resolution_milestones: List[int]
         if (
             len(self.heights) == 1
@@ -107,16 +118,18 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
         ]
 
         self.efficiency_masks = [
-            (mask_ray_directions(H,W,s_H,s_W)) for (H,W,s_H,s_W) 
-            in zip( self.heights, self.widths, 
-                   self.sample_heights, self.sample_widths)]
+            (mask_ray_directions(H, W, s_H, s_W))
+            for (H, W, s_H, s_W) in zip(
+                self.heights, self.widths, self.sample_heights, self.sample_widths
+            )
+        ]
         self.directions_unit_focals = [
-            (
-                self.directions_unit_focals[i].view(-1,3)[self.efficiency_masks[i]]
-                ).view(self.sample_heights[i],self.sample_widths[i],3)
+            (self.directions_unit_focals[i].view(-1, 3)[self.efficiency_masks[i]]).view(
+                self.sample_heights[i], self.sample_widths[i], 3
+            )
             for i in range(len(self.heights))
         ]
-        
+
         self.height: int = self.heights[0]
         self.width: int = self.widths[0]
         self.sample_height: int = self.sample_heights[0]
@@ -360,7 +373,7 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
         return {
             "rays_o": rays_o,
             "rays_d": rays_d,
-            "efficiency_mask":self.efficiency_mask,
+            "efficiency_mask": self.efficiency_mask,
             "mvp_mtx": mvp_mtx,
             "camera_positions": camera_positions,
             "c2w": c2w,
@@ -375,7 +388,6 @@ class EffRandomCameraIterableDataset(IterableDataset, Updateable):
             "fovy": self.fovy,
             "proj_mtx": self.proj_mtx,
         }
-
 
 
 @register("eff-random-camera-datamodule")
