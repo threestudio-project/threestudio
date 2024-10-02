@@ -160,5 +160,3 @@ class DreamFusion(BaseLift3DSystem):
             name="test",
             step=self.true_global_step,
         )
-
-

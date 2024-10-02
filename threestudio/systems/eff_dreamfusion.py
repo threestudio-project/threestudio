@@ -1,5 +1,6 @@
 from .dreamfusion import *
 
+
 @threestudio.register("efficient-dreamfusion-system")
 class EffDreamFusion(DreamFusion):
     @dataclass
@@ -12,45 +13,50 @@ class EffDreamFusion(DreamFusion):
         # create geometry, material, background, renderer
         super().configure()
 
-    def unmask(self,ind,subsampled_tensor,H,W):
+    def unmask(self, ind, subsampled_tensor, H, W):
         """
         ind: B,s_H,s_W
         subsampled_tensor: B,C,s_H,s_W
         """
 
         # Create a grid of coordinates for the original image size
-        offset = [ind[0,0]%H,ind[0,0]//H]
+        offset = [ind[0, 0] % H, ind[0, 0] // H]
         indices_all = torch.meshgrid(
-                torch.arange(W, dtype=torch.float32,device=self.device) ,
-                torch.arange(H, dtype=torch.float32,device=self.device) ,
-                indexing="xy"
-            )
-        
+            torch.arange(W, dtype=torch.float32, device=self.device),
+            torch.arange(H, dtype=torch.float32, device=self.device),
+            indexing="xy",
+        )
+
         grid = torch.stack(
-            [(indices_all[0] - offset[0])*4/(3*W),
-            (indices_all[1] - offset[1])*4/(H*3)],
-            dim=-1)
-        grid = grid*2 - 1
+            [
+                (indices_all[0] - offset[0]) * 4 / (3 * W),
+                (indices_all[1] - offset[1]) * 4 / (H * 3),
+            ],
+            dim=-1,
+        )
+        grid = grid * 2 - 1
         grid = grid.repeat(subsampled_tensor.shape[0], 1, 1, 1)
         # Use grid_sample to upsample the subsampled tensor (B,C,H,W)
-        upsampled_tensor = torch.nn.functional.grid_sample(subsampled_tensor, grid, mode='bilinear', align_corners=True)
+        upsampled_tensor = torch.nn.functional.grid_sample(
+            subsampled_tensor, grid, mode="bilinear", align_corners=True
+        )
 
-        return upsampled_tensor.permute(0,2,3,1) 
+        return upsampled_tensor.permute(0, 2, 3, 1)
 
     def training_step(self, batch, batch_idx):
         out = self(batch)
         ### using mask to create image at original resolution during training
-        (B,s_H,s_W,C) = out["comp_rgb"].shape
-        comp_rgb = out["comp_rgb"].permute(0,3,1,2)
+        (B, s_H, s_W, C) = out["comp_rgb"].shape
+        comp_rgb = out["comp_rgb"].permute(0, 3, 1, 2)
         mask = batch["efficiency_mask"]
-        comp_rgb = self.unmask(mask,comp_rgb,batch["height"],batch["width"])
+        comp_rgb = self.unmask(mask, comp_rgb, batch["height"], batch["width"])
         # comp_rgb = torch.zeros(B,batch["height"],batch["width"],C,device=self.device).view(B,-1,C)
         # comp_rgb[:,mask.view(-1)] = out["comp_rgb"].view(B,-1,C)
         out.update(
-                {
-            "comp_rgb": comp_rgb,
-        }
-            )
+            {
+                "comp_rgb": comp_rgb,
+            }
+        )
 
         prompt_utils = self.prompt_processor()
         guidance_out = self.guidance(
