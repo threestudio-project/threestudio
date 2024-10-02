@@ -55,6 +55,8 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Slurm logs
+slurm*
 # Translations
 *.mo
 *.pot
