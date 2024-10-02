@@ -216,6 +216,65 @@ def get_ray_directions(
 
     return directions
 
+def mask_ray_directions(
+    H: int,
+    W:int,
+    s_H:int,
+    s_W:int
+    ) -> Float[Tensor, "s_H s_W"]:
+    """
+    Masking the (H,W) image to (s_H,s_W), for efficient training at higher resolution image.
+    pixels from (s_H,s_W) are sampled more (1-aspect_ratio) than outside pixels(aspect_ratio).
+    the masking is deferred to before calling get_rays().
+    """
+    # indices_all = torch.meshgrid(
+    #     torch.arange(W, dtype=torch.float32) ,
+    #     torch.arange(H, dtype=torch.float32) ,
+    #     indexing="xy",
+    # )
+
+    indices_inner =  torch.meshgrid(
+        torch.linspace(0,0.75*W,s_W, dtype=torch.int8) ,
+        torch.linspace(0,0.75*H,s_H, dtype=torch.int8) ,
+        indexing="xy",
+    )
+    offset = [torch.randint(0,W//8 +1,(1,)),
+              torch.randint(0,H//8 +1,(1,))]
+                               
+    select_ind = indices_inner[0]+offset[0] + H*(indices_inner[1] + offset[1])
+    
+
+    ### removing the random sampling approach, we sample in uniform grid
+    # mask = torch.zeros(H,W, dtype=torch.bool)
+    # mask[(H-s_H)//2 : H - math.ceil((H-s_H)/2),(W-s_W)//2 : W - math.ceil((W-s_W)/2)] = True
+
+    # in_ind_1d = (indices_all[0]+H*indices_all[1])[mask]
+    # out_ind_1d = (indices_all[0]+H*indices_all[1])[torch.logical_not(mask)]
+    # ### tried using 0.5 p ratio of sampling inside vs outside, as smaller area already 
+    # ### leads to more samples inside anyways
+    
+    # p = 0.5#(s_H*s_W)/(H*W)
+    # select_ind = in_ind_1d[
+    #     torch.multinomial(
+    #     torch.ones_like(in_ind_1d)*(1-p),int((1-p)*(s_H*s_W)),replacement=False)]
+    # select_ind = torch.concatenate(
+    #     [select_ind, out_ind_1d[torch.multinomial(
+    #         torch.ones_like(out_ind_1d)*(p),int((p)*(s_H*s_W)),replacement=False)]
+    #     ],
+    #     dim=0).to(dtype=torch.int).view(s_H,s_W)
+
+    ### first attempt at sampling, this produces variable number of rays, 
+    ### so 4D tensor directions cant be sampled
+    # mask = torch.zeros(H,W, device= directions.device)
+    # p = (s_H*s_W)/(H*W)
+    # mask += p 
+    # mask[(H-s_H)//2 : H - math.ceil((H-s_H)/2),(W-s_W)//2 : W - math.ceil((W-s_W)/2)] = 1 - p
+    # ### mask contains prob of individual pixel, drawing using Bernoulli dist
+    # mask = torch.bernoulli(mask).to(dtype=torch.bool)
+    ### postponing masking before get_rays is called
+    #directions = directions[mask]
+
+    return select_ind
 
 def get_rays(
     directions: Float[Tensor, "... 3"],
