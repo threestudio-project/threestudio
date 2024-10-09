@@ -2,14 +2,16 @@
 <p align="center">
   This is the official implementation of the paper
 </p>
-<p align="center" style="font-size: 24px; font-weight: bold;">
-Score Distillation via Reparametrized DDIM
-</p>
+
+<div id="user-content-toc" display="inline">
+  <ul align="center" style="list-style: none;">
+    <summary>
+      <h1>Score Distillation via Reparametrized DDIM</h1>
+    </summary>
+  </ul>
 
 <p align="center">
-  <span style="color: orange;">
-    ⚠️ The code is in beta version, please report any issues to the authors ⚠️
-  </span>
+  <strong style="color: orange;">⚠️ The code is in beta version, please report any issues to the authors ⚠️</strong>
 </p>
 
 <p align="center">
