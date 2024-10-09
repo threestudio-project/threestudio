@@ -2,6 +2,11 @@
 <p align="center">
   This is the official implementation of the paper
 </p>
+<p align="center">
+  <span style="color: orange;">
+    ⚠️ The code is in beta version, please report any issues to the authors ⚠️
+  </span>
+</p>
 <p align="center" style="font-size: 24px; font-weight: bold;">
 Score Distillation via Reparametrized DDIM
 </p>
@@ -18,7 +23,7 @@ Score Distillation via Reparametrized DDIM
 </p>
 
 <p align="center">
-  <img alt="sample generation" src="https://lukoianov.com/static/media/a_photograph_of_a_ninja.279adaff.gif" width="50%">
+  <img alt="sample generation" src="docs/Pumpkin_head_zombie_skinny_highly_detailed_photorealistic.gif" width="50%">
 <!-- <img alt="sample generation" src="https://lukoianov.com/static/media/A_DSLR_photo_of_a_freshly_baked_round_loaf_of_sourdough_bread.8bfaaad1.gif" width="70%">
 <br/> -->
 </p>
