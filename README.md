@@ -2,16 +2,15 @@
 <p align="center">
   This is the official implementation of the paper
 </p>
+<p align="center" style="font-size: 24px; font-weight: bold;">
+Score Distillation via Reparametrized DDIM
+</p>
+
 <p align="center">
   <span style="color: orange;">
     ⚠️ The code is in beta version, please report any issues to the authors ⚠️
   </span>
 </p>
-<p align="center" style="font-size: 24px; font-weight: bold;">
-Score Distillation via Reparametrized DDIM
-</p>
-
-
 
 <p align="center">
   <a href="https://arxiv.org/abs/2405.15891">
