@@ -68,6 +68,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b>
 
 ## News
+- 12/03/2024: Thank [Amir Barda](https://github.com/amirbarda) for implementation of [MagicClay](https://github.com/amirbarda/MagicClay)! Follow the instructions on its website to give it a try.
 - 12/03/2024: Thank [Matthew Kwak](https://github.com/mskwak01) and [Inès Hyeonsu Kim](https://github.com/Ines-Hyeonsu-Kim) for implementation of [3DFuse](https://github.com/KU-CVLAB/3DFuse-threestudio)! Follow the instructions on its website to give it a try.
 - 08/03/2024: Thank [Xinhua Cheng](https://github.com/cxh0519/) for implementation of [GaussianDreamer](https://github.com/cxh0519/threestudio-gaussiandreamer)! Follow the instructions on its website to give it a try.
 - 01/03/2024: Thank [Xinhua Cheng](https://github.com/cxh0519/) for implementation of [Progressive3D](https://github.com/cxh0519/Progressive3D)! Follow the instructions on its website to give it a try.
