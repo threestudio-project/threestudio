@@ -112,41 +112,10 @@ class ScoreDistillationViaInversion(BaseLift3DSystem):
         out = self(batch)
         
         with torch.no_grad():
-            pred_x0_latent, noisy_latent = self.guidance(
-                out["comp_rgb"], self.prompt_processor(), **batch, rgb_as_latents=False, test_call=True
+            guidance_output = self.guidance(
+                out["comp_rgb"], self.prompt_processor(), **batch, rgb_as_latents=False, test_info=True
             )
-        
-        # self.save_image_grid(
-        #     f"it{self.true_global_step}-{batch['index'][0]}.png",
-        #     [
-        #         {
-        #             "type": "rgb",
-        #             "img": out["comp_rgb"][0],
-        #             "kwargs": {"data_format": "HWC"},
-        #         },
-        #     ]
-        #     + (
-        #         [
-        #             {
-        #                 "type": "rgb",
-        #                 "img": out["comp_normal"][0],
-        #                 "kwargs": {"data_format": "HWC", "data_range": (0, 1)},
-        #             }
-        #         ]
-        #         if "comp_normal" in out
-        #         else []
-        #     )
-        #     + [
-        #         {
-        #             "type": "grayscale",
-        #             "img": out["opacity"][0, :, :, 0],
-        #             "kwargs": {"cmap": None, "data_range": (0, 1)},
-        #         },
-        #     ],
-        #     name="validation_step",
-        #     step=self.true_global_step,
-        # )
-        
+
         self.save_image_grid(
             f"it{self.true_global_step}-{batch['index'][0]}.png",
             [
@@ -196,45 +165,41 @@ class ScoreDistillationViaInversion(BaseLift3DSystem):
                     "kwargs": {"cmap": None, "data_range": (0, 1)},
                 },
             ]
-            # + [
-            #     {
-            #         "type": "grayscale",
-            #         "img": rescaled_nerf_depth[0, :, :, 0],
-            #         "kwargs": {"cmap": None, "data_range": (0, 1)},
-            #     },
-            # ]
             + [
                 {
                     "type": "rgb",
-                    "img": self.guidance.decode_latents(noisy_latent)[0].permute(1, 2, 0),
+                    "img": guidance_output["noisy_img"],
                     "kwargs": {"data_format": "HWC"},
                 },
             ]
             + [
                 {
                     "type": "rgb",
-                    "img": self.guidance.decode_latents(pred_x0_latent)[0].permute(1, 2, 0),
+                    "img": guidance_output["noise_img"],
                     "kwargs": {"data_format": "HWC"},
                 },
             ]
             + [
                 {
                     "type": "rgb",
-                    "img": self.guidance.decode_latents(pred_x0_latent)[0].permute(1, 2, 0) - out["comp_rgb"][0],
+                    "img": guidance_output["target"],
                     "kwargs": {"data_format": "HWC"},
                 },
             ]
-            + (
-                [
-                    {
-                        "type": "grayscale",
-                        "img": predicted_depth[0, :, :, 0],
-                        "kwargs": {"cmap": None, "data_range": (0, 1)},
-                    }
-                ]
-                if "lambda_depth" in self.cfg.loss
-                else []
-            )
+            + [
+                {
+                    "type": "rgb",
+                    "img": guidance_output["target"] - out["comp_rgb"][0],
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
+            + [
+                {
+                    "type": "rgb",
+                    "img": out["comp_rgb"][0] - guidance_output["target"],
+                    "kwargs": {"data_format": "HWC"},
+                },
+            ]
             ,
             name="validation_step", 
             step=self.true_global_step,

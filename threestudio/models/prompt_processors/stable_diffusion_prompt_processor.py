@@ -78,7 +78,7 @@ class StableDiffusionPromptProcessor(PromptProcessor):
         text_encoder = CLIPTextModel.from_pretrained(
             pretrained_model_name_or_path,
             subfolder="text_encoder",
-            device_map="auto",
+            device_map="cuda:0",
         )
 
         with torch.no_grad():

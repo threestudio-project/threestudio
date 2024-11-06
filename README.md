@@ -11,10 +11,6 @@
   </ul>
 
 <p align="center">
-  <strong style="color: orange;">⚠️ The code is in beta version, please report any issues to the authors ⚠️</strong>
-</p>
-
-<p align="center">
   <a href="https://arxiv.org/abs/2405.15891">
     <img src="https://img.shields.io/badge/arXiv-2405.15891-b31b1b.svg?logo=arXiv">
   </a>
@@ -78,9 +74,6 @@ pip install ninja
 pip install -r requirements.txt
 ```
 
-<span style="color: orange;">⚠️ Newer versions of diffusers can break the generation, please make sure you are using `diffusers==0.19.3`.</span>
-
-
 For additional options please address the official installation instructions of Threestudio [here](https://github.com/threestudio-project/threestudio?tab=readme-ov-file#installation) to install threestudio.
 
 ## Running generation
@@ -131,6 +124,13 @@ inversion_n_steps: 10 # number of steps in the inversion process
 inversion_eta: 0.3 # random noise added to in the end of the inversion process
 t_anneal: true # if true - timestep t is annealed from 0.98 to 0.2 instead of sampled from U[0.2, 0.98] like in SDS
 ```
+
+## 2D Generation
+
+There are 2 main methods that allow to perform score distialltion in 2D with the insights from our paper.
+The first one, as in 3D case, is inferring noise with DDIM inversion.
+Absence of other views, however, allows us to use a second method - caching of $\kappa$, which is also provided in the notebook.
+Please conuslt `2dplayground_SDI_version.ipynb` for more details. 
 
 ## Citing
 
