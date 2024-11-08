@@ -597,5 +597,3 @@ class StableDiffusionSDIGuidance(BaseObject):
                 min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
                 max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
             )
-            
-        # print("Epoch: ", epoch, "Global step: ", global_step, "Min step: ", self.min_step, "Max step: ", self.max_step)

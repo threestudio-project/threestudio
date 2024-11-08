@@ -91,12 +91,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
                 else:
                     shading = "diffuse"
             else:
-                shading = "albedo"
-                # if self.ambient_only:
-                #     shading = "albedo"
-                # else:
-                #     # return shaded color by default in evaluation
-                #     shading = "diffuse"
+                shading = "albedo" # test time visualization only with ambient lighting
 
         # multiply by 0 to prevent checking for unused parameters in DDP
         if shading == "albedo":
