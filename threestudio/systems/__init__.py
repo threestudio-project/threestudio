@@ -1,6 +1,7 @@
 from . import (
     control4d_multiview,
     dreamfusion,
+    eff_dreamfusion,
     fantasia3d,
     imagedreamfusion,
     instructnerf2nerf,
