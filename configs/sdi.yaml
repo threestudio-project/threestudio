@@ -47,6 +47,7 @@ system:
     albedo_activation: sigmoid
     diffuse_prob: 0.3
     textureless_prob: 0.75
+    ambient_only_on_test: true
 
   background_type: "neural-environment-map-background"
   background:
