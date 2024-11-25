@@ -1,18 +1,17 @@
-from dataclasses import dataclass, field
-from dataclasses import dataclass, field
-import time
 import random
-import numpy as np
+import time
+from dataclasses import dataclass, field
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import DDIMScheduler, DDIMInverseScheduler, StableDiffusionPipeline
+from diffusers import DDIMInverseScheduler, DDIMScheduler, StableDiffusionPipeline
 from diffusers.utils.import_utils import is_xformers_available
 from tqdm import tqdm
 
-from extern.ldm_zero123 import guidance
 import threestudio
+from extern.ldm_zero123 import guidance
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
 from threestudio.utils.base import BaseObject
 from threestudio.utils.misc import C, cleanup, parse_version
@@ -39,7 +38,7 @@ class StableDiffusionSDIGuidance(BaseObject):
         max_step_percent: float = 0.98
         trainer_max_steps: int = 10000
         use_img_loss: bool = False  # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
-        
+
         var_red: bool = True
         weighting_strategy: str = "sds"
 
@@ -50,11 +49,11 @@ class StableDiffusionSDIGuidance(BaseObject):
 
         """Maximum number of batch items to evaluate guidance for (for debugging) and to save on disk. -1 means save all items."""
         max_items_eval: int = 4
-        
+
         n_ddim_steps: int = 50
-        
+
         # SDI parameters https://arxiv.org/abs/2405.15891
-        enable_sdi: bool = True # if false, sample noise randomly like in SDS
+        enable_sdi: bool = True  # if false, sample noise randomly like in SDS
         inversion_guidance_scale: float = -7.5
         inversion_n_steps: int = 10
         inversion_eta: float = 0.3
@@ -124,16 +123,22 @@ class StableDiffusionSDIGuidance(BaseObject):
             subfolder="scheduler",
             torch_dtype=self.weights_dtype,
         )
-        self.scheduler.alphas_cumprod = self.scheduler.alphas_cumprod.to(device=self.device)
+        self.scheduler.alphas_cumprod = self.scheduler.alphas_cumprod.to(
+            device=self.device
+        )
         self.scheduler.set_timesteps(self.cfg.n_ddim_steps, device=self.device)
-        
+
         self.inverse_scheduler = DDIMInverseScheduler.from_pretrained(
             self.cfg.pretrained_model_name_or_path,
             subfolder="scheduler",
             torch_dtype=self.weights_dtype,
         )
-        self.inverse_scheduler.set_timesteps(self.cfg.inversion_n_steps, device=self.device)
-        self.inverse_scheduler.alphas_cumprod = self.inverse_scheduler.alphas_cumprod.to(device=self.device)
+        self.inverse_scheduler.set_timesteps(
+            self.cfg.inversion_n_steps, device=self.device
+        )
+        self.inverse_scheduler.alphas_cumprod = (
+            self.inverse_scheduler.alphas_cumprod.to(device=self.device)
+        )
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.set_min_max_steps()  # set to default value
@@ -189,7 +194,7 @@ class StableDiffusionSDIGuidance(BaseObject):
         image = self.vae.decode(latents.to(self.weights_dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
-    
+
     @torch.cuda.amp.autocast(enabled=False)
     @torch.no_grad()
     def predict_noise(
@@ -203,7 +208,6 @@ class StableDiffusionSDIGuidance(BaseObject):
         guidance_scale: float = 1.0,
         text_embeddings: Optional[Float[Tensor, "..."]] = None,
     ):
-        
         batch_size = elevation.shape[0]
 
         if prompt_utils.use_perp_neg:
@@ -213,7 +217,7 @@ class StableDiffusionSDIGuidance(BaseObject):
             ) = prompt_utils.get_text_embeddings_perp_neg(
                 elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
             )
-        
+
             latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
             noise_pred = self.forward_unet(
                 latent_model_input,
@@ -230,19 +234,20 @@ class StableDiffusionSDIGuidance(BaseObject):
             n_negative_prompts = neg_guidance_weights.shape[-1]
             for i in range(n_negative_prompts):
                 e_i_neg = noise_pred_neg[i::n_negative_prompts] - noise_pred_uncond
-                accum_grad += neg_guidance_weights[:, i].view(
-                    -1, 1, 1, 1
-                ).to(e_i_neg.device) * perpendicular_component(e_i_neg, e_pos)
+                accum_grad += neg_guidance_weights[:, i].view(-1, 1, 1, 1).to(
+                    e_i_neg.device
+                ) * perpendicular_component(e_i_neg, e_pos)
 
-            noise_pred = noise_pred_uncond + guidance_scale * (
-                e_pos + accum_grad
-            )
+            noise_pred = noise_pred_uncond + guidance_scale * (e_pos + accum_grad)
         else:
             neg_guidance_weights = None
-            
+
             if text_embeddings is None:
                 text_embeddings = prompt_utils.get_text_embeddings(
-                    elevation, azimuth, camera_distances, self.cfg.view_dependent_prompting
+                    elevation,
+                    azimuth,
+                    camera_distances,
+                    self.cfg.view_dependent_prompting,
                 )
             # predict the noise residual with unet, NO grad!
             with torch.no_grad():
@@ -258,19 +263,23 @@ class StableDiffusionSDIGuidance(BaseObject):
             noise_pred = noise_pred_text + guidance_scale * (
                 noise_pred_text - noise_pred_uncond
             )
-        
+
         return noise_pred, neg_guidance_weights, text_embeddings
-    
+
     def ddim_inversion_step(
         self,
         model_output: torch.FloatTensor,
         timestep: int,
         prev_timestep: int,
-        sample: torch.FloatTensor
+        sample: torch.FloatTensor,
     ) -> torch.FloatTensor:
         # 1. compute alphas, betas
         # change original implementation to exactly match noise levels for analogous forward process
-        alpha_prod_t = self.inverse_scheduler.alphas_cumprod[timestep] if timestep >= 0 else self.inverse_scheduler.initial_alpha_cumprod
+        alpha_prod_t = (
+            self.inverse_scheduler.alphas_cumprod[timestep]
+            if timestep >= 0
+            else self.inverse_scheduler.initial_alpha_cumprod
+        )
         alpha_prod_t_prev = self.inverse_scheduler.alphas_cumprod[prev_timestep]
 
         beta_prod_t = 1 - alpha_prod_t
@@ -278,14 +287,22 @@ class StableDiffusionSDIGuidance(BaseObject):
         # 2. compute predicted original sample from predicted noise also called
         # "predicted x_0" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
         if self.inverse_scheduler.config.prediction_type == "epsilon":
-            pred_original_sample = (sample - beta_prod_t ** (0.5) * model_output) / alpha_prod_t ** (0.5)
+            pred_original_sample = (
+                sample - beta_prod_t ** (0.5) * model_output
+            ) / alpha_prod_t ** (0.5)
             pred_epsilon = model_output
         elif self.inverse_scheduler.config.prediction_type == "sample":
             pred_original_sample = model_output
-            pred_epsilon = (sample - alpha_prod_t ** (0.5) * pred_original_sample) / beta_prod_t ** (0.5)
+            pred_epsilon = (
+                sample - alpha_prod_t ** (0.5) * pred_original_sample
+            ) / beta_prod_t ** (0.5)
         elif self.inverse_scheduler.config.prediction_type == "v_prediction":
-            pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
-            pred_epsilon = (alpha_prod_t**0.5) * model_output + (beta_prod_t**0.5) * sample
+            pred_original_sample = (alpha_prod_t**0.5) * sample - (
+                beta_prod_t**0.5
+            ) * model_output
+            pred_epsilon = (alpha_prod_t**0.5) * model_output + (
+                beta_prod_t**0.5
+            ) * sample
         else:
             raise ValueError(
                 f"prediction_type given as {self.inverse_scheduler.config.prediction_type} must be one of `epsilon`, `sample`, or"
@@ -294,31 +311,43 @@ class StableDiffusionSDIGuidance(BaseObject):
         # 3. Clip or threshold "predicted x_0"
         if self.inverse_scheduler.config.clip_sample:
             pred_original_sample = pred_original_sample.clamp(
-                -self.inverse_scheduler.config.clip_sample_range, self.inverse_scheduler.config.clip_sample_range
+                -self.inverse_scheduler.config.clip_sample_range,
+                self.inverse_scheduler.config.clip_sample_range,
             )
         # 4. compute "direction pointing to x_t" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
         pred_sample_direction = (1 - alpha_prod_t_prev) ** (0.5) * pred_epsilon
 
         # 5. compute x_t without "random noise" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
-        prev_sample = alpha_prod_t_prev ** (0.5) * pred_original_sample + pred_sample_direction
-        
+        prev_sample = (
+            alpha_prod_t_prev ** (0.5) * pred_original_sample + pred_sample_direction
+        )
+
         # 6. Add noise to the sample
         variance = self.scheduler._get_variance(prev_timestep, timestep) ** (0.5)
         prev_sample += self.cfg.inversion_eta * torch.randn_like(prev_sample) * variance
-        
+
         return prev_sample
-    
+
     def get_inversion_timesteps(self, invert_to_t, B):
         n_training_steps = self.inverse_scheduler.config.num_train_timesteps
-        effective_n_inversion_steps = self.cfg.inversion_n_steps #int((n_training_steps / invert_to_t) * self.cfg.inversion_n_steps)
+        effective_n_inversion_steps = (
+            self.cfg.inversion_n_steps
+        )  # int((n_training_steps / invert_to_t) * self.cfg.inversion_n_steps)
 
         if self.inverse_scheduler.config.timestep_spacing == "leading":
             step_ratio = n_training_steps // effective_n_inversion_steps
-            timesteps = (np.arange(0, effective_n_inversion_steps) * step_ratio).round().copy().astype(np.int64)
+            timesteps = (
+                (np.arange(0, effective_n_inversion_steps) * step_ratio)
+                .round()
+                .copy()
+                .astype(np.int64)
+            )
             timesteps += self.inverse_scheduler.config.steps_offset
         elif self.inverse_scheduler.config.timestep_spacing == "trailing":
             step_ratio = n_training_steps / effective_n_inversion_steps
-            timesteps = np.round(np.arange(n_training_steps, 0, -step_ratio)[::-1]).astype(np.int64)
+            timesteps = np.round(
+                np.arange(n_training_steps, 0, -step_ratio)[::-1]
+            ).astype(np.int64)
             timesteps -= 1
         else:
             raise ValueError(
@@ -326,52 +355,74 @@ class StableDiffusionSDIGuidance(BaseObject):
             )
         # use only timesteps before invert_to_t
         timesteps = timesteps[timesteps < int(invert_to_t)]
-        
+
         # Roll timesteps array by one to reflect reversed origin and destination semantics for each step
         timesteps = np.concatenate([[int(timesteps[0] - step_ratio)], timesteps])
         timesteps = torch.from_numpy(timesteps).to(self.device)
-        
+
         # Add the last step
-        delta_t = int(random.random() * self.inverse_scheduler.config.num_train_timesteps // self.cfg.inversion_n_steps)
+        delta_t = int(
+            random.random()
+            * self.inverse_scheduler.config.num_train_timesteps
+            // self.cfg.inversion_n_steps
+        )
         last_t = torch.tensor(
-                    min(  #timesteps[-1] + self.inverse_scheduler.config.num_train_timesteps // self.inverse_scheduler.num_inference_steps,
-                        invert_to_t + delta_t,
-                        self.inverse_scheduler.config.num_train_timesteps - 1
-                    )
-                , device=self.device)
+            min(  # timesteps[-1] + self.inverse_scheduler.config.num_train_timesteps // self.inverse_scheduler.num_inference_steps,
+                invert_to_t + delta_t,
+                self.inverse_scheduler.config.num_train_timesteps - 1,
+            ),
+            device=self.device,
+        )
         timesteps = torch.cat([timesteps, last_t.repeat([B])])
         return timesteps
-    
+
     @torch.no_grad()
-    def invert_noise(self, start_latents, invert_to_t, prompt_utils, elevation, azimuth, camera_distances):
+    def invert_noise(
+        self,
+        start_latents,
+        invert_to_t,
+        prompt_utils,
+        elevation,
+        azimuth,
+        camera_distances,
+    ):
         latents = start_latents.clone()
         B = start_latents.shape[0]
-        
+
         timesteps = self.get_inversion_timesteps(invert_to_t, B)
         for t, next_t in zip(timesteps[:-1], timesteps[1:]):
-            noise_pred, _, _ =  self.predict_noise(latents, t.repeat([B]), prompt_utils, elevation, azimuth, camera_distances,
-                                                    guidance_scale=self.cfg.inversion_guidance_scale)
+            noise_pred, _, _ = self.predict_noise(
+                latents,
+                t.repeat([B]),
+                prompt_utils,
+                elevation,
+                azimuth,
+                camera_distances,
+                guidance_scale=self.cfg.inversion_guidance_scale,
+            )
             latents = self.ddim_inversion_step(noise_pred, t, next_t, latents)
 
         # remap the noise from t+delta_t to t
         found_noise = self.get_noise_from_target(start_latents, latents, next_t)
 
         return latents, found_noise
-    
+
     def get_noise_from_target(self, target, cur_xt, t):
         alpha_prod_t = self.scheduler.alphas_cumprod[t]
         beta_prod_t = 1 - alpha_prod_t
         noise = (cur_xt - target * alpha_prod_t ** (0.5)) / (beta_prod_t ** (0.5))
         return noise
-    
+
     def get_x0(self, original_samples, noise_pred, t):
-        step_results = self.scheduler.step(noise_pred, t[0], original_samples, return_dict=True)
+        step_results = self.scheduler.step(
+            noise_pred, t[0], original_samples, return_dict=True
+        )
         if "pred_original_sample" in step_results:
             return step_results["pred_original_sample"]
         elif "denoised" in step_results:
             return step_results["denoised"]
         raise ValueError("Looks like the scheduler does not compute x0")
-    
+
     @torch.no_grad()
     def compute_grad_sdi(
         self,
@@ -387,11 +438,13 @@ class StableDiffusionSDIGuidance(BaseObject):
             noise = call_with_defined_noise.clone()
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
         elif self.cfg.enable_sdi:
-            latents_noisy, noise = self.invert_noise(latents, t, prompt_utils, elevation, azimuth, camera_distances)
+            latents_noisy, noise = self.invert_noise(
+                latents, t, prompt_utils, elevation, azimuth, camera_distances
+            )
         else:
             noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
-        
+
         noise_pred, neg_guidance_weights, text_embeddings = self.predict_noise(
             latents_noisy,
             t,
@@ -399,10 +452,12 @@ class StableDiffusionSDIGuidance(BaseObject):
             elevation,
             azimuth,
             camera_distances,
-            guidance_scale=self.cfg.guidance_scale
+            guidance_scale=self.cfg.guidance_scale,
         )
 
-        latents_denoised = self.get_x0(latents_noisy, noise_pred, t).detach() # (latents_noisy - sigma * noise_pred) / alpha
+        latents_denoised = self.get_x0(
+            latents_noisy, noise_pred, t
+        ).detach()  # (latents_noisy - sigma * noise_pred) / alpha
 
         guidance_eval_utils = {
             "use_perp_neg": prompt_utils.use_perp_neg,
@@ -451,7 +506,7 @@ class StableDiffusionSDIGuidance(BaseObject):
             dtype=torch.long,
             device=self.device,
         )
-        
+
         target, noisy_img, noise, guidance_eval_utils = self.compute_grad_sdi(
             latents,
             t,
@@ -466,7 +521,9 @@ class StableDiffusionSDIGuidance(BaseObject):
         # SpecifyGradient is not straghtforward, use a reparameterization trick instead
         # target = (latents - grad).detach()
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        loss_sdi = 0.5 * F.mse_loss(latents, target.detach(), reduction="mean") / batch_size
+        loss_sdi = (
+            0.5 * F.mse_loss(latents, target.detach(), reduction="mean") / batch_size
+        )
 
         guidance_out = {
             "loss_sdi": loss_sdi,
@@ -474,17 +531,21 @@ class StableDiffusionSDIGuidance(BaseObject):
             "min_step": self.min_step,
             "max_step": self.max_step,
         }
-        
+
         if test_info:
             guidance_out["target"] = self.decode_latents(target)[0].permute(1, 2, 0)
             guidance_out["target_latent"] = target
-            guidance_out["noisy_img"] = self.decode_latents(noisy_img)[0].permute(1, 2, 0)
+            guidance_out["noisy_img"] = self.decode_latents(noisy_img)[0].permute(
+                1, 2, 0
+            )
             guidance_out["noise_img"] = self.decode_latents(noise)[0].permute(1, 2, 0)
-            guidance_out["noise_pred"] = guidance_eval_utils['noise_pred']
+            guidance_out["noise_pred"] = guidance_eval_utils["noise_pred"]
             return guidance_out
 
         if guidance_eval:
-            guidance_eval_out = self.guidance_eval(**guidance_eval_utils, prompt_utils=prompt_utils)
+            guidance_eval_out = self.guidance_eval(
+                **guidance_eval_utils, prompt_utils=prompt_utils
+            )
             texts = []
             for n, e, a, c in zip(
                 guidance_eval_out["noise_levels"], elevation, azimuth, camera_distances
@@ -550,7 +611,13 @@ class StableDiffusionSDIGuidance(BaseObject):
             for t in tqdm(self.scheduler.timesteps[i + 1 :], leave=False):
                 # pred noise
                 noise_pred, _, _ = self.predict_noise(
-                    latents, t, prompt_utils, elevation, azimuth, camera_distances, guidance_scale=1.0
+                    latents,
+                    t,
+                    prompt_utils,
+                    elevation,
+                    azimuth,
+                    camera_distances,
+                    guidance_scale=1.0,
                 )
                 # get prev latent
                 latents = self.scheduler.step(noise_pred, t, latents, eta=1)[

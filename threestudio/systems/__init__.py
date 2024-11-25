@@ -9,9 +9,9 @@ from . import (
     magic3d,
     magic123,
     prolificdreamer,
+    sdi,
     sjc,
     textmesh,
     zero123,
     zero123_simple,
-    sdi
 )

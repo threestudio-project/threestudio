@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="threestudio",
-    version='0.2.3',  # the current version of your package
+    version="0.2.3",  # the current version of your package
     packages=find_packages(),  # automatically discover all packages and subpackages
     url="https://github.com/threestudio-project/threestudio",  # replace with the URL of your project
     author="Yuan-Chen Guo and Ruizhi Shao and Ying-Tian Liu and Christian Laforte and Vikram Voleti and Guan Luo and Chia-Hao Chen and Zi-Xin Zou and Chen Wang and Yan-Pei Cao and Song-Hai Zhang",  # replace with your name

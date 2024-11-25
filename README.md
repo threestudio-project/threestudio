@@ -253,7 +253,7 @@ Notable differences from the paper: N/A.
 Pros:
 * High quality of the textures
 * Sharp geometric details
-  
+
 Cons:
 * Slower than SDS (1.5x times) due to additional inversion. Still faster then prolific dreamer due to lower number of steps
 * Requires more VRAM than SDS due to higher resolution rendering. Decrease the resolution to fit to smaller GPUs.
