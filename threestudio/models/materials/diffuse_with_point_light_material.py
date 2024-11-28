@@ -22,6 +22,9 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
         textureless_prob: float = 0.5
         albedo_activation: str = "sigmoid"
         soft_shading: bool = False
+        ambient_only_on_test: bool = (
+            False  # if true, test time visualization only with ambient lighting
+        )
 
     cfg: Config
 
@@ -91,7 +94,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
                 else:
                     shading = "diffuse"
             else:
-                if self.ambient_only:
+                if self.ambient_only or self.cfg.ambient_only_on_test:
                     shading = "albedo"
                 else:
                     # return shaded color by default in evaluation

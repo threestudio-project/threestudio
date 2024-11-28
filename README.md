@@ -13,12 +13,14 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/01a00207-3240-4a8e-aa6f-d48436370fe7.png" width="100%">
 <br/>
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/1dbdebab-43d5-4830-872c-66b38d9fda92" width="60%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/d746b874-d82f-4977-a549-98d9ba764dfc" width="30%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/1dbdebab-43d5-4830-872c-66b38d9fda92" width="48%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/d746b874-d82f-4977-a549-98d9ba764dfc" width="25%">
+<img alt="threestudio" src="https://github.com/user-attachments/assets/afcf74ee-85ff-4792-b109-191f54b44edd" width="24%">
 
 <br/>
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/437b4044-142c-4e5d-a406-4d9bad0205e1" width="60%">
-<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/812741c0-7229-412e-b6ab-81e377890f04" width="30%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/437b4044-142c-4e5d-a406-4d9bad0205e1" width="48%">
+<img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/24589363/812741c0-7229-412e-b6ab-81e377890f04" width="25%">
+<img alt="threestudio" src="https://github.com/user-attachments/assets/c0858bc5-6b9d-446a-b5df-76534c8a3072" width="25%">
 
 <br/>
 <img alt="threestudio" src="https://github.com/threestudio-project/threestudio/assets/19284678/4f4d62c5-2304-4e20-b632-afe6d144a203" width="68%">
@@ -31,7 +33,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 👆 Results obtained from methods implemented by threestudio 👆 <br/>
 | <a href="https://ml.cs.tsinghua.edu.cn/prolificdreamer/">ProlificDreamer</a> | <a href="https://dreamfusion3d.github.io/">DreamFusion</a> | <a href="https://research.nvidia.com/labs/dir/magic3d/">Magic3D</a> | <a href="https://pals.ttic.edu/p/score-jacobian-chaining">SJC</a> | <a href="https://github.com/eladrich/latent-nerf">Latent-NeRF</a> | <a href="https://fantasia3d.github.io/">Fantasia3D</a> | <a href="https://fabi92.github.io/textmesh/">TextMesh</a> |
 <br/>
-| <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> | <a href="https://guochengqian.github.io/project/magic123/">Magic123</a> | <a href="https://github.com/JunzheJosephZhu/HiFA">HiFA</a> |
+| <a href="https://zero123.cs.columbia.edu/">Zero-1-to-3</a> | <a href="https://guochengqian.github.io/project/magic123/">Magic123</a> | <a href="https://github.com/JunzheJosephZhu/HiFA">HiFA</a> | <a href="https://lukoianov.com/sdi">SDI</a> |
 <br />
 | <a href="https://instruct-nerf2nerf.github.io/">InstructNeRF2NeRF</a> | <a href="https://control4darxiv.github.io/">Control4D</a> |
 </b>
@@ -68,6 +70,7 @@ threestudio is a unified framework for 3D content creation from text prompts, si
 </b>
 
 ## News
+- 08/11/2024: Thank [Artem Lukoianov](https://github.com/ottogin) for implementation of [Score Distillation via Reparametrized DDIM](https://lukoianov.com/sdi)! Text-to-3D module is added to Threestudio as well as a notebook with 2D score distillation experiments.
 - 21/10/2024: Thank [Amir Barda](https://github.com/amirbarda) for implementation of [MagicClay](https://github.com/amirbarda/MagicClay)! Follow the instructions on its website to give it a try.
 - 12/03/2024: Thank [Matthew Kwak](https://github.com/mskwak01) and [Inès Hyeonsu Kim](https://github.com/Ines-Hyeonsu-Kim) for implementation of [3DFuse](https://github.com/KU-CVLAB/3DFuse-threestudio)! Follow the instructions on its website to give it a try.
 - 08/03/2024: Thank [Xinhua Cheng](https://github.com/cxh0519/) for implementation of [GaussianDreamer](https://github.com/cxh0519/threestudio-gaussiandreamer)! Follow the instructions on its website to give it a try.
@@ -240,6 +243,36 @@ Parameters:
 For feature requests, bug reports, or discussions about technical problems, please [file an issue](https://github.com/threestudio-project/threestudio/issues/new). In case you want to discuss the generation quality or showcase your generation results, please feel free to participate in the [discussion panel](https://github.com/threestudio-project/threestudio/discussions).
 
 ## Supported Models
+
+### Score Distillation via Reparametrized DDIM (SDI) [![arXiv](https://img.shields.io/badge/arXiv-2405.15891-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2405.15891)
+
+SDI suggests to reconsider the approach to sampling the noise term in Dreamfusion. The paper demonstrates that score distillation process can be seen as a reparametrization of 2D image sampling algorithms. In that case the noise added on each step of score distillation should be of a very particular form. Noise in Dreamfusion (SDS), however, is sampled randomly, what causes over-blurring. SDI approximates the correct noise term by inverting the DDIM process.
+
+Notable differences from the paper: N/A.
+
+Pros:
+* High quality of the textures
+* Sharp geometric details
+
+Cons:
+* Slower than SDS (1.5x times) due to additional inversion. Still faster then prolific dreamer due to lower number of steps
+* Requires more VRAM than SDS due to higher resolution rendering. Decrease the resolution to fit to smaller GPUs.
+
+**Results obtained in threestudio (Stable Diffusion, 512x512)**
+
+<img alt="A_DSLR_photo_of_a_freshly_baked_round_loaf_of_sourdough_bread" src="https://github.com/user-attachments/assets/ec499869-502a-4bcc-b983-279643920b89" width="48%">
+<img alt="a_photograph_of_a_knight" src="https://github.com/user-attachments/assets/71981e65-b8b5-4505-beab-41ef1cd545a9" width="48%">
+
+**Example running commands**
+```sh
+python launch.py --config configs/sdi.yaml --train --gpu 0 system.prompt_processor.prompt="pumpkin head zombie, skinny, highly detailed, photorealistic"
+
+python launch.py --config configs/sdi.yaml --train --gpu 1 system.prompt_processor.prompt="a photograph of a ninja"
+
+python launch.py --config configs/sdi.yaml --train --gpu 2 system.prompt_processor.prompt="a zoomed out DSLR photo of a hamburger"
+
+python launch.py --config configs/sdi.yaml --train --gpu 3 system.prompt_processor.prompt="bagel filled with cream cheese and lox"
+```
 
 ### ProlificDreamer [![arXiv](https://img.shields.io/badge/arXiv-2305.16213-b31b1b.svg?style=flat-square)](https://arxiv.org/abs/2305.16213)
 
