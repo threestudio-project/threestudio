@@ -92,7 +92,7 @@ class StableDiffusionPromptProcessor(PromptProcessor):
 
         for prompt, embedding in zip(prompts, text_embeddings):
             torch.save(
-                embedding,
+                embedding.clone(),
                 os.path.join(
                     cache_dir,
                     f"{hash_prompt(pretrained_model_name_or_path, prompt)}.pt",
