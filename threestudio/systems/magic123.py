@@ -87,6 +87,42 @@ class Magic123(BaseLift3DSystem):
                 )
 
         if not self.cfg.refinement:
+            # depth loss
+            if self.C(self.cfg.loss.lambda_depth) > 0:
+                valid_gt_depth = batch["ref_depth"][batch["mask"].squeeze(-1)].unsqueeze(1)
+                valid_pred_depth = out_input["depth"][batch["mask"]].unsqueeze(1)
+                with torch.no_grad():
+                    A = torch.cat(
+                        [valid_gt_depth, torch.ones_like(valid_gt_depth)], dim=-1
+                    )  # [B, 2]
+                    X = torch.linalg.lstsq(A, valid_pred_depth).solution  # [2, 1]
+                    valid_gt_depth = A @ X  # [B, 1]
+                loss_depth = F.mse_loss(valid_pred_depth, valid_gt_depth)
+                self.log("train/loss_depth", loss_depth)
+                loss += loss_depth * self.C(self.cfg.loss.lambda_depth)
+
+            # relative depth loss
+            if self.C(self.cfg.loss.lambda_depth_rel) > 0:
+                valid_gt_depth = batch["ref_depth"][batch["mask"].squeeze(-1)]  # [B,]
+                valid_pred_depth = out_input["depth"][batch["mask"]]  # [B,]
+                loss_depth_rel = 1 - self.pearson(valid_pred_depth, valid_gt_depth)
+                self.log("train/loss_relative_depth", loss_depth_rel)
+                loss += loss_depth_rel * self.C(self.cfg.loss.lambda_depth_rel)
+
+            # normal loss
+            if self.C(self.cfg.loss.lambda_normal) > 0:
+                valid_gt_normal = (
+                    1 - 2 * batch["ref_normal"][batch["mask"].squeeze(-1)]
+                )  # [B, 3]
+                valid_pred_normal = (
+                    2 * out_input["comp_normal"][batch["mask"].squeeze(-1)] - 1
+                )  # [B, 3]
+                loss_normal = 1 - F.cosine_similarity(
+                    valid_pred_normal, valid_gt_normal
+                ).mean()
+                self.log("train/loss_normal", loss_normal)
+                loss += loss_normal * self.C(self.cfg.loss.lambda_normal)
+
             if self.C(self.cfg.loss.lambda_orient) > 0:
                 if "normal" not in out:
                     raise ValueError(

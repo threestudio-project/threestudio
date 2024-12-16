@@ -111,10 +111,14 @@ system:
   loss:
     lambda_rgb: 1000.
     lambda_mask: 100.
+    lambda_depth: 0.
+    lambda_depth_rel: 0.
     lambda_sd: 0.025
     lambda_3d_sd: 1.
     lambda_sd_img: 0.00025
     lambda_orient: 0.
+    lambda_normal: 0.
+    lambda_3d_normal_smooth: [ 100, 7.0, 5.0, 150, 10.0, 200 ]
     lambda_normal_smoothness_2d: 1000.
     lambda_sparsity: 0.
     lambda_opaque: 0.
