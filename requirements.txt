@@ -31,7 +31,7 @@ xformers
 bitsandbytes==0.38.1
 sentencepiece
 safetensors
-huggingface_hub
+huggingface_hub<0.26.0
 
 # for zero123
 einops
