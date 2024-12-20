@@ -515,6 +515,9 @@ python launch.py --config configs/fantasia3d.yaml --train --gpu 0 system.prompt_
 # --------- Texture --------- #
 # to train PBR texture continued from a geometry checkpoint:
 python launch.py --config configs/fantasia3d-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a DSLR photo of an ice cream sundae" system.geometry_convert_from=path/to/geometry/stage/trial/dir/ckpts/last.ckpt
+# To train PBR texture from a custom (fixed) geometry: you need to change fantasia3d-texture.yaml, see comments there.
+python launch.py --config configs/fantasia3d-texture.yaml --train --gpu 0 system.prompt_processor.prompt="a girl" system.geometry.shape_init=mesh:/path/to/custom/geometry/girl.ply
+# You can also allow stronger control using ControlNet and normal map from geometry. See comments in fantasia3d-texture.yaml.
 ```
 
 **Tips**

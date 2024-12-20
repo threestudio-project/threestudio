@@ -22,6 +22,12 @@ class Fantasia3D(BaseLift3DSystem):
         # create geometry, material, background, renderer
         super().configure()
 
+        # only used in training
+        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
+            self.cfg.prompt_processor
+        )
+        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
+
     def forward(self, batch: Dict[str, Any]) -> Dict[str, Any]:
         render_out = self.renderer(**batch, render_rgb=self.cfg.texture)
         return {
@@ -30,11 +36,6 @@ class Fantasia3D(BaseLift3DSystem):
 
     def on_fit_start(self) -> None:
         super().on_fit_start()
-        # only used in training
-        self.prompt_processor = threestudio.find(self.cfg.prompt_processor_type)(
-            self.cfg.prompt_processor
-        )
-        self.guidance = threestudio.find(self.cfg.guidance_type)(self.cfg.guidance)
 
         if not self.cfg.texture:
             # initialize SDF
@@ -70,9 +71,12 @@ class Fantasia3D(BaseLift3DSystem):
             guidance_inp = out["comp_rgb"]
             if isinstance(
                 self.guidance,
-                threestudio.models.guidance.controlnet_guidance.ControlNetGuidance,
+                (
+                    threestudio.models.guidance.controlnet_guidance.ControlNetGuidance,
+                    threestudio.models.guidance.controlnet_vsd_guidance.ControlNetVSDGuidance,
+                ),
             ):
-                cond_inp = out["comp_normal"]
+                cond_inp = out["comp_normal_viewspace"]
                 guidance_out = self.guidance(
                     guidance_inp, cond_inp, prompt_utils, **batch, rgb_as_latents=False
                 )

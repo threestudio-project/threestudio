@@ -56,7 +56,7 @@ class ControlNetGuidance(BaseObject):
         threestudio.info(f"Loading ControlNet ...")
 
         controlnet_name_or_path: str
-        if self.cfg.control_type == "normal":
+        if self.cfg.control_type in ("normal", "input_normal"):
             controlnet_name_or_path = "lllyasviel/control_v11p_sd15_normalbae"
         elif self.cfg.control_type == "canny":
             controlnet_name_or_path = "lllyasviel/control_v11p_sd15_canny"
@@ -289,6 +289,13 @@ class ControlNetGuidance(BaseObject):
             control = control.unsqueeze(-1).repeat(1, 1, 3)
             control = control.unsqueeze(0)
             control = control.permute(0, 3, 1, 2)
+        elif self.cfg.control_type == "input_normal":
+            cond_rgb[..., 0] = (
+                1 - cond_rgb[..., 0]
+            )  # Flip the sign on the x-axis to match bae system
+            control = cond_rgb.permute(0, 3, 1, 2)
+        else:
+            raise ValueError(f"Unknown control type: {self.cfg.control_type}")
 
         return control
 

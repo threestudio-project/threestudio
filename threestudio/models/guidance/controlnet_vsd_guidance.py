@@ -1,13 +1,20 @@
+# Yanke Song: Currently sample, sample_lora and edit_latents are not supported yet.
+import os
 import random
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
+import cv2
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from controlnet_aux import CannyDetector, NormalBaeDetector
 from diffusers import (
+    ControlNetModel,
+    DDIMScheduler,
     DDPMScheduler,
-    DPMSolverMultistepScheduler,
+    StableDiffusionControlNetPipeline,
     StableDiffusionPipeline,
     UNet2DConditionModel,
 )
@@ -15,10 +22,11 @@ from diffusers.loaders import AttnProcsLayers
 from diffusers.models.attention_processor import LoRAAttnProcessor
 from diffusers.models.embeddings import TimestepEmbedding
 from diffusers.utils.import_utils import is_xformers_available
+from tqdm import tqdm
 
 import threestudio
 from threestudio.models.prompt_processors.base import PromptProcessorOutput
-from threestudio.utils.base import BaseModule
+from threestudio.utils.base import BaseModule, BaseObject
 from threestudio.utils.misc import C, cleanup, parse_version
 from threestudio.utils.typing import *
 
@@ -33,18 +41,23 @@ class ToWeightsDType(nn.Module):
         return self.module(x).to(self.dtype)
 
 
-@threestudio.register("stable-diffusion-vsd-guidance")
-class StableDiffusionVSDGuidance(BaseModule):
+@threestudio.register("stable-diffusion-controlnet-vsd-guidance")
+class ControlNetVSDGuidance(BaseModule):
     @dataclass
     class Config(BaseModule.Config):
-        pretrained_model_name_or_path: str = "stabilityai/stable-diffusion-2-1-base"
-        pretrained_model_name_or_path_lora: str = "stabilityai/stable-diffusion-2-1"
+        cache_dir: Optional[str] = None
+        pretrained_model_name_or_path: str = "SG161222/Realistic_Vision_V2.0"
+        pretrained_model_name_or_path_lora: str = "SG161222/Realistic_Vision_V2.0"
+        ddim_scheduler_name_or_path: str = "runwayml/stable-diffusion-v1-5"
+        control_type: str = "normal"  # normal/canny
+
         enable_memory_efficient_attention: bool = False
         enable_sequential_cpu_offload: bool = False
         enable_attention_slicing: bool = False
         enable_channels_last_format: bool = False
         guidance_scale: float = 7.5
         guidance_scale_lora: float = 1.0
+        condition_scale: float = 0.5
         grad_clip: Optional[
             Any
         ] = None  # field(default_factory=lambda: [0, 2.0, 8.0, 1000])
@@ -54,63 +67,98 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         min_step_percent: float = 0.02
         max_step_percent: float = 0.98
-        sqrt_anneal: bool = False  # sqrt anneal proposed in HiFA: https://hifa-team.github.io/HiFA-site/
-        trainer_max_steps: int = 25000
-        use_img_loss: bool = False  # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
 
         view_dependent_prompting: bool = True
         camera_condition_type: str = "extrinsics"
 
+        diffusion_steps: int = 20
+
+        use_sds: bool = False
+
+        # Canny threshold
+        canny_lower_bound: int = 50
+        canny_upper_bound: int = 100
+
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading Stable Diffusion ...")
+        threestudio.info(f"Loading ControlNet ...")
+
+        controlnet_name_or_path: str
+        if self.cfg.control_type in ("normal", "input_normal"):
+            controlnet_name_or_path = "lllyasviel/control_v11p_sd15_normalbae"
+        elif self.cfg.control_type == "canny":
+            controlnet_name_or_path = "lllyasviel/control_v11p_sd15_canny"
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
         )
 
         pipe_kwargs = {
-            "tokenizer": None,
             "safety_checker": None,
             "feature_extractor": None,
             "requires_safety_checker": False,
             "torch_dtype": self.weights_dtype,
+            "cache_dir": self.cfg.cache_dir,
         }
 
         pipe_lora_kwargs = {
-            "tokenizer": None,
             "safety_checker": None,
             "feature_extractor": None,
             "requires_safety_checker": False,
             "torch_dtype": self.weights_dtype,
+            "cache_dir": self.cfg.cache_dir,
         }
+
+        controlnet = ControlNetModel.from_pretrained(
+            controlnet_name_or_path,
+            torch_dtype=self.weights_dtype,
+            cache_dir=self.cfg.cache_dir,
+        )
 
         @dataclass
         class SubModules:
-            pipe: StableDiffusionPipeline
-            pipe_lora: StableDiffusionPipeline
+            pipe: StableDiffusionControlNetPipeline
+            pipe_lora: StableDiffusionControlNetPipeline
 
-        pipe = StableDiffusionPipeline.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            **pipe_kwargs,
+        pipe = StableDiffusionControlNetPipeline.from_pretrained(
+            self.cfg.pretrained_model_name_or_path, controlnet=controlnet, **pipe_kwargs
         ).to(self.device)
-        if (
-            self.cfg.pretrained_model_name_or_path
-            == self.cfg.pretrained_model_name_or_path_lora
-        ):
-            self.single_model = True
-            pipe_lora = pipe
-        else:
-            self.single_model = False
-            pipe_lora = StableDiffusionPipeline.from_pretrained(
-                self.cfg.pretrained_model_name_or_path_lora,
-                **pipe_lora_kwargs,
-            ).to(self.device)
-            del pipe_lora.vae
-            cleanup()
-            pipe_lora.vae = pipe.vae
+
+        # force single model false
+        # if (
+        #     self.cfg.pretrained_model_name_or_path
+        #     == self.cfg.pretrained_model_name_or_path_lora
+        # ):
+        #     self.single_model = True
+        #     pipe_lora = pipe
+        # else:
+        self.single_model = False
+        pipe_lora = StableDiffusionControlNetPipeline.from_pretrained(
+            self.cfg.pretrained_model_name_or_path_lora,
+            controlnet=controlnet,
+            **pipe_lora_kwargs,
+        ).to(self.device)
+        del pipe_lora.vae
+        cleanup()
+        pipe_lora.vae = pipe.vae
+
         self.submodules = SubModules(pipe=pipe, pipe_lora=pipe_lora)
+
+        self.scheduler = DDIMScheduler.from_pretrained(
+            self.cfg.ddim_scheduler_name_or_path,
+            subfolder="scheduler",
+            torch_dtype=self.weights_dtype,
+            cache_dir=self.cfg.cache_dir,
+        )
+        self.scheduler_lora = DDIMScheduler.from_pretrained(
+            self.cfg.ddim_scheduler_name_or_path,
+            subfolder="scheduler",
+            torch_dtype=self.weights_dtype,
+            cache_dir=self.cfg.cache_dir,
+        )
+        self.scheduler.set_timesteps(self.cfg.diffusion_steps)
+        self.scheduler_lora.set_timesteps(self.cfg.diffusion_steps)
 
         if self.cfg.enable_memory_efficient_attention:
             if parse_version(torch.__version__) >= parse_version("2"):
@@ -142,18 +190,22 @@ class StableDiffusionVSDGuidance(BaseModule):
             del self.pipe_lora.text_encoder
         cleanup()
 
+        if self.cfg.control_type == "normal":
+            self.preprocessor = NormalBaeDetector.from_pretrained(
+                "lllyasviel/Annotators"
+            )
+            self.preprocessor.model.to(self.device)
+        elif self.cfg.control_type == "canny":
+            self.preprocessor = CannyDetector()
+
         for p in self.vae.parameters():
             p.requires_grad_(False)
         for p in self.unet.parameters():
             p.requires_grad_(False)
         for p in self.unet_lora.parameters():
             p.requires_grad_(False)
-
-        # FIXME: hard-coded dims
-        self.camera_embedding = ToWeightsDType(
-            TimestepEmbedding(16, 1280), self.weights_dtype
-        ).to(self.device)
-        self.unet_lora.class_embedding = self.camera_embedding
+        for p in self.controlnet.parameters():
+            p.requires_grad_(False)
 
         # set up LoRA layers
         lora_attn_procs = {}
@@ -180,33 +232,9 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         self.unet_lora.set_attn_processor(lora_attn_procs)
 
-        self.lora_layers = AttnProcsLayers(self.unet_lora.attn_processors).to(
-            self.device
-        )
+        self.lora_layers = AttnProcsLayers(self.unet_lora.attn_processors)
         self.lora_layers._load_state_dict_pre_hooks.clear()
         self.lora_layers._state_dict_hooks.clear()
-
-        self.scheduler = DDPMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path,
-            subfolder="scheduler",
-            torch_dtype=self.weights_dtype,
-        )
-
-        self.scheduler_lora = DDPMScheduler.from_pretrained(
-            self.cfg.pretrained_model_name_or_path_lora,
-            subfolder="scheduler",
-            torch_dtype=self.weights_dtype,
-        )
-
-        self.scheduler_sample = DPMSolverMultistepScheduler.from_config(
-            self.pipe.scheduler.config
-        )
-        self.scheduler_lora_sample = DPMSolverMultistepScheduler.from_config(
-            self.pipe_lora.scheduler.config
-        )
-
-        self.pipe.scheduler = self.scheduler
-        self.pipe_lora.scheduler = self.scheduler_lora
 
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
         self.set_min_max_steps()  # set to default value
@@ -217,7 +245,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         self.grad_clip_val: Optional[float] = None
 
-        threestudio.info(f"Loaded Stable Diffusion!")
+        threestudio.info(f"Loaded ControlNet!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -248,164 +276,38 @@ class StableDiffusionVSDGuidance(BaseModule):
     def vae_lora(self):
         return self.submodules.pipe_lora.vae
 
-    @torch.no_grad()
+    @property
+    def controlnet(self):
+        return self.submodules.pipe.controlnet
+
     @torch.cuda.amp.autocast(enabled=False)
-    def _sample(
+    def forward_controlnet(
         self,
-        pipe: StableDiffusionPipeline,
-        sample_scheduler: DPMSolverMultistepScheduler,
-        text_embeddings: Float[Tensor, "BB N Nf"],
-        num_inference_steps: int,
-        guidance_scale: float,
-        num_images_per_prompt: int = 1,
-        height: Optional[int] = None,
-        width: Optional[int] = None,
-        class_labels: Optional[Float[Tensor, "BB 16"]] = None,
-        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
-        generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
-    ) -> Float[Tensor, "B H W 3"]:
-        vae_scale_factor = 2 ** (len(pipe.vae.config.block_out_channels) - 1)
-        height = height or pipe.unet.config.sample_size * vae_scale_factor
-        width = width or pipe.unet.config.sample_size * vae_scale_factor
-        batch_size = text_embeddings.shape[0] // 2
-        device = self.device
-
-        sample_scheduler.set_timesteps(num_inference_steps, device=device)
-        timesteps = sample_scheduler.timesteps
-        num_channels_latents = pipe.unet.config.in_channels
-
-        latents = pipe.prepare_latents(
-            batch_size * num_images_per_prompt,
-            num_channels_latents,
-            height,
-            width,
-            self.weights_dtype,
-            device,
-            generator,
-        )
-
-        for i, t in enumerate(timesteps):
-            # expand the latents if we are doing classifier free guidance
-            latent_model_input = torch.cat([latents] * 2)
-            latent_model_input = sample_scheduler.scale_model_input(
-                latent_model_input, t
-            )
-
-            # predict the noise residual
-            if class_labels is None:
-                with self.disable_unet_class_embedding(pipe.unet) as unet:
-                    noise_pred = unet(
-                        latent_model_input,
-                        t,
-                        encoder_hidden_states=text_embeddings.to(self.weights_dtype),
-                        cross_attention_kwargs=cross_attention_kwargs,
-                    ).sample
-            else:
-                noise_pred = pipe.unet(
-                    latent_model_input,
-                    t,
-                    encoder_hidden_states=text_embeddings.to(self.weights_dtype),
-                    class_labels=class_labels,
-                    cross_attention_kwargs=cross_attention_kwargs,
-                ).sample
-
-            noise_pred_text, noise_pred_uncond = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (
-                noise_pred_text - noise_pred_uncond
-            )
-
-            # compute the previous noisy sample x_t -> x_t-1
-            latents = sample_scheduler.step(noise_pred, t, latents).prev_sample
-
-        latents = 1 / pipe.vae.config.scaling_factor * latents
-        images = pipe.vae.decode(latents).sample
-        images = (images / 2 + 0.5).clamp(0, 1)
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
-        images = images.permute(0, 2, 3, 1).float()
-        return images
-
-    def sample(
-        self,
-        prompt_utils: PromptProcessorOutput,
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-        seed: int = 0,
-        **kwargs,
-    ) -> Float[Tensor, "N H W 3"]:
-        # view-dependent text embeddings
-        text_embeddings_vd = prompt_utils.get_text_embeddings(
-            elevation,
-            azimuth,
-            camera_distances,
-            view_dependent_prompting=self.cfg.view_dependent_prompting,
-        )
-        cross_attention_kwargs = {"scale": 0.0} if self.single_model else None
-        generator = torch.Generator(device=self.device).manual_seed(seed)
-
-        return self._sample(
-            pipe=self.pipe,
-            sample_scheduler=self.scheduler_sample,
-            text_embeddings=text_embeddings_vd,
-            num_inference_steps=25,
-            guidance_scale=self.cfg.guidance_scale,
-            cross_attention_kwargs=cross_attention_kwargs,
-            generator=generator,
-        )
-
-    def sample_lora(
-        self,
-        prompt_utils: PromptProcessorOutput,
-        elevation: Float[Tensor, "B"],
-        azimuth: Float[Tensor, "B"],
-        camera_distances: Float[Tensor, "B"],
-        mvp_mtx: Float[Tensor, "B 4 4"],
-        c2w: Float[Tensor, "B 4 4"],
-        seed: int = 0,
-        **kwargs,
-    ) -> Float[Tensor, "N H W 3"]:
-        # input text embeddings, view-independent
-        text_embeddings = prompt_utils.get_text_embeddings(
-            elevation, azimuth, camera_distances, view_dependent_prompting=False
-        )
-
-        if self.cfg.camera_condition_type == "extrinsics":
-            camera_condition = c2w
-        elif self.cfg.camera_condition_type == "mvp":
-            camera_condition = mvp_mtx
-        else:
-            raise ValueError(
-                f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
-            )
-
-        B = elevation.shape[0]
-        camera_condition_cfg = torch.cat(
-            [
-                camera_condition.view(B, -1),
-                torch.zeros_like(camera_condition.view(B, -1)),
-            ],
-            dim=0,
-        )
-
-        generator = torch.Generator(device=self.device).manual_seed(seed)
-        return self._sample(
-            sample_scheduler=self.scheduler_lora_sample,
-            pipe=self.pipe_lora,
-            text_embeddings=text_embeddings,
-            num_inference_steps=25,
-            guidance_scale=self.cfg.guidance_scale_lora,
-            class_labels=camera_condition_cfg,
-            cross_attention_kwargs={"scale": 1.0},
-            generator=generator,
+        controlnet: ControlNetModel,
+        latents: Float[Tensor, "..."],
+        t: Float[Tensor, "..."],
+        image_cond: Float[Tensor, "..."],
+        condition_scale: float,
+        encoder_hidden_states: Float[Tensor, "..."],
+    ) -> Float[Tensor, "..."]:
+        return controlnet(
+            latents.to(self.weights_dtype),
+            t.to(self.weights_dtype),
+            encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
+            controlnet_cond=image_cond.to(self.weights_dtype),
+            conditioning_scale=condition_scale,
+            return_dict=False,
         )
 
     @torch.cuda.amp.autocast(enabled=False)
-    def forward_unet(
+    def forward_control_unet(
         self,
         unet: UNet2DConditionModel,
         latents: Float[Tensor, "..."],
         t: Float[Tensor, "..."],
         encoder_hidden_states: Float[Tensor, "..."],
+        down_block_additional_residuals,
+        mid_block_additional_residual,
         class_labels: Optional[Float[Tensor, "B 16"]] = None,
         cross_attention_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Float[Tensor, "..."]:
@@ -414,8 +316,10 @@ class StableDiffusionVSDGuidance(BaseModule):
             latents.to(self.weights_dtype),
             t.to(self.weights_dtype),
             encoder_hidden_states=encoder_hidden_states.to(self.weights_dtype),
-            class_labels=class_labels,
             cross_attention_kwargs=cross_attention_kwargs,
+            class_labels=class_labels,
+            down_block_additional_residuals=down_block_additional_residuals,
+            mid_block_additional_residual=mid_block_additional_residual,
         ).sample.to(input_dtype)
 
     @torch.cuda.amp.autocast(enabled=False)
@@ -426,6 +330,18 @@ class StableDiffusionVSDGuidance(BaseModule):
         imgs = imgs * 2.0 - 1.0
         posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
         latents = posterior.sample() * self.vae.config.scaling_factor
+        return latents.to(input_dtype)
+
+    @torch.cuda.amp.autocast(enabled=False)
+    def encode_cond_images(
+        self, imgs: Float[Tensor, "B 3 512 512"]
+    ) -> Float[Tensor, "B 4 64 64"]:
+        input_dtype = imgs.dtype
+        imgs = imgs * 2.0 - 1.0
+        posterior = self.vae.encode(imgs.to(self.weights_dtype)).latent_dist
+        latents = posterior.mode()
+        uncond_image_latents = torch.zeros_like(latents)
+        latents = torch.cat([latents, latents, uncond_image_latents], dim=0)
         return latents.to(input_dtype)
 
     @torch.cuda.amp.autocast(enabled=False)
@@ -444,14 +360,40 @@ class StableDiffusionVSDGuidance(BaseModule):
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
 
-    @contextmanager
-    def disable_unet_class_embedding(self, unet: UNet2DConditionModel):
-        class_embedding = unet.class_embedding
-        try:
-            unet.class_embedding = None
-            yield unet
-        finally:
-            unet.class_embedding = class_embedding
+    def prepare_image_cond(self, cond_rgb: Float[Tensor, "B H W C"]):
+        if self.cfg.control_type == "normal":
+            cond_rgb = (
+                (cond_rgb[0].detach().cpu().numpy() * 255).astype(np.uint8).copy()
+            )
+            detected_map = self.preprocessor(cond_rgb)
+            control = (
+                torch.from_numpy(np.array(detected_map)).float().to(self.device) / 255.0
+            )
+            control = control.unsqueeze(0)
+            control = control.permute(0, 3, 1, 2)
+        elif self.cfg.control_type == "canny":
+            cond_rgb = (
+                (cond_rgb[0].detach().cpu().numpy() * 255).astype(np.uint8).copy()
+            )
+            blurred_img = cv2.blur(cond_rgb, ksize=(5, 5))
+            detected_map = self.preprocessor(
+                blurred_img, self.cfg.canny_lower_bound, self.cfg.canny_upper_bound
+            )
+            control = (
+                torch.from_numpy(np.array(detected_map)).float().to(self.device) / 255.0
+            )
+            control = control.unsqueeze(-1).repeat(1, 1, 3)
+            control = control.unsqueeze(0)
+            control = control.permute(0, 3, 1, 2)
+        elif self.cfg.control_type == "input_normal":
+            cond_rgb[..., 0] = (
+                1 - cond_rgb[..., 0]
+            )  # Flip the sign on the x-axis to match bae system
+            control = cond_rgb.permute(0, 3, 1, 2)
+        else:
+            raise ValueError(f"Unknown control type: {self.cfg.control_type}")
+
+        return F.interpolate(control, (512, 512), mode="bilinear", align_corners=False)
 
     def compute_grad_vsd(
         self,
@@ -459,6 +401,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         text_embeddings_vd: Float[Tensor, "BB 77 768"],
         text_embeddings: Float[Tensor, "BB 77 768"],
         camera_condition: Float[Tensor, "B 4 4"],
+        image_cond: Float[Tensor, "B 3 512 512"],
     ):
         B = latents.shape[0]
 
@@ -471,29 +414,37 @@ class StableDiffusionVSDGuidance(BaseModule):
                 dtype=torch.long,
                 device=self.device,
             )
-
-            # add noise
             noise = torch.randn_like(latents)
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
-            with self.disable_unet_class_embedding(self.unet) as unet:
-                cross_attention_kwargs = {"scale": 0.0} if self.single_model else None
-                noise_pred_pretrain = self.forward_unet(
-                    unet,
-                    latent_model_input,
-                    torch.cat([t] * 2),
-                    encoder_hidden_states=text_embeddings_vd,
-                    cross_attention_kwargs=cross_attention_kwargs,
-                )
+            cross_attention_kwargs = {"scale": 0.0} if self.single_model else None
+            down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
+                self.controlnet,
+                latent_model_input,
+                t,
+                encoder_hidden_states=text_embeddings,
+                image_cond=image_cond,
+                condition_scale=self.cfg.condition_scale,
+            )
 
-            # use view-independent text embeddings in LoRA
+            noise_pred_pretrain = self.forward_control_unet(
+                self.unet,
+                latent_model_input,
+                t,
+                encoder_hidden_states=text_embeddings_vd,
+                down_block_additional_residuals=down_block_res_samples,
+                mid_block_additional_residual=mid_block_res_sample,
+                cross_attention_kwargs=cross_attention_kwargs,
+            )
+
             text_embeddings_cond, _ = text_embeddings.chunk(2)
-            noise_pred_est = self.forward_unet(
+            noise_pred_est = self.forward_control_unet(
                 self.unet_lora,
                 latent_model_input,
-                torch.cat([t] * 2),
+                t,
                 encoder_hidden_states=torch.cat([text_embeddings_cond] * 2),
+                cross_attention_kwargs={"scale": 1.0},
                 class_labels=torch.cat(
                     [
                         camera_condition.view(B, -1),
@@ -501,15 +452,16 @@ class StableDiffusionVSDGuidance(BaseModule):
                     ],
                     dim=0,
                 ),
-                cross_attention_kwargs={"scale": 1.0},
+                down_block_additional_residuals=down_block_res_samples,
+                mid_block_additional_residual=mid_block_res_sample,
             )
 
+        # perform classifier-free guidance
         (
             noise_pred_pretrain_text,
             noise_pred_pretrain_uncond,
         ) = noise_pred_pretrain.chunk(2)
 
-        # NOTE: guidance scale definition here is aligned with diffusers, but different from other guidance
         noise_pred_pretrain = noise_pred_pretrain_uncond + self.cfg.guidance_scale * (
             noise_pred_pretrain_text - noise_pred_pretrain_uncond
         )
@@ -532,7 +484,6 @@ class StableDiffusionVSDGuidance(BaseModule):
             noise_pred_est_uncond,
         ) = noise_pred_est.chunk(2)
 
-        # NOTE: guidance scale definition here is aligned with diffusers, but different from other guidance
         noise_pred_est = noise_pred_est_uncond + self.cfg.guidance_scale_lora * (
             noise_pred_est_camera - noise_pred_est_uncond
         )
@@ -540,29 +491,14 @@ class StableDiffusionVSDGuidance(BaseModule):
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
 
         grad = w * (noise_pred_pretrain - noise_pred_est)
-
-        alpha = (self.alphas[t] ** 0.5).view(-1, 1, 1, 1)
-        sigma = ((1 - self.alphas[t]) ** 0.5).view(-1, 1, 1, 1)
-        # image-space SDS proposed in HiFA: https://hifa-team.github.io/HiFA-site/
-        if self.cfg.use_img_loss:
-            latents_denoised_pretrain = (
-                latents_noisy - sigma * noise_pred_pretrain
-            ) / alpha
-            latents_denoised_est = (latents_noisy - sigma * noise_pred_est) / alpha
-            image_denoised_pretrain = self.decode_latents(latents_denoised_pretrain)
-            image_denoised_est = self.decode_latents(latents_denoised_est)
-            grad_img = (
-                w * (image_denoised_est - image_denoised_pretrain) * alpha / sigma
-            )
-        else:
-            grad_img = None
-        return grad, grad_img
+        return grad
 
     def train_lora(
         self,
         latents: Float[Tensor, "B 4 64 64"],
         text_embeddings: Float[Tensor, "BB 77 768"],
         camera_condition: Float[Tensor, "B 4 4"],
+        image_cond: Float[Tensor, "B 3 512 512"],
     ):
         B = latents.shape[0]
         latents = latents.detach().repeat(self.cfg.lora_n_timestamp_samples, 1, 1, 1)
@@ -587,40 +523,53 @@ class StableDiffusionVSDGuidance(BaseModule):
             )
         # use view-independent text embeddings in LoRA
         text_embeddings_cond, _ = text_embeddings.chunk(2)
-        if self.cfg.lora_cfg_training and random.random() < 0.1:
-            camera_condition = torch.zeros_like(camera_condition)
-        noise_pred = self.forward_unet(
+
+        down_block_res_samples, mid_block_res_sample = self.forward_controlnet(
+            self.controlnet,
+            noisy_latents,
+            t,
+            encoder_hidden_states=text_embeddings_cond.repeat(
+                self.cfg.lora_n_timestamp_samples, 1, 1
+            ),
+            image_cond=image_cond,
+            condition_scale=self.cfg.condition_scale,
+        )
+
+        noise_pred = self.forward_control_unet(
             self.unet_lora,
             noisy_latents,
             t,
             encoder_hidden_states=text_embeddings_cond.repeat(
                 self.cfg.lora_n_timestamp_samples, 1, 1
             ),
-            class_labels=camera_condition.view(B, -1).repeat(
-                self.cfg.lora_n_timestamp_samples, 1
-            ),
             cross_attention_kwargs={"scale": 1.0},
+            class_labels=torch.ones(B, 4, 4, device=noisy_latents.device)
+            .view(B, -1)
+            .repeat(self.cfg.lora_n_timestamp_samples, 1),
+            down_block_additional_residuals=down_block_res_samples,
+            mid_block_additional_residual=mid_block_res_sample,
         )
         return F.mse_loss(noise_pred.float(), target.float(), reduction="mean")
 
     def get_latents(
         self, rgb_BCHW: Float[Tensor, "B C H W"], rgb_as_latents=False
     ) -> Float[Tensor, "B 4 64 64"]:
-        rgb_BCHW_512 = F.interpolate(
-            rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-        )
         if rgb_as_latents:
             latents = F.interpolate(
                 rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
             )
         else:
+            rgb_BCHW_512 = F.interpolate(
+                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+            )
             # encode image into latents with vae
             latents = self.encode_images(rgb_BCHW_512)
-        return latents, rgb_BCHW_512
+        return latents
 
-    def forward(
+    def __call__(
         self,
         rgb: Float[Tensor, "B H W C"],
+        cond_rgb: Float[Tensor, "B H W C"],
         prompt_utils: PromptProcessorOutput,
         elevation: Float[Tensor, "B"],
         azimuth: Float[Tensor, "B"],
@@ -630,12 +579,13 @@ class StableDiffusionVSDGuidance(BaseModule):
         rgb_as_latents=False,
         **kwargs,
     ):
-        batch_size = rgb.shape[0]
+        batch_size, H, W, _ = rgb.shape
+        assert batch_size == 1  # Need enhancement
 
         rgb_BCHW = rgb.permute(0, 3, 1, 2)
-        latents, rgb_BCHW_512 = self.get_latents(
-            rgb_BCHW, rgb_as_latents=rgb_as_latents
-        )
+        latents = self.get_latents(rgb_BCHW, rgb_as_latents=rgb_as_latents)
+
+        image_cond = self.prepare_image_cond(cond_rgb)
 
         # view-dependent text embeddings
         text_embeddings_vd = prompt_utils.get_text_embeddings(
@@ -659,40 +609,37 @@ class StableDiffusionVSDGuidance(BaseModule):
                 f"Unknown camera_condition_type {self.cfg.camera_condition_type}"
             )
 
-        grad, grad_img = self.compute_grad_vsd(
-            latents, text_embeddings_vd, text_embeddings, camera_condition
-        )
-
-        grad = torch.nan_to_num(grad)
-        # clip grad for stable training?
-        if self.grad_clip_val is not None:
-            grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
-
-        # reparameterization trick
-        # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
-        target = (latents - grad).detach()
-        loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
-        loss_lora = self.train_lora(latents, text_embeddings, camera_condition)
-
-        loss_dict = {
-            "loss_vsd": loss_vsd,
-            "loss_lora": loss_lora,
-            "grad_norm": grad.norm(),
-            "min_step": self.min_step,
-            "max_step": self.max_step,
-        }
-
-        if self.cfg.use_img_loss:
-            grad_img = torch.nan_to_num(grad_img)
-            if self.grad_clip_val is not None:
-                grad_img = grad_img.clamp(-self.grad_clip_val, self.grad_clip_val)
-            target_img = (rgb_BCHW_512 - grad_img).detach()
-            loss_vsd_img = (
-                0.5 * F.mse_loss(rgb_BCHW_512, target_img, reduction="sum") / batch_size
+        if (
+            self.cfg.use_sds
+        ):  # did not change to vsd for backward compatibility in config files
+            grad = self.compute_grad_vsd(
+                latents,
+                text_embeddings_vd,
+                text_embeddings,
+                camera_condition,
+                image_cond,
             )
-            loss_dict["loss_vsd_img"] = loss_vsd_img
+            grad = torch.nan_to_num(grad)
+            if self.grad_clip_val is not None:
+                grad = grad.clamp(-self.grad_clip_val, self.grad_clip_val)
+            target = (latents - grad).detach()
+            loss_vsd = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
+            loss_lora = self.train_lora(
+                latents, text_embeddings, camera_condition, image_cond
+            )
+            return {
+                "loss_sds": loss_vsd,
+                "loss_lora": loss_lora,
+                "grad_norm": grad.norm(),
+                "min_step": self.min_step,
+                "max_step": self.max_step,
+            }
+        else:
+            edit_latents = self.edit_latents(text_embeddings, latents, image_cond, t)
+            edit_images = self.decode_latents(edit_latents)
+            edit_images = F.interpolate(edit_images, (H, W), mode="bilinear")
 
-        return loss_dict
+            return {"edit_images": edit_images.permute(0, 2, 3, 1)}
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in
@@ -701,23 +648,7 @@ class StableDiffusionVSDGuidance(BaseModule):
         if self.cfg.grad_clip is not None:
             self.grad_clip_val = C(self.cfg.grad_clip, epoch, global_step)
 
-        if self.cfg.sqrt_anneal:
-            percentage = (
-                float(global_step) / self.cfg.trainer_max_steps
-            ) ** 0.5  # progress percentage
-            if type(self.cfg.max_step_percent) not in [float, int]:
-                max_step_percent = self.cfg.max_step_percent[1]
-            else:
-                max_step_percent = self.cfg.max_step_percent
-            curr_percent = (
-                max_step_percent - C(self.cfg.min_step_percent, epoch, global_step)
-            ) * (1 - percentage) + C(self.cfg.min_step_percent, epoch, global_step)
-            self.set_min_max_steps(
-                min_step_percent=curr_percent,
-                max_step_percent=curr_percent,
-            )
-        else:
-            self.set_min_max_steps(
-                min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
-                max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
-            )
+        self.set_min_max_steps(
+            min_step_percent=C(self.cfg.min_step_percent, epoch, global_step),
+            max_step_percent=C(self.cfg.max_step_percent, epoch, global_step),
+        )
